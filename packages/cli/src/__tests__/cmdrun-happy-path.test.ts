@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { HISTORY_SCHEMA_VERSION } from "../history.js";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -262,9 +263,10 @@ describe("cmdRun happy-path pipeline", () => {
 
       const historyPath = join(historyDir, "history.json");
       expect(existsSync(historyPath)).toBe(true);
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      expect(records.length).toBeGreaterThanOrEqual(1);
-      const record = records[records.length - 1];
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records.length).toBeGreaterThanOrEqual(1);
+      const record = data.records[data.records.length - 1];
       expect(record.agent).toBe("claude");
       expect(record.cloud).toBe("sprite");
       expect(record.timestamp).toBeDefined();
@@ -279,8 +281,8 @@ describe("cmdRun happy-path pipeline", () => {
       await cmdRun("claude", "sprite", "Fix all bugs");
 
       const historyPath = join(historyDir, "history.json");
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      const record = records[records.length - 1];
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      const record = data.records[data.records.length - 1];
       expect(record.prompt).toBe("Fix all bugs");
     });
 
@@ -293,8 +295,8 @@ describe("cmdRun happy-path pipeline", () => {
       await cmdRun("claude", "sprite");
 
       const historyPath = join(historyDir, "history.json");
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      const record = records[records.length - 1];
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      const record = data.records[data.records.length - 1];
       expect(record.prompt).toBeUndefined();
     });
 
@@ -309,8 +311,8 @@ describe("cmdRun happy-path pipeline", () => {
       const after = new Date().toISOString();
 
       const historyPath = join(historyDir, "history.json");
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      const record = records[records.length - 1];
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      const record = data.records[data.records.length - 1];
       expect(record.timestamp >= before).toBe(true);
       expect(record.timestamp <= after).toBe(true);
     });
@@ -331,9 +333,9 @@ describe("cmdRun happy-path pipeline", () => {
 
       const historyPath = join(historyDir, "history.json");
       expect(existsSync(historyPath)).toBe(true);
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      expect(records.length).toBeGreaterThanOrEqual(1);
-      expect(records[records.length - 1].agent).toBe("claude");
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      expect(data.records.length).toBeGreaterThanOrEqual(1);
+      expect(data.records[data.records.length - 1].agent).toBe("claude");
     });
 
     it("should still execute script when history save fails", async () => {
@@ -381,10 +383,10 @@ describe("cmdRun happy-path pipeline", () => {
       await cmdRun("claude", "sprite");
 
       const historyPath = join(historyDir, "history.json");
-      const records = JSON.parse(readFileSync(historyPath, "utf-8"));
-      expect(records).toHaveLength(2);
-      expect(records[0].agent).toBe("codex");
-      expect(records[1].agent).toBe("claude");
+      const data = JSON.parse(readFileSync(historyPath, "utf-8"));
+      expect(data.records).toHaveLength(2);
+      expect(data.records[0].agent).toBe("codex");
+      expect(data.records[1].agent).toBe("claude");
     });
   });
 

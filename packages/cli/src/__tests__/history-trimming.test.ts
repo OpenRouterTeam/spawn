@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { filterHistory, loadHistory, saveSpawnRecord } from "../history.js";
+import { filterHistory, HISTORY_SCHEMA_VERSION, loadHistory, saveSpawnRecord } from "../history.js";
 
 /**
  * Tests for history trimming and boundary behavior.
@@ -849,12 +849,13 @@ describe("History Trimming and Boundaries", () => {
         timestamp: "2026-01-02T00:00:00.000Z",
       });
 
-      // Read raw file and verify it's valid JSON
+      // Read raw file and verify it's valid v1 JSON
       const raw = readFileSync(join(testDir, "history.json"), "utf-8");
       expect(() => JSON.parse(raw)).not.toThrow();
       const parsed = JSON.parse(raw);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed).toHaveLength(100);
+      expect(parsed.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(Array.isArray(parsed.records)).toBe(true);
+      expect(parsed.records).toHaveLength(100);
     });
 
     it("should write pretty-printed JSON with trailing newline after trimming", () => {
