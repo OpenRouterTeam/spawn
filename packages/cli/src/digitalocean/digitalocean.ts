@@ -234,15 +234,7 @@ function generateCsrfState(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function isOAuthConfigured(): boolean {
-  return true;
-}
-
 async function tryRefreshDoToken(): Promise<string | null> {
-  if (!isOAuthConfigured()) {
-    return null;
-  }
-
   const refreshToken = loadRefreshToken();
   if (!refreshToken) {
     return null;
@@ -291,10 +283,6 @@ async function tryRefreshDoToken(): Promise<string | null> {
 }
 
 async function tryDoOAuth(): Promise<string | null> {
-  if (!isOAuthConfigured()) {
-    return null;
-  }
-
   logStep("Attempting DigitalOcean OAuth authentication...");
 
   // Check connectivity to DigitalOcean
