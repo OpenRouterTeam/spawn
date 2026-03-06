@@ -5,6 +5,7 @@ import type { VMConnection } from "../history.js";
 import { getHistoryPath } from "../history.js";
 import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "../security.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
+import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { getErrorMessage } from "./shared.js";
 
 /** Execute a shell command and resolve/reject on process close/error */
@@ -83,11 +84,13 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
   const sshCmd = `ssh ${connection.user}@${connection.ip}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   return runInteractiveCommand(
     "ssh",
     [
       ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
       `${connection.user}@${connection.ip}`,
     ],
     "SSH connection failed",
@@ -192,10 +195,12 @@ export async function cmdEnterAgent(
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
   const escapedRemoteCmd = remoteCmd.replace(/'/g, "'\\''");
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   return runInteractiveCommand(
     "ssh",
     [
       ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
       `${connection.user}@${connection.ip}`,
       "--",
       `bash -lc '${escapedRemoteCmd}'`,
