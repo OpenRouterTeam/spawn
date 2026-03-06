@@ -740,29 +740,16 @@ export async function promptDoRegion(): Promise<string> {
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
-function getCloudInitUserdata(tier: CloudInitTier = "full", agentName?: string): string {
+function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
     "set -e",
     "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -y",
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
-
-  if (agentName) {
-    // Install Docker FIRST (uses apt internally), then start image pull in background.
-    // The pull runs in parallel with the remaining apt-get/node/bun installs below.
-    if (!/^[a-z0-9-]+$/.test(agentName)) {
-      throw new Error(`Invalid agent name: ${agentName}`);
-    }
-    lines.push(
-      "curl -fsSL https://get.docker.com | sh",
-      `nohup docker pull "ghcr.io/openrouterteam/spawn-${agentName}:latest" > /tmp/docker-pull.log 2>&1 &`,
-    );
-  }
-
-  // Install remaining packages (runs in parallel with docker pull above)
-  lines.push("apt-get update -y", `apt-get install -y --no-install-recommends ${packages.join(" ")}`);
   if (needsNode(tier)) {
     lines.push(`${NODE_INSTALL_CMD} || true`);
   }
@@ -784,7 +771,6 @@ export async function createServer(
   tier?: CloudInitTier,
   dropletSize?: string,
   region?: string,
-  agentName?: string,
 ): Promise<void> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
@@ -811,7 +797,7 @@ export async function createServer(
     size,
     image,
     ssh_keys: sshKeyIds,
-    user_data: getCloudInitUserdata(tier, agentName),
+    user_data: getCloudInitUserdata(tier),
     backups: false,
     monitoring: false,
   });

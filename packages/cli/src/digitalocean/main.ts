@@ -57,7 +57,7 @@ async function main() {
     },
     async createServer(name: string, spawnId?: string) {
       process.env.SPAWN_ID = spawnId || "";
-      await createDroplet(name, agent.cloudInitTier, dropletSize, region, agent.slowInstall ? agentName : undefined);
+      await createDroplet(name, agent.cloudInitTier, dropletSize, region);
     },
     getServerName,
     async waitForReady() {
