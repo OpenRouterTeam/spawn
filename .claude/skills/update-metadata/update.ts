@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -59,20 +59,24 @@ const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf-8"));
 const agents: Record<string, AgentEntry> = manifest.agents;
 const clouds: Record<string, CloudEntry> = manifest.clouds;
 
-const agentSources: Record<string, SourceEntry> = existsSync(
-  AGENT_SOURCES_PATH
-)
+const agentSources: Record<string, SourceEntry> = existsSync(AGENT_SOURCES_PATH)
   ? JSON.parse(readFileSync(AGENT_SOURCES_PATH, "utf-8"))
   : {};
 
-const cloudSources: Record<string, SourceEntry> = existsSync(
-  CLOUD_SOURCES_PATH
-)
+const cloudSources: Record<string, SourceEntry> = existsSync(CLOUD_SOURCES_PATH)
   ? JSON.parse(readFileSync(CLOUD_SOURCES_PATH, "utf-8"))
   : {};
 
-const agentIds = onlyAgent ? [onlyAgent] : Object.keys(agents);
-const cloudIds = onlyCloud ? [onlyCloud] : Object.keys(clouds);
+const agentIds = onlyAgent
+  ? [
+      onlyAgent,
+    ]
+  : Object.keys(agents);
+const cloudIds = onlyCloud
+  ? [
+      onlyCloud,
+    ]
+  : Object.keys(clouds);
 const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
 const EXT_MAP: Record<string, string> = {
@@ -103,9 +107,15 @@ const AGENT_METADATA_FIELDS = [
 async function validateSources(
   label: string,
   ids: string[],
-  entries: Record<string, { icon?: string; [k: string]: unknown }>,
+  entries: Record<
+    string,
+    {
+      icon?: string;
+      [k: string]: unknown;
+    }
+  >,
   sources: Record<string, SourceEntry>,
-  assetDir: string
+  assetDir: string,
 ) {
   console.log(`── Validating ${label} source URLs ──`);
   for (const id of ids) {
@@ -120,20 +130,17 @@ async function validateSources(
       continue;
     }
     try {
-      const res = await fetch(src.url, { method: "HEAD" });
+      const res = await fetch(src.url, {
+        method: "HEAD",
+      });
       if (!res.ok) {
-        console.log(
-          `  ✗  ${id}: BROKEN source URL (HTTP ${res.status}) → ${src.url}`
-        );
+        console.log(`  ✗  ${id}: BROKEN source URL (HTTP ${res.status}) → ${src.url}`);
         hasErrors = true;
       } else {
-        const contentType =
-          res.headers.get("content-type")?.split(";")[0] ?? "";
+        const contentType = res.headers.get("content-type")?.split(";")[0] ?? "";
         const isImage = contentType.startsWith("image/");
         if (!isImage) {
-          console.log(
-            `  ⚠  ${id}: source URL returns ${contentType}, not an image → ${src.url}`
-          );
+          console.log(`  ⚠  ${id}: source URL returns ${contentType}, not an image → ${src.url}`);
         } else {
           console.log(`  ✓  ${id}: OK (${contentType})`);
         }
@@ -150,9 +157,15 @@ async function validateSources(
 async function refreshIconsFor(
   label: string,
   ids: string[],
-  entries: Record<string, { icon?: string; [k: string]: unknown }>,
+  entries: Record<
+    string,
+    {
+      icon?: string;
+      [k: string]: unknown;
+    }
+  >,
   sources: Record<string, SourceEntry>,
-  assetDir: string
+  assetDir: string,
 ) {
   console.log(`── Refreshing ${label} icons ──`);
   for (const id of ids) {
@@ -167,24 +180,19 @@ async function refreshIconsFor(
         console.log(`  ⚠  ${id}: icon fetch failed (HTTP ${res.status})`);
         continue;
       }
-      const contentType =
-        res.headers.get("content-type")?.split(";")[0] ?? "";
+      const contentType = res.headers.get("content-type")?.split(";")[0] ?? "";
       const ext = EXT_MAP[contentType] ?? src.ext;
       const outPath = resolve(ROOT, `${assetDir}/${id}.${ext}`);
       const rawUrl = `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/${assetDir}/${id}.${ext}`;
 
       if (dryRun) {
-        console.log(
-          `  [dry-run] ${id}: would download ${src.url} → ${outPath}`
-        );
+        console.log(`  [dry-run] ${id}: would download ${src.url} → ${outPath}`);
       } else {
         const buf = Buffer.from(await res.arrayBuffer());
         writeFileSync(outPath, buf);
         entries[id].icon = rawUrl;
         sources[id].ext = ext;
-        console.log(
-          `  ✓  ${id}: icon refreshed (${buf.length} bytes, .${ext})`
-        );
+        console.log(`  ✓  ${id}: icon refreshed (${buf.length} bytes, .${ext})`);
       }
     } catch (err) {
       console.log(`  ⚠  ${id}: icon fetch error: ${err}`);
@@ -218,7 +226,10 @@ async function refreshAgentStats() {
           "--jq",
           "{stargazers_count, license: .license.spdx_id, language}",
         ],
-        { stdout: "pipe", stderr: "pipe" }
+        {
+          stdout: "pipe",
+          stderr: "pipe",
+        },
       );
       const out = await new Response(proc.stdout).text();
       const exitCode = await proc.exited;
@@ -231,22 +242,22 @@ async function refreshAgentStats() {
       const oldStars = agent.github_stars;
 
       if (dryRun) {
-        console.log(
-          `  [dry-run] ${id}: stars ${oldStars ?? "?"} → ${data.stargazers_count}`
-        );
-        if (data.license && data.license !== agent.license)
-          console.log(
-            `  [dry-run] ${id}: license ${agent.license ?? "?"} → ${data.license}`
-          );
-        if (data.language && data.language !== agent.language)
-          console.log(
-            `  [dry-run] ${id}: language ${agent.language ?? "?"} → ${data.language}`
-          );
+        console.log(`  [dry-run] ${id}: stars ${oldStars ?? "?"} → ${data.stargazers_count}`);
+        if (data.license && data.license !== agent.license) {
+          console.log(`  [dry-run] ${id}: license ${agent.license ?? "?"} → ${data.license}`);
+        }
+        if (data.language && data.language !== agent.language) {
+          console.log(`  [dry-run] ${id}: language ${agent.language ?? "?"} → ${data.language}`);
+        }
       } else {
         agent.github_stars = data.stargazers_count;
         agent.stars_updated = today;
-        if (data.license) agent.license = data.license;
-        if (data.language) agent.language = data.language;
+        if (data.license) {
+          agent.license = data.license;
+        }
+        if (data.language) {
+          agent.language = data.language;
+        }
         const delta =
           oldStars != null
             ? ` (${data.stargazers_count - oldStars >= 0 ? "+" : ""}${data.stargazers_count - oldStars})`
@@ -289,31 +300,29 @@ function validateCloudIcons() {
 // ── Main ────────────────────────────────────────────────────────────
 
 async function main() {
-  const scope = cloudsOnly
-    ? "clouds"
-    : agentsOnly
-      ? "agents"
-      : "agents + clouds";
-  const mode = validateOnly
-    ? "validate"
-    : dryRun
-      ? "dry-run"
-      : "update";
-  console.log(`${mode === "validate" ? "Validating" : "Updating"} metadata for ${scope}${mode === "dry-run" ? " [dry-run]" : ""}...\n`);
+  const scope = cloudsOnly ? "clouds" : agentsOnly ? "agents" : "agents + clouds";
+  const mode = validateOnly ? "validate" : dryRun ? "dry-run" : "update";
+  console.log(
+    `${mode === "validate" ? "Validating" : "Updating"} metadata for ${scope}${mode === "dry-run" ? " [dry-run]" : ""}...\n`,
+  );
 
   if (validateOnly) {
     // Validate-only: HEAD-check all source URLs, report broken ones
-    if (!cloudsOnly)
+    if (!cloudsOnly) {
       await validateSources("agent", agentIds, agents, agentSources, "assets/agents");
-    if (!agentsOnly)
+    }
+    if (!agentsOnly) {
       await validateSources("cloud", cloudIds, clouds, cloudSources, "assets/clouds");
-    if (!cloudsOnly) validateAgentMetadata();
-    if (!agentsOnly) validateCloudIcons();
+    }
+    if (!cloudsOnly) {
+      validateAgentMetadata();
+    }
+    if (!agentsOnly) {
+      validateCloudIcons();
+    }
 
     if (hasErrors) {
-      console.log(
-        "\n✗  Validation failed — fix broken source URLs in .sources.json files"
-      );
+      console.log("\n✗  Validation failed — fix broken source URLs in .sources.json files");
       process.exit(1);
     } else {
       console.log("\n✓  All source URLs valid");
@@ -323,24 +332,12 @@ async function main() {
 
   // Agent icons
   if (!cloudsOnly && !statsOnly) {
-    await refreshIconsFor(
-      "agent",
-      agentIds,
-      agents,
-      agentSources,
-      "assets/agents"
-    );
+    await refreshIconsFor("agent", agentIds, agents, agentSources, "assets/agents");
   }
 
   // Cloud icons
   if (!agentsOnly && !statsOnly) {
-    await refreshIconsFor(
-      "cloud",
-      cloudIds,
-      clouds,
-      cloudSources,
-      "assets/clouds"
-    );
+    await refreshIconsFor("cloud", cloudIds, clouds, cloudSources, "assets/clouds");
   }
 
   // Agent GitHub stats
@@ -349,25 +346,17 @@ async function main() {
   }
 
   // Validation
-  if (!cloudsOnly) validateAgentMetadata();
-  if (!agentsOnly) validateCloudIcons();
+  if (!cloudsOnly) {
+    validateAgentMetadata();
+  }
+  if (!agentsOnly) {
+    validateCloudIcons();
+  }
 
   if (!dryRun) {
-    writeFileSync(
-      MANIFEST_PATH,
-      JSON.stringify(manifest, null, 2) + "\n",
-      "utf-8"
-    );
-    writeFileSync(
-      AGENT_SOURCES_PATH,
-      JSON.stringify(agentSources, null, 2) + "\n",
-      "utf-8"
-    );
-    writeFileSync(
-      CLOUD_SOURCES_PATH,
-      JSON.stringify(cloudSources, null, 2) + "\n",
-      "utf-8"
-    );
+    writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+    writeFileSync(AGENT_SOURCES_PATH, JSON.stringify(agentSources, null, 2) + "\n", "utf-8");
+    writeFileSync(CLOUD_SOURCES_PATH, JSON.stringify(cloudSources, null, 2) + "\n", "utf-8");
     console.log("\n✓  manifest.json and .sources.json files updated");
   }
 }

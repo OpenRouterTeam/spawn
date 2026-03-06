@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-import { mockClackPrompts } from "./test-helpers";
 import type { SpawnRecord } from "../history.js";
-import { clearHistory, loadHistory, saveSpawnRecord, filterHistory, getHistoryPath } from "../history.js";
+
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { clearHistory, filterHistory, getHistoryPath, loadHistory, saveSpawnRecord } from "../history.js";
+import { mockClackPrompts } from "./test-helpers";
 
 /**
  * Tests for clearHistory (history.ts) and cmdListClear (commands/list.ts).

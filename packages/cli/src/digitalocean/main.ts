@@ -1,24 +1,26 @@
 #!/usr/bin/env bun
+
 // digitalocean/main.ts — Orchestrator: deploys an agent on DigitalOcean
 
-import {
-  ensureDoToken,
-  ensureSshKey,
-  promptSpawnName,
-  promptDropletSize,
-  promptDoRegion,
-  createServer as createDroplet,
-  getServerName,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./digitalocean";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
 import { logStep } from "../shared/ui";
+import { agents, resolveAgent } from "./agents";
+import {
+  createServer as createDroplet,
+  ensureDoToken,
+  ensureSshKey,
+  getServerName,
+  interactiveSession,
+  promptDoRegion,
+  promptDropletSize,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./digitalocean";
 
 async function main() {
   const agentName = process.argv[2];
@@ -53,7 +55,8 @@ async function main() {
       dropletSize = await promptDropletSize();
       region = await promptDoRegion();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createDroplet(name, agent.cloudInitTier, dropletSize, region, agent.slowInstall ? agentName : undefined);
     },
     getServerName,
@@ -61,7 +64,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

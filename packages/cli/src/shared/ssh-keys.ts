@@ -3,8 +3,8 @@
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { logInfo, logStep } from "./ui";
 import { multiPickToTTY } from "../picker";
+import { logInfo, logStep } from "./ui";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

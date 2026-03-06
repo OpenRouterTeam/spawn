@@ -1,30 +1,30 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
-import { mkdirSync, readFileSync } from "node:fs";
+import type { CloudInitTier } from "../shared/agents";
 
+import { mkdirSync, readFileSync } from "node:fs";
+import { saveVmConnection } from "../history.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
+import { parseJsonObj } from "../shared/parse";
+import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
+import { isString } from "../shared/type-guards";
 import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  logStepInline,
-  logStepDone,
-  prompt,
-  jsonEscape,
-  getSpawnCloudConfigPath,
-  loadApiToken,
-  validateServerName,
-  toKebabCase,
   defaultSpawnName,
+  getSpawnCloudConfigPath,
+  jsonEscape,
+  loadApiToken,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  prompt,
   sanitizeTermValue,
   selectFromList,
+  toKebabCase,
+  validateServerName,
 } from "../shared/ui";
-import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonObj } from "../shared/parse";
-import { isString } from "../shared/type-guards";
-import { saveVmConnection } from "../history.js";
-import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -354,7 +354,16 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   // Set up SSH access
   await setupSshAccess();
 
-  saveVmConnection("daytona-sandbox", "daytona", sandboxId, name, "daytona");
+  saveVmConnection(
+    "daytona-sandbox",
+    "daytona",
+    sandboxId,
+    name,
+    "daytona",
+    undefined,
+    undefined,
+    process.env.SPAWN_ID || undefined,
+  );
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────

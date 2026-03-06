@@ -1,23 +1,24 @@
+import type { SpawnRecord } from "../history.js";
+import type { Manifest } from "../manifest.js";
+
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import type { Manifest } from "../manifest.js";
-import { loadManifest } from "../manifest.js";
-import type { SpawnRecord } from "../history.js";
-import { getActiveServers, markRecordDeleted, getHistoryPath } from "../history.js";
-import { validateServerIdentifier, validateMetadataValue } from "../security.js";
-import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "../hetzner/hetzner.js";
+import { authenticate as awsAuthenticate, destroyServer as awsDestroyServer, ensureAwsCli } from "../aws/aws.js";
+import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "../daytona/daytona.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
 import {
+  authenticate as gcpAuthenticate,
   destroyInstance as gcpDestroyInstance,
   ensureGcloudCli as gcpEnsureGcloudCli,
-  authenticate as gcpAuthenticate,
   resolveProject as gcpResolveProject,
 } from "../gcp/gcp.js";
-import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "../aws/aws.js";
-import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "../daytona/daytona.js";
-import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "../sprite/sprite.js";
+import { ensureHcloudToken, destroyServer as hetznerDestroyServer } from "../hetzner/hetzner.js";
+import { getActiveServers, getHistoryPath, markRecordDeleted } from "../history.js";
+import { loadManifest } from "../manifest.js";
+import { validateMetadataValue, validateServerIdentifier } from "../security.js";
+import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
+import { activeServerPicker, resolveListFilters } from "./list.js";
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";
-import { resolveListFilters, activeServerPicker } from "./list.js";
 
 /**
  * Ensure credentials are available for a record's cloud provider.

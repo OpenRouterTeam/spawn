@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test";
-import { KNOWN_FLAGS, findUnknownFlag, expandEqualsFlags } from "../flags";
+import { describe, expect, it } from "bun:test";
+import { expandEqualsFlags, findUnknownFlag, KNOWN_FLAGS } from "../flags";
 
 /**
  * Tests for unknown flag detection and flag expansion in CLI argument parsing.

@@ -23,9 +23,9 @@
  * - Subprocesses (execSync, spawnSync) inherit the sandboxed environment
  */
 
-import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // ── Stray test file cleanup ──────────────────────────────────────────────────
 //

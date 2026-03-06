@@ -1,23 +1,24 @@
 // SPA (Spawn's Personal Agent) — Slack bot entry point.
 // Pipes Slack threads into Claude Code sessions and streams responses back.
 
-import type { SectionBlock, ContextBlock, KnownBlock } from "@slack/bolt";
+import type { ContextBlock, KnownBlock, SectionBlock } from "@slack/bolt";
+import type { State, ToolCall } from "./helpers";
+
+import { isString, toRecord } from "@openrouter/spawn-shared";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
-import { toRecord, isString } from "@openrouter/spawn-shared";
-import type { State, ToolCall } from "./helpers";
 import {
-  ResultSchema,
-  loadState,
-  saveState,
-  findMapping,
   addMapping,
-  parseStreamEvent,
-  stripMention,
   downloadSlackFile,
-  runCleanupIfDue,
-  formatToolStats,
+  findMapping,
   formatToolHistory,
+  formatToolStats,
+  loadState,
+  parseStreamEvent,
+  ResultSchema,
+  runCleanupIfDue,
+  saveState,
+  stripMention,
 } from "./helpers";
 
 type SlackClient = InstanceType<typeof App>["client"];

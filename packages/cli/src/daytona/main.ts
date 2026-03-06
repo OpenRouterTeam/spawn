@@ -1,22 +1,24 @@
 #!/usr/bin/env bun
+
 // daytona/main.ts — Orchestrator: deploys an agent on Daytona
 
-import {
-  ensureDaytonaToken,
-  promptSpawnName,
-  promptSandboxSize,
-  getServerName,
-  createServer as createDaytonaServer,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./daytona";
+import type { CloudOrchestrator } from "../shared/orchestrate";
 import type { SandboxSize } from "./daytona";
-import { agents, resolveAgent } from "./agents";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  createServer as createDaytonaServer,
+  ensureDaytonaToken,
+  getServerName,
+  interactiveSession,
+  promptSandboxSize,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./daytona";
 
 async function main() {
   const agentName = process.argv[2];
@@ -44,7 +46,8 @@ async function main() {
     async promptSize() {
       sandboxSize = await promptSandboxSize();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createDaytonaServer(name, sandboxSize);
     },
     getServerName,
@@ -52,7 +55,7 @@ async function main() {
       await waitForCloudInit(agent.cloudInitTier);
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

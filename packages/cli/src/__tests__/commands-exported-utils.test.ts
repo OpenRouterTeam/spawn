@@ -1,16 +1,16 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
-  parseAuthEnvVars,
+  calculateColumnWidth,
+  formatRelativeTime,
+  getErrorMessage,
   getImplementedAgents,
   getImplementedClouds,
   getMissingClouds,
-  getErrorMessage,
   getStatusDescription,
-  calculateColumnWidth,
   getTerminalWidth,
-  formatRelativeTime,
+  parseAuthEnvVars,
 } from "../commands";
-import { createMockManifest, createEmptyManifest } from "./test-helpers";
+import { createEmptyManifest, createMockManifest } from "./test-helpers";
 
 /**
  * Tests for exported utility functions in commands/ that lacked

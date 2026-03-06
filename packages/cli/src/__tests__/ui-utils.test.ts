@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 const { validateServerName, validateRegionName, validateModelId, toKebabCase, sanitizeTermValue, jsonEscape } =
   await import("../shared/ui.js");

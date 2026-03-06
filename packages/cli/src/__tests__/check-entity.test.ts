@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { checkEntity } from "../commands";
 import type { Manifest } from "../manifest";
+
+import { beforeEach, describe, expect, it } from "bun:test";
+import { checkEntity } from "../commands";
 
 /**
  * Tests for checkEntity (commands/shared.ts).

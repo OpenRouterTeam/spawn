@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import { SPAWN_CDN, REPO } from "../manifest.js";
+import { REPO, SPAWN_CDN } from "../manifest.js";
 
 function getHelpUsageSection(): string {
   return `${pc.bold("USAGE")}

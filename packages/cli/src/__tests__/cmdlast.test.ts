@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import type { SpawnRecord } from "../history";
+
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
  * Tests for cmdLast — the feature added in PR #1171 that reruns the most recent spawn.

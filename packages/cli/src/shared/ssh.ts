@@ -1,8 +1,8 @@
 // shared/ssh.ts — Shared SSH wait utility with TCP pre-check and stderr capture
 
-import { logInfo, logStep, logStepInline, logStepDone, logError } from "./ui";
-import { connect } from "node:net";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { connect } from "node:net";
+import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
 

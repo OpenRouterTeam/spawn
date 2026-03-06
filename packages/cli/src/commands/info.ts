@@ -1,19 +1,20 @@
-import pc from "picocolors";
 import type { Manifest } from "../manifest.js";
-import { agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest.js";
+
+import pc from "picocolors";
+import { agentKeys, cloudKeys, countImplemented, matrixStatus } from "../manifest.js";
 import {
-  NAME_COLUMN_WIDTH,
-  loadManifestWithSpinner,
-  getImplementedClouds,
   getImplementedAgents,
+  getImplementedClouds,
+  groupByType,
   hasCloudCredentials,
+  loadManifestWithSpinner,
+  NAME_COLUMN_WIDTH,
   parseAuthEnvVars,
+  printGroupedList,
+  printInfoHeader,
+  printQuickStart,
   prioritizeCloudsByCredentials,
   validateAndGetEntity,
-  printInfoHeader,
-  groupByType,
-  printGroupedList,
-  printQuickStart,
 } from "./shared.js";
 
 // ── Matrix display ───────────────────────────────────────────────────────────

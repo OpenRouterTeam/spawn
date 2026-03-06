@@ -1,8 +1,9 @@
-import { spyOn, mock } from "bun:test";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import type { Manifest } from "../manifest";
+
+import { mock, spyOn } from "bun:test";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
 

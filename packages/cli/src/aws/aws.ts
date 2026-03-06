@@ -1,39 +1,39 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import * as v from "valibot";
+import { saveVmConnection } from "../history.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
+import { parseJsonWith } from "../shared/parse";
 import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  logStepInline,
-  logStepDone,
-  prompt,
-  selectFromList,
-  getSpawnCloudConfigPath,
-  validateServerName,
-  validateRegionName,
-  toKebabCase,
-  defaultSpawnName,
-  sanitizeTermValue,
-  jsonEscape,
-} from "../shared/ui";
-import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import {
+  killWithTimeout,
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
-  sleep,
   waitForSsh as sharedWaitForSsh,
-  killWithTimeout,
+  sleep,
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
-import * as v from "valibot";
-import { parseJsonWith } from "../shared/parse";
-import { saveVmConnection } from "../history.js";
+import {
+  defaultSpawnName,
+  getSpawnCloudConfigPath,
+  jsonEscape,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  prompt,
+  sanitizeTermValue,
+  selectFromList,
+  toKebabCase,
+  validateRegionName,
+  validateServerName,
+} from "../shared/ui";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -956,7 +956,16 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
       logInfo(`Instance running: IP=${instanceIp}`);
 
       // Save connection info
-      saveVmConnection(instanceIp, SSH_USER, "", instanceName, "aws");
+      saveVmConnection(
+        instanceIp,
+        SSH_USER,
+        "",
+        instanceName,
+        "aws",
+        undefined,
+        undefined,
+        process.env.SPAWN_ID || undefined,
+      );
       return;
     }
 

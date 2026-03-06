@@ -12,9 +12,7 @@
         "type": "local"
       }
     ],
-    "features": [
-      "droplet_agent"
-    ],
+    "features": ["droplet_agent"],
     "id": 550842125,
     "image": {
       "created_at": "2025-08-08T15:11:27Z",
@@ -59,14 +57,7 @@
     "next_backup_window": null,
     "region": {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "New York 3",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -248,20 +239,7 @@
       "networking_throughput": 2000,
       "price_hourly": 0.00595,
       "price_monthly": 4,
-      "regions": [
-        "ams3",
-        "blr1",
-        "fra1",
-        "lon1",
-        "nyc1",
-        "nyc2",
-        "nyc3",
-        "sfo2",
-        "sfo3",
-        "sgp1",
-        "syd1",
-        "tor1"
-      ],
+      "regions": ["ams3", "blr1", "fra1", "lon1", "nyc1", "nyc2", "nyc3", "sfo2", "sfo3", "sgp1", "syd1", "tor1"],
       "slug": "s-1vcpu-512mb-10gb",
       "transfer": 0.5,
       "vcpus": 1

@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { unlinkSync, existsSync, readFileSync } from "node:fs";
-
-import { BUNDLES, DEFAULT_BUNDLE, loadCredsFromConfig, saveCredsToConfig, getAwsConfigPath } from "../aws/aws";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { BUNDLES, DEFAULT_BUNDLE, getAwsConfigPath, loadCredsFromConfig, saveCredsToConfig } from "../aws/aws";
 
 // ─── Credential caching tests ────────────────────────────────────────────────
 

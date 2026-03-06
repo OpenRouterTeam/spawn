@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { Manifest } from "../manifest";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import type { TestEnvironment } from "./test-helpers";
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { agentKeys, cloudKeys, countImplemented, loadManifest, matrixStatus } from "../manifest";
 import {
-  createMockManifest,
   createEmptyManifest,
+  createMockManifest,
   mockSuccessfulFetch,
   setupTestEnvironment,
   teardownTestEnvironment,

@@ -10,7 +10,7 @@
  * bleed into with-retry-result.test.ts which tests the real wrapSshCall.
  */
 
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { isNumber } from "../shared/type-guards.js";
 
 // ── Mock only oauth (needed to avoid interactive prompts) ─────────────
@@ -26,8 +26,9 @@ mock.module("../shared/oauth", () => ({
 // ── Import the real module under test ─────────────────────────────────────
 
 const { runOrchestration } = await import("../shared/orchestrate");
-import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import type { AgentConfig } from "../shared/agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -398,7 +399,10 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(saveLaunchCmd).toHaveBeenCalledWith("my-agent --start");
+    expect(saveLaunchCmd).toHaveBeenCalledTimes(1);
+    const args = saveLaunchCmd.mock.calls[0];
+    expect(args[0]).toBe("my-agent --start");
+    expect(typeof args[1]).toBe("string"); // spawnId
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });

@@ -1,21 +1,22 @@
+import type { Manifest } from "../manifest.js";
+
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import type { Manifest } from "../manifest.js";
 import { agentKeys } from "../manifest.js";
+import { execScript, showDryRunPreview } from "./run.js";
 import {
-  VERSION,
+  buildAgentPickerHints,
+  findClosestKeyByNameOrKey,
+  getAuthHint,
+  getImplementedClouds,
   handleCancel,
   loadManifestWithSpinner,
   mapToSelectOptions,
-  getImplementedClouds,
-  findClosestKeyByNameOrKey,
-  resolveAgentKey,
-  buildAgentPickerHints,
-  prioritizeCloudsByCredentials,
   preflightCredentialCheck,
-  getAuthHint,
+  prioritizeCloudsByCredentials,
+  resolveAgentKey,
+  VERSION,
 } from "./shared.js";
-import { execScript, showDryRunPreview } from "./run.js";
 
 // Prompt user to select an agent with hints and type-ahead filtering
 async function selectAgent(manifest: Manifest): Promise<string> {

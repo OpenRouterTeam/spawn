@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import { hasCloudCredentials } from "../commands";
 
 describe("hasCloudCredentials", () => {

@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { join, resolve, isAbsolute } from "node:path";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "./security.js";
+import { isAbsolute, join, resolve } from "node:path";
+import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "./security.js";
 import { isString } from "./shared/type-guards";
 
 export interface VMConnection {
@@ -17,12 +18,18 @@ export interface VMConnection {
 }
 
 export interface SpawnRecord {
+  id: string;
   agent: string;
   cloud: string;
   timestamp: string;
   name?: string;
   prompt?: string;
   connection?: VMConnection;
+}
+
+/** Generate a unique spawn ID. */
+export function generateSpawnId(): string {
+  return randomUUID();
 }
 
 /** Returns the directory for spawn data, respecting SPAWN_HOME env var.
@@ -63,9 +70,8 @@ export function getConnectionPath(): string {
 }
 
 /** Save VM connection info directly into history.json.
- *  Finds the most recent record matching this cloud that has no connection yet
- *  and attaches the connection data to it. This is called during provisioning
- *  so the connection is persisted immediately — not deferred to a lazy merge. */
+ *  Matches by spawnId for exact targeting. Falls back to heuristic matching
+ *  for backward compatibility with records that have no id. */
 export function saveVmConnection(
   ip: string,
   user: string,
@@ -74,6 +80,7 @@ export function saveVmConnection(
   cloud: string,
   launchCmd?: string,
   metadata?: Record<string, string>,
+  spawnId?: string,
 ): void {
   const dir = getSpawnDir();
   mkdirSync(dir, {
@@ -91,16 +98,25 @@ export function saveVmConnection(
     metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
   };
 
-  // Merge directly into history — find the most recent record for this cloud
-  // that doesn't have a connection yet (the record created by saveSpawnRecord).
   const history = loadHistory();
   let merged = false;
-  for (let i = history.length - 1; i >= 0; i--) {
-    const r = history[i];
-    if (r.cloud === cloud && !r.connection) {
-      r.connection = connData;
+
+  if (spawnId) {
+    // Exact match by spawn ID
+    const idx = history.findIndex((r) => r.id === spawnId);
+    if (idx >= 0) {
+      history[idx].connection = connData;
       merged = true;
-      break;
+    }
+  } else {
+    // Fallback: heuristic match for backward compatibility
+    for (let i = history.length - 1; i >= 0; i--) {
+      const r = history[i];
+      if (r.cloud === cloud && !r.connection) {
+        r.connection = connData;
+        merged = true;
+        break;
+      }
     }
   }
 
@@ -111,7 +127,6 @@ export function saveVmConnection(
   }
 
   // Also write last-connection.json for backward compatibility
-  // (other tools or older CLI versions may still read it)
   const json: Record<string, unknown> = {
     ip,
     user,
@@ -131,25 +146,43 @@ export function saveVmConnection(
   if (metadata && Object.keys(metadata).length > 0) {
     json.metadata = metadata;
   }
+  if (spawnId) {
+    json.spawn_id = spawnId;
+  }
   writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n", {
     mode: 0o600,
   });
 }
 
-/** Save launch command to the most recent history record's connection. */
-export function saveLaunchCmd(launchCmd: string): void {
-  // Update history directly — find the most recent record with a connection
+/** Save launch command to a history record's connection.
+ *  Matches by spawnId when provided; falls back to most recent record with a connection. */
+export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
   try {
     const history = loadHistory();
-    for (let i = history.length - 1; i >= 0; i--) {
-      const conn = history[i].connection;
-      if (conn) {
-        conn.launch_cmd = launchCmd;
-        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-          mode: 0o600,
-        });
-        break;
+    let found = false;
+
+    if (spawnId) {
+      const idx = history.findIndex((r) => r.id === spawnId);
+      if (idx >= 0 && history[idx].connection) {
+        history[idx].connection.launch_cmd = launchCmd;
+        found = true;
       }
+    } else {
+      // Fallback: most recent record with a connection
+      for (let i = history.length - 1; i >= 0; i--) {
+        const conn = history[i].connection;
+        if (conn) {
+          conn.launch_cmd = launchCmd;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (found) {
+      writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+        mode: 0o600,
+      });
     }
   } catch {
     // non-fatal
@@ -222,6 +255,10 @@ export function saveSpawnRecord(record: SpawnRecord): void {
       recursive: true,
       mode: 0o700,
     });
+  }
+  // Ensure every record has an id
+  if (!record.id) {
+    record.id = generateSpawnId();
   }
   let history = loadHistory();
   history.push(record);
@@ -334,15 +371,23 @@ function mergeLastConnection(): void {
 
     const history = loadHistory();
 
-    // Find the most recent entry without a connection and merge into it.
-    // Search backwards so we match the right record even if earlier records
-    // already have connections (e.g., from concurrent spawns).
+    // Match by spawn_id if present in the connection file, else fall back to
+    // heuristic matching (most recent entry without a connection).
+    const spawnId = isString(entries.spawn_id) ? entries.spawn_id : undefined;
     let merged = false;
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (!history[i].connection) {
-        history[i].connection = connData;
+    if (spawnId) {
+      const idx = history.findIndex((r) => r.id === spawnId);
+      if (idx >= 0) {
+        history[idx].connection = connData;
         merged = true;
-        break;
+      }
+    } else {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (!history[i].connection) {
+          history[i].connection = connData;
+          merged = true;
+          break;
+        }
       }
     }
     if (merged) {
@@ -358,12 +403,24 @@ function mergeLastConnection(): void {
   }
 }
 
+/** Find a record's index by id, falling back to timestamp+agent+cloud for old records. */
+function findRecordIndex(history: SpawnRecord[], record: SpawnRecord): number {
+  if (record.id) {
+    const idx = history.findIndex((r) => r.id === record.id);
+    if (idx >= 0) {
+      return idx;
+    }
+  }
+  // Fallback for records without id (pre-migration)
+  return history.findIndex(
+    (r) => r.timestamp === record.timestamp && r.agent === record.agent && r.cloud === record.cloud,
+  );
+}
+
 /** Remove a record from history entirely (soft delete — no cloud API call). */
 export function removeRecord(record: SpawnRecord): boolean {
   const history = loadHistory();
-  const index = history.findIndex(
-    (r) => r.timestamp === record.timestamp && r.agent === record.agent && r.cloud === record.cloud,
-  );
+  const index = findRecordIndex(history, record);
   if (index < 0) {
     return false;
   }
@@ -376,9 +433,7 @@ export function removeRecord(record: SpawnRecord): boolean {
 
 export function markRecordDeleted(record: SpawnRecord): boolean {
   const history = loadHistory();
-  const index = history.findIndex(
-    (r) => r.timestamp === record.timestamp && r.agent === record.agent && r.cloud === record.cloud,
-  );
+  const index = findRecordIndex(history, record);
   if (index < 0) {
     return false;
   }

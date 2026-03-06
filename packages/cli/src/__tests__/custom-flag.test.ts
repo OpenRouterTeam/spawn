@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "bun:test";
-import { KNOWN_FLAGS, findUnknownFlag } from "../flags";
+import { afterEach, describe, expect, it } from "bun:test";
+import { findUnknownFlag, KNOWN_FLAGS } from "../flags";
 
 describe("--custom flag", () => {
   describe("flag registration", () => {

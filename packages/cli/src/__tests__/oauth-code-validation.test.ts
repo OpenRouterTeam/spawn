@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { OAUTH_CODE_REGEX } from "../shared/oauth-constants";
 
 describe("OAUTH_CODE_REGEX", () => {

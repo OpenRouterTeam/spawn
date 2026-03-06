@@ -1,8 +1,9 @@
-import { describe, it, expect } from "bun:test";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import type { Manifest } from "../manifest";
+
+import { describe, expect, it } from "bun:test";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as v from "valibot";
-import type { Manifest } from "../manifest";
 
 /**
  * Icon integrity tests.

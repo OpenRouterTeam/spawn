@@ -1,8 +1,8 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
   findClosestKeyByNameOrKey,
-  levenshtein,
   findClosestMatch,
+  levenshtein,
   resolveAgentKey,
   resolveCloudKey,
 } from "../commands";

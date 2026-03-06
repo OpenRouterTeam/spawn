@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { mockClackPrompts } from "./test-helpers";
 
 /**
  * Tests for critical-path functions in the `spawn <agent> <cloud>` run flow:

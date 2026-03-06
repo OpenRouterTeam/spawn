@@ -1,13 +1,14 @@
 import "../unicode-detect.js"; // Must be first: configures TERM before clack reads it
+import type { Manifest } from "../manifest.js";
+
+import * as fs from "node:fs";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as v from "valibot";
-import { isString } from "../shared/type-guards.js";
-import * as fs from "node:fs";
-import type { Manifest } from "../manifest.js";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, isStaleCache } from "../manifest.js";
 import pkg from "../../package.json" with { type: "json" };
+import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
+import { isString } from "../shared/type-guards.js";
 import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
