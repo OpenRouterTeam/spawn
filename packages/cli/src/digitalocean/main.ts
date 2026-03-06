@@ -53,7 +53,8 @@ async function main() {
       dropletSize = await promptDropletSize();
       region = await promptDoRegion();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createDroplet(name, agent.cloudInitTier, dropletSize, region, agent.slowInstall ? agentName : undefined);
     },
     getServerName,
@@ -61,7 +62,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

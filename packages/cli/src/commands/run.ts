@@ -13,7 +13,7 @@ import {
   validateUsername,
   validateServerIdentifier,
 } from "../security.js";
-import { saveSpawnRecord, getActiveServers } from "../history.js";
+import { saveSpawnRecord, getActiveServers, generateSpawnId } from "../history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guidance-data.js";
 import { toKebabCase, prepareStdinForHandoff } from "../shared/ui.js";
 import {
@@ -603,9 +603,11 @@ export async function execScript(
     return; // Exit early - cannot proceed without script content
   }
 
-  // Record the spawn before execution (so it's logged even if the script fails midway)
+  // Generate a unique spawn ID and record the spawn before execution
+  const spawnId = generateSpawnId();
   try {
     saveSpawnRecord({
+      id: spawnId,
       agent,
       cloud,
       timestamp: new Date().toISOString(),
@@ -627,6 +629,9 @@ export async function execScript(
       console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(err)}`));
     }
   }
+
+  // Pass spawn ID to the bash script so connection data can be linked back
+  process.env.SPAWN_ID = spawnId;
 
   const lastErr = runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {

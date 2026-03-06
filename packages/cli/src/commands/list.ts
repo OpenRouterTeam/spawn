@@ -306,6 +306,12 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     });
   }
 
+  options.push({
+    value: "remove",
+    label: "Remove from history",
+    hint: "remove this entry only",
+  });
+
   const action = await p.select({
     message: "What would you like to do?",
     options,
@@ -341,6 +347,16 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
 
   if (action === "delete") {
     await confirmAndDelete(selected, manifest);
+    return;
+  }
+
+  if (action === "remove") {
+    const removed = removeRecord(selected);
+    if (removed) {
+      p.log.success("Removed from history.");
+    } else {
+      p.log.warn("Could not find record in history.");
+    }
     return;
   }
 

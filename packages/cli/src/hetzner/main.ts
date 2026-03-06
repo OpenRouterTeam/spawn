@@ -48,7 +48,8 @@ async function main() {
       serverType = await promptServerType();
       location = await promptLocation();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createHetznerServer(name, serverType, location, agent.cloudInitTier);
     },
     getServerName,
@@ -56,7 +57,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

@@ -28,7 +28,9 @@ async function main() {
       saveLocalConnection();
     },
     async promptSize() {},
-    async createServer() {},
+    async createServer(_name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
+    },
     async getServerName() {
       const result = Bun.spawnSync(
         [
@@ -46,7 +48,7 @@ async function main() {
     },
     async waitForReady() {},
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

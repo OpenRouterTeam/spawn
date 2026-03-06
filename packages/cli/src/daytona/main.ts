@@ -44,7 +44,8 @@ async function main() {
     async promptSize() {
       sandboxSize = await promptSandboxSize();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createDaytonaServer(name, sandboxSize);
     },
     getServerName,
@@ -52,7 +53,7 @@ async function main() {
       await waitForCloudInit(agent.cloudInitTier);
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

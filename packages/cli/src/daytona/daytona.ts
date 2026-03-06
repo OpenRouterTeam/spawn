@@ -354,7 +354,16 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   // Set up SSH access
   await setupSshAccess();
 
-  saveVmConnection("daytona-sandbox", "daytona", sandboxId, name, "daytona");
+  saveVmConnection(
+    "daytona-sandbox",
+    "daytona",
+    sandboxId,
+    name,
+    "daytona",
+    undefined,
+    undefined,
+    process.env.SPAWN_ID || undefined,
+  );
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────

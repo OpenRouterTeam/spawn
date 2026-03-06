@@ -956,7 +956,16 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
       logInfo(`Instance running: IP=${instanceIp}`);
 
       // Save connection info
-      saveVmConnection(instanceIp, SSH_USER, "", instanceName, "aws");
+      saveVmConnection(
+        instanceIp,
+        SSH_USER,
+        "",
+        instanceName,
+        "aws",
+        undefined,
+        undefined,
+        process.env.SPAWN_ID || undefined,
+      );
       return;
     }
 

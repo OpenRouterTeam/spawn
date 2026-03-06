@@ -428,7 +428,16 @@ export async function createServer(
   }
 
   logInfo(`Server created: ID=${hetznerServerId}, IP=${hetznerServerIp}`);
-  saveVmConnection(hetznerServerIp, "root", hetznerServerId, name, "hetzner");
+  saveVmConnection(
+    hetznerServerIp,
+    "root",
+    hetznerServerId,
+    name,
+    "hetzner",
+    undefined,
+    undefined,
+    process.env.SPAWN_ID || undefined,
+  );
 }
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { logInfo, logStep, logWarn, withRetry, prepareStdinForHandoff } from "./
 import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import type { CloudRunner } from "./agent-setup";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
+import { generateSpawnId, saveSpawnRecord } from "../history.js";
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -14,11 +15,11 @@ export interface CloudOrchestrator {
   runner: CloudRunner;
   authenticate(): Promise<void>;
   promptSize(): Promise<void>;
-  createServer(name: string): Promise<void>;
+  createServer(name: string, spawnId?: string): Promise<void>;
   getServerName(): Promise<string>;
   waitForReady(): Promise<void>;
   interactiveSession(cmd: string): Promise<number>;
-  saveLaunchCmd(launchCmd: string): void;
+  saveLaunchCmd(launchCmd: string, spawnId?: string): void;
 }
 
 /**
@@ -76,8 +77,23 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   await cloud.promptSize();
 
   // 6. Provision server
+  const spawnId = generateSpawnId();
   const serverName = await cloud.getServerName();
-  await cloud.createServer(serverName);
+  await cloud.createServer(serverName, spawnId);
+
+  // 6b. Record the spawn now that the server exists
+  const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+  saveSpawnRecord({
+    id: spawnId,
+    agent: agentName,
+    cloud: cloud.cloudName,
+    timestamp: new Date().toISOString(),
+    ...(spawnName
+      ? {
+          name: spawnName,
+        }
+      : {}),
+  });
 
   // 7. Wait for readiness
   await cloud.waitForReady();
@@ -143,7 +159,7 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   prepareStdinForHandoff();
 
   const launchCmd = agent.launchCmd();
-  cloud.saveLaunchCmd(launchCmd);
+  cloud.saveLaunchCmd(launchCmd, spawnId);
 
   // Wrap in restart loop for cloud VMs — not for local execution
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);

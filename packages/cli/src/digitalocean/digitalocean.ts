@@ -836,7 +836,16 @@ export async function createServer(
   // Wait for droplet to become active and get IP
   await waitForDropletActive(doDropletId);
 
-  saveVmConnection(doServerIp, "root", doDropletId, name, "digitalocean");
+  saveVmConnection(
+    doServerIp,
+    "root",
+    doDropletId,
+    name,
+    "digitalocean",
+    undefined,
+    undefined,
+    process.env.SPAWN_ID || undefined,
+  );
 }
 
 async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promise<void> {

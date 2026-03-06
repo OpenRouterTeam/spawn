@@ -42,7 +42,8 @@ async function main() {
       await ensureSpriteAuthenticated();
     },
     async promptSize() {},
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createSprite(name);
       await verifySpriteConnectivity();
       await setupShellEnvironment();
@@ -51,7 +52,7 @@ async function main() {
     getServerName,
     async waitForReady() {},
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

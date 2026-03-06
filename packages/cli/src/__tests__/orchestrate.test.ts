@@ -398,7 +398,10 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(saveLaunchCmd).toHaveBeenCalledWith("my-agent --start");
+    expect(saveLaunchCmd).toHaveBeenCalledTimes(1);
+    const args = saveLaunchCmd.mock.calls[0];
+    expect(args[0]).toBe("my-agent --start");
+    expect(typeof args[1]).toBe("string"); // spawnId
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });

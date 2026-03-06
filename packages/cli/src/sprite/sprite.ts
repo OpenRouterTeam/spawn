@@ -428,7 +428,16 @@ export async function setupShellEnvironment(): Promise<void> {
 // ─── Connection Tracking ─────────────────────────────────────────────────────
 
 export function saveVmConnection(): void {
-  saveVmConnectionToHistory("sprite-console", process.env.USER || "root", "", spriteName, "sprite");
+  saveVmConnectionToHistory(
+    "sprite-console",
+    process.env.USER || "root",
+    "",
+    spriteName,
+    "sprite",
+    undefined,
+    undefined,
+    process.env.SPAWN_ID || undefined,
+  );
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────
