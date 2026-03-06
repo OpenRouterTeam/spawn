@@ -284,12 +284,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     options.push({
       value: "reconnect",
       label: "SSH into VM",
-      hint:
-        conn.ip === "sprite-console"
-          ? `sprite console -s ${conn.server_name}`
-          : conn.ip === "daytona-sandbox"
-            ? `daytona ssh ${conn.server_id}`
-            : `ssh ${conn.user}@${conn.ip}`,
+      hint: conn.ip === "sprite-console" ? `sprite console -s ${conn.server_name}` : `ssh ${conn.user}@${conn.ip}`,
     });
   }
 
