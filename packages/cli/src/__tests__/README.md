@@ -63,7 +63,7 @@ bun test src/__tests__/manifest.test.ts
 - `orchestrate.test.ts` — `runOrchestration`
 
 ### Parsing and type utilities
-- `parse.test.ts` — `parseJsonWith`, `parseJsonRaw`
+- `parse.test.ts` — `parseJsonWith`
 - `fuzzy-key-matching.test.ts` — `findClosestKeyByNameOrKey`, `levenshtein`, `findClosestMatch`, `resolveAgentKey`, `resolveCloudKey`
 - `unknown-flags.test.ts` — Unknown flag detection, `KNOWN_FLAGS`, `expandEqualsFlags`
 - `custom-flag.test.ts` — `--custom` flag for AWS, GCP, Hetzner, DigitalOcean
@@ -75,6 +75,17 @@ bun test src/__tests__/manifest.test.ts
 - `aws.test.ts` — AWS credential cache, SigV4 signing helpers
 - `cloud-init.test.ts` — `getPackagesForTier`, `needsNode`, `needsBun`, `NODE_INSTALL_CMD`
 - `check-entity.test.ts` / `check-entity-messages.test.ts` — Entity validation
+- `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
+- `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
+
+### OAuth and auth
+- `oauth-code-validation.test.ts` — `OAUTH_CODE_REGEX` format validation
+
+### History (extended)
+- `history-spawn-id.test.ts` — Unique spawn IDs, `saveVmConnection`/`saveLaunchCmd` by spawnId, concurrent spawn isolation
+
+### Manifest (extended)
+- `icon-integrity.test.ts` — Icon file existence and format validation
 
 ### Support files (not test files)
 - `test-helpers.ts` — Shared fixtures: `createMockManifest`, `mockClackPrompts`, `setupTestEnvironment`, etc.
