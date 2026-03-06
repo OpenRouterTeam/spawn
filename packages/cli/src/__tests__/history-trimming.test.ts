@@ -885,52 +885,9 @@ describe("History Trimming and Boundaries", () => {
   // ── Race-like sequential saves near the boundary ────────────────────────
 
   describe("sequential saves at the boundary", () => {
-    it("should correctly handle saving from exactly 99 to 100 entries", () => {
-      const records: SpawnRecord[] = [];
-      for (let i = 0; i < 99; i++) {
-        records.push({
-          agent: `agent-${i}`,
-          cloud: "cloud",
-          timestamp: "2026-01-01T00:00:00.000Z",
-        });
-      }
-      writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-
-      saveSpawnRecord({
-        agent: "agent-99",
-        cloud: "cloud",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-
-      const loaded = loadHistory();
-      expect(loaded).toHaveLength(100);
-      // No trimming should have happened
-      expect(loaded[0].agent).toBe("agent-0");
-    });
-
-    it("should correctly handle saving from exactly 100 to 101 entries (trim boundary)", () => {
-      const records: SpawnRecord[] = [];
-      for (let i = 0; i < 100; i++) {
-        records.push({
-          agent: `agent-${i}`,
-          cloud: "cloud",
-          timestamp: "2026-01-01T00:00:00.000Z",
-        });
-      }
-      writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-
-      saveSpawnRecord({
-        agent: "agent-100",
-        cloud: "cloud",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-
-      const loaded = loadHistory();
-      expect(loaded).toHaveLength(100);
-      // Oldest entry should be trimmed
-      expect(loaded[0].agent).toBe("agent-1");
-      expect(loaded[99].agent).toBe("agent-100");
-    });
+    // NOTE: "99 to 100" and "100 to 101" boundary tests were removed as duplicates
+    // of "should keep all entries when at exactly 100" and "should trim to 100 when
+    // adding entry that exceeds the limit" in the MAX_HISTORY_ENTRIES section above.
 
     it("should handle rapid sequential saves that build up from zero", () => {
       for (let i = 0; i < 105; i++) {
