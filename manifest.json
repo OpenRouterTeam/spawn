@@ -312,7 +312,7 @@
       "description": "Simple AWS instances starting at $3.50/mo",
       "url": "https://aws.amazon.com/lightsail/",
       "type": "cli",
-      "auth": "aws configure (AWS credentials)",
+      "auth": "AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY",
       "provision_method": "aws lightsail create-instances with --user-data",
       "exec_method": "ssh ubuntu@IP",
       "interactive_method": "ssh -t ubuntu@IP",
