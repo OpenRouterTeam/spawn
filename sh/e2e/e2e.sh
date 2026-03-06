@@ -34,7 +34,7 @@ source "${SCRIPT_DIR}/lib/teardown.sh"
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
 # ---------------------------------------------------------------------------
-ALL_CLOUDS="aws hetzner digitalocean gcp daytona sprite"
+ALL_CLOUDS="aws hetzner digitalocean gcp sprite"
 
 # ---------------------------------------------------------------------------
 # Parse arguments

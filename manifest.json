@@ -151,7 +151,7 @@
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/opencode.png",
-      "featured_cloud": ["daytona", "gcp", "aws"],
+      "featured_cloud": ["gcp", "aws", "digitalocean"],
       "creator": "SST",
       "repo": "sst/opencode",
       "license": "MIT",
@@ -265,24 +265,6 @@
       "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/aws.png"
     },
-    "daytona": {
-      "name": "Daytona",
-      "description": "Instant sandboxes with pay-per-second pricing",
-      "url": "https://www.daytona.io/",
-      "type": "sandbox",
-      "auth": "DAYTONA_API_KEY",
-      "key_request": false,
-      "provision_method": "daytona create",
-      "exec_method": "daytona exec",
-      "interactive_method": "daytona ssh",
-      "defaults": {
-        "cpu": 2,
-        "memory": 2048,
-        "disk": 5
-      },
-      "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io.",
-      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/daytona.png"
-    },
     "digitalocean": {
       "name": "DigitalOcean",
       "description": "Developer-friendly Droplets from $4/mo",
@@ -347,12 +329,6 @@
     "aws/codex": "implemented",
     "aws/opencode": "implemented",
     "aws/kilocode": "implemented",
-    "daytona/claude": "implemented",
-    "daytona/openclaw": "implemented",
-    "daytona/zeroclaw": "implemented",
-    "daytona/codex": "implemented",
-    "daytona/opencode": "implemented",
-    "daytona/kilocode": "implemented",
     "digitalocean/claude": "implemented",
     "digitalocean/openclaw": "implemented",
     "digitalocean/zeroclaw": "implemented",
@@ -374,7 +350,6 @@
     "local/hermes": "implemented",
     "hetzner/hermes": "implemented",
     "aws/hermes": "implemented",
-    "daytona/hermes": "implemented",
     "digitalocean/hermes": "implemented",
     "gcp/hermes": "implemented",
     "sprite/hermes": "implemented"

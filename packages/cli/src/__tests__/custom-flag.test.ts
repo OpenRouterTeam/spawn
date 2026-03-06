@@ -193,44 +193,6 @@ describe("DigitalOcean --custom prompts", () => {
   });
 });
 
-describe("Daytona --custom prompts", () => {
-  const savedCustom = process.env.SPAWN_CUSTOM;
-  const savedCpu = process.env.DAYTONA_CPU;
-  const savedMemory = process.env.DAYTONA_MEMORY;
-  const savedDisk = process.env.DAYTONA_DISK;
-
-  afterEach(() => {
-    restoreEnv("SPAWN_CUSTOM", savedCustom);
-    restoreEnv("DAYTONA_CPU", savedCpu);
-    restoreEnv("DAYTONA_MEMORY", savedMemory);
-    restoreEnv("DAYTONA_DISK", savedDisk);
-  });
-
-  it("promptSandboxSize should return default without --custom", async () => {
-    delete process.env.DAYTONA_CPU;
-    delete process.env.DAYTONA_MEMORY;
-    delete process.env.DAYTONA_DISK;
-    delete process.env.SPAWN_CUSTOM;
-    const { promptSandboxSize, DEFAULT_SANDBOX_SIZE } = await import("../daytona/daytona");
-    const result = await promptSandboxSize();
-    expect(result.cpu).toBe(DEFAULT_SANDBOX_SIZE.cpu);
-    expect(result.memory).toBe(DEFAULT_SANDBOX_SIZE.memory);
-    expect(result.disk).toBe(DEFAULT_SANDBOX_SIZE.disk);
-  });
-
-  it("promptSandboxSize should respect env vars", async () => {
-    process.env.DAYTONA_CPU = "4";
-    process.env.DAYTONA_MEMORY = "8";
-    process.env.DAYTONA_DISK = "50";
-    process.env.SPAWN_CUSTOM = "1";
-    const { promptSandboxSize } = await import("../daytona/daytona");
-    const result = await promptSandboxSize();
-    expect(result.cpu).toBe(4);
-    expect(result.memory).toBe(8);
-    expect(result.disk).toBe(50);
-  });
-});
-
 /** Helper to restore or delete an env var */
 function restoreEnv(key: string, savedValue: string | undefined): void {
   if (savedValue !== undefined) {

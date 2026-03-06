@@ -17,14 +17,13 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 ## 2. Add a new cloud provider (HIGH BAR)
 
-We are currently shipping with **7 curated clouds** (sorted by price):
+We are currently shipping with **6 curated clouds** (sorted by price):
 1. **local** — free (no provisioning)
 2. **hetzner** — ~€3.29/mo (CX22)
 3. **aws** — $3.50/mo (nano)
-4. **daytona** — pay-per-second sandboxes
-5. **digitalocean** — $4/mo (Basic droplet)
-6. **gcp** — $7.11/mo (e2-micro)
-7. **sprite** — managed cloud VMs
+4. **digitalocean** — $4/mo (Basic droplet)
+5. **gcp** — $7.11/mo (e2-micro)
+6. **sprite** — managed cloud VMs
 
 **Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
 

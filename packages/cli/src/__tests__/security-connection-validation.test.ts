@@ -24,12 +24,10 @@ describe("validateConnectionIP", () => {
 
     it("should accept special sentinel values", () => {
       expect(() => validateConnectionIP("sprite-console")).not.toThrow();
-      expect(() => validateConnectionIP("daytona-sandbox")).not.toThrow();
       expect(() => validateConnectionIP("localhost")).not.toThrow();
     });
 
     it("should accept valid hostnames", () => {
-      expect(() => validateConnectionIP("ssh.app.daytona.io")).not.toThrow();
       expect(() => validateConnectionIP("example.com")).not.toThrow();
       expect(() => validateConnectionIP("sub.domain.example.com")).not.toThrow();
     });

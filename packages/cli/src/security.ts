@@ -15,7 +15,7 @@ const IPV4_PATTERN = /^(\d{1,3}\.){3}\d{1,3}$/;
 // IPv6 address pattern (simplified - catches most valid IPv6 addresses)
 const IPV6_PATTERN = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
 
-// Hostname pattern: valid DNS hostnames (e.g., ssh.app.daytona.io)
+// Hostname pattern: valid DNS hostnames (e.g., compute.amazonaws.com)
 // Only allows safe characters: lowercase alphanumeric, hyphens, dots
 // Must have at least two labels (e.g., "host.domain")
 const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -27,7 +27,6 @@ const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 // Special connection sentinel values (not actual IPs)
 const CONNECTION_SENTINELS = [
   "sprite-console",
-  "daytona-sandbox",
   "localhost",
 ];
 
@@ -171,8 +170,8 @@ export function validateScriptContent(script: string): void {
  * Allows:
  * - Valid IPv4 addresses (e.g., "192.168.1.1")
  * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
- * - Valid hostnames (e.g., "ssh.app.daytona.io")
- * - Special sentinel values ("sprite-console", "daytona-sandbox", "localhost")
+ * - Valid hostnames (e.g., "compute.amazonaws.com")
+ * - Special sentinel values ("sprite-console", "localhost")
  *
  * @param ip - The IP address or sentinel to validate
  * @throws Error if validation fails
@@ -213,7 +212,7 @@ export function validateConnectionIP(ip: string): void {
     return;
   }
 
-  // Validate as hostname (e.g., ssh.app.daytona.io)
+  // Validate as hostname (e.g., compute.amazonaws.com)
   if (HOSTNAME_PATTERN.test(ip)) {
     return;
   }
