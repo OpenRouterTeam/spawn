@@ -18,6 +18,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   generateSpawnId,
+  getActiveServers,
   getConnectionPath,
   getHistoryPath,
   loadHistory,
@@ -446,8 +447,7 @@ describe("history spawn IDs", () => {
 
       // getActiveServers triggers mergeLastConnection
       const servers = loadHistory();
-      // Force merge by importing getActiveServers (it calls mergeLastConnection internally)
-      const { getActiveServers } = require("../history.js");
+      // Force merge by calling getActiveServers (it calls mergeLastConnection internally)
       getActiveServers();
 
       const history = loadHistory();
@@ -475,7 +475,6 @@ describe("history spawn IDs", () => {
       };
       writeFileSync(getConnectionPath(), JSON.stringify(connData) + "\n");
 
-      const { getActiveServers } = require("../history.js");
       getActiveServers();
 
       const history = loadHistory();
