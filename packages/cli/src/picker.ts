@@ -17,8 +17,8 @@
  *            | spawn pick --prompt "Select zone" --default "us-central1-a")
  */
 
-import * as fs from "node:fs";
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
 
 export interface PickOption {
   value: string;

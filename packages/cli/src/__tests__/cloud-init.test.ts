@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test";
-import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init.js";
+import { describe, expect, it } from "bun:test";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
 
 describe("getPackagesForTier", () => {
   const MINIMAL_PACKAGES = [

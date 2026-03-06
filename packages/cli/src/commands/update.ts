@@ -1,9 +1,9 @@
+import { execFileSync } from "node:child_process";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { execFileSync } from "node:child_process";
+import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "../manifest.js";
 import { parseJsonWith } from "../shared/parse.js";
-import { SPAWN_CDN, VERSION_URL, RAW_BASE } from "../manifest.js";
-import { VERSION, PkgVersionSchema, getErrorMessage } from "./shared.js";
+import { getErrorMessage, PkgVersionSchema, VERSION } from "./shared.js";
 
 const INSTALL_URL = `${SPAWN_CDN}/cli/install.sh`;
 const INSTALL_CMD = `curl --proto '=https' -fsSL ${INSTALL_URL} | bash`;

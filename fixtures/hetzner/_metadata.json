@@ -2,12 +2,12 @@
   "cloud": "hetzner",
   "recorded_at": "2026-02-11T03:07:29Z",
   "fixtures": {
-    "server-types": {"endpoint": "/server_types?per_page=50", "recorded_at": "2026-02-11T03:07:22Z"},
-    "datacenters": {"endpoint": "/datacenters", "recorded_at": "2026-02-14T00:00:00Z"},
-    "locations": {"endpoint": "/locations", "recorded_at": "2026-02-11T03:07:23Z"},
-    "ssh-keys": {"endpoint": "/ssh_keys", "recorded_at": "2026-02-11T03:07:24Z"},
-    "servers": {"endpoint": "/servers", "recorded_at": "2026-02-11T03:07:25Z"},
-    "create-server": {"endpoint": "POST /servers", "type": "live", "recorded_at": "2026-02-11T03:07:26Z"},
-    "delete-server": {"endpoint": "DELETE /servers/{id}", "type": "live", "recorded_at": "2026-02-11T03:07:29Z"}
+    "server-types": { "endpoint": "/server_types?per_page=50", "recorded_at": "2026-02-11T03:07:22Z" },
+    "datacenters": { "endpoint": "/datacenters", "recorded_at": "2026-02-14T00:00:00Z" },
+    "locations": { "endpoint": "/locations", "recorded_at": "2026-02-11T03:07:23Z" },
+    "ssh-keys": { "endpoint": "/ssh_keys", "recorded_at": "2026-02-11T03:07:24Z" },
+    "servers": { "endpoint": "/servers", "recorded_at": "2026-02-11T03:07:25Z" },
+    "create-server": { "endpoint": "POST /servers", "type": "live", "recorded_at": "2026-02-11T03:07:26Z" },
+    "delete-server": { "endpoint": "DELETE /servers/{id}", "type": "live", "recorded_at": "2026-02-11T03:07:29Z" }
   }
 }

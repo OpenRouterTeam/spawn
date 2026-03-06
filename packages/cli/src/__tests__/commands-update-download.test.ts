@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
-import { isString } from "../shared/type-guards";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import pkg from "../../package.json" with { type: "json" };
+import { isString } from "../shared/type-guards";
+import { createConsoleMocks, mockClackPrompts, restoreMocks } from "./test-helpers";
+
 const VERSION = pkg.version;
 
 /**

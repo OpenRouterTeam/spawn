@@ -1,15 +1,16 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
 import type { ExecFileSyncOptions } from "node:child_process";
+
 import { execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import pc from "picocolors";
 import * as v from "valibot";
+import pkg from "../package.json" with { type: "json" };
+import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { parseJsonWith } from "./shared/parse";
 import { hasStatus } from "./shared/type-guards";
-import pkg from "../package.json" with { type: "json" };
-import { SPAWN_CDN, VERSION_URL, RAW_BASE } from "./manifest.js";
 
 const VERSION = pkg.version;
 

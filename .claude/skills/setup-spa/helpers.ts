@@ -1,12 +1,13 @@
 // SPA helpers — pure functions for parsing Claude Code stream events,
 // Slack formatting, state management, and file download/cleanup.
 
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
-import { dirname } from "node:path";
-import * as v from "valibot";
 import type { Result } from "@openrouter/spawn-shared";
-import { isString, toRecord, Ok, Err } from "@openrouter/spawn-shared";
+
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { Err, isString, Ok, toRecord } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
+import * as v from "valibot";
 
 // #region State
 

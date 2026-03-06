@@ -1,32 +1,33 @@
 #!/usr/bin/env bun
-import {
-  cmdInteractive,
-  cmdAgentInteractive,
-  cmdRun,
-  cmdRunHeadless,
-  cmdList,
-  cmdListClear,
-  cmdLast,
-  cmdDelete,
-  cmdMatrix,
-  cmdAgents,
-  cmdClouds,
-  cmdAgentInfo,
-  cmdCloudInfo,
-  cmdUpdate,
-  cmdHelp,
-  cmdPick,
-  findClosestKeyByNameOrKey,
-  resolveAgentKey,
-  resolveCloudKey,
-  loadManifestWithSpinner,
-  isInteractiveTTY,
-} from "./commands.js";
+
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
+import {
+  cmdAgentInfo,
+  cmdAgentInteractive,
+  cmdAgents,
+  cmdCloudInfo,
+  cmdClouds,
+  cmdDelete,
+  cmdHelp,
+  cmdInteractive,
+  cmdLast,
+  cmdList,
+  cmdListClear,
+  cmdMatrix,
+  cmdPick,
+  cmdRun,
+  cmdRunHeadless,
+  cmdUpdate,
+  findClosestKeyByNameOrKey,
+  isInteractiveTTY,
+  loadManifestWithSpinner,
+  resolveAgentKey,
+  resolveCloudKey,
+} from "./commands.js";
+import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
+import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { checkForUpdates } from "./update-check.js";
-import { loadManifest, agentKeys, cloudKeys, getCacheAge } from "./manifest.js";
-import { findUnknownFlag, expandEqualsFlags } from "./flags.js";
 
 const VERSION = pkg.version;
 

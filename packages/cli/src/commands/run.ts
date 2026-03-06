@@ -1,39 +1,40 @@
-import * as p from "@clack/prompts";
-import pc from "picocolors";
+import type { Manifest } from "../manifest.js";
+
+import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
-import type { Manifest } from "../manifest.js";
-import { loadManifest, SPAWN_CDN, RAW_BASE, REPO } from "../manifest.js";
-import {
-  validateIdentifier,
-  validateScriptContent,
-  validatePrompt,
-  validateConnectionIP,
-  validateUsername,
-  validateServerIdentifier,
-} from "../security.js";
-import { saveSpawnRecord, getActiveServers } from "../history.js";
+import * as p from "@clack/prompts";
+import pc from "picocolors";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guidance-data.js";
-import { toKebabCase, prepareStdinForHandoff } from "../shared/ui.js";
+import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.js";
+import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import {
-  FETCH_TIMEOUT,
-  getErrorMessage,
-  loadManifestWithSpinner,
-  resolveAgentKey,
-  resolveCloudKey,
-  validateRunSecurity,
-  validateEntities,
-  getAuthHint,
-  preflightCredentialCheck,
-  collectMissingCredentials,
-  parseAuthEnvVars,
-  credentialHints,
-  formatCredStatusLine,
-  buildRetryCommand,
-} from "./shared.js";
+  validateConnectionIP,
+  validateIdentifier,
+  validatePrompt,
+  validateScriptContent,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
+import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
+import {
+  buildRetryCommand,
+  collectMissingCredentials,
+  credentialHints,
+  FETCH_TIMEOUT,
+  formatCredStatusLine,
+  getAuthHint,
+  getErrorMessage,
+  loadManifestWithSpinner,
+  parseAuthEnvVars,
+  preflightCredentialCheck,
+  resolveAgentKey,
+  resolveCloudKey,
+  validateEntities,
+  validateRunSecurity,
+} from "./shared.js";
 
 // ── Dry-run helpers ──────────────────────────────────────────────────────────
 
@@ -603,9 +604,11 @@ export async function execScript(
     return; // Exit early - cannot proceed without script content
   }
 
-  // Record the spawn before execution (so it's logged even if the script fails midway)
+  // Generate a unique spawn ID and record the spawn before execution
+  const spawnId = generateSpawnId();
   try {
     saveSpawnRecord({
+      id: spawnId,
       agent,
       cloud,
       timestamp: new Date().toISOString(),
@@ -627,6 +630,9 @@ export async function execScript(
       console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(err)}`));
     }
   }
+
+  // Pass spawn ID to the bash script so connection data can be linked back
+  process.env.SPAWN_ID = spawnId;
 
   const lastErr = runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {

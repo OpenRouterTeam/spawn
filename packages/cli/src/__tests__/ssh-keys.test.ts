@@ -5,8 +5,8 @@
  * to mock ssh-keygen invocations — no real subprocess calls.
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { mockClackPrompts } from "./test-helpers";
 

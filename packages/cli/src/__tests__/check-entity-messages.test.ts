@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
+
+import { beforeEach, describe, expect, it } from "bun:test";
+import { mockClackPrompts } from "./test-helpers";
 
 /**
  * Tests for checkEntity output messages (commands/shared.ts).

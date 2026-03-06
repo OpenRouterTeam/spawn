@@ -1,24 +1,26 @@
 #!/usr/bin/env bun
+
 // gcp/main.ts — Orchestrator: deploys an agent on GCP Compute Engine
 
-import {
-  ensureGcloudCli,
-  authenticate,
-  resolveProject,
-  promptSpawnName,
-  promptMachineType,
-  promptZone,
-  getServerName,
-  createInstance,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./gcp";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  authenticate,
+  createInstance,
+  ensureGcloudCli,
+  getServerName,
+  interactiveSession,
+  promptMachineType,
+  promptSpawnName,
+  promptZone,
+  resolveProject,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./gcp";
 
 async function main() {
   const agentName = process.argv[2];
@@ -50,7 +52,8 @@ async function main() {
       machineType = await promptMachineType();
       zone = await promptZone();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createInstance(name, zone, machineType, agent.cloudInitTier);
     },
     getServerName,
@@ -58,7 +61,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

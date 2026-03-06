@@ -4,7 +4,7 @@
  * gateway recovers from crashes without manual intervention.
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mockClackPrompts } from "./test-helpers";
 
 // ── Mock @clack/prompts (must be before importing agent-setup) ──────────
@@ -12,6 +12,7 @@ const clack = mockClackPrompts();
 
 // ── Import the function under test ──────────────────────────────────────
 const { startGateway } = await import("../shared/agent-setup");
+
 import type { CloudRunner } from "../shared/agent-setup";
 
 // ── Helpers ─────────────────────────────────────────────────────────────

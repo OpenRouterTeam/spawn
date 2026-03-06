@@ -3,8 +3,8 @@
  * These functions prevent command injection via corrupted history files
  */
 
-import { describe, it, expect } from "bun:test";
-import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "../security.js";
+import { describe, expect, it } from "bun:test";
+import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
 
 describe("validateConnectionIP", () => {
   describe("valid inputs", () => {

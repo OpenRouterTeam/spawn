@@ -3,7 +3,6 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
-
 import { getSpawnDir } from "../history.js";
 import { spawnInteractive } from "../shared/ssh";
 

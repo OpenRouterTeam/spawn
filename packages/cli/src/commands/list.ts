@@ -1,22 +1,23 @@
+import type { SpawnRecord } from "../history.js";
+import type { Manifest } from "../manifest.js";
+
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import type { Manifest } from "../manifest.js";
-import { loadManifest, agentKeys, cloudKeys } from "../manifest.js";
-import type { SpawnRecord } from "../history.js";
-import { filterHistory, clearHistory, removeRecord, getActiveServers } from "../history.js";
-import {
-  handleCancel,
-  getErrorMessage,
-  resolveAgentKey,
-  resolveCloudKey,
-  findClosestKeyByNameOrKey,
-  isInteractiveTTY,
-  resolveDisplayName,
-  buildRetryCommand,
-} from "./shared.js";
-import { cmdRun } from "./run.js";
+import { clearHistory, filterHistory, getActiveServers, removeRecord } from "../history.js";
+import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
 import { cmdConnect, cmdEnterAgent } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
+import { cmdRun } from "./run.js";
+import {
+  buildRetryCommand,
+  findClosestKeyByNameOrKey,
+  getErrorMessage,
+  handleCancel,
+  isInteractiveTTY,
+  resolveAgentKey,
+  resolveCloudKey,
+  resolveDisplayName,
+} from "./shared.js";
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -306,6 +307,12 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     });
   }
 
+  options.push({
+    value: "remove",
+    label: "Remove from history",
+    hint: "remove this entry only",
+  });
+
   const action = await p.select({
     message: "What would you like to do?",
     options,
@@ -341,6 +348,16 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
 
   if (action === "delete") {
     await confirmAndDelete(selected, manifest);
+    return;
+  }
+
+  if (action === "remove") {
+    const removed = removeRecord(selected);
+    if (removed) {
+      p.log.success("Removed from history.");
+    } else {
+      p.log.warn("Could not find record in history.");
+    }
     return;
   }
 

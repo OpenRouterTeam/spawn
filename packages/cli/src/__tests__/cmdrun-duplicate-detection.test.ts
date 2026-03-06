@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
-import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
+import { join } from "node:path";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
+import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
  * Tests for the --name duplicate detection feature (issue #1864).

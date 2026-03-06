@@ -1,23 +1,25 @@
 #!/usr/bin/env bun
+
 // hetzner/main.ts — Orchestrator: deploys an agent on Hetzner Cloud
 
-import {
-  ensureHcloudToken,
-  ensureSshKey,
-  promptSpawnName,
-  promptServerType,
-  promptLocation,
-  createServer as createHetznerServer,
-  getServerName,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./hetzner";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  createServer as createHetznerServer,
+  ensureHcloudToken,
+  ensureSshKey,
+  getServerName,
+  interactiveSession,
+  promptLocation,
+  promptServerType,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./hetzner";
 
 async function main() {
   const agentName = process.argv[2];
@@ -48,7 +50,8 @@ async function main() {
       serverType = await promptServerType();
       location = await promptLocation();
     },
-    async createServer(name: string) {
+    async createServer(name: string, spawnId?: string) {
+      process.env.SPAWN_ID = spawnId || "";
       await createHetznerServer(name, serverType, location, agent.cloudInitTier);
     },
     getServerName,
@@ -56,7 +59,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd,
+    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);
