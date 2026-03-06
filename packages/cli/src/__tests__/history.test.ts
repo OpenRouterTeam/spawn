@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { filterHistory, getHistoryPath, getSpawnDir, loadHistory, saveSpawnRecord } from "../history.js";
+import {
+  filterHistory,
+  getHistoryPath,
+  getSpawnDir,
+  HISTORY_SCHEMA_VERSION,
+  loadHistory,
+  saveSpawnRecord,
+} from "../history.js";
 
 describe("history", () => {
   let testDir: string;
@@ -185,6 +192,55 @@ describe("history", () => {
       writeFileSync(join(testDir, "history.json"), "");
       expect(loadHistory()).toEqual([]);
     });
+
+    it("loads v1 format: { version: 1, records: [...] }", () => {
+      const records: SpawnRecord[] = [
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+      ];
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify({
+          version: 1,
+          records,
+        }),
+      );
+      expect(loadHistory()).toEqual(records);
+    });
+
+    it("returns empty array for v1 format with unknown version", () => {
+      const records: SpawnRecord[] = [
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+      ];
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify({
+          version: 99,
+          records,
+        }),
+      );
+      // Unknown version is not a recognized format; treated as invalid non-array
+      expect(loadHistory()).toEqual([]);
+    });
+
+    it("loads v0 format: bare array (backward compatibility)", () => {
+      const records: SpawnRecord[] = [
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+      ];
+      writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
+      expect(loadHistory()).toEqual(records);
+    });
   });
 
   // ── saveSpawnRecord ─────────────────────────────────────────────────────
@@ -202,8 +258,9 @@ describe("history", () => {
 
       expect(existsSync(join(nestedDir, "history.json"))).toBe(true);
       const data = JSON.parse(readFileSync(join(nestedDir, "history.json"), "utf-8"));
-      expect(data).toHaveLength(1);
-      expect(data[0].agent).toBe("claude");
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].agent).toBe("claude");
 
       // Clean up
       rmSync(join(homedir(), ".spawn-test"), {
@@ -229,9 +286,10 @@ describe("history", () => {
       });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data).toHaveLength(2);
-      expect(data[0].agent).toBe("claude");
-      expect(data[1].agent).toBe("codex");
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records).toHaveLength(2);
+      expect(data.records[0].agent).toBe("claude");
+      expect(data.records[1].agent).toBe("codex");
     });
 
     it("saves record with prompt field", () => {
@@ -243,7 +301,7 @@ describe("history", () => {
       });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data[0].prompt).toBe("Fix all linter errors");
+      expect(data.records[0].prompt).toBe("Fix all linter errors");
     });
 
     it("saves record without prompt field", () => {
@@ -254,7 +312,7 @@ describe("history", () => {
       });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data[0].prompt).toBeUndefined();
+      expect(data.records[0].prompt).toBeUndefined();
     });
 
     it("writes pretty-printed JSON with trailing newline", () => {
@@ -281,9 +339,47 @@ describe("history", () => {
       }
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data).toHaveLength(5);
-      expect(data[0].agent).toBe("agent-0");
-      expect(data[4].agent).toBe("agent-4");
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records).toHaveLength(5);
+      expect(data.records[0].agent).toBe("agent-0");
+      expect(data.records[4].agent).toBe("agent-4");
+    });
+
+    it("writes v1 format with version and records fields", () => {
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
+
+      const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(Array.isArray(data.records)).toBe(true);
+    });
+
+    it("migrates v0 bare array to v1 format on next save", () => {
+      const existing: SpawnRecord[] = [
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+      ];
+      // Write v0 bare array
+      writeFileSync(join(testDir, "history.json"), JSON.stringify(existing));
+
+      // Trigger a write via saveSpawnRecord
+      saveSpawnRecord({
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T00:00:00.000Z",
+      });
+
+      const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records).toHaveLength(2);
+      expect(data.records[0].agent).toBe("claude");
+      expect(data.records[1].agent).toBe("codex");
     });
 
     it("recovers from corrupted existing history file", () => {
@@ -297,8 +393,9 @@ describe("history", () => {
 
       // loadHistory returns [] for corrupted files, so saveSpawnRecord starts fresh
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data).toHaveLength(1);
-      expect(data[0].agent).toBe("claude");
+      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].agent).toBe("claude");
     });
   });
 
