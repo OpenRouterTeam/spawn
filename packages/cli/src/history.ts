@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import * as v from "valibot";
 import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "./security.js";
 import { isString } from "./shared/type-guards";
 
@@ -26,6 +27,38 @@ export interface SpawnRecord {
   prompt?: string;
   connection?: VMConnection;
 }
+
+// ── Schema versioning ──────────────────────────────────────────────────────
+
+export const HISTORY_SCHEMA_VERSION = 1;
+
+const VMConnectionSchema = v.object({
+  ip: v.string(),
+  user: v.string(),
+  server_id: v.optional(v.string()),
+  server_name: v.optional(v.string()),
+  cloud: v.optional(v.string()),
+  deleted: v.optional(v.boolean()),
+  deleted_at: v.optional(v.string()),
+  launch_cmd: v.optional(v.string()),
+  metadata: v.optional(v.record(v.string(), v.string())),
+});
+
+const SpawnRecordSchema = v.object({
+  id: v.optional(v.string()),
+  agent: v.string(),
+  cloud: v.string(),
+  timestamp: v.string(),
+  name: v.optional(v.string()),
+  prompt: v.optional(v.string()),
+  connection: v.optional(VMConnectionSchema),
+});
+
+/** v1 history file format: { version: 1, records: SpawnRecord[] } */
+const HistoryFileV1Schema = v.object({
+  version: v.literal(1),
+  records: v.array(SpawnRecordSchema),
+});
 
 /** Generate a unique spawn ID. */
 export function generateSpawnId(): string {
@@ -67,6 +100,24 @@ export function getHistoryPath(): string {
 
 export function getConnectionPath(): string {
   return join(getSpawnDir(), "last-connection.json");
+}
+
+/** Write history records to disk in v1 format: { version: 1, records: [...] } */
+function writeHistory(records: SpawnRecord[]): void {
+  writeFileSync(
+    getHistoryPath(),
+    JSON.stringify(
+      {
+        version: HISTORY_SCHEMA_VERSION,
+        records,
+      },
+      null,
+      2,
+    ) + "\n",
+    {
+      mode: 0o600,
+    },
+  );
 }
 
 /** Save VM connection info directly into history.json.
@@ -121,9 +172,7 @@ export function saveVmConnection(
   }
 
   if (merged) {
-    writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-      mode: 0o600,
-    });
+    writeHistory(history);
   }
 
   // Also write last-connection.json for backward compatibility
@@ -180,9 +229,7 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
     }
 
     if (found) {
-      writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-        mode: 0o600,
-      });
+      writeHistory(history);
     }
   } catch {
     // non-fatal
@@ -207,8 +254,24 @@ export function loadHistory(): SpawnRecord[] {
     return [];
   }
   try {
-    const data = JSON.parse(readFileSync(path, "utf-8"));
-    return Array.isArray(data) ? data : [];
+    const text = readFileSync(path, "utf-8");
+    if (!text.trim()) {
+      return [];
+    }
+    const raw: unknown = JSON.parse(text);
+
+    // v1 format: { version: 1, records: [...] }
+    const v1 = v.safeParse(HistoryFileV1Schema, raw);
+    if (v1.success) {
+      return v1.output.records;
+    }
+
+    // v0 format: bare array (pre-versioning; migrated to v1 on next write)
+    if (Array.isArray(raw)) {
+      return raw;
+    }
+
+    return [];
   } catch {
     return [];
   }
@@ -287,9 +350,7 @@ export function saveSpawnRecord(record: SpawnRecord): void {
       ]);
     }
   }
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-    mode: 0o600,
-  });
+  writeHistory(history);
 }
 
 export function clearHistory(): number {
@@ -325,9 +386,9 @@ function mergeLastConnection(): void {
     let metadata: Record<string, string> | undefined;
     if (entries.metadata && typeof entries.metadata === "object" && !Array.isArray(entries.metadata)) {
       metadata = {};
-      for (const [k, v] of Object.entries(entries.metadata)) {
-        if (isString(v)) {
-          metadata[k] = v;
+      for (const [k, val] of Object.entries(entries.metadata)) {
+        if (isString(val)) {
+          metadata[k] = val;
         }
       }
       if (Object.keys(metadata).length === 0) {
@@ -391,9 +452,7 @@ function mergeLastConnection(): void {
       }
     }
     if (merged) {
-      writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-        mode: 0o600,
-      });
+      writeHistory(history);
     }
 
     // Clean up the connection file after merging
@@ -425,9 +484,7 @@ export function removeRecord(record: SpawnRecord): boolean {
     return false;
   }
   history.splice(index, 1);
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-    mode: 0o600,
-  });
+  writeHistory(history);
   return true;
 }
 
@@ -443,9 +500,7 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
   }
   found.connection.deleted = true;
   found.connection.deleted_at = new Date().toISOString();
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-    mode: 0o600,
-  });
+  writeHistory(history);
   return true;
 }
 
