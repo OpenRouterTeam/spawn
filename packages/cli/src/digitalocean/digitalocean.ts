@@ -89,9 +89,27 @@ const DO_SCOPES = [
 const DO_OAUTH_CALLBACK_PORT = 5190;
 
 // ─── State ───────────────────────────────────────────────────────────────────
-let doToken = "";
-let doDropletId = "";
-let doServerIp = "";
+
+export interface DigitalOceanState {
+  token: string;
+  dropletId: string;
+  serverIp: string;
+}
+
+let _state: DigitalOceanState = {
+  token: "",
+  dropletId: "",
+  serverIp: "",
+};
+
+/** Reset session state — used in tests for isolation. */
+export function resetDigitalOceanState(): void {
+  _state = {
+    token: "",
+    dropletId: "",
+    serverIp: "",
+  };
+}
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
@@ -103,7 +121,7 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${doToken}`,
+        Authorization: `Bearer ${_state.token}`,
       };
       const opts: RequestInit = {
         method,
@@ -208,7 +226,7 @@ function isTokenExpired(): boolean {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testDoToken(): Promise<boolean> {
-  if (!doToken) {
+  if (!_state.token) {
     return false;
   }
   try {
@@ -474,14 +492,14 @@ async function tryDoOAuth(): Promise<string | null> {
 export async function ensureDoToken(): Promise<boolean> {
   // 1. Env var
   if (process.env.DO_API_TOKEN) {
-    doToken = process.env.DO_API_TOKEN.trim();
+    _state.token = process.env.DO_API_TOKEN.trim();
     if (await testDoToken()) {
       logInfo("Using DigitalOcean API token from environment");
-      await saveTokenToConfig(doToken);
+      await saveTokenToConfig(_state.token);
       return false;
     }
     logWarn("DO_API_TOKEN from environment is invalid");
-    doToken = "";
+    _state.token = "";
   }
 
   // 2. Saved config (check expiry first, try refresh if needed)
@@ -491,14 +509,14 @@ export async function ensureDoToken(): Promise<boolean> {
       logWarn("Saved DigitalOcean token has expired, trying refresh...");
       const refreshed = await tryRefreshDoToken();
       if (refreshed) {
-        doToken = refreshed;
+        _state.token = refreshed;
         if (await testDoToken()) {
           logInfo("Using refreshed DigitalOcean token");
           return false;
         }
       }
     } else {
-      doToken = saved;
+      _state.token = saved;
       if (await testDoToken()) {
         logInfo("Using saved DigitalOcean API token");
         return false;
@@ -507,26 +525,26 @@ export async function ensureDoToken(): Promise<boolean> {
       // Try refresh as fallback
       const refreshed = await tryRefreshDoToken();
       if (refreshed) {
-        doToken = refreshed;
+        _state.token = refreshed;
         if (await testDoToken()) {
           logInfo("Using refreshed DigitalOcean token");
           return false;
         }
       }
     }
-    doToken = "";
+    _state.token = "";
   }
 
   // 3. Try OAuth browser flow
   const oauthToken = await tryDoOAuth();
   if (oauthToken) {
-    doToken = oauthToken;
+    _state.token = oauthToken;
     if (await testDoToken()) {
       logInfo("Using DigitalOcean token from OAuth");
       return true;
     }
     logWarn("OAuth token failed validation");
-    doToken = "";
+    _state.token = "";
   }
 
   // 4. Manual entry (fallback)
@@ -539,14 +557,14 @@ export async function ensureDoToken(): Promise<boolean> {
       logError("Token cannot be empty");
       continue;
     }
-    doToken = token.trim();
+    _state.token = token.trim();
     if (await testDoToken()) {
-      await saveTokenToConfig(doToken);
+      await saveTokenToConfig(_state.token);
       logInfo("DigitalOcean API token validated and saved");
       return false;
     }
     logError("Token is invalid");
-    doToken = "";
+    _state.token = "";
   }
 
   logError("No valid token after 3 attempts");
@@ -816,16 +834,16 @@ export async function createServer(
     throw new Error("Droplet creation failed");
   }
 
-  doDropletId = String(createData.droplet.id);
-  logInfo(`Droplet created: ID=${doDropletId}`);
+  _state.dropletId = String(createData.droplet.id);
+  logInfo(`Droplet created: ID=${_state.dropletId}`);
 
   // Wait for droplet to become active and get IP
-  await waitForDropletActive(doDropletId);
+  await waitForDropletActive(_state.dropletId);
 
   saveVmConnection(
-    doServerIp,
+    _state.serverIp,
     "root",
-    doDropletId,
+    _state.dropletId,
     name,
     "digitalocean",
     undefined,
@@ -846,9 +864,9 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
       const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
       const publicNet = v4Networks.find((n) => n.type === "public");
       if (publicNet?.ip_address) {
-        doServerIp = isString(publicNet.ip_address) ? publicNet.ip_address : "";
+        _state.serverIp = isString(publicNet.ip_address) ? publicNet.ip_address : "";
         logStepDone();
-        logInfo(`Droplet active, IP: ${doServerIp}`);
+        logInfo(`Droplet active, IP: ${_state.serverIp}`);
         return;
       }
     }
@@ -867,7 +885,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
 export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
-  const serverIp = ip || doServerIp;
+  const serverIp = ip || _state.serverIp;
   const selectedKeys = await ensureSshKeys();
   const keyOpts = getSshKeyOpts(selectedKeys);
   await sharedWaitForSsh({
@@ -958,7 +976,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
-  const serverIp = ip || doServerIp;
+  const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
@@ -992,7 +1010,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 }
 
 export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
-  const serverIp = ip || doServerIp;
+  const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
@@ -1032,7 +1050,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 }
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
-  const serverIp = ip || doServerIp;
+  const serverIp = ip || _state.serverIp;
   if (
     !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
     remotePath.includes("..") ||
@@ -1066,7 +1084,7 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 }
 
 export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
-  const serverIp = ip || doServerIp;
+  const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
   const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
@@ -1083,7 +1101,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
 
   // Post-session summary
   process.stderr.write("\n");
-  logWarn(`Session ended. Your DigitalOcean droplet (ID: ${doDropletId}) is still running.`);
+  logWarn(`Session ended. Your DigitalOcean droplet (ID: ${_state.dropletId}) is still running.`);
   logWarn("Remember to delete it when you're done to avoid ongoing charges.");
   logWarn("");
   logWarn("Manage or delete it in your dashboard:");
@@ -1150,7 +1168,7 @@ export async function promptSpawnName(): Promise<void> {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 export async function destroyServer(dropletId?: string): Promise<void> {
-  const id = dropletId || doDropletId;
+  const id = dropletId || _state.dropletId;
   if (!id) {
     logError("destroy_server: no droplet ID provided");
     throw new Error("No droplet ID");

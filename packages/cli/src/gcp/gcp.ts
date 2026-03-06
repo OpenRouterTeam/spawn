@@ -139,11 +139,32 @@ export const DEFAULT_ZONE = "us-central1-a";
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-let gcpProject = "";
-let gcpZone = "";
-let gcpInstanceName = "";
-let gcpServerIp = "";
-let gcpUsername = "";
+export interface GcpState {
+  project: string;
+  zone: string;
+  instanceName: string;
+  serverIp: string;
+  username: string;
+}
+
+let _state: GcpState = {
+  project: "",
+  zone: "",
+  instanceName: "",
+  serverIp: "",
+  username: "",
+};
+
+/** Reset session state — used in tests for isolation. */
+export function resetGcpState(): void {
+  _state = {
+    project: "",
+    zone: "",
+    instanceName: "",
+    serverIp: "",
+    username: "",
+  };
+}
 
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
 
@@ -426,8 +447,8 @@ export async function authenticate(): Promise<void> {
 export async function resolveProject(): Promise<void> {
   // 1. Env var
   if (process.env.GCP_PROJECT) {
-    gcpProject = process.env.GCP_PROJECT;
-    logInfo(`Using GCP project from environment: ${gcpProject}`);
+    _state.project = process.env.GCP_PROJECT;
+    logInfo(`Using GCP project from environment: ${_state.project}`);
     return;
   }
 
@@ -498,8 +519,8 @@ export async function resolveProject(): Promise<void> {
     throw new Error("No GCP project");
   }
 
-  gcpProject = project;
-  logInfo(`Using GCP project: ${gcpProject}`);
+  _state.project = project;
+  logInfo(`Using GCP project: ${_state.project}`);
 }
 
 // ─── Interactive Pickers ────────────────────────────────────────────────────
@@ -559,8 +580,8 @@ async function ensureSshKey(): Promise<string> {
 // ─── Username ───────────────────────────────────────────────────────────────
 
 function resolveUsername(): string {
-  if (gcpUsername) {
-    return gcpUsername;
+  if (_state.username) {
+    return _state.username;
   }
   const result = Bun.spawnSync(
     [
@@ -579,7 +600,7 @@ function resolveUsername(): string {
     logError("Invalid username detected");
     throw new Error("Invalid username");
   }
-  gcpUsername = username;
+  _state.username = username;
   return username;
 }
 
@@ -690,7 +711,7 @@ export async function createInstance(
     `--subnet=${process.env.GCP_SUBNET ?? "default"}`,
     `--metadata-from-file=startup-script=${tmpFile}`,
     `--metadata=ssh-keys=${sshKeysMetadata}`,
-    `--project=${gcpProject}`,
+    `--project=${_state.project}`,
     "--quiet",
   ];
 
@@ -711,7 +732,7 @@ export async function createInstance(
         "config",
         "set",
         "project",
-        gcpProject,
+        _state.project,
       ]);
       logInfo("Re-authenticated, retrying instance creation...");
       result = await gcloud(args);
@@ -749,19 +770,19 @@ export async function createInstance(
     "describe",
     name,
     `--zone=${zone}`,
-    `--project=${gcpProject}`,
+    `--project=${_state.project}`,
     "--format=get(networkInterfaces[0].accessConfigs[0].natIP)",
   ]);
 
-  gcpInstanceName = name;
-  gcpZone = zone;
-  gcpServerIp = ipResult.stdout;
+  _state.instanceName = name;
+  _state.zone = zone;
+  _state.serverIp = ipResult.stdout;
 
-  logInfo(`Instance created: IP=${gcpServerIp}`);
+  logInfo(`Instance created: IP=${_state.serverIp}`);
 
   // Save connection info with zone/project for later deletion
   saveVmConnection(
-    gcpServerIp,
+    _state.serverIp,
     username,
     "",
     name,
@@ -769,7 +790,7 @@ export async function createInstance(
     undefined,
     {
       zone,
-      project: gcpProject,
+      project: _state.project,
     },
     process.env.SPAWN_ID || undefined,
   );
@@ -781,7 +802,7 @@ async function waitForSsh(maxAttempts = 36): Promise<void> {
   const username = resolveUsername();
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await sharedWaitForSsh({
-    host: gcpServerIp,
+    host: _state.serverIp,
     user: username,
     maxAttempts,
     extraSshOpts: keyOpts,
@@ -802,7 +823,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           "ssh",
           ...SSH_BASE_OPTS,
           ...keyOpts,
-          `${username}@${gcpServerIp}`,
+          `${username}@${_state.serverIp}`,
           "test -f /tmp/.cloud-init-complete",
         ],
         {
@@ -843,7 +864,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
       "ssh",
       ...SSH_BASE_OPTS,
       ...keyOpts,
-      `${username}@${gcpServerIp}`,
+      `${username}@${_state.serverIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
     {
@@ -877,7 +898,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
       "ssh",
       ...SSH_BASE_OPTS,
       ...keyOpts,
-      `${username}@${gcpServerIp}`,
+      `${username}@${_state.serverIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
     {
@@ -927,7 +948,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       ...SSH_BASE_OPTS,
       ...keyOpts,
       localPath,
-      `${username}@${gcpServerIp}:${expandedPath}`,
+      `${username}@${_state.serverIp}:${expandedPath}`,
     ],
     {
       stdio: [
@@ -956,13 +977,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
     "ssh",
     ...SSH_INTERACTIVE_OPTS,
     ...keyOpts,
-    `${username}@${gcpServerIp}`,
+    `${username}@${_state.serverIp}`,
     fullCmd,
   ]);
 
   // Post-session summary
   process.stderr.write("\n");
-  logWarn(`Session ended. Your GCP instance '${gcpInstanceName}' is still running.`);
+  logWarn(`Session ended. Your GCP instance '${_state.instanceName}' is still running.`);
   logWarn("Remember to delete it when you're done to avoid ongoing charges.");
   logWarn("");
   logWarn("Manage or delete it in your dashboard:");
@@ -971,7 +992,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
   logInfo("To delete from CLI:");
   logInfo("  spawn delete");
   logInfo("To reconnect:");
-  logInfo(`  gcloud compute ssh ${gcpInstanceName} --zone=${gcpZone} --project=${gcpProject}`);
+  logInfo(`  gcloud compute ssh ${_state.instanceName} --zone=${_state.zone} --project=${_state.project}`);
 
   return exitCode;
 }
@@ -979,8 +1000,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 export async function destroyInstance(name?: string): Promise<void> {
-  const instanceName = name || gcpInstanceName;
-  const zone = gcpZone || process.env.GCP_ZONE || DEFAULT_ZONE;
+  const instanceName = name || _state.instanceName;
+  const zone = _state.zone || process.env.GCP_ZONE || DEFAULT_ZONE;
 
   if (!instanceName) {
     logError("destroy: no instance name provided");
@@ -994,7 +1015,7 @@ export async function destroyInstance(name?: string): Promise<void> {
     "delete",
     instanceName,
     `--zone=${zone}`,
-    `--project=${gcpProject}`,
+    `--project=${_state.project}`,
     "--quiet",
   ]);
 
