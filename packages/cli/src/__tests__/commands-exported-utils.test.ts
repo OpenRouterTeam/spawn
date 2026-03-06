@@ -6,7 +6,6 @@ import {
   getImplementedAgents,
   getImplementedClouds,
   getMissingClouds,
-  getStatusDescription,
   getTerminalWidth,
   parseAuthEnvVars,
 } from "../commands";
@@ -27,7 +26,6 @@ import { createEmptyManifest, createMockManifest } from "./test-helpers";
  * - getImplementedAgents: returns agents implemented on a cloud
  * - getMissingClouds: returns clouds where an agent is NOT implemented
  * - getErrorMessage: duck-typed error message extraction
- * - getStatusDescription: HTTP status to human-readable string
  * - calculateColumnWidth: matrix display column sizing
  * - getTerminalWidth: terminal width with fallback
  */
@@ -335,26 +333,6 @@ describe("getErrorMessage", () => {
         message: 123,
       }),
     ).toBe("123");
-  });
-});
-
-// ── getStatusDescription ──────────────────────────────────────────────────────
-
-describe("getStatusDescription", () => {
-  it("should return 'not found' for 404", () => {
-    expect(getStatusDescription(404)).toBe("not found");
-  });
-
-  it("should return HTTP prefix for non-404 codes", () => {
-    expect(getStatusDescription(200)).toBe("HTTP 200");
-    expect(getStatusDescription(500)).toBe("HTTP 500");
-    expect(getStatusDescription(403)).toBe("HTTP 403");
-    expect(getStatusDescription(502)).toBe("HTTP 502");
-    expect(getStatusDescription(503)).toBe("HTTP 503");
-  });
-
-  it("should handle zero", () => {
-    expect(getStatusDescription(0)).toBe("HTTP 0");
   });
 });
 

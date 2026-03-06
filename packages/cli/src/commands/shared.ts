@@ -747,10 +747,6 @@ export function getImplementedAgents(manifest: Manifest, cloud: string): string[
   return agentKeys(manifest).filter((a: string): boolean => matrixStatus(manifest, cloud, a) === "implemented");
 }
 
-export function getStatusDescription(status: number): string {
-  return status === 404 ? "not found" : `HTTP ${status}`;
-}
-
 /** Resolve an agent/cloud key to its display name, or return the key as-is */
 export function resolveDisplayName(manifest: Manifest | null, key: string, kind: "agent" | "cloud"): string {
   if (!manifest) {
