@@ -32,11 +32,6 @@ export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
   }
 }
 
-// Re-export so cloud modules can re-export from here
-export type { AgentConfig };
-
-export { generateEnvConfig } from "./agents";
-
 // ─── CloudRunner interface ──────────────────────────────────────────────────
 
 export interface CloudRunner {
