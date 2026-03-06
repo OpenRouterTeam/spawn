@@ -41,10 +41,9 @@ case "${AGENT_NAME}" in
 esac
 
 # Create marker file with agent name + build date
-MARKER_DIR="/root/.spawn-tarball"
-mkdir -p "$(dirname "${MARKER_DIR}")"
-printf '%s\n%s\n' "${AGENT_NAME}" "$(date -u +%Y%m%dT%H%M%SZ)" > "${MARKER_DIR}"
-echo "${MARKER_DIR}" >> "${PATHS_FILE}"
+MARKER_FILE="/root/.spawn-tarball"
+printf '%s\n%s\n' "${AGENT_NAME}" "$(date -u +%Y%m%dT%H%M%SZ)" > "${MARKER_FILE}"
+echo "${MARKER_FILE}" >> "${PATHS_FILE}"
 
 # Filter to only paths that exist (use a temp file to avoid word-splitting)
 FILTERED_FILE="/tmp/spawn-tarball-filtered.txt"

@@ -2,31 +2,31 @@
   "claude": {
     "tier": "minimal",
     "install": [
-      "curl -fsSL https://claude.ai/install.sh | bash || npm install -g @anthropic-ai/claude-code"
+      "curl -fsSL https://claude.ai/install.sh | bash || mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @anthropic-ai/claude-code"
     ]
   },
   "codex": {
     "tier": "node",
     "install": [
-      "npm install -g @openai/codex"
+      "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @openai/codex"
     ]
   },
   "openclaw": {
     "tier": "full",
     "install": [
-      "npm install -g openclaw"
+      "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global openclaw"
     ]
   },
   "opencode": {
     "tier": "minimal",
     "install": [
-      "curl -fsSL https://opencode.ai/install | bash"
+      "mkdir -p ~/.opencode/bin && curl -fsSL https://opencode.ai/install | bash"
     ]
   },
   "kilocode": {
     "tier": "node",
     "install": [
-      "npm install -g @kilocode/cli"
+      "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @kilocode/cli"
     ]
   },
   "zeroclaw": {
