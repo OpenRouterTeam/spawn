@@ -44,6 +44,8 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn` | Interactive agent + cloud picker |
 | `spawn <agent> <cloud>` | Launch agent on cloud directly |
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
+| `spawn <agent> <cloud> --zone <zone>` | Set zone/region for the cloud |
+| `spawn <agent> <cloud> --size <type>` | Set instance size/type for the cloud |
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
