@@ -1,10 +1,10 @@
 // shared/ui.ts — Logging, prompts, and browser opening
 // @clack/prompts is bundled into cli.js at build time.
 
-import * as p from "@clack/prompts";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import * as p from "@clack/prompts";
 import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
@@ -185,7 +185,8 @@ export function openBrowser(url: string): void {
 // ─── Result-based retry ────────────────────────────────────────────────
 
 import type { Result } from "./result";
-export { type Result, Ok, Err } from "./result";
+
+export { Err, Ok, type Result } from "./result";
 
 /**
  * Phase-aware retry helper using the Result monad.

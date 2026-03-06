@@ -1,13 +1,14 @@
 // shared/orchestrate.ts — Shared orchestration pipeline for deploying agents
 // Each cloud implements CloudOrchestrator and calls runOrchestration().
 
-import type { AgentConfig } from "./agents";
-import { generateEnvConfig } from "./agents";
-import { logInfo, logStep, logWarn, withRetry, prepareStdinForHandoff } from "./ui";
-import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import type { CloudRunner } from "./agent-setup";
-import { offerGithubAuth, wrapSshCall } from "./agent-setup";
+import type { AgentConfig } from "./agents";
+
 import { generateSpawnId, saveSpawnRecord } from "../history.js";
+import { offerGithubAuth, wrapSshCall } from "./agent-setup";
+import { generateEnvConfig } from "./agents";
+import { getModelIdInteractive, getOrPromptApiKey } from "./oauth";
+import { logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
 
 export interface CloudOrchestrator {
   cloudName: string;

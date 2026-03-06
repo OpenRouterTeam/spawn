@@ -1,35 +1,35 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
+import type { CloudInitTier } from "../shared/agents";
+
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-
+import { saveVmConnection } from "../history.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  logStepInline,
-  logStepDone,
-  prompt,
-  selectFromList,
-  validateServerName,
-  toKebabCase,
-  defaultSpawnName,
-  sanitizeTermValue,
-} from "../shared/ui";
-import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import {
+  killWithTimeout,
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
-  sleep,
   waitForSsh as sharedWaitForSsh,
-  killWithTimeout,
+  sleep,
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
-import { saveVmConnection } from "../history.js";
+import {
+  defaultSpawnName,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  prompt,
+  sanitizeTermValue,
+  selectFromList,
+  toKebabCase,
+  validateServerName,
+} from "../shared/ui";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 

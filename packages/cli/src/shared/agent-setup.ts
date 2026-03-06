@@ -1,13 +1,14 @@
 // shared/agent-setup.ts — Shared agent helpers + definitions for SSH-based clouds
 // Cloud-agnostic: receives runServer/uploadFile via CloudRunner interface.
 
-import { writeFileSync, unlinkSync } from "node:fs";
+import type { AgentConfig } from "./agents";
+import type { Result } from "./ui";
+
+import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Result } from "./ui";
-import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err } from "./ui";
 import { hasMessage } from "./type-guards";
-import type { AgentConfig } from "./agents";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -33,6 +34,7 @@ export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
 
 // Re-export so cloud modules can re-export from here
 export type { AgentConfig };
+
 export { generateEnvConfig } from "./agents";
 
 // ─── CloudRunner interface ──────────────────────────────────────────────────

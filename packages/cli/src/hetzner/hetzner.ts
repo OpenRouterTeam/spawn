@@ -1,39 +1,39 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { mkdirSync, readFileSync } from "node:fs";
-
-import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  logStepInline,
-  logStepDone,
-  prompt,
-  jsonEscape,
-  getSpawnCloudConfigPath,
-  loadApiToken,
-  validateServerName,
-  validateRegionName,
-  toKebabCase,
-  defaultSpawnName,
-  sanitizeTermValue,
-  selectFromList,
-} from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+
+import { mkdirSync, readFileSync } from "node:fs";
+import { saveVmConnection } from "../history.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
+import { parseJsonObj } from "../shared/parse";
 import {
+  killWithTimeout,
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
-  sleep,
   waitForSsh as sharedWaitForSsh,
-  killWithTimeout,
+  sleep,
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { parseJsonObj } from "../shared/parse";
-import { isString, isNumber, toObjectArray, toRecord } from "../shared/type-guards";
-import { saveVmConnection } from "../history.js";
+import { isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
+import {
+  defaultSpawnName,
+  getSpawnCloudConfigPath,
+  jsonEscape,
+  loadApiToken,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  prompt,
+  sanitizeTermValue,
+  selectFromList,
+  toKebabCase,
+  validateRegionName,
+  validateServerName,
+} from "../shared/ui";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";

@@ -1,23 +1,25 @@
 #!/usr/bin/env bun
+
 // hetzner/main.ts — Orchestrator: deploys an agent on Hetzner Cloud
 
-import {
-  ensureHcloudToken,
-  ensureSshKey,
-  promptSpawnName,
-  promptServerType,
-  promptLocation,
-  createServer as createHetznerServer,
-  getServerName,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./hetzner";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  createServer as createHetznerServer,
+  ensureHcloudToken,
+  ensureSshKey,
+  getServerName,
+  interactiveSession,
+  promptLocation,
+  promptServerType,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./hetzner";
 
 async function main() {
   const agentName = process.argv[2];

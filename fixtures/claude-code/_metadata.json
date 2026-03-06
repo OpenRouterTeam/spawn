@@ -2,6 +2,6 @@
   "agent": "claude-code",
   "recorded_at": "2026-02-24T00:00:00Z",
   "fixtures": {
-    "stream-events": {"format": "stream-json", "type": "synthetic", "recorded_at": "2026-02-24T00:00:00Z"}
+    "stream-events": { "format": "stream-json", "type": "synthetic", "recorded_at": "2026-02-24T00:00:00Z" }
   }
 }

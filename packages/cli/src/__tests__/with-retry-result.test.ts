@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, spyOn } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 
 // Suppress log output during tests
 spyOn(process.stderr, "write").mockImplementation(() => true);

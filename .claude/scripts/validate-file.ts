@@ -9,8 +9,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const file = process.env.CLAUDE_FILE;
 if (!file) {

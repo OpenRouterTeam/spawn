@@ -6,14 +6,7 @@
   "regions": [
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "New York 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -178,27 +171,14 @@
     },
     {
       "available": false,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "image_transfer"],
       "name": "San Francisco 1",
       "sizes": [],
       "slug": "sfo1"
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "New York 2",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -341,27 +321,14 @@
     },
     {
       "available": false,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "image_transfer"],
       "name": "Amsterdam 2",
       "sizes": [],
       "slug": "ams2"
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Singapore 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -524,14 +491,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "London 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -702,14 +662,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "New York 3",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -876,14 +829,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Amsterdam 3",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1046,14 +992,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Frankfurt 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1218,14 +1157,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Toronto 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1393,14 +1325,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "San Francisco 2",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1543,14 +1468,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Bangalore 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1718,14 +1636,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "San Francisco 3",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -1896,14 +1807,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Sydney 1",
       "sizes": [
         "s-1vcpu-512mb-10gb",
@@ -2072,14 +1976,7 @@
     },
     {
       "available": true,
-      "features": [
-        "backups",
-        "ipv6",
-        "metadata",
-        "install_agent",
-        "storage",
-        "image_transfer"
-      ],
+      "features": ["backups", "ipv6", "metadata", "install_agent", "storage", "image_transfer"],
       "name": "Atlanta 1",
       "sizes": [
         "s-1vcpu-1gb-amd",

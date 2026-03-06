@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mockClackPrompts } from "./test-helpers";
-import { preflightCredentialCheck } from "../commands";
 import type { Manifest } from "../manifest";
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { preflightCredentialCheck } from "../commands";
+import { mockClackPrompts } from "./test-helpers";
 
 const mockIsCancel = mock(() => false);
 const clackMocks = mockClackPrompts({

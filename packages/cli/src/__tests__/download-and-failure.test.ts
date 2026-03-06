@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
+import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
  * Tests for the download failure pipeline through real code paths in commands/run.ts.

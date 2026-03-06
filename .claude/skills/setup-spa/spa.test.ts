@@ -1,18 +1,19 @@
-import { describe, it, expect, mock, afterEach } from "bun:test";
-import {
-  parseStreamEvent,
-  stripMention,
-  markdownToSlack,
-  loadState,
-  saveState,
-  downloadSlackFile,
-  extractToolHint,
-  formatToolStats,
-  formatToolHistory,
-} from "./helpers";
 import type { ToolCall } from "./helpers";
+
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { toRecord } from "@openrouter/spawn-shared";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
+import {
+  downloadSlackFile,
+  extractToolHint,
+  formatToolHistory,
+  formatToolStats,
+  loadState,
+  markdownToSlack,
+  parseStreamEvent,
+  saveState,
+  stripMention,
+} from "./helpers";
 
 // Helper: extract a fixture event by index and cast to Record<string, unknown>
 function fixture(index: number): Record<string, unknown> {

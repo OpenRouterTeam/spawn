@@ -1,24 +1,26 @@
 #!/usr/bin/env bun
+
 // digitalocean/main.ts — Orchestrator: deploys an agent on DigitalOcean
 
-import {
-  ensureDoToken,
-  ensureSshKey,
-  promptSpawnName,
-  promptDropletSize,
-  promptDoRegion,
-  createServer as createDroplet,
-  getServerName,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./digitalocean";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
 import { logStep } from "../shared/ui";
+import { agents, resolveAgent } from "./agents";
+import {
+  createServer as createDroplet,
+  ensureDoToken,
+  ensureSshKey,
+  getServerName,
+  interactiveSession,
+  promptDoRegion,
+  promptDropletSize,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./digitalocean";
 
 async function main() {
   const agentName = process.argv[2];

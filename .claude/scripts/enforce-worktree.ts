@@ -6,8 +6,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { dirname } from "node:path";
 import { existsSync } from "node:fs";
+import { dirname } from "node:path";
 import { FilePathInput, parseStdin } from "./schemas.ts";
 
 const raw = await Bun.stdin.text();

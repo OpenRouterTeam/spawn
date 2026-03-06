@@ -1,7 +1,8 @@
-import { describe, it, expect } from "bun:test";
-import { readFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
 import type { Manifest } from "../manifest";
+
+import { describe, expect, it } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 /**
  * Manifest integrity tests.

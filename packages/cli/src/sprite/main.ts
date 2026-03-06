@@ -1,23 +1,25 @@
 #!/usr/bin/env bun
+
 // sprite/main.ts — Orchestrator: deploys an agent on Sprite
 
-import {
-  ensureSpriteCli,
-  ensureSpriteAuthenticated,
-  promptSpawnName,
-  getServerName,
-  createSprite,
-  verifySpriteConnectivity,
-  setupShellEnvironment,
-  saveVmConnection,
-  runSprite,
-  uploadFileSprite,
-  interactiveSession,
-} from "./sprite";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  createSprite,
+  ensureSpriteAuthenticated,
+  ensureSpriteCli,
+  getServerName,
+  interactiveSession,
+  promptSpawnName,
+  runSprite,
+  saveVmConnection,
+  setupShellEnvironment,
+  uploadFileSprite,
+  verifySpriteConnectivity,
+} from "./sprite";
 
 async function main() {
   const agentName = process.argv[2];

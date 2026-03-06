@@ -1,8 +1,9 @@
 import type { spyOn } from "bun:test";
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { Manifest } from "../manifest";
+
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { loadManifest } from "../manifest";
-import { createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
+import { createConsoleMocks, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
  * Tests for cmdMatrix, cmdAgents, and cmdClouds listing command output.

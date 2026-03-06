@@ -1,25 +1,27 @@
 #!/usr/bin/env bun
+
 // aws/main.ts — Orchestrator: deploys an agent on AWS Lightsail
 
-import {
-  ensureAwsCli,
-  authenticate,
-  promptRegion,
-  promptBundle,
-  ensureSshKey,
-  promptSpawnName,
-  createInstance,
-  waitForInstance,
-  waitForCloudInit,
-  getServerName,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./aws";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  authenticate,
+  createInstance,
+  ensureAwsCli,
+  ensureSshKey,
+  getServerName,
+  interactiveSession,
+  promptBundle,
+  promptRegion,
+  promptSpawnName,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+  waitForInstance,
+} from "./aws";
 
 async function main() {
   const agentName = process.argv[2];

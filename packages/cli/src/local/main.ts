@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
+
 // local/main.ts — Orchestrator: deploys an agent on the local machine
 
-import { runLocal, uploadFile, interactiveSession, saveLocalConnection } from "./local";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import { interactiveSession, runLocal, saveLocalConnection, uploadFile } from "./local";
 
 async function main() {
   const agentName = process.argv[2];

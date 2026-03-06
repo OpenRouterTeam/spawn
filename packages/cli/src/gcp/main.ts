@@ -1,24 +1,26 @@
 #!/usr/bin/env bun
+
 // gcp/main.ts — Orchestrator: deploys an agent on GCP Compute Engine
 
-import {
-  ensureGcloudCli,
-  authenticate,
-  resolveProject,
-  promptSpawnName,
-  promptMachineType,
-  promptZone,
-  getServerName,
-  createInstance,
-  waitForCloudInit,
-  runServer,
-  uploadFile,
-  interactiveSession,
-} from "./gcp";
-import { agents, resolveAgent } from "./agents";
+import type { CloudOrchestrator } from "../shared/orchestrate";
+
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import { agents, resolveAgent } from "./agents";
+import {
+  authenticate,
+  createInstance,
+  ensureGcloudCli,
+  getServerName,
+  interactiveSession,
+  promptMachineType,
+  promptSpawnName,
+  promptZone,
+  resolveProject,
+  runServer,
+  uploadFile,
+  waitForCloudInit,
+} from "./gcp";
 
 async function main() {
   const agentName = process.argv[2];

@@ -1,9 +1,10 @@
+import type { VMConnection } from "../history.js";
+import type { Manifest } from "../manifest.js";
+
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import type { Manifest } from "../manifest.js";
-import type { VMConnection } from "../history.js";
 import { getHistoryPath } from "../history.js";
-import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "../security.js";
+import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { getErrorMessage } from "./shared.js";

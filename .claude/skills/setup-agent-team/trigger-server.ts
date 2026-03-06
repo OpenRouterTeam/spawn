@@ -17,18 +17,15 @@
  * (log files at .docs/).
  */
 
-import { timingSafeEqual } from "crypto";
-import { realpathSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
+import { timingSafeEqual } from "node:crypto";
+import { existsSync, realpathSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
-const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT ?? "1", 10);
-const RUN_TIMEOUT_MS = parseInt(
-  process.env.RUN_TIMEOUT_MS ?? String(75 * 60 * 1000),
-  10
-);
+const MAX_CONCURRENT = Number.parseInt(process.env.MAX_CONCURRENT ?? "1", 10);
+const RUN_TIMEOUT_MS = Number.parseInt(process.env.RUN_TIMEOUT_MS ?? String(75 * 60 * 1000), 10);
 
 if (!TRIGGER_SECRET) {
   console.error("ERROR: TRIGGER_SECRET env var is required");
@@ -43,13 +40,13 @@ if (!TARGET_SCRIPT) {
 // Validate TARGET_SCRIPT against an allowlist of directories and file extensions.
 // This prevents an attacker who can control the env var from executing arbitrary scripts.
 const SKILL_DIR = realpathSync(dirname(new URL(import.meta.url).pathname));
-const ALLOWED_SCRIPT_DIRS = [SKILL_DIR];
+const ALLOWED_SCRIPT_DIRS = [
+  SKILL_DIR,
+];
 
 function validateTargetScript(scriptPath: string): string {
   if (!scriptPath.endsWith(".sh")) {
-    console.error(
-      `ERROR: TARGET_SCRIPT must be a .sh file, got: ${scriptPath}`
-    );
+    console.error(`ERROR: TARGET_SCRIPT must be a .sh file, got: ${scriptPath}`);
     process.exit(1);
   }
   const resolved = resolve(scriptPath);
@@ -58,12 +55,10 @@ function validateTargetScript(scriptPath: string): string {
     process.exit(1);
   }
   const real = realpathSync(resolved);
-  const inAllowedDir = ALLOWED_SCRIPT_DIRS.some((dir) =>
-    real.startsWith(dir + "/")
-  );
+  const inAllowedDir = ALLOWED_SCRIPT_DIRS.some((dir) => real.startsWith(dir + "/"));
   if (!inAllowedDir) {
     console.error(
-      `ERROR: TARGET_SCRIPT must be inside an allowed directory (${ALLOWED_SCRIPT_DIRS.join(", ")}), got: ${real}`
+      `ERROR: TARGET_SCRIPT must be inside an allowed directory (${ALLOWED_SCRIPT_DIRS.join(", ")}), got: ${real}`,
     );
     process.exit(1);
   }
@@ -87,7 +82,9 @@ let nextRunId = 1;
 function isAuthed(req: Request): boolean {
   const given = req.headers.get("Authorization") ?? "";
   const expected = `Bearer ${TRIGGER_SECRET}`;
-  if (given.length !== expected.length) return false;
+  if (given.length !== expected.length) {
+    return false;
+  }
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
@@ -125,7 +122,7 @@ function reapAndEnforce() {
     // Check if process is still alive
     if (!isAlive(pid)) {
       console.log(
-        `[trigger] Reaping dead run #${id} (pid=${pid}, reason=${run.reason}, age=${Math.round(elapsed / 1000)}s)`
+        `[trigger] Reaping dead run #${id} (pid=${pid}, reason=${run.reason}, age=${Math.round(elapsed / 1000)}s)`,
       );
       runs.delete(id);
       continue;
@@ -134,7 +131,7 @@ function reapAndEnforce() {
     // Kill if exceeded timeout
     if (elapsed > RUN_TIMEOUT_MS) {
       console.log(
-        `[trigger] Killing stale run #${id} (pid=${pid}, reason=${run.reason}, age=${Math.round(elapsed / 1000)}s, timeout=${Math.round(RUN_TIMEOUT_MS / 1000)}s)`
+        `[trigger] Killing stale run #${id} (pid=${pid}, reason=${run.reason}, age=${Math.round(elapsed / 1000)}s, timeout=${Math.round(RUN_TIMEOUT_MS / 1000)}s)`,
       );
       try {
         run.proc.kill(9);
@@ -145,25 +142,23 @@ function reapAndEnforce() {
 }
 
 function gracefulShutdown(signal: string) {
-  if (shuttingDown) return;
+  if (shuttingDown) {
+    return;
+  }
   shuttingDown = true;
   console.log(`[trigger] Received ${signal}, shutting down gracefully...`);
-  console.log(
-    `[trigger] Waiting for ${runs.size} running script(s) to finish...`
-  );
+  console.log(`[trigger] Waiting for ${runs.size} running script(s) to finish...`);
 
   server.stop();
 
   if (runs.size === 0) {
-    console.log(`[trigger] No running scripts, exiting immediately`);
+    console.log("[trigger] No running scripts, exiting immediately");
     process.exit(0);
   }
 
   const HARD_TIMEOUT_MS = 15 * 60 * 1000;
   const forceKillTimer = setTimeout(() => {
-    console.error(
-      `[trigger] Hard timeout reached (${HARD_TIMEOUT_MS / 1000}s), force killing remaining processes`
-    );
+    console.error(`[trigger] Hard timeout reached (${HARD_TIMEOUT_MS / 1000}s), force killing remaining processes`);
     for (const [, run] of runs) {
       try {
         run.proc.kill(9);
@@ -175,12 +170,12 @@ function gracefulShutdown(signal: string) {
 
   Promise.all(Array.from(runs.values()).map((r) => r.proc.exited))
     .then(() => {
-      console.log(`[trigger] All scripts finished, exiting`);
+      console.log("[trigger] All scripts finished, exiting");
       clearTimeout(forceKillTimer);
       process.exit(0);
     })
     .catch((e) => {
-      console.error(`[trigger] Error waiting for scripts:`, e);
+      console.error("[trigger] Error waiting for scripts:", e);
       clearTimeout(forceKillTimer);
       process.exit(1);
     });
@@ -198,34 +193,40 @@ function startFireAndForgetRun(reason: string, issue: string): Response {
   const startedAt = Date.now();
 
   console.log(
-    `[trigger] Run #${id} starting (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size + 1}/${MAX_CONCURRENT})`
+    `[trigger] Run #${id} starting (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size + 1}/${MAX_CONCURRENT})`,
   );
 
-  const proc = Bun.spawn(["bash", VALIDATED_TARGET_SCRIPT], {
-    cwd:
-      process.env.REPO_ROOT ||
-      VALIDATED_TARGET_SCRIPT.substring(
-        0,
-        VALIDATED_TARGET_SCRIPT.lastIndexOf("/")
-      ) ||
-      ".",
-    stdout: "inherit",
-    stderr: "inherit",
-    env: {
-      ...process.env,
-      SPAWN_ISSUE: issue,
-      SPAWN_REASON: reason,
+  const proc = Bun.spawn(
+    [
+      "bash",
+      VALIDATED_TARGET_SCRIPT,
+    ],
+    {
+      cwd:
+        process.env.REPO_ROOT || VALIDATED_TARGET_SCRIPT.substring(0, VALIDATED_TARGET_SCRIPT.lastIndexOf("/")) || ".",
+      stdout: "inherit",
+      stderr: "inherit",
+      env: {
+        ...process.env,
+        SPAWN_ISSUE: issue,
+        SPAWN_REASON: reason,
+      },
     },
-  });
+  );
 
-  runs.set(id, { proc, startedAt, reason, issue });
+  runs.set(id, {
+    proc,
+    startedAt,
+    reason,
+    issue,
+  });
 
   // Clean up run entry when process exits
   proc.exited
     .then((exitCode) => {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
       console.log(
-        `[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size - 1}/${MAX_CONCURRENT})`
+        `[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size - 1}/${MAX_CONCURRENT})`,
       );
       runs.delete(id);
     })
@@ -243,14 +244,16 @@ function startFireAndForgetRun(reason: string, issue: string): Response {
       max: MAX_CONCURRENT,
     },
     {
-      headers: { "X-Run-Id": String(id) },
-    }
+      headers: {
+        "X-Run-Id": String(id),
+      },
+    },
   );
 }
 
 const server = Bun.serve({
   port: PORT,
-  async fetch(req, server) {
+  async fetch(req, _server) {
     const url = new URL(req.url);
 
     if (req.method === "GET" && url.pathname === "/health") {
@@ -276,13 +279,24 @@ const server = Bun.serve({
     if (req.method === "POST" && url.pathname === "/trigger") {
       if (shuttingDown) {
         return Response.json(
-          { error: "server is shutting down" },
-          { status: 503 }
+          {
+            error: "server is shutting down",
+          },
+          {
+            status: 503,
+          },
         );
       }
 
       if (!isAuthed(req)) {
-        return Response.json({ error: "unauthorized" }, { status: 401 });
+        return Response.json(
+          {
+            error: "unauthorized",
+          },
+          {
+            status: 401,
+          },
+        );
       }
 
       // Reap dead processes and kill timed-out runs before checking capacity
@@ -290,9 +304,7 @@ const server = Bun.serve({
 
       if (runs.size >= MAX_CONCURRENT) {
         const now = Date.now();
-        const oldest = Array.from(runs.values()).reduce((a, b) =>
-          a.startedAt < b.startedAt ? a : b
-        );
+        const oldest = Array.from(runs.values()).reduce((a, b) => (a.startedAt < b.startedAt ? a : b));
         return Response.json(
           {
             error: "max concurrent runs reached",
@@ -302,15 +314,22 @@ const server = Bun.serve({
             oldestAgeSec: Math.round((now - oldest.startedAt) / 1000),
             timeoutSec: Math.round(RUN_TIMEOUT_MS / 1000),
           },
-          { status: 429 }
+          {
+            status: 429,
+          },
         );
       }
 
       const reason = url.searchParams.get("reason") ?? "manual";
       if (!VALID_REASONS.has(reason)) {
         return Response.json(
-          { error: "invalid reason", allowed: Array.from(VALID_REASONS) },
-          { status: 400 }
+          {
+            error: "invalid reason",
+            allowed: Array.from(VALID_REASONS),
+          },
+          {
+            status: 400,
+          },
         );
       }
       const issue = url.searchParams.get("issue") ?? "";
@@ -320,8 +339,12 @@ const server = Bun.serve({
       // Digits-only regex is the primary defense; length cap is defense-in-depth.
       if (issue && (!/^\d+$/.test(issue) || issue.length > 10)) {
         return Response.json(
-          { error: "issue must be a positive integer (max 10 digits)" },
-          { status: 400 }
+          {
+            error: "issue must be a positive integer (max 10 digits)",
+          },
+          {
+            status: 400,
+          },
         );
       }
 
@@ -335,7 +358,9 @@ const server = Bun.serve({
                 issue,
                 running: runs.size,
               },
-              { status: 409 }
+              {
+                status: 409,
+              },
             );
           }
         }
@@ -351,7 +376,9 @@ const server = Bun.serve({
                 reason,
                 running: runs.size,
               },
-              { status: 409 }
+              {
+                status: 409,
+              },
             );
           }
         }
@@ -360,20 +387,27 @@ const server = Bun.serve({
       return startFireAndForgetRun(reason, issue);
     }
 
-    return Response.json({ error: "not found" }, { status: 404 });
+    return Response.json(
+      {
+        error: "not found",
+      },
+      {
+        status: 404,
+      },
+    );
   },
 });
 
 // Proactively reap stale runs every 60 seconds instead of only on requests
 const reapInterval = setInterval(() => {
-  if (runs.size > 0) reapAndEnforce();
+  if (runs.size > 0) {
+    reapAndEnforce();
+  }
 }, 60_000);
 reapInterval.unref?.();
 
 console.log(`[trigger] Listening on port ${server.port}`);
 console.log(`[trigger] TARGET_SCRIPT=${VALIDATED_TARGET_SCRIPT}`);
 console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
-console.log(
-  `[trigger] RUN_TIMEOUT_MS=${RUN_TIMEOUT_MS} (${Math.round(RUN_TIMEOUT_MS / 1000 / 60)}min)`
-);
-console.log(`[trigger] Fire-and-forget mode — /trigger returns immediately, output goes to console`);
+console.log(`[trigger] RUN_TIMEOUT_MS=${RUN_TIMEOUT_MS} (${Math.round(RUN_TIMEOUT_MS / 1000 / 60)}min)`);
+console.log("[trigger] Fire-and-forget mode — /trigger returns immediately, output goes to console");

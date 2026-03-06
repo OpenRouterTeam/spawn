@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test";
-import { validateIdentifier, validateScriptContent, validatePrompt } from "../security";
+import { describe, expect, it } from "bun:test";
+import { validateIdentifier, validatePrompt, validateScriptContent } from "../security";
 
 /**
  * Edge case tests for security validation functions.

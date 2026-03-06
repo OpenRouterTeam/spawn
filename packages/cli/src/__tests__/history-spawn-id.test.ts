@@ -10,21 +10,22 @@
  * - Backward compat: records without id still work via heuristic
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import type { SpawnRecord } from "../history.js";
+
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { SpawnRecord } from "../history.js";
 import {
   generateSpawnId,
+  getConnectionPath,
+  getHistoryPath,
+  loadHistory,
+  markRecordDeleted,
+  removeRecord,
+  saveLaunchCmd,
   saveSpawnRecord,
   saveVmConnection,
-  saveLaunchCmd,
-  removeRecord,
-  markRecordDeleted,
-  loadHistory,
-  getHistoryPath,
-  getConnectionPath,
 } from "../history.js";
 
 describe("history spawn IDs", () => {

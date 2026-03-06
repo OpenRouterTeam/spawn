@@ -1,7 +1,8 @@
-import { describe, it, expect } from "bun:test";
+import type { Manifest } from "../manifest";
+
+import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Manifest } from "../manifest";
 
 /**
  * Manifest type contract validation tests.

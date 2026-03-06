@@ -3,22 +3,21 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-
-import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  logStepInline,
-  logStepDone,
-  prompt,
-  validateServerName,
-  toKebabCase,
-  defaultSpawnName,
-} from "../shared/ui";
-import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
-import { hasMessage } from "../shared/type-guards";
 import { saveVmConnection as saveVmConnectionToHistory } from "../history.js";
+import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
+import { hasMessage } from "../shared/type-guards";
+import {
+  defaultSpawnName,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  prompt,
+  toKebabCase,
+  validateServerName,
+} from "../shared/ui";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 

@@ -75,6 +75,30 @@
     }
   },
   "assist": {
-    "enabled": false
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              {
+                "type": true
+              },
+              ":BLANK_LINE:",
+              {
+                "type": false
+              },
+              [":NODE:"],
+              ":BLANK_LINE:",
+              ["!@openrouter/**"],
+              ":BLANK_LINE:",
+              ["@openrouter/**"],
+              ":BLANK_LINE:",
+              ":ALIAS:"
+            ]
+          }
+        }
+      }
+    }
   }
 }

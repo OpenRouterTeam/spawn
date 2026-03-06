@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { loadManifest } from "../manifest";
+import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
  * Tests for display/output commands: cmdAgentInfo (happy path) and cmdHelp.
