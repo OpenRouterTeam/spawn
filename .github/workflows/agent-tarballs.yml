@@ -95,7 +95,7 @@ jobs:
             cmd=$(jq -r --arg a "${AGENT_NAME}" --argjson i "$i" '.[$a].install[$i]' packer/agents.json)
 
             # Safety layer 1: reject suspicious command patterns
-            if printf '%s' "${cmd}" | grep -qE '(mktemp|eval |base64 -d|/dev/tcp|nc -[elp]|python[23]? -c|perl -e|ruby -e|\bdd\b|>[[:space:]]*/dev/)'; then
+            if printf '%s' "${cmd}" | grep -qE '(mktemp|eval |base64 -d|/dev/tcp|nc -[elp]|python[23]? -c|perl -e|ruby -e|\bdd\b|>[[:space:]]*/dev/|rm -rf)'; then
               echo "::error::Suspicious install command rejected: ${cmd}"
               exit 1
             fi
