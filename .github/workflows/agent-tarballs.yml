@@ -77,17 +77,41 @@ jobs:
 
           # TRUST BOUNDARY: packer/agents.json is version-controlled and requires
           # PR review to modify. Install commands are executed via bash -c, so any
-          # change to agents.json MUST be reviewed for command safety.
+          # change to agents.json MUST be reviewed carefully for command safety.
+          #
+          # Security layers:
+          #   1. agents.json changes require PR review (branch protection)
+          #   2. curl/wget targets validated against domain allowlist
+          #   3. Suspicious command patterns rejected via blocklist
+          #   4. Runs in ephemeral GitHub Actions container (destroyed after each run)
           echo "==> Installing agent..."
+
+          # Allowed domains for curl/wget downloads (official agent vendor domains)
+          ALLOWED_DOMAINS="claude.ai|opencode.ai|raw.githubusercontent.com|registry.npmjs.org|crates.io|github.com"
+
           CMD_COUNT=$(jq -r --arg a "${AGENT_NAME}" '.[$a].install | length' packer/agents.json)
           i=0
           while [ "$i" -lt "$CMD_COUNT" ]; do
             cmd=$(jq -r --arg a "${AGENT_NAME}" --argjson i "$i" '.[$a].install[$i]' packer/agents.json)
-            # Basic safety: reject commands with suspicious patterns
-            if printf '%s' "${cmd}" | grep -qE '(mktemp|eval |base64 -d|/dev/tcp|nc -e)'; then
+
+            # Safety layer 1: reject suspicious command patterns
+            if printf '%s' "${cmd}" | grep -qE '(mktemp|eval |base64 -d|/dev/tcp|nc -[elp]|python[23]? -c|perl -e|ruby -e|\bdd\b|>[[:space:]]*/dev/)'; then
               echo "::error::Suspicious install command rejected: ${cmd}"
               exit 1
             fi
+
+            # Safety layer 2: validate curl/wget URLs against domain allowlist
+            if printf '%s' "${cmd}" | grep -qE '(curl|wget)'; then
+              urls=$(printf '%s' "${cmd}" | grep -oE 'https?://[^[:space:]"|'\'']+' || true)
+              for url in ${urls}; do
+                domain=$(printf '%s' "${url}" | sed -E 's|^https?://([^/]+).*|\1|')
+                if ! printf '%s' "${domain}" | grep -qE "^(${ALLOWED_DOMAINS})$"; then
+                  echo "::error::curl/wget to unapproved domain '${domain}' in: ${cmd}"
+                  exit 1
+                fi
+              done
+            fi
+
             echo "==> Running: ${cmd}"
             sudo HOME=/root bash -c "${cmd}"
             i=$((i + 1))
