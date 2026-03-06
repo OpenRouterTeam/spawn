@@ -298,7 +298,7 @@ verify_claude() {
 
   # Binary check
   log_step "Checking claude binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
     log_ok "claude binary found"
   else
     log_err "claude binary not found"

@@ -22,6 +22,7 @@ case "${AGENT_NAME}" in
   claude)
     echo "/root/.claude/local/" >> "${PATHS_FILE}"
     echo "/root/.local/bin/" >> "${PATHS_FILE}"
+    echo "/root/.local/share/claude/" >> "${PATHS_FILE}"
     echo "/root/.npm-global/" >> "${PATHS_FILE}"
     ;;
   opencode)
