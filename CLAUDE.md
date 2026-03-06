@@ -21,7 +21,7 @@ spawn/
       src/commands.ts            # Compatibility shim → re-exports from commands/
       package.json               # npm package (@openrouter/spawn)
     shared/
-      src/parse.ts               # parseJsonWith(text, schema) and parseJsonRaw(text)
+      src/parse.ts               # parseJsonWith(text, schema) and parseJsonObj(text)
       src/type-guards.ts         # isString, isNumber, hasStatus, hasMessage
       package.json               # npm package (@openrouter/spawn-shared)
   sh/
