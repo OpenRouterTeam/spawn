@@ -5,10 +5,10 @@ import type { Result } from "../../../packages/cli/src/shared/result";
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { Err, Ok } from "../../../packages/cli/src/shared/result";
-import { isString, toRecord } from "../../../packages/cli/src/shared/type-guards";
 import { slackifyMarkdown } from "slackify-markdown";
 import * as v from "valibot";
+import { Err, Ok } from "../../../packages/cli/src/shared/result";
+import { isString, toRecord } from "../../../packages/cli/src/shared/type-guards";
 
 // #region State
 

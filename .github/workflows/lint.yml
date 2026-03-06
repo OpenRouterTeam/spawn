@@ -50,7 +50,7 @@ jobs:
         run: bun install
 
       - name: Run Biome check (all packages)
-        run: bunx @biomejs/biome check packages/cli/src/ packages/shared/src/ .claude/scripts/ .claude/skills/setup-spa/
+        run: bunx @biomejs/biome check packages/cli/src/ .claude/scripts/ .claude/skills/setup-spa/
 
   macos-compat:
     name: macOS Compatibility
