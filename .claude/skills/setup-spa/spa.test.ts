@@ -1,7 +1,7 @@
 import type { ToolCall } from "./helpers";
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { toRecord } from "@openrouter/spawn-shared";
+import { toRecord } from "../../../packages/cli/src/shared/type-guards";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 import {
   downloadSlackFile,

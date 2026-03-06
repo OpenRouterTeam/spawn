@@ -4,7 +4,7 @@
 import type { ContextBlock, KnownBlock, SectionBlock } from "@slack/bolt";
 import type { State, ToolCall } from "./helpers";
 
-import { isString, toRecord } from "@openrouter/spawn-shared";
+import { isString, toRecord } from "../../../packages/cli/src/shared/type-guards";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
 import {
