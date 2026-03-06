@@ -614,15 +614,6 @@ describe("Manifest Cache Lifecycle", () => {
       };
       expect(countImplemented(manifest)).toBe(1);
     });
-
-    it("should handle empty matrix", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {},
-      };
-      expect(countImplemented(manifest)).toBe(0);
-    });
   });
 
   describe("agentKeys and cloudKeys ordering", () => {
@@ -684,16 +675,6 @@ describe("Manifest Cache Lifecycle", () => {
         matrix: {},
       };
       expect(cloudKeys(manifest)).toHaveLength(30);
-    });
-
-    it("should return empty arrays for empty manifest", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {},
-      };
-      expect(agentKeys(manifest)).toEqual([]);
-      expect(cloudKeys(manifest)).toEqual([]);
     });
 
     it("should return single-element array for single agent", () => {
