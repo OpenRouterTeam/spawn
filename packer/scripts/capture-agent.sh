@@ -57,8 +57,11 @@ while IFS= read -r p; do
   fi
 done < "${PATHS_FILE}"
 
-if [ ! -s "${FILTERED_FILE}" ]; then
-  echo "Error: no files found to capture for ${AGENT_NAME}" >&2
+# Count non-marker entries — if only the marker survived filtering,
+# the agent's actual files are missing (install likely failed).
+AGENT_PATHS=$(grep -cv "^${MARKER_FILE}$" "${FILTERED_FILE}" || true)
+if [ "${AGENT_PATHS}" -eq 0 ]; then
+  echo "Error: no agent files found for ${AGENT_NAME} (install may have failed)" >&2
   exit 1
 fi
 
