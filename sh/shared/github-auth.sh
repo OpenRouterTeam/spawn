@@ -289,6 +289,12 @@ ensure_gh_auth() {
                 return 1
                 ;;
         esac
+        # SECURITY: Reject tokens containing newlines, tabs, or carriage returns
+        # to prevent credential file corruption and bypass of downstream validation.
+        if [[ "${GITHUB_TOKEN}" =~ $'\n' ]] || [[ "${GITHUB_TOKEN}" =~ $'\t' ]] || [[ "${GITHUB_TOKEN}" =~ $'\r' ]]; then
+            log_error "GITHUB_TOKEN contains invalid control characters (newline/tab/CR)"
+            return 1
+        fi
 
         # Fast path: skip persistence if gh is already authenticated with
         # stored credentials (not just the env var). Temporarily unset
