@@ -271,6 +271,7 @@
       "url": "https://www.daytona.io/",
       "type": "sandbox",
       "auth": "DAYTONA_API_KEY",
+      "key_request": false,
       "provision_method": "daytona create",
       "exec_method": "daytona exec",
       "interactive_method": "daytona ssh",
