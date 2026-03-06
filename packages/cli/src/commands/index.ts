@@ -50,7 +50,6 @@ export {
   getErrorMessage,
   getImplementedAgents,
   getImplementedClouds,
-  getStatusDescription,
   hasCloudCli,
   hasCloudCredentials,
   isInteractiveTTY,

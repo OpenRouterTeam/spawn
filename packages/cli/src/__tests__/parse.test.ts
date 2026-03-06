@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import * as v from "valibot";
-import { parseJsonRaw, parseJsonWith } from "../shared/parse";
+import { parseJsonWith } from "../shared/parse";
 
 describe("parseJsonWith", () => {
   const NumberSchema = v.object({
@@ -68,40 +68,5 @@ describe("parseJsonWith", () => {
   it("should reject array when object schema expected", () => {
     const result = parseJsonWith("[1, 2, 3]", NumberSchema);
     expect(result).toBeNull();
-  });
-});
-
-describe("parseJsonRaw", () => {
-  it("should parse valid JSON to unknown", () => {
-    const result = parseJsonRaw('{"key": "value"}');
-    expect(result).toEqual({
-      key: "value",
-    });
-  });
-
-  it("should parse JSON arrays", () => {
-    const result = parseJsonRaw("[1, 2, 3]");
-    expect(result).toEqual([
-      1,
-      2,
-      3,
-    ]);
-  });
-
-  it("should return null for invalid JSON", () => {
-    const result = parseJsonRaw("not json");
-    expect(result).toBeNull();
-  });
-
-  it("should return null for empty string", () => {
-    const result = parseJsonRaw("");
-    expect(result).toBeNull();
-  });
-
-  it("should parse primitive JSON values", () => {
-    expect(parseJsonRaw("42")).toBe(42);
-    expect(parseJsonRaw('"hello"')).toBe("hello");
-    expect(parseJsonRaw("true")).toBe(true);
-    expect(parseJsonRaw("null")).toBeNull();
   });
 });

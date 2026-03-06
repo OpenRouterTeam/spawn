@@ -18,19 +18,6 @@ export function parseJsonWith<T extends v.BaseSchema<unknown, unknown, v.BaseIss
 }
 
 /**
- * Escape hatch: parse JSON to `unknown` without schema validation.
- * Use for dynamic response formats where a fixed schema isn't practical
- * (e.g., cloud APIs with 5+ response shapes).
- */
-export function parseJsonRaw(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Parse a JSON string and return it as a Record<string, unknown> or null.
  * Rejects non-object results (arrays, primitives).
  * Use for API responses that are always a JSON object.
