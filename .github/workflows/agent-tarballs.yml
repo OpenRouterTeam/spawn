@@ -39,12 +39,24 @@ jobs:
 
   build:
     needs: matrix
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
-      max-parallel: 3
+      max-parallel: 4
       fail-fast: false
       matrix:
         agent: ${{ fromJson(needs.matrix.outputs.agents) }}
+        arch: [x86_64]
+        # Native-binary agents need ARM builds too.
+        # npm-based agents (codex, openclaw, kilocode) are arch-independent — x86_64 only.
+        include:
+          - agent: zeroclaw
+            arch: arm64
+          - agent: opencode
+            arch: arm64
+          - agent: hermes
+            arch: arm64
+          - agent: claude
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -132,17 +144,29 @@ jobs:
           set -eo pipefail
           TAG="agent-${AGENT_NAME}-latest"
           DATE=$(date -u +%Y%m%d)
-          TARBALL="spawn-agent-${AGENT_NAME}-x86_64-${DATE}.tar.gz"
+          ARCH="${{ matrix.arch }}"
+          TARBALL="spawn-agent-${AGENT_NAME}-${ARCH}-${DATE}.tar.gz"
 
           # Move tarball to expected name (tarball is owned by root from sudo capture)
           sudo mv "/tmp/spawn-agent-${AGENT_NAME}.tar.gz" "${TARBALL}"
           sudo chown "$(id -u):$(id -g)" "${TARBALL}"
 
-          # Delete existing release if present (rolling release)
-          gh release delete "${TAG}" --yes 2>/dev/null || true
+          # Create release if it doesn't exist, then upload the arch-specific tarball.
+          # Multiple arch builds (x86_64, arm64) upload to the same release.
+          if ! gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --title "Agent tarball: ${AGENT_NAME} (${DATE})" \
+              --notes "Pre-built tarball for \`${AGENT_NAME}\` agent. Auto-generated nightly." \
+              --prerelease
+          fi
 
-          # Create fresh release with the tarball
-          gh release create "${TAG}" "${TARBALL}" \
-            --title "Agent tarball: ${AGENT_NAME} (${DATE})" \
-            --notes "Pre-built tarball for \`${AGENT_NAME}\` agent. Auto-generated nightly." \
-            --prerelease
+          # Delete stale asset for this arch if present (from a previous build today)
+          gh release delete-asset "${TAG}" "${TARBALL}" --yes 2>/dev/null || true
+          # Also clean up any older-dated tarball for this arch
+          gh release view "${TAG}" --json assets --jq ".assets[].name" 2>/dev/null \
+            | grep "spawn-agent-${AGENT_NAME}-${ARCH}-" \
+            | while IFS= read -r old; do
+                gh release delete-asset "${TAG}" "${old}" --yes 2>/dev/null || true
+              done
+
+          gh release upload "${TAG}" "${TARBALL}"
