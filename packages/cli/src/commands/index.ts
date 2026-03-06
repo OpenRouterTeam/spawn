@@ -62,5 +62,7 @@ export {
   resolveCloudKey,
   resolveDisplayName,
 } from "./shared.js";
+// status.ts — cmdStatus
+export { cmdStatus } from "./status.js";
 // update.ts — cmdUpdate
 export { cmdUpdate } from "./update.js";
