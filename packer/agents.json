@@ -32,14 +32,14 @@
   "zeroclaw": {
     "tier": "minimal",
     "install": [
-      "fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile",
+      "if [ ! -f /swapfile ]; then fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile; fi",
       "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
     ]
   },
   "hermes": {
     "tier": "minimal",
     "install": [
-      "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+      "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash || [ -f ~/.local/bin/hermes ]"
     ]
   }
 }

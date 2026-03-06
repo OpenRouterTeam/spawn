@@ -113,7 +113,7 @@ jobs:
             fi
 
             echo "==> Running: ${cmd}"
-            sudo HOME=/root bash -c "${cmd}"
+            sudo HOME=/root bash -c "${cmd}" < /dev/null
             i=$((i + 1))
           done
 
@@ -134,8 +134,9 @@ jobs:
           DATE=$(date -u +%Y%m%d)
           TARBALL="spawn-agent-${AGENT_NAME}-x86_64-${DATE}.tar.gz"
 
-          # Move tarball to expected name
-          mv "/tmp/spawn-agent-${AGENT_NAME}.tar.gz" "${TARBALL}"
+          # Move tarball to expected name (tarball is owned by root from sudo capture)
+          sudo mv "/tmp/spawn-agent-${AGENT_NAME}.tar.gz" "${TARBALL}"
+          sudo chown "$(id -u):$(id -g)" "${TARBALL}"
 
           # Delete existing release if present (rolling release)
           gh release delete "${TAG}" --yes 2>/dev/null || true
