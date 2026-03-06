@@ -54,30 +54,45 @@ export async function tryTarballInstall(
       return false;
     }
 
-    // Find the .tar.gz asset
-    const asset = parsed.output.assets.find((a) => a.name.endsWith(".tar.gz"));
-    if (!asset) {
+    // Find both arch-specific .tar.gz assets and let the remote VM pick the right one.
+    // We try x86_64 first (most common), and include arm64 fallback in the remote script.
+    const x86Asset = parsed.output.assets.find((a) => a.name.includes("-x86_64-") && a.name.endsWith(".tar.gz"));
+    const armAsset = parsed.output.assets.find((a) => a.name.includes("-arm64-") && a.name.endsWith(".tar.gz"));
+
+    if (!x86Asset && !armAsset) {
       logWarn("No tarball asset found in release");
       return false;
     }
 
-    const url = asset.browser_download_url;
+    // Build arch-aware download: remote VM detects its own arch and picks the right URL
+    const x86Url = x86Asset?.browser_download_url || "";
+    const armUrl = armAsset?.browser_download_url || "";
+    const url = x86Url || armUrl;
 
-    // SECURITY: Validate URL matches expected GitHub releases pattern.
+    // SECURITY: Validate URLs match expected GitHub releases pattern.
     // Prevents shell injection via crafted API responses.
-    if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/.test(url)) {
+    const urlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/;
+    if ((x86Url && !urlPattern.test(x86Url)) || (armUrl && !urlPattern.test(armUrl))) {
       logWarn("Tarball URL failed safety validation");
       return false;
     }
 
     logStep("Downloading pre-built agent tarball...");
 
+    // Build arch-aware download command: remote VM picks the right URL based on uname -m
+    let downloadCmd: string;
+    if (x86Url && armUrl) {
+      downloadCmd =
+        "_arch=$(uname -m); " +
+        `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
+        `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
+        `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | tar xz -C / && [ -f /root/.spawn-tarball ]`;
+    } else {
+      downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | tar xz -C / && [ -f /root/.spawn-tarball ]`;
+    }
+
     // Download and extract on the remote VM
-    // --connect-timeout 10s, --max-time 120s, -L to follow redirects (GitHub releases redirect)
-    await runner.runServer(
-      `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | tar xz -C / && [ -f /root/.spawn-tarball ]`,
-      150, // 2.5 min total timeout for the SSH command
-    );
+    await runner.runServer(downloadCmd, 150);
 
     logInfo("Agent installed from pre-built tarball");
     return true;
