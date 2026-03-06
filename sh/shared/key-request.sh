@@ -22,13 +22,14 @@ fi
 _parse_cloud_auths() {
     local manifest_path="${1}"
     if command -v jq &>/dev/null; then
-        jq -r '.clouds | to_entries[] | select(.value.auth != null and .value.auth != "") | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i") | not) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null
+        jq -r '.clouds | to_entries[] | select(.value.auth != null and .value.auth != "") | select(.value.key_request != false) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i") | not) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null
     else
         _MANIFEST="${manifest_path}" bun -e "
 import fs from 'fs';
 const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
 for (const [key, cloud] of Object.entries(m.clouds || {})) {
   const auth = cloud.auth || '';
+  if (cloud.key_request === false) continue;
   if (/\b(login|configure|setup)\b/i.test(auth)) continue;
   if (!auth.trim()) continue;
   process.stdout.write(key + '|' + auth + '\n');
