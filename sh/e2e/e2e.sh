@@ -235,13 +235,9 @@ run_agents_for_cloud() {
 
   # Validate environment for this cloud
   if ! require_env; then
-    log_err "Environment validation failed for ${cloud}"
-    # Write fail results for all agents
-    for agent in ${AGENTS_TO_TEST}; do
-      printf 'fail' > "${log_dir}/${cloud}-${agent}.result"
-    done
-    printf 'FAILED (env validation)' > "${log_dir}/${cloud}.summary"
-    return 1
+    log_warn "Credentials not configured for ${cloud} — skipping"
+    printf 'SKIPPED (no credentials)' > "${log_dir}/${cloud}.summary"
+    return 0
   fi
 
   local cloud_passed=""
@@ -468,6 +464,21 @@ for cloud in ${CLOUDS}; do
 
   cloud_pass=0
   cloud_fail=0
+  cloud_skip=0
+
+  # Check if this cloud was skipped (no credentials) — no result files written
+  cloud_has_results=0
+  for agent in ${AGENTS_TO_TEST}; do
+    if [ -f "${LOG_DIR}/${cloud}-${agent}.result" ]; then
+      cloud_has_results=1
+      break
+    fi
+  done
+
+  if [ "${cloud_has_results}" -eq 0 ]; then
+    printf "    ${YELLOW}(skipped — credentials not configured)${NC}\n"
+    continue
+  fi
 
   for agent in ${AGENTS_TO_TEST}; do
     result_file="${LOG_DIR}/${cloud}-${agent}.result"

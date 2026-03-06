@@ -183,8 +183,8 @@ done
 
 log "Pre-cycle cleanup done."
 
-# --- Load cloud credentials (quality + fixtures modes) ---
-if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]]; then
+# --- Load cloud credentials (quality + fixtures + e2e modes) ---
+if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]]; then
     if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
         source "${REPO_ROOT}/sh/shared/key-request.sh"
         load_cloud_keys_from_config

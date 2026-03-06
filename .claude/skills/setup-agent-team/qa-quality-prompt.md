@@ -122,29 +122,26 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
 ### Teammate 4: e2e-tester (model=sonnet)
 
-**Task**: Run the AWS E2E test suite, investigate failures, and fix broken test infrastructure.
+**Task**: Run the E2E test suite across all configured clouds, investigate failures, and fix broken test infrastructure.
 
 **Protocol**:
 1. Run the E2E suite from the main repo checkout (E2E tests provision live VMs — no worktree needed for the test runner itself):
    ```bash
    cd REPO_ROOT_PLACEHOLDER
-   chmod +x sh/e2e/aws-e2e.sh
-   ./sh/e2e/aws-e2e.sh --parallel 6
+   chmod +x sh/e2e/e2e.sh
+   ./sh/e2e/e2e.sh --cloud all --parallel 6 --skip-input-test
    ```
-2. Capture the full output. Note which agents passed and which failed.
-3. If all agents pass: report results and you're done. No PR needed.
-4. If any agent fails, investigate the root cause. Failure categories:
+2. Capture the full output. Note which clouds ran, which agents passed, which failed, and which clouds were skipped (no credentials).
+3. If all configured clouds pass (or only skipped clouds): report results and you're done. No PR needed.
+4. If any agent fails on a configured cloud, investigate the root cause. Failure categories:
 
    **a) Provision failure** (instance does not exist after provisioning):
    - Check the stderr log in the temp directory printed at the start of the run
-   - Common causes: missing env var for headless mode, AWS API auth issues, agent install script changed upstream
-   - Read: `packages/cli/src/aws/aws.ts`, `packages/cli/src/shared/agent-setup.ts`, `sh/e2e/lib/provision.sh`
+   - Common causes: missing env var for headless mode, cloud API auth issues, agent install script changed upstream
+   - Read: `packages/cli/src/{cloud}/{cloud}.ts`, `packages/cli/src/shared/agent-setup.ts`, `sh/e2e/lib/provision.sh`
 
    **b) Verification failure** (instance exists but checks fail):
-   - SSH into the VM to investigate:
-     ```bash
-     ssh -o StrictHostKeyChecking=no root@INSTANCE_IP "ls -la ~; cat ~/.spawnrc; echo ---; env"
-     ```
+   - SSH into the VM to investigate: check the IP from the log output
    - Check if binary paths or env var names changed in `manifest.json` or `packages/cli/src/shared/agent-setup.ts`
    - Update verification checks in `sh/e2e/lib/verify.sh` if stale
 
@@ -160,12 +157,11 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - `sh/e2e/lib/verify.sh` — binary paths, config file locations, env var checks
    - `sh/e2e/lib/common.sh` — API helpers, constants
    - `sh/e2e/lib/teardown.sh` — cleanup logic
-   - `sh/e2e/lib/cleanup.sh` — stale instance detection
 7. Run `bash -n` on every modified `.sh` file
-8. Re-run the E2E suite for the failed agent(s) only: `./sh/e2e/aws-e2e.sh AGENT_NAME`
+8. Re-run only the failed agents: `./sh/e2e/e2e.sh --cloud CLOUD AGENT_NAME`
 9. If changes were made: commit, push, open a PR (NOT draft) with title "fix(e2e): [description]"
 10. Clean up worktree when done
-11. Report: agents tested, passed, failed, fixed
+11. Report: clouds tested, clouds skipped, agents passed, agents failed, fixed
 12. **SIGN-OFF**: `-- qa/e2e-tester`
 
 ### Teammate 5: record-keeper (model=sonnet)
@@ -267,7 +263,7 @@ After all teammates finish, compile a summary:
 - PRs: [links if any]
 
 ### E2E Tester
-- Agents tested: X | Passed: Y | Failed: Z | Fixed: W
+- Clouds tested: X | Clouds skipped: Y | Agents passed: Z | Agents failed: W | Fixed: V
 - PRs: [links if any]
 
 ### Record-Keeper
