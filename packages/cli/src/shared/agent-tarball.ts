@@ -80,15 +80,18 @@ export async function tryTarballInstall(
     logStep("Downloading pre-built agent tarball...");
 
     // Build arch-aware download command: remote VM picks the right URL based on uname -m
+    // Use sudo for tar extraction — on clouds like AWS Lightsail, SSH user is 'ubuntu' (non-root)
+    // but tarballs extract to /root/. The ubuntu user has passwordless sudo.
+    const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
     let downloadCmd: string;
     if (x86Url && armUrl) {
       downloadCmd =
         "_arch=$(uname -m); " +
         `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
         `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
-        `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | tar xz -C / && [ -f /root/.spawn-tarball ]`;
+        `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
     } else {
-      downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | tar xz -C / && [ -f /root/.spawn-tarball ]`;
+      downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
     }
 
     // Download and extract on the remote VM
