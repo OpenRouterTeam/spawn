@@ -251,23 +251,32 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
           ],
         },
       );
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
+      // Per-process timeout: ConnectTimeout=10 only covers TCP connect, not
+      // the full SSH handshake. If sshd accepts the connection but stalls
+      // during key exchange or auth, the process hangs indefinitely. Kill it
+      // after 30s so the retry loop can continue.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
+      try {
+        const [stdout, stderr] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        const exitCode = await proc.exited;
 
-      if (exitCode === 0 && stdout.includes("ok")) {
-        logInfo("SSH is ready");
-        return;
-      }
+        if (exitCode === 0 && stdout.includes("ok")) {
+          logInfo("SSH is ready");
+          return;
+        }
 
-      // Show the actual SSH error reason dimly so users can debug
-      const reason = stderr.trim();
-      if (reason) {
-        logStep(`SSH handshake failed (${i}/${handshakeAttempts}): ${reason}`);
-      } else {
-        logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
+        // Show the actual SSH error reason dimly so users can debug
+        const reason = stderr.trim();
+        if (reason) {
+          logStep(`SSH handshake failed (${i}/${handshakeAttempts}): ${reason}`);
+        } else {
+          logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
+        }
+      } finally {
+        clearTimeout(timer);
       }
     } catch {
       logStep(`SSH handshake error (${i}/${handshakeAttempts})`);
