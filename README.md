@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**7 agents. 7 clouds. 49 working combinations. Zero config.**
+**7 agents. 6 clouds. 42 working combinations. Zero config.**
 
 ## Install
 
