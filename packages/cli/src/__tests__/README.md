@@ -77,6 +77,8 @@ bun test src/__tests__/manifest.test.ts
 - `check-entity.test.ts` / `check-entity-messages.test.ts` — Entity validation
 - `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
 - `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
+- `do-snapshot.test.ts` — `findSpawnSnapshot`: DigitalOcean snapshot lookup, filtering, error handling
+- `ui-utils.test.ts` — `validateServerName`, `validateRegionName`, `validateModelId`, `toKebabCase`, `sanitizeTermValue`, `jsonEscape`
 
 ### OAuth and auth
 - `oauth-code-validation.test.ts` — `OAUTH_CODE_REGEX` format validation
