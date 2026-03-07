@@ -131,7 +131,7 @@ async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
     }
 
     default:
-      // Other clouds (aws, gcp, sprite, daytona) require CLI or complex auth;
+      // Other clouds (aws, gcp, sprite) require CLI or complex auth;
       // report "unknown" rather than attempting a potentially interactive flow.
       return "unknown";
   }
@@ -159,7 +159,7 @@ function fmtIp(conn: SpawnRecord["connection"]): string {
   if (conn.cloud === "local") {
     return "localhost";
   }
-  if (!conn.ip || conn.ip === "sprite-console" || conn.ip === "daytona-sandbox") {
+  if (!conn.ip || conn.ip === "sprite-console") {
     return "—";
   }
   return conn.ip;
