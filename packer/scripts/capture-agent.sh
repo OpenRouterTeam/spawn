@@ -11,6 +11,15 @@ if [ -z "${AGENT_NAME}" ]; then
   exit 1
 fi
 
+# Validate agent name against allowed list to prevent injection
+case "${AGENT_NAME}" in
+  openclaw|codex|kilocode|claude|opencode|zeroclaw|hermes) ;;
+  *)
+    printf 'Error: Invalid agent name: %s\nAllowed: openclaw, codex, kilocode, claude, opencode, zeroclaw, hermes\n' "${AGENT_NAME}" >&2
+    exit 1
+    ;;
+esac
+
 PATHS_FILE="/tmp/spawn-tarball-paths.txt"
 : > "${PATHS_FILE}"
 
