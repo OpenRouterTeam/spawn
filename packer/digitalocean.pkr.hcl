@@ -142,11 +142,11 @@ build {
     ]
   }
 
-  # DO Marketplace validation — download and run img_check.sh to verify the image
+  # DO Marketplace validation — download and run 99-img-check.sh to verify the image
   # meets marketplace requirements (firewall active, no root password, etc.)
   provisioner "shell" {
     inline = [
-      "curl -fsSL https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/img_check.sh -o /tmp/img_check.sh",
+      "curl -fsSL https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/99-img-check.sh -o /tmp/img_check.sh",
       "chmod +x /tmp/img_check.sh",
       "/tmp/img_check.sh",
       "rm -f /tmp/img_check.sh",
