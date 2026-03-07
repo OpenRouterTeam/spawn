@@ -948,9 +948,14 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       env: process.env,
     },
   );
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`upload_file failed for ${remotePath}`);
+  const timer = setTimeout(() => killWithTimeout(proc), 120_000);
+  try {
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      throw new Error(`upload_file failed for ${remotePath}`);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
