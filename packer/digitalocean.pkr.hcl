@@ -43,8 +43,6 @@ source "digitalocean" "spawn" {
     "nyc1", "nyc3", "sfo3", "tor1", "ams3",
     "lon1", "fra1", "blr1", "sgp1", "syd1",
   ]
-
-  tags = ["spawn", "spawn-${var.agent_name}"]
 }
 
 build {
