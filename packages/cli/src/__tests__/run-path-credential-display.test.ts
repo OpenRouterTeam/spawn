@@ -119,7 +119,7 @@ mockClackPrompts({
 });
 
 // Import after mocks are set up
-const { prioritizeCloudsByCredentials, isRetryableExitCode } = await import("../commands.js");
+const { prioritizeCloudsByCredentials, isRetryableExitCode } = await import("../commands/index.js");
 
 // ── prioritizeCloudsByCredentials ────────────────────────────────────────
 

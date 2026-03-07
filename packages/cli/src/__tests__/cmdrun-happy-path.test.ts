@@ -39,7 +39,7 @@ const {
   spinnerMessage: mockSpinnerMessage,
 } = mockClackPrompts();
 
-const { cmdRun } = await import("../commands.js");
+const { cmdRun } = await import("../commands/index.js");
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 

@@ -38,7 +38,7 @@ const {
 } = mockClackPrompts();
 
 // Import after mock setup
-const { cmdList } = await import("../commands.js");
+const { cmdList } = await import("../commands/index.js");
 const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Test Setup ──────────────────────────────────────────────────────────────────

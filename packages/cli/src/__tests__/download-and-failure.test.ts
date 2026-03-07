@@ -21,7 +21,7 @@ const mockManifest = createMockManifest();
 mockClackPrompts();
 
 // Import after mock setup
-const { cmdRun } = await import("../commands.js");
+const { cmdRun } = await import("../commands/index.js");
 
 describe("Download and Failure Pipeline", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;

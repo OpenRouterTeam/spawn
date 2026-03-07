@@ -166,7 +166,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
 ### Teammate 5: record-keeper (model=sonnet)
 
-**Task**: Keep README.md in sync with manifest.json (matrix table), commands.ts (commands table), and recurring user issues (troubleshooting). **Conservative by design — if nothing changed, do nothing.**
+**Task**: Keep README.md in sync with manifest.json (matrix table), commands/index.ts (commands table), and recurring user issues (troubleshooting). **Conservative by design — if nothing changed, do nothing.**
 
 **Protocol**:
 1. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/record-keeper -b qa/record-keeper origin/main`
@@ -180,10 +180,10 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - To check: parse `manifest.json`, count agents/clouds/implemented entries, compare against README matrix table rows and tagline numbers
 
    **Gate 2 — Commands drift**:
-   - Source of truth: `packages/cli/src/commands.ts` → `getHelpUsageSection()` (line ~3339)
+   - Source of truth: `packages/cli/src/commands/help.ts` → `getHelpUsageSection()`
    - README section: Commands table (lines ~42-66)
    - Triggers when: a command exists in code but not in the README table, or vice versa
-   - To check: read the help section from `commands.ts`, extract command patterns, compare against README commands table entries
+   - To check: read the help section from `commands/help.ts`, extract command patterns, compare against README commands table entries
 
    **Gate 3 — Troubleshooting gaps** (hardest gate — requires recurrence):
    - Source of truth: `gh issue list --repo OpenRouterTeam/spawn --state all --limit 30 --json title,body,labels,state`

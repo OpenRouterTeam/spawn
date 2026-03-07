@@ -25,7 +25,7 @@ import {
   loadManifestWithSpinner,
   resolveAgentKey,
   resolveCloudKey,
-} from "./commands.js";
+} from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { checkForUpdates } from "./update-check.js";

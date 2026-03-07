@@ -3,7 +3,7 @@ import {
   getScriptFailureGuidance as _getScriptFailureGuidance,
   getSignalGuidance as _getSignalGuidance,
   buildRetryCommand,
-} from "../commands";
+} from "../commands/index.js";
 
 /** Strip ANSI escape codes from a string so assertions work regardless of color support. */
 function stripAnsi(s: string): string {
