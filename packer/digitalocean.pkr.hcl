@@ -66,7 +66,7 @@ build {
 
   # Run the tier script (installs base packages: curl, git, node, bun, etc.)
   provisioner "shell" {
-    script = "scripts/tier-${var.cloud_init_tier}.sh"
+    script = "packer/scripts/tier-${var.cloud_init_tier}.sh"
   }
 
   # Install the agent
