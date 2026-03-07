@@ -93,7 +93,7 @@ function Install-SpawnCli {
             git clone --depth 1 --filter=blob:none --sparse `
                 "https://github.com/$SPAWN_REPO.git" $repoDir 2>$null
             Push-Location $repoDir
-            git sparse-checkout set packages/cli packages/shared 2>$null
+            git sparse-checkout set packages/cli 2>$null
             Pop-Location
             Move-Item (Join-Path $repoDir "packages" "cli") $cliDir
             Remove-Item $repoDir -Recurse -Force -ErrorAction SilentlyContinue
