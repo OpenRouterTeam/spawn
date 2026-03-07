@@ -35,9 +35,9 @@ source "digitalocean" "spawn" {
   api_token    = var.do_api_token
   image        = "ubuntu-24-04-x64"
   region       = "sfo3"
-  # DO Marketplace recommends the smallest droplet ($6/mo s-1vcpu-1gb) for
-  # build compatibility — snapshots built on s-1vcpu-1gb work on all sizes.
-  size         = "s-1vcpu-1gb"
+  # 2 GB RAM needed — Claude's native installer and zeroclaw's Rust build
+  # get OOM-killed on s-1vcpu-1gb. Snapshots built here work on all sizes.
+  size         = "s-2vcpu-2gb"
   ssh_username = "root"
 
   snapshot_name = local.image_name
@@ -116,8 +116,7 @@ build {
       "rm -f /root/.ssh/authorized_keys",
       "find /home -name authorized_keys -delete",
 
-      # Clear bash history
-      "history -c",
+      # Clear bash history (history -c is bash-only; Packer runs /bin/sh)
       "rm -f /root/.bash_history",
       "find /home -name .bash_history -delete",
 
