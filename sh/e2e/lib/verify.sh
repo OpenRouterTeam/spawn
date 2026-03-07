@@ -24,18 +24,16 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode prompt for safe embedding.
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec_long "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); claude -p \"\$PROMPT\"" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -52,16 +50,15 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex exec \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec_long "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); codex exec \"\$PROMPT\"" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
@@ -129,8 +126,9 @@ input_test_openclaw() {
 
   log_step "Running input test for openclaw..."
 
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   while [ "${attempt}" -lt "${max_attempts}" ]; do
     attempt=$((attempt + 1))
@@ -143,14 +141,11 @@ input_test_openclaw() {
       _openclaw_restart_gateway "${app}"
     fi
 
-    local remote_cmd
-    remote_cmd="source ~/.spawnrc 2>/dev/null; \
+    local output
+    output=$(printf '%s' "${encoded_prompt}" | cloud_exec_long "${app}" "source ~/.spawnrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-      PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60"
-
-    local output
-    output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+      PROMPT=\$(base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
     if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
@@ -175,15 +170,14 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec_long "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); zeroclaw agent -p \"\$PROMPT\"" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
