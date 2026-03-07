@@ -100,14 +100,14 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
    **b) Stale references**: Scripts or code referencing files that no longer exist
    - Shell scripts are under `sh/` (e.g., `sh/shared/`, `sh/e2e/`, `sh/test/`, `sh/{cloud}/`)
-   - TypeScript is under `packages/cli/src/` and `packages/shared/src/`
+   - TypeScript is under `packages/cli/src/`
    - Grep for paths that reference old locations or deleted files and fix them
 
    **c) Python usage**: Any `python3 -c` or `python -c` calls in shell scripts
    - Replace with `bun eval` or `jq` as appropriate per CLAUDE.md rules
 
    **d) Duplicate utilities**: Same helper function defined in multiple TypeScript cloud modules
-   - If identical, move to `packages/shared/src/` and have cloud modules import it
+   - If identical, move to `packages/cli/src/shared/` and have cloud modules import it
 
    **e) Stale comments**: Comments referencing removed infrastructure, old test files, or deleted functions
    - Remove or update these comments
