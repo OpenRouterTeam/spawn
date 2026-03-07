@@ -147,24 +147,13 @@ export interface GcpState {
   username: string;
 }
 
-let _state: GcpState = {
+const _state: GcpState = {
   project: "",
   zone: "",
   instanceName: "",
   serverIp: "",
   username: "",
 };
-
-/** Reset session state — used in tests for isolation. */
-export function resetGcpState(): void {
-  _state = {
-    project: "",
-    zone: "",
-    instanceName: "",
-    serverIp: "",
-    username: "",
-  };
-}
 
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
 

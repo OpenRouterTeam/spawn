@@ -177,7 +177,7 @@ export interface AwsState {
   selectedBundle: string;
 }
 
-let _state: AwsState = {
+const _state: AwsState = {
   accessKeyId: "",
   secretAccessKey: "",
   sessionToken: "",
@@ -187,20 +187,6 @@ let _state: AwsState = {
   instanceIp: "",
   selectedBundle: DEFAULT_BUNDLE.id,
 };
-
-/** Reset session state — used in tests for isolation. */
-export function resetAwsState(): void {
-  _state = {
-    accessKeyId: "",
-    secretAccessKey: "",
-    sessionToken: "",
-    region: "us-east-1",
-    lightsailMode: "cli",
-    instanceName: "",
-    instanceIp: "",
-    selectedBundle: DEFAULT_BUNDLE.id,
-  };
-}
 
 export function getState() {
   return {
