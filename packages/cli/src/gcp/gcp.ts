@@ -35,12 +35,12 @@ const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
 // ─── Machine Type Tiers ─────────────────────────────────────────────────────
 
-export interface MachineTypeTier {
+interface MachineTypeTier {
   id: string;
   label: string;
 }
 
-export const MACHINE_TYPES: MachineTypeTier[] = [
+const MACHINE_TYPES: MachineTypeTier[] = [
   {
     id: "e2-micro",
     label: "Shared CPU \u00b7 2 vCPU \u00b7 1 GB RAM (~$7/mo)",
@@ -79,12 +79,12 @@ export const DEFAULT_MACHINE_TYPE = "e2-medium";
 
 // ─── Zone Options ────────────────────────────────────────────────────────────
 
-export interface ZoneOption {
+interface ZoneOption {
   id: string;
   label: string;
 }
 
-export const ZONES: ZoneOption[] = [
+const ZONES: ZoneOption[] = [
   {
     id: "us-central1-a",
     label: "Iowa, US",
@@ -139,7 +139,7 @@ export const DEFAULT_ZONE = "us-central1-a";
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-export interface GcpState {
+interface GcpState {
   project: string;
   zone: string;
   instanceName: string;

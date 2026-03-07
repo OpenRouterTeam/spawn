@@ -40,7 +40,7 @@ const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-export interface HetznerState {
+interface HetznerState {
   hcloudToken: string;
   serverId: string;
   serverIp: string;
@@ -262,12 +262,12 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
 
 // ─── Server Type Options ─────────────────────────────────────────────────────
 
-export interface ServerTypeTier {
+interface ServerTypeTier {
   id: string;
   label: string;
 }
 
-export const SERVER_TYPES: ServerTypeTier[] = [
+const SERVER_TYPES: ServerTypeTier[] = [
   {
     id: "cx23",
     label: "cx23 \u00b7 2 vCPU \u00b7 4 GB \u00b7 40 GB (~\u20AC3.49/mo, EU only)",
@@ -298,12 +298,12 @@ export const DEFAULT_SERVER_TYPE = "cx23";
 
 // ─── Location Options ────────────────────────────────────────────────────────
 
-export interface LocationOption {
+interface LocationOption {
   id: string;
   label: string;
 }
 
-export const LOCATIONS: LocationOption[] = [
+const LOCATIONS: LocationOption[] = [
   {
     id: "fsn1",
     label: "Falkenstein, Germany",

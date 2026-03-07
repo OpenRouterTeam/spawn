@@ -25,7 +25,7 @@ const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-export interface SpriteState {
+interface SpriteState {
   name: string;
   org: string;
 }

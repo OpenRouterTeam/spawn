@@ -90,7 +90,7 @@ const DO_OAUTH_CALLBACK_PORT = 5190;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-export interface DigitalOceanState {
+interface DigitalOceanState {
   token: string;
   dropletId: string;
   serverIp: string;
@@ -621,12 +621,12 @@ export async function ensureSshKey(): Promise<void> {
 
 // ─── Droplet Size Options ────────────────────────────────────────────────────
 
-export interface DropletSize {
+interface DropletSize {
   id: string;
   label: string;
 }
 
-export const DROPLET_SIZES: DropletSize[] = [
+const DROPLET_SIZES: DropletSize[] = [
   {
     id: "s-1vcpu-1gb",
     label: "1 vCPU \u00b7 1 GB RAM \u00b7 $6/mo",
@@ -657,12 +657,12 @@ export const DEFAULT_DROPLET_SIZE = "s-2vcpu-4gb";
 
 // ─── Region Options ──────────────────────────────────────────────────────────
 
-export interface DoRegion {
+interface DoRegion {
   id: string;
   label: string;
 }
 
-export const DO_REGIONS: DoRegion[] = [
+const DO_REGIONS: DoRegion[] = [
   {
     id: "nyc1",
     label: "New York 1",

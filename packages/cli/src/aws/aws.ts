@@ -126,18 +126,18 @@ export const BUNDLES: Bundle[] = [
 export const DEFAULT_BUNDLE = BUNDLES[0]; // nano_3_0
 
 /** Per-agent default bundles — heavier agents need more RAM. */
-export const AGENT_BUNDLE_DEFAULTS: Record<string, string> = {
+const AGENT_BUNDLE_DEFAULTS: Record<string, string> = {
   openclaw: "medium_3_0", // OpenClaw gateway + 713 npm packages needs >=4 GB
 };
 
 // ─── Lightsail Regions ────────────────────────────────────────────────────────
 
-export interface Region {
+interface Region {
   id: string;
   label: string;
 }
 
-export const REGIONS: Region[] = [
+const REGIONS: Region[] = [
   {
     id: "us-east-1",
     label: "us-east-1 (N. Virginia)",
@@ -166,7 +166,7 @@ export const REGIONS: Region[] = [
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-export interface AwsState {
+interface AwsState {
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken: string;
