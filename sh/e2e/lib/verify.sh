@@ -1,7 +1,7 @@
 #!/bin/bash
 # e2e/lib/verify.sh — Per-agent verification (cloud-agnostic)
 #
-# All remote execution uses cloud_exec/cloud_exec_long from the active driver.
+# All remote execution uses cloud_exec from the active driver.
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ input_test_claude() {
   output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(base64 -d); claude -p \"\$PROMPT\"" 2>&1) || true
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} claude -p \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -58,7 +58,7 @@ input_test_codex() {
   output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(base64 -d); codex exec \"\$PROMPT\"" 2>&1) || true
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} codex exec \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
@@ -145,7 +145,7 @@ input_test_openclaw() {
     output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-      PROMPT=\$(base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
+      PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
@@ -177,7 +177,7 @@ input_test_zeroclaw() {
   local output
   output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(base64 -d); zeroclaw agent -p \"\$PROMPT\"" 2>&1) || true
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -p \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
