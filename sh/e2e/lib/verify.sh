@@ -35,7 +35,7 @@ input_test_claude() {
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} claude -p \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
     return 0
   else
@@ -60,7 +60,7 @@ input_test_codex() {
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} codex exec \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
     return 0
   else
@@ -147,7 +147,7 @@ input_test_openclaw() {
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
-    if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
       return 0
     fi
@@ -179,7 +179,7 @@ input_test_zeroclaw() {
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -p \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
     return 0
   else
