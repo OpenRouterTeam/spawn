@@ -46,20 +46,11 @@ export interface HetznerState {
   serverIp: string;
 }
 
-let _state: HetznerState = {
+const _state: HetznerState = {
   hcloudToken: "",
   serverId: "",
   serverIp: "",
 };
-
-/** Reset session state — used in tests for isolation. */
-export function resetHetznerState(): void {
-  _state = {
-    hcloudToken: "",
-    serverId: "",
-    serverIp: "",
-  };
-}
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 

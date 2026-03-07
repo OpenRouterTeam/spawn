@@ -96,20 +96,11 @@ export interface DigitalOceanState {
   serverIp: string;
 }
 
-let _state: DigitalOceanState = {
+const _state: DigitalOceanState = {
   token: "",
   dropletId: "",
   serverIp: "",
 };
-
-/** Reset session state — used in tests for isolation. */
-export function resetDigitalOceanState(): void {
-  _state = {
-    token: "",
-    dropletId: "",
-    serverIp: "",
-  };
-}
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 

@@ -30,18 +30,10 @@ export interface SpriteState {
   org: string;
 }
 
-let _state: SpriteState = {
+const _state: SpriteState = {
   name: "",
   org: "",
 };
-
-/** Reset session state — used in tests for isolation. */
-export function resetSpriteState(): void {
-  _state = {
-    name: "",
-    org: "",
-  };
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
