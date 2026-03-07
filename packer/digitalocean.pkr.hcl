@@ -107,10 +107,13 @@ build {
   }
 
   # DO Marketplace: install all security updates and remove DO droplet agent
+  # Uses --force-confold to keep existing config files during upgrades
   provisioner "shell" {
     inline = [
       "apt-get update -y",
-      "apt-get dist-upgrade -y",
+      "apt-get -o Dpkg::Options::='--force-confold' dist-upgrade -y",
+      "apt-get -y autoremove",
+      "apt-get -y autoclean",
       "apt-get purge -y droplet-agent || true",
       "rm -rf /opt/digitalocean",
     ]
@@ -119,22 +122,31 @@ build {
     ]
   }
 
-  # DO Marketplace cleanup — runs last before snapshot.
-  # Based on https://github.com/digitalocean/marketplace-partners/blob/master/scripts/cleanup.sh
-  # Clears secrets, history, logs, and machine-id so each launched droplet
+  # DO Marketplace cleanup — matches digitalocean/marketplace-partners/scripts/90-cleanup.sh
+  # Clears secrets, keys, history, logs, and machine-id so each launched droplet
   # gets a fresh identity. cloud-init re-runs on first boot to re-inject keys.
   provisioner "shell" {
     inline = [
-      # Remove SSH authorized keys (cloud-init re-injects them on first boot)
+      # Ensure /tmp exists with correct permissions
+      "mkdir -p /tmp",
+      "chmod 1777 /tmp",
+
+      # Remove SSH authorized keys (cloud-init re-injects on first boot)
       "rm -f /root/.ssh/authorized_keys",
       "find /home -name authorized_keys -delete",
 
-      # Clear bash history (history -c is bash-only; Packer runs /bin/sh)
+      # Remove SSH host keys (regenerated on first boot)
+      "rm -f /etc/ssh/ssh_host_*",
+      "touch /etc/ssh/revoked_keys",
+      "chmod 600 /etc/ssh/revoked_keys",
+
+      # Clear bash history
       "rm -f /root/.bash_history",
       "find /home -name .bash_history -delete",
 
-      # Purge log files
-      "find /var/log -type f -exec truncate --size 0 {} \\;",
+      # Truncate recent log files and remove archived logs
+      "find /var/log -mtime -1 -type f -exec truncate -s 0 {} \\;",
+      "rm -rf /var/log/*.gz /var/log/*.[0-9] /var/log/*-????????",
 
       # Clear apt cache
       "apt-get clean",
@@ -143,13 +155,20 @@ build {
       # Clear tmp
       "rm -rf /tmp/* /var/tmp/*",
 
+      # Remove cloud-init instance data so it re-runs on first boot
+      "rm -rf /var/lib/cloud/instances/*",
+
       # Remove machine-id so each launched droplet gets a unique one
       "truncate -s 0 /etc/machine-id",
       "rm -f /var/lib/dbus/machine-id",
       "ln -sf /etc/machine-id /var/lib/dbus/machine-id",
 
-      # Reset cloud-init so it runs again on first boot (re-injects SSH keys, hostname, etc.)
+      # Reset cloud-init so it runs again on first boot
       "cloud-init clean --logs",
+
+      # Zero-fill free disk space to reduce snapshot size
+      "dd if=/dev/zero of=/zerofile bs=4096 || true",
+      "rm -f /zerofile",
 
       "sync",
     ]
@@ -164,5 +183,11 @@ build {
       "/tmp/img_check.sh",
       "rm -f /tmp/img_check.sh",
     ]
+  }
+
+  # Write Packer manifest for automated Marketplace submission
+  post-processor "manifest" {
+    output     = "packer/manifest.json"
+    strip_path = true
   }
 }

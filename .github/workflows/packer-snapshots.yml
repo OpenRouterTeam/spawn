@@ -84,8 +84,6 @@ jobs:
 
       - name: Build snapshot
         run: packer build -var-file=packer/auto.pkrvars.json packer/digitalocean.pkr.hcl
-        env:
-          PACKER_LOG: "1"
 
       - name: Cleanup old snapshots
         if: success()
@@ -105,3 +103,53 @@ jobs:
         env:
           DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
           AGENT_NAME: ${{ matrix.agent }}
+
+      - name: Submit to DO Marketplace
+        if: success()
+        run: |
+          # Skip if no marketplace app IDs configured
+          if [ -z "$MARKETPLACE_APP_IDS" ]; then
+            echo "No MARKETPLACE_APP_IDS secret — skipping marketplace submission"
+            exit 0
+          fi
+
+          # Look up this agent's app ID from the JSON map
+          APP_ID=$(echo "$MARKETPLACE_APP_IDS" | jq -r --arg a "$AGENT_NAME" '.[$a] // empty')
+          if [ -z "$APP_ID" ]; then
+            echo "No marketplace app ID for agent ${AGENT_NAME} — skipping"
+            exit 0
+          fi
+
+          # Extract snapshot ID from Packer manifest
+          # artifact_id format is "region:snapshot_id" (e.g. "sfo3:12345678")
+          IMG_ID=$(jq '.builds[-1].artifact_id | split(":")[1] | tonumber' packer/manifest.json)
+          if [ -z "$IMG_ID" ] || [ "$IMG_ID" = "null" ]; then
+            echo "Failed to extract snapshot ID from manifest"
+            exit 1
+          fi
+
+          echo "Submitting snapshot ${IMG_ID} for ${AGENT_NAME} (app: ${APP_ID})"
+
+          # PATCH the Vendor API — updates go to "pending" review.
+          # 400 = app already pending/in-review (expected for nightly runs), not an error.
+          HTTP_CODE=$(curl -s -o /tmp/mp-response.json -w "%{http_code}" \
+            -X PATCH \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            -d "$(jq -n \
+              --arg reason "Nightly rebuild — $(date -u '+%Y-%m-%d')" \
+              --argjson imageId "$IMG_ID" \
+              '{reasonForUpdate: $reason, imageId: $imageId}')" \
+            "https://api.digitalocean.com/api/v1/vendor-portal/apps/${APP_ID}")
+
+          case "$HTTP_CODE" in
+            200) echo "Marketplace submission accepted (pending review)" ;;
+            400) echo "App already pending review — skipping (expected for nightly runs)" ;;
+            *)   echo "Marketplace API returned ${HTTP_CODE}:"
+                 cat /tmp/mp-response.json
+                 exit 1 ;;
+          esac
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          AGENT_NAME: ${{ matrix.agent }}
+          MARKETPLACE_APP_IDS: ${{ secrets.MARKETPLACE_APP_IDS }}
