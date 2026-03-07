@@ -58,7 +58,7 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
 //      gcloud (Google), and az (Azure).
 //
-// TODO(#2041): PKCE migration — monitor and migrate when DigitalOcean adds support.
+// TODO: PKCE migration — monitor and migrate when DigitalOcean adds support.
 //   Last checked: 2026-03 — PKCE without client_secret returns 401 invalid_request.
 //   Check status: POST to /v1/oauth/token with code_verifier but WITHOUT client_secret.
 //   If it succeeds, migrate using this checklist:
