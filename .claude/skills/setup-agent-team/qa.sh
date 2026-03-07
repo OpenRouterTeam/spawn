@@ -202,6 +202,25 @@ if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "
     fi
 fi
 
+# --- Load email credentials for matrix report (e2e mode) ---
+if [[ "${RUN_MODE}" == "e2e" ]]; then
+    if [[ -f /etc/spawn-key-server-auth.env ]]; then
+        while IFS='=' read -r _ekey _eval || [[ -n "${_ekey}" ]]; do
+            _ekey="${_ekey#"${_ekey%%[! ]*}"}"
+            _ekey="${_ekey%"${_ekey##*[! ]}"}"
+            [[ -z "${_ekey}" || "${_ekey}" == \#* ]] && continue
+            case "${_ekey}" in
+                RESEND_API_KEY|KEY_REQUEST_EMAIL)
+                    export "${_ekey}=${_eval}"
+                    ;;
+            esac
+        done < /etc/spawn-key-server-auth.env
+        log "Email credentials loaded for matrix report"
+    else
+        log "No /etc/spawn-key-server-auth.env found — matrix email will be skipped"
+    fi
+fi
+
 # Launch Claude Code with mode-specific prompt
 # Enable agent teams (required for team-based workflows)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1

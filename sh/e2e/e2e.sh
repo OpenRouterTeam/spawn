@@ -362,6 +362,148 @@ run_agents_for_cloud() {
 }
 
 # ---------------------------------------------------------------------------
+# send_matrix_email LOG_DIR CLOUDS AGENTS TOTAL_PASS TOTAL_FAIL DURATION_STR
+#
+# Sends an agent x cloud matrix report via Resend.
+# Requires: RESEND_API_KEY, KEY_REQUEST_EMAIL env vars (silently skips if absent).
+# ---------------------------------------------------------------------------
+send_matrix_email() {
+  local log_dir="$1"
+  local clouds="$2"
+  local agents="$3"
+  local total_pass="$4"
+  local total_fail="$5"
+  local duration_str="$6"
+
+  local resend_key="${RESEND_API_KEY:-}"
+  local to_email="${KEY_REQUEST_EMAIL:-}"
+
+  if [ -z "${resend_key}" ] || [ -z "${to_email}" ]; then
+    log_info "Matrix email skipped (RESEND_API_KEY or KEY_REQUEST_EMAIL not set)"
+    return 0
+  fi
+
+  # Build results string: "cloud:agent:result,..." for bun to process
+  local results=""
+  for cloud in ${clouds}; do
+    for agent in ${agents}; do
+      local result="skip"
+      local result_file="${log_dir}/${cloud}-${agent}.result"
+      if [ -f "${result_file}" ]; then
+        result=$(cat "${result_file}")
+      fi
+      if [ -n "${results}" ]; then results="${results},"; fi
+      results="${results}${cloud}:${agent}:${result}"
+    done
+  done
+
+  local ts_file
+  ts_file=$(mktemp /tmp/e2e-email-XXXXXX.ts)
+
+  cat > "${ts_file}" << 'TS_EOF'
+const results = (process.env._E2E_RESULTS ?? "").split(",").filter(Boolean);
+const clouds = (process.env._E2E_CLOUDS ?? "").split(" ").filter(Boolean);
+const agents = (process.env._E2E_AGENTS ?? "").split(" ").filter(Boolean);
+const totalPass = process.env._E2E_TOTAL_PASS ?? "0";
+const totalFail = process.env._E2E_TOTAL_FAIL ?? "0";
+const duration = process.env._E2E_DURATION ?? "?";
+const toEmail = process.env.KEY_REQUEST_EMAIL ?? "";
+const resendKey = process.env.RESEND_API_KEY ?? "";
+const timestamp = new Date().toUTCString();
+
+// Build lookup map: "cloud:agent" -> result
+const resultMap: Record<string, string> = {};
+for (const entry of results) {
+  const parts = entry.split(":");
+  resultMap[`${parts[0]}:${parts[1]}`] = parts[2] ?? "skip";
+}
+
+// Cell styles per result
+const cellStyle = (result: string): string => {
+  if (result === "pass") return "background:#22c55e;color:#fff;font-weight:bold;padding:4px 10px;border-radius:4px;";
+  if (result === "fail") return "background:#ef4444;color:#fff;font-weight:bold;padding:4px 10px;border-radius:4px;";
+  return "background:#e2e8f0;color:#94a3b8;padding:4px 10px;border-radius:4px;";
+};
+
+const headerCells = clouds
+  .map(c => `<th style="padding:8px 14px;background:#1e293b;color:#fff;text-transform:uppercase;font-size:11px;letter-spacing:.05em;">${c}</th>`)
+  .join("");
+
+const bodyRows = agents
+  .map(agent => {
+    const cells = clouds
+      .map(cloud => {
+        const r = resultMap[`${cloud}:${agent}`] ?? "skip";
+        return `<td style="padding:6px 14px;text-align:center;"><span style="${cellStyle(r)}">${r.toUpperCase()}</span></td>`;
+      })
+      .join("");
+    return `<tr><td style="padding:6px 14px;font-weight:600;white-space:nowrap;color:#1e293b;">${agent}</td>${cells}</tr>`;
+  })
+  .join("");
+
+const status = totalFail === "0" ? "✅ All Passed" : `❌ ${totalFail} Failed`;
+
+const html = `<!DOCTYPE html>
+<html><body style="font-family:system-ui,-apple-system,sans-serif;max-width:860px;margin:0 auto;padding:24px;color:#1e293b;">
+<h2 style="margin:0 0 4px;">${status} — Spawn E2E Matrix</h2>
+<p style="margin:0 0 20px;color:#64748b;font-size:14px;">Completed ${timestamp}</p>
+<table style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr>
+      <th style="padding:8px 14px;background:#1e293b;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Agent</th>
+      ${headerCells}
+    </tr>
+  </thead>
+  <tbody>
+    ${bodyRows}
+  </tbody>
+</table>
+<p style="margin-top:18px;color:#64748b;font-size:13px;">
+  <strong style="color:#1e293b;">Total:</strong> ${totalPass} passed, ${totalFail} failed
+  &nbsp;·&nbsp;
+  <strong style="color:#1e293b;">Duration:</strong> ${duration}
+</p>
+</body></html>`;
+
+const subject = totalFail === "0"
+  ? `✅ E2E Matrix: ${totalPass} passed · ${duration}`
+  : `❌ E2E Matrix: ${totalFail} failed, ${totalPass} passed · ${duration}`;
+
+const res = await fetch("https://api.resend.com/emails", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${resendKey}`,
+  },
+  body: JSON.stringify({
+    from: "Spawn QA <onboarding@resend.dev>",
+    to: [toEmail],
+    subject,
+    html,
+  }),
+});
+
+if (!res.ok) {
+  const body = await res.text();
+  console.error(`Resend API error ${res.status}: ${body}`);
+  process.exit(1);
+}
+console.log(`Matrix email sent to ${toEmail}`);
+TS_EOF
+
+  log_info "Sending matrix email to ${to_email}..."
+  _E2E_RESULTS="${results}" \
+  _E2E_CLOUDS="${clouds}" \
+  _E2E_AGENTS="${agents}" \
+  _E2E_TOTAL_PASS="${total_pass}" \
+  _E2E_TOTAL_FAIL="${total_fail}" \
+  _E2E_DURATION="${duration_str}" \
+    bun run "${ts_file}" 2>&1 || log_warn "Failed to send matrix email"
+
+  rm -f "${ts_file}" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
 # Final cleanup trap
 # ---------------------------------------------------------------------------
 final_cleanup() {
@@ -507,6 +649,9 @@ if [ "${total_fail}" -gt 0 ]; then
   printf ", ${RED}%d failed${NC}" "${total_fail}"
 fi
 printf "\n  Duration: %s\n" "${DURATION_STR}"
+
+# Send matrix email report
+send_matrix_email "${LOG_DIR}" "${CLOUDS}" "${AGENTS_TO_TEST}" "${total_pass}" "${total_fail}" "${DURATION_STR}"
 
 # Exit with failure if any agent on any cloud failed
 if [ "${total_fail}" -gt 0 ]; then
