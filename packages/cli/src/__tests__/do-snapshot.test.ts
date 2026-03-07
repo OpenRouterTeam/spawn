@@ -2,7 +2,7 @@
  * do-snapshot.test.ts — Tests for findSpawnSnapshot().
  *
  * Verifies snapshot lookup: happy path, empty results, API errors,
- * invalid IDs, and network failures all return correct values.
+ * invalid IDs, name filtering, and network failures.
  */
 
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test";
@@ -37,14 +37,17 @@ describe("findSpawnSnapshot", () => {
             images: [
               {
                 id: 100,
+                name: "spawn-claude-20260101-0000",
                 created_at: "2026-01-01T00:00:00Z",
               },
               {
                 id: 200,
+                name: "spawn-claude-20260301-0000",
                 created_at: "2026-03-01T00:00:00Z",
               },
               {
                 id: 150,
+                name: "spawn-claude-20260201-0000",
                 created_at: "2026-02-01T00:00:00Z",
               },
             ],
@@ -57,12 +60,59 @@ describe("findSpawnSnapshot", () => {
     expect(result).toBe("200");
   });
 
+  it("filters by name prefix — ignores other agents", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            images: [
+              {
+                id: 300,
+                name: "spawn-codex-20260301-0000",
+                created_at: "2026-03-01T00:00:00Z",
+              },
+              {
+                id: 400,
+                name: "spawn-claude-20260201-0000",
+                created_at: "2026-02-01T00:00:00Z",
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    const result = await findSpawnSnapshot("claude");
+    expect(result).toBe("400");
+  });
+
   it("returns null when no images are found", async () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(
         new Response(
           JSON.stringify({
             images: [],
+          }),
+        ),
+      ),
+    );
+
+    const result = await findSpawnSnapshot("claude");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when no images match the agent name", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            images: [
+              {
+                id: 100,
+                name: "spawn-codex-20260101-0000",
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
           }),
         ),
       ),
@@ -93,6 +143,7 @@ describe("findSpawnSnapshot", () => {
             images: [
               {
                 id: "not-a-number",
+                name: "spawn-claude-20260101-0000",
                 created_at: "2026-01-01T00:00:00Z",
               },
             ],

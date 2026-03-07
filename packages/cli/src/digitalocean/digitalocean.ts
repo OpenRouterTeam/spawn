@@ -887,14 +887,12 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
 export async function findSpawnSnapshot(agentName: string): Promise<string | null> {
   try {
-    const text = await doApi(
-      "GET",
-      `/images?private=true&per_page=50&tag_name=spawn-${encodeURIComponent(agentName)}`,
-      undefined,
-      1,
-    );
+    // DO snapshots don't support tags — filter by name prefix instead
+    const prefix = `spawn-${agentName}-`;
+    const text = await doApi("GET", "/images?private=true&per_page=100", undefined, 1);
     const data = parseJsonObj(text);
-    const images = toObjectArray(data?.images);
+    const allImages = toObjectArray(data?.images);
+    const images = allImages.filter((img) => isString(img.name) && img.name.startsWith(prefix));
     if (images.length === 0) {
       return null;
     }

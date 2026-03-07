@@ -2,7 +2,7 @@
   "claude": {
     "tier": "minimal",
     "install": [
-      "curl -fsSL https://claude.ai/install.sh | bash || mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @anthropic-ai/claude-code"
+      "curl -fsSL https://claude.ai/install.sh | bash || [ -f /root/.local/bin/claude ]"
     ]
   },
   "codex": {

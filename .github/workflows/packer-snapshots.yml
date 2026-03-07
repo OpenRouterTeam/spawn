@@ -90,10 +90,12 @@ jobs:
       - name: Cleanup old snapshots
         if: success()
         run: |
-          # Keep only the latest snapshot per agent
+          # DO snapshots don't support tags — filter by name prefix instead
+          PREFIX="spawn-${AGENT_NAME}-"
           SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
-            "https://api.digitalocean.com/v2/images?private=true&per_page=100&tag_name=spawn-${AGENT_NAME}" \
-            | jq -r '.images | sort_by(.created_at) | reverse | .[1:] | .[].id')
+            "https://api.digitalocean.com/v2/images?private=true&per_page=100" \
+            | jq -r --arg prefix "$PREFIX" \
+              '[.images[] | select(.name | startswith($prefix))] | sort_by(.created_at) | reverse | .[1:] | .[].id')
 
           for ID in $SNAPSHOTS; do
             echo "Deleting old snapshot: ${ID}"
