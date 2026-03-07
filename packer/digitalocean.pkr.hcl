@@ -35,7 +35,9 @@ source "digitalocean" "spawn" {
   api_token    = var.do_api_token
   image        = "ubuntu-24-04-x64"
   region       = "sfo3"
-  size         = "s-2vcpu-2gb"
+  # DO Marketplace recommends the smallest droplet ($6/mo s-1vcpu-1gb) for
+  # build compatibility — snapshots built on s-1vcpu-1gb work on all sizes.
+  size         = "s-1vcpu-1gb"
   ssh_username = "root"
 
   snapshot_name = local.image_name
@@ -69,6 +71,20 @@ build {
     script = "packer/scripts/tier-${var.cloud_init_tier}.sh"
   }
 
+  # DO Marketplace requirement: enable ufw firewall with SSH allowed
+  provisioner "shell" {
+    inline = [
+      "apt-get install -y ufw",
+      "ufw default deny incoming",
+      "ufw default allow outgoing",
+      "ufw allow ssh",
+      "ufw --force enable",
+    ]
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive",
+    ]
+  }
+
   # Install the agent
   provisioner "shell" {
     inline = var.install_commands
@@ -92,12 +108,51 @@ build {
     ]
   }
 
-  # Clean up to reduce snapshot size
+  # DO Marketplace cleanup — runs last before snapshot.
+  # Based on https://github.com/digitalocean/marketplace-partners/blob/master/scripts/cleanup.sh
+  # Clears secrets, history, logs, and machine-id so each launched droplet
+  # gets a fresh identity. cloud-init re-runs on first boot to re-inject keys.
   provisioner "shell" {
     inline = [
+      # Remove SSH authorized keys (cloud-init re-injects them on first boot)
+      "rm -f /root/.ssh/authorized_keys",
+      "find /home -name authorized_keys -delete",
+
+      # Clear bash history
+      "history -c",
+      "rm -f /root/.bash_history",
+      "find /home -name .bash_history -delete",
+
+      # Purge log files
+      "find /var/log -type f -exec truncate --size 0 {} \\;",
+
+      # Clear apt cache
       "apt-get clean",
-      "rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*",
+      "rm -rf /var/lib/apt/lists/*",
+
+      # Clear tmp
+      "rm -rf /tmp/* /var/tmp/*",
+
+      # Remove machine-id so each launched droplet gets a unique one
+      "truncate -s 0 /etc/machine-id",
+      "rm -f /var/lib/dbus/machine-id",
+      "ln -sf /etc/machine-id /var/lib/dbus/machine-id",
+
+      # Reset cloud-init so it runs again on first boot (re-injects SSH keys, hostname, etc.)
+      "cloud-init clean --logs",
+
       "sync",
+    ]
+  }
+
+  # DO Marketplace validation — download and run img_check.sh to verify the image
+  # meets marketplace requirements (firewall active, no root password, etc.)
+  provisioner "shell" {
+    inline = [
+      "curl -fsSL https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/img_check.sh -o /tmp/img_check.sh",
+      "chmod +x /tmp/img_check.sh",
+      "/tmp/img_check.sh",
+      "rm -f /tmp/img_check.sh",
     ]
   }
 }
