@@ -268,7 +268,7 @@ export function loadHistory(): SpawnRecord[] {
 
     // v0 format: bare array (pre-versioning; migrated to v1 on next write)
     if (Array.isArray(raw)) {
-      return raw;
+      return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
     }
 
     return [];
