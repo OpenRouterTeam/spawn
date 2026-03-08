@@ -64,7 +64,7 @@ If multiple modules validate the same shape, extract the schema to a shared file
 
 Shared schema locations:
 - `.claude/scripts/schemas.ts` — hook stdin payload schemas
-- `packages/shared/src/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
+- `packages/cli/src/shared/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonObj(text)`
 
 ### For test mocks — use proper Response objects instead of `as any`:
 ```typescript
@@ -83,5 +83,5 @@ global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })
 ```
 
 ### Shared utilities
-- `packages/shared/src/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
-- `packages/shared/src/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
+- `packages/cli/src/shared/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonObj(text)`
+- `packages/cli/src/shared/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`

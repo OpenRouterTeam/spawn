@@ -1,7 +1,7 @@
 #!/bin/bash
 # e2e/lib/verify.sh — Per-agent verification (cloud-agnostic)
 #
-# All remote execution uses cloud_exec/cloud_exec_long from the active driver.
+# All remote execution uses cloud_exec from the active driver.
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -24,20 +24,18 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode prompt for safe embedding.
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} claude -p \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
     return 0
   else
@@ -52,18 +50,17 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex exec \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} codex exec \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
     return 0
   else
@@ -129,8 +126,9 @@ input_test_openclaw() {
 
   log_step "Running input test for openclaw..."
 
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   while [ "${attempt}" -lt "${max_attempts}" ]; do
     attempt=$((attempt + 1))
@@ -143,16 +141,13 @@ input_test_openclaw() {
       _openclaw_restart_gateway "${app}"
     fi
 
-    local remote_cmd
-    remote_cmd="source ~/.spawnrc 2>/dev/null; \
+    local output
+    output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-      PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60"
+      PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
-    local output
-    output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
-
-    if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
       return 0
     fi
@@ -175,17 +170,16 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
+  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
-  local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\""
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    PROMPT=\$(base64 -d); timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -p \"\$PROMPT\"" 2>&1) || true
 
-  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
     return 0
   else
@@ -208,6 +202,11 @@ input_test_kilocode() {
 
 input_test_hermes() {
   log_warn "hermes is TUI-only — skipping input test"
+  return 0
+}
+
+input_test_junie() {
+  log_warn "junie CLI input test not yet implemented — skipping"
   return 0
 }
 
@@ -237,6 +236,7 @@ run_input_test() {
     opencode)  input_test_opencode          ;;
     kilocode)  input_test_kilocode          ;;
     hermes)    input_test_hermes            ;;
+    junie)     input_test_junie            ;;
     *)
       log_err "Unknown agent for input test: ${agent}"
       return 1
@@ -552,7 +552,7 @@ verify_hermes() {
 
   # Binary check
   log_step "Checking hermes binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v hermes" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.hermes/hermes-agent/venv/bin:\$HOME/.bun/bin:\$PATH command -v hermes" >/dev/null 2>&1; then
     log_ok "hermes binary found"
   else
     log_err "hermes binary not found"
@@ -574,6 +574,40 @@ verify_hermes() {
     log_ok "OPENAI_BASE_URL set to openrouter"
   else
     log_err "OPENAI_BASE_URL not set to openrouter in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  return "${failures}"
+}
+
+verify_junie() {
+  local app="$1"
+  local failures=0
+
+  # Binary check
+  log_step "Checking junie binary..."
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v junie" >/dev/null 2>&1; then
+    log_ok "junie binary found"
+  else
+    log_err "junie binary not found"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: JUNIE_OPENROUTER_API_KEY
+  log_step "Checking junie env (JUNIE_OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q JUNIE_OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "JUNIE_OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "JUNIE_OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENROUTER_API_KEY
+  log_step "Checking junie env (OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "OPENROUTER_API_KEY not found in .spawnrc"
     failures=$((failures + 1))
   fi
 
@@ -608,6 +642,7 @@ verify_agent() {
     opencode)  verify_opencode "${app}"  || agent_failures=$? ;;
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;
     hermes)    verify_hermes "${app}"    || agent_failures=$? ;;
+    junie)     verify_junie "${app}"    || agent_failures=$? ;;
     *)
       log_err "Unknown agent: ${agent}"
       return 1

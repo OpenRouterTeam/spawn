@@ -13,11 +13,9 @@ _ensure_bun() {
 
 _ensure_bun
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-
-# Local checkout — run from source
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../packages/cli/src/local/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/../../packages/cli/src/local/main.ts" hermes "$@"
+# SPAWN_CLI_DIR override — force local source (used by e2e tests)
+if [[ -n "${SPAWN_CLI_DIR:-}" && -f "$SPAWN_CLI_DIR/packages/cli/src/local/main.ts" ]]; then
+    exec bun run "$SPAWN_CLI_DIR/packages/cli/src/local/main.ts" hermes "$@"
 fi
 
 # Remote — download bundled local.js from GitHub release

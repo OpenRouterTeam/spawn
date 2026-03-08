@@ -18,13 +18,14 @@ import {
   cmdPick,
   cmdRun,
   cmdRunHeadless,
+  cmdStatus,
   cmdUpdate,
   findClosestKeyByNameOrKey,
   isInteractiveTTY,
   loadManifestWithSpinner,
   resolveAgentKey,
   resolveCloudKey,
-} from "./commands.js";
+} from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { checkForUpdates } from "./update-check.js";
@@ -482,6 +483,12 @@ const DELETE_COMMANDS = new Set([
   "kill",
 ]);
 
+// status handled separately for --prune/--json flag parsing
+const STATUS_COMMANDS = new Set([
+  "status",
+  "ps",
+]);
+
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
 // These are not real subcommands -- we strip them and forward to the default handler
 const VERB_ALIASES = new Set([
@@ -573,6 +580,21 @@ async function dispatchDeleteCommand(filteredArgs: string[]): Promise<void> {
   await cmdDelete(agentFilter, cloudFilter);
 }
 
+/** Handle status/ps commands with --prune and --json flags */
+async function dispatchStatusCommand(filteredArgs: string[]): Promise<void> {
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
+  const args = filteredArgs.slice(1);
+  const prune = args.includes("--prune");
+  const json = args.includes("--json");
+  await cmdStatus({
+    prune,
+    json,
+  });
+}
+
 /** Handle named subcommands (agents, clouds, matrix, etc.) */
 async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<void> {
   if (hasTrailingHelpFlag(filteredArgs)) {
@@ -659,6 +681,10 @@ async function dispatchCommand(
   }
   if (DELETE_COMMANDS.has(cmd)) {
     await dispatchDeleteCommand(filteredArgs);
+    return;
+  }
+  if (STATUS_COMMANDS.has(cmd)) {
+    await dispatchStatusCommand(filteredArgs);
     return;
   }
   if (SUBCOMMANDS[cmd]) {

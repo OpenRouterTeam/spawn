@@ -58,7 +58,7 @@ const {
 } = mockClackPrompts();
 
 // Import commands after mock setup
-const { cmdCloudInfo } = await import("../commands.js");
+const { cmdCloudInfo } = await import("../commands/index.js");
 
 describe("cmdCloudInfo", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;

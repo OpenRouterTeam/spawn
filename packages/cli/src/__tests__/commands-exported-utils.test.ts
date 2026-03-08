@@ -8,7 +8,7 @@ import {
   getMissingClouds,
   getTerminalWidth,
   parseAuthEnvVars,
-} from "../commands";
+} from "../commands/index.js";
 import { createEmptyManifest, createMockManifest } from "./test-helpers";
 
 /**

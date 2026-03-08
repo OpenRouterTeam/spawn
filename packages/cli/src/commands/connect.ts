@@ -68,20 +68,6 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
     );
   }
 
-  // Handle Daytona sandbox connections
-  if (connection.ip === "daytona-sandbox" && connection.server_id) {
-    p.log.step(`Connecting to Daytona sandbox ${pc.bold(connection.server_id)}...`);
-    return runInteractiveCommand(
-      "daytona",
-      [
-        "ssh",
-        connection.server_id,
-      ],
-      "Daytona sandbox connection failed",
-      `daytona ssh ${connection.server_id}`,
-    );
-  }
-
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
   const sshCmd = `ssh ${connection.user}@${connection.ip}`;
@@ -172,24 +158,6 @@ export async function cmdEnterAgent(
       ],
       `Failed to enter ${agentName}`,
       `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`,
-    );
-  }
-
-  // Handle Daytona sandbox connections
-  if (connection.ip === "daytona-sandbox" && connection.server_id) {
-    p.log.step(`Entering ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(connection.server_id)}...`);
-    return runInteractiveCommand(
-      "daytona",
-      [
-        "ssh",
-        connection.server_id,
-        "--",
-        "bash",
-        "-lc",
-        remoteCmd,
-      ],
-      `Failed to enter ${agentName}`,
-      `daytona ssh ${connection.server_id} -- bash -lc '${remoteCmd}'`,
     );
   }
 

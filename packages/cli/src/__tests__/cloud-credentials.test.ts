@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { hasCloudCredentials } from "../commands";
+import { hasCloudCredentials } from "../commands/index.js";
 
 describe("hasCloudCredentials", () => {
   const savedEnv: Record<string, string | undefined> = {};

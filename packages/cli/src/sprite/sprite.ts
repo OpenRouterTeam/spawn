@@ -25,8 +25,15 @@ const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-let spriteName = "";
-let spriteOrg = "";
+interface SpriteState {
+  name: string;
+  org: string;
+}
+
+const _state: SpriteState = {
+  name: "",
+  org: "",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -231,20 +238,20 @@ export async function ensureSpriteAuthenticated(): Promise<void> {
 
 function detectOrg(output: string): void {
   if (process.env.SPRITE_ORG) {
-    spriteOrg = process.env.SPRITE_ORG;
+    _state.org = process.env.SPRITE_ORG;
     return;
   }
   const match = output.match(/Currently selected org: (\S+)/);
   if (match) {
-    spriteOrg = match[1];
+    _state.org = match[1];
   }
 }
 
 function orgFlags(): string[] {
-  if (spriteOrg) {
+  if (_state.org) {
     return [
       "-o",
-      spriteOrg,
+      _state.org,
     ];
   }
   return [];
@@ -305,7 +312,7 @@ export async function createSprite(name: string): Promise<void> {
       const firstToken = line.split(/\s/)[0];
       if (firstToken === name) {
         logInfo(`Sprite '${name}' already exists`);
-        spriteName = name;
+        _state.name = name;
         return;
       }
     }
@@ -353,7 +360,7 @@ export async function createSprite(name: string): Promise<void> {
         const firstToken = line.split(/\s/)[0];
         if (firstToken === name) {
           logInfo(`Sprite '${name}' provisioned`);
-          spriteName = name;
+          _state.name = name;
           return;
         }
       }
@@ -376,14 +383,14 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
       ...orgFlags(),
       "exec",
       "-s",
-      spriteName,
+      _state.name,
       "--",
       "echo",
       "ok",
     ]);
     if (proc.exitCode === 0) {
       logStepDone();
-      logInfo(`Sprite '${spriteName}' is ready`);
+      logInfo(`Sprite '${_state.name}' is ready`);
       return;
     }
     logStepInline(`Sprite not ready, retrying (${attempt}/${maxAttempts})...`);
@@ -391,7 +398,7 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
   }
 
   logStepDone();
-  logError(`Sprite '${spriteName}' failed to respond after ${maxAttempts} attempts`);
+  logError(`Sprite '${_state.name}' failed to respond after ${maxAttempts} attempts`);
   logError("Try: sprite list, sprite logs, or recreate the sprite");
   throw new Error("Sprite connectivity timeout");
 }
@@ -431,7 +438,7 @@ export function saveVmConnection(): void {
     "sprite-console",
     process.env.USER || "root",
     "",
-    spriteName,
+    _state.name,
     "sprite",
     undefined,
     undefined,
@@ -453,7 +460,7 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
         ...orgFlags(),
         "exec",
         "-s",
-        spriteName,
+        _state.name,
         "--",
         "bash",
         "-c",
@@ -489,7 +496,7 @@ async function runSpriteSilent(cmd: string): Promise<void> {
       ...orgFlags(),
       "exec",
       "-s",
-      spriteName,
+      _state.name,
       "--",
       "bash",
       "-c",
@@ -542,7 +549,7 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         ...orgFlags(),
         "exec",
         "-s",
-        spriteName,
+        _state.name,
         "-file",
         `${localPath}:${tempRemote}`,
         "--",
@@ -580,7 +587,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
         ...orgFlags(),
         "exec",
         "-s",
-        spriteName,
+        _state.name,
         "--",
         "bash",
         "-c",
@@ -591,7 +598,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
         ...orgFlags(),
         "exec",
         "-s",
-        spriteName,
+        _state.name,
         "-tty",
         "--",
         "bash",
@@ -603,13 +610,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
   // Post-session summary
   process.stderr.write("\n");
-  logWarn(`Session ended. Your sprite '${spriteName}' is still running.`);
+  logWarn(`Session ended. Your sprite '${_state.name}' is still running.`);
   logWarn("Remember to destroy it when you're done to avoid ongoing charges.");
   logWarn("");
   logInfo("To destroy:");
-  logInfo(`  sprite destroy ${spriteName}`);
+  logInfo(`  sprite destroy ${_state.name}`);
   logInfo("To reconnect:");
-  logInfo(`  sprite console -s ${spriteName}`);
+  logInfo(`  sprite console -s ${_state.name}`);
 
   return exitCode;
 }
@@ -617,7 +624,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 export async function destroyServer(name?: string): Promise<void> {
-  const target = name || spriteName;
+  const target = name || _state.name;
   if (!target) {
     logError("destroy_server: no sprite name provided");
     throw new Error("No sprite name");

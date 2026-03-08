@@ -26,5 +26,9 @@
   "hermes": {
     "url": "https://s.w.org/images/core/emoji/17.0.2/svg/2695.svg",
     "ext": "png"
+  },
+  "junie": {
+    "url": "https://avatars.githubusercontent.com/u/878437?s=200&v=4",
+    "ext": "png"
   }
 }

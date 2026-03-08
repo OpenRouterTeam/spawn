@@ -5,7 +5,7 @@ import {
   levenshtein,
   resolveAgentKey,
   resolveCloudKey,
-} from "../commands";
+} from "../commands/index.js";
 import { createMockManifest } from "./test-helpers";
 
 /**

@@ -134,7 +134,7 @@ const {
 } = mockClackPrompts();
 
 // Import commands after mock setup
-const { cmdRun } = await import("../commands.js");
+const { cmdRun } = await import("../commands/index.js");
 
 describe("cmdRun - display name resolution", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;

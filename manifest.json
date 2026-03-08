@@ -151,7 +151,7 @@
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/opencode.png",
-      "featured_cloud": ["daytona", "gcp", "aws"],
+      "featured_cloud": ["gcp", "aws", "digitalocean"],
       "creator": "SST",
       "repo": "sst/opencode",
       "license": "MIT",
@@ -218,6 +218,32 @@
       "category": "cli",
       "tagline": "Persistent AI agent with memory, tools, and multi-platform messaging",
       "tags": ["agent", "messaging", "memory", "tools"]
+    },
+    "junie": {
+      "name": "Junie",
+      "description": "JetBrains' AI coding agent with native OpenRouter BYOK support",
+      "url": "https://www.jetbrains.com/junie/",
+      "install": "npm install -g @jetbrains/junie-cli",
+      "launch": "junie",
+      "env": {
+        "JUNIE_OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter via JUNIE_OPENROUTER_API_KEY. Subagent tasks may require GPT-4.1 Mini, GPT-4.1, or GPT-5 models to be enabled on your OpenRouter account.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/junie.png",
+      "featured_cloud": ["hetzner", "aws", "digitalocean"],
+      "creator": "JetBrains",
+      "repo": "JetBrains/junie",
+      "license": "Proprietary",
+      "created": "2026-03",
+      "added": "2026-03",
+      "github_stars": 5000,
+      "stars_updated": "2026-03-07",
+      "language": "TypeScript",
+      "runtime": "node",
+      "category": "cli",
+      "tagline": "JetBrains' AI coding agent — BYOK with OpenRouter, IDE-quality intelligence in the terminal",
+      "tags": ["coding", "terminal", "jetbrains", "byok"]
     }
   },
   "clouds": {
@@ -264,24 +290,6 @@
       },
       "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/aws.png"
-    },
-    "daytona": {
-      "name": "Daytona",
-      "description": "Instant sandboxes with pay-per-second pricing",
-      "url": "https://www.daytona.io/",
-      "type": "sandbox",
-      "auth": "DAYTONA_API_KEY",
-      "key_request": false,
-      "provision_method": "daytona create",
-      "exec_method": "daytona exec",
-      "interactive_method": "daytona ssh",
-      "defaults": {
-        "cpu": 2,
-        "memory": 2048,
-        "disk": 5
-      },
-      "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io.",
-      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/daytona.png"
     },
     "digitalocean": {
       "name": "DigitalOcean",
@@ -347,12 +355,6 @@
     "aws/codex": "implemented",
     "aws/opencode": "implemented",
     "aws/kilocode": "implemented",
-    "daytona/claude": "implemented",
-    "daytona/openclaw": "implemented",
-    "daytona/zeroclaw": "implemented",
-    "daytona/codex": "implemented",
-    "daytona/opencode": "implemented",
-    "daytona/kilocode": "implemented",
     "digitalocean/claude": "implemented",
     "digitalocean/openclaw": "implemented",
     "digitalocean/zeroclaw": "implemented",
@@ -374,9 +376,14 @@
     "local/hermes": "implemented",
     "hetzner/hermes": "implemented",
     "aws/hermes": "implemented",
-    "daytona/hermes": "implemented",
     "digitalocean/hermes": "implemented",
     "gcp/hermes": "implemented",
-    "sprite/hermes": "implemented"
+    "sprite/hermes": "implemented",
+    "local/junie": "implemented",
+    "hetzner/junie": "implemented",
+    "aws/junie": "implemented",
+    "digitalocean/junie": "implemented",
+    "gcp/junie": "implemented",
+    "sprite/junie": "implemented"
   }
 }

@@ -287,7 +287,7 @@ describe("clearHistory", () => {
 const { logInfo: mockLogInfo, logSuccess: mockLogSuccess } = mockClackPrompts();
 
 // Import after mock setup
-const { cmdListClear } = await import("../commands.js");
+const { cmdListClear } = await import("../commands/index.js");
 
 describe("cmdListClear", () => {
   let testDir: string;

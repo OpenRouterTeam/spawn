@@ -17,14 +17,13 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 ## 2. Add a new cloud provider (HIGH BAR)
 
-We are currently shipping with **7 curated clouds** (sorted by price):
+We are currently shipping with **6 curated clouds** (sorted by price):
 1. **local** — free (no provisioning)
 2. **hetzner** — ~€3.29/mo (CX22)
 3. **aws** — $3.50/mo (nano)
-4. **daytona** — pay-per-second sandboxes
-5. **digitalocean** — $4/mo (Basic droplet)
-6. **gcp** — $7.11/mo (e2-micro)
-7. **sprite** — managed cloud VMs
+4. **digitalocean** — $4/mo (Basic droplet)
+5. **gcp** — $7.11/mo (e2-micro)
+6. **sprite** — managed cloud VMs
 
 **Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
 
@@ -58,6 +57,12 @@ Do NOT add agents speculatively. Only add one if there's **real community buzz**
 - Installable via a single command (npm, pip, curl)
 - Accepts API keys via env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`)
 - Works with OpenRouter (natively or via `OPENAI_BASE_URL` override)
+
+**ARM builds for native binary agents:**
+Agents that ship compiled binaries (Rust, Go, etc.) need separate ARM (aarch64) tarball builds. npm-based agents are arch-independent and only need x86_64 builds. When adding a new agent:
+- If it installs via `npm install -g` → x86_64 tarball only (Node handles arch)
+- If it installs a pre-compiled binary (curl download, cargo install, go install) → add an ARM entry in `.github/workflows/agent-tarballs.yml` matrix `include` section
+- Current native binary agents needing ARM: zeroclaw (Rust), opencode (Go), hermes, claude
 
 To add: same steps as before (manifest.json entry, matrix entries, implement on 1+ cloud, README).
 

@@ -15,6 +15,8 @@ export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;
   runner: CloudRunner;
+  /** When true, skip tarball + agent install (e.g. booting from a pre-baked snapshot). */
+  skipAgentInstall?: boolean;
   authenticate(): Promise<void>;
   promptSize(): Promise<void>;
   createServer(name: string, spawnId?: string): Promise<void>;
@@ -112,14 +114,18 @@ export async function runOrchestration(
 
   const envContent = generateEnvConfig(agent.envVars(apiKey));
 
-  // 8. Install agent (try tarball first on cloud VMs)
-  let installedFromTarball = false;
-  if (cloud.cloudName !== "local" && !agent.skipTarball) {
-    const tarball = options?.tryTarball ?? tryTarballInstall;
-    installedFromTarball = await tarball(cloud.runner, agentName);
-  }
-  if (!installedFromTarball) {
-    await agent.install();
+  // 8. Install agent (skip entirely for snapshot boots, try tarball first on cloud VMs)
+  if (cloud.skipAgentInstall) {
+    logInfo("Snapshot boot — skipping agent install");
+  } else {
+    let installedFromTarball = false;
+    if (cloud.cloudName !== "local" && !agent.skipTarball) {
+      const tarball = options?.tryTarball ?? tryTarballInstall;
+      installedFromTarball = await tarball(cloud.runner, agentName);
+    }
+    if (!installedFromTarball) {
+      await agent.install();
+    }
   }
 
   // 9. Inject environment variables via .spawnrc

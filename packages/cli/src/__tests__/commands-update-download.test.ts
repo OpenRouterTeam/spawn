@@ -32,7 +32,7 @@ mock.module("node:child_process", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdUpdate } = await import("../commands.js");
+const { cmdUpdate } = await import("../commands/index.js");
 
 describe("cmdUpdate", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;

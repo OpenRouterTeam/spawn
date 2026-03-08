@@ -8,7 +8,7 @@ import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hasMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -31,11 +31,6 @@ export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
     return Err(new Error(msg));
   }
 }
-
-// Re-export so cloud modules can re-export from here
-export type { AgentConfig };
-
-export { generateEnvConfig } from "./agents";
 
 // ─── CloudRunner interface ──────────────────────────────────────────────────
 
@@ -200,44 +195,40 @@ function readHostGitConfig(key: string): string {
   return "";
 }
 
-async function promptGithubAuth(): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
-    return;
-  }
-  process.stderr.write("\n");
-  const choice = await prompt("Set up GitHub CLI (gh) on this machine? (y/N): ");
-  if (/^[Yy]$/.test(choice)) {
-    githubAuthRequested = true;
-    if (process.env.GITHUB_TOKEN) {
-      githubToken = process.env.GITHUB_TOKEN;
-    } else {
-      try {
-        const result = Bun.spawnSync(
-          [
-            "gh",
-            "auth",
-            "token",
+async function detectGithubAuth(): Promise<void> {
+  if (process.env.GITHUB_TOKEN) {
+    githubToken = process.env.GITHUB_TOKEN;
+  } else {
+    try {
+      const result = Bun.spawnSync(
+        [
+          "gh",
+          "auth",
+          "token",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
           ],
-          {
-            stdio: [
-              "ignore",
-              "pipe",
-              "ignore",
-            ],
-          },
-        );
-        if (result.exitCode === 0) {
-          githubToken = new TextDecoder().decode(result.stdout).trim();
-        }
-      } catch {
-        /* ignore */
+        },
+      );
+      if (result.exitCode === 0) {
+        githubToken = new TextDecoder().decode(result.stdout).trim();
       }
+    } catch {
+      /* ignore */
     }
-
-    // Capture host git identity to propagate to the remote VM
-    hostGitName = readHostGitConfig("user.name");
-    hostGitEmail = readHostGitConfig("user.email");
   }
+
+  if (githubToken) {
+    githubAuthRequested = true;
+  }
+
+  // Capture host git identity to propagate to the remote VM
+  hostGitName = readHostGitConfig("user.name");
+  hostGitEmail = readHostGitConfig("user.email");
 }
 
 export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
@@ -529,75 +520,6 @@ const NPM_PREFIX_SETUP =
   'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
   'export PATH="$HOME/.npm-global/bin:$PATH"';
 
-// ─── Docker Image Extraction ──────────────────────────────────────────────────
-
-const DOCKER_IMAGE_PREFIX = "ghcr.io/openrouterteam/spawn-";
-
-/**
- * Try to extract a pre-built agent from a Docker image pulled during cloud-init.
- * Returns true if extraction succeeded, false if Docker/image unavailable.
- *
- * How it works:
- *   1. Check if Docker is installed and the image was pulled
- *   2. Create a temporary container from the image
- *   3. Copy /root/. from the container to /root/ on the host
- *   4. Remove the temporary container
- *
- * The agent then runs natively on the host (not in a container).
- */
-async function tryInstallFromDocker(runner: CloudRunner, agentName: string, dockerImage: string): Promise<boolean> {
-  logStep(`Checking for pre-built Docker image (${agentName})...`);
-  const script = [
-    // Bail if Docker isn't installed
-    "command -v docker >/dev/null 2>&1 || { echo '==> Docker not installed'; exit 1; }",
-    // Poll for image availability — cloud-init started the pull in the background.
-    // We can't rely on pgrep because the docker CLI exits while dockerd continues pulling.
-    "_elapsed=0; _max=300",
-    `while ! docker images -q "${dockerImage}" 2>/dev/null | grep -q .; do`,
-    `  if [ $_elapsed -ge $_max ]; then echo "==> Timed out waiting for ${dockerImage}"; exit 1; fi`,
-    '  if [ $_elapsed -eq 0 ]; then echo "==> Waiting for Docker image pull to complete..."; fi',
-    "  sleep 5; _elapsed=$((_elapsed + 5))",
-    "done",
-    // Create temp container, copy only known agent directories, clean up
-    `_cid=$(docker create "${dockerImage}")`,
-    'docker cp "$_cid":/root/.claude /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.bun /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.local /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.npm /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.cargo /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.opencode /root/ 2>/dev/null || true',
-    'docker rm "$_cid" >/dev/null',
-    'echo "==> Agent extracted from Docker image"',
-  ].join("\n");
-
-  try {
-    await runner.runServer(script, 600);
-    logInfo(`${agentName} extracted from Docker image`);
-    return true;
-  } catch {
-    logInfo("Docker image not available, falling back to normal install");
-    return false;
-  }
-}
-
-/**
- * Wrap an agent's install function with Docker image extraction.
- * Tries Docker first; falls back to the original install if unavailable.
- */
-function withDockerInstall(
-  runner: CloudRunner,
-  agentName: string,
-  dockerImage: string,
-  originalInstall: () => Promise<void>,
-): () => Promise<void> {
-  return async () => {
-    const extracted = await tryInstallFromDocker(runner, agentName, dockerImage);
-    if (!extracted) {
-      await originalInstall();
-    }
-  };
-}
-
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 const ZEROCLAW_INSTALL_URL =
@@ -608,8 +530,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     claude: {
       name: "Claude Code",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}claude:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () => installClaudeCode(runner),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -627,8 +548,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     codex: {
       name: "Codex CLI",
       cloudInitTier: "node",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}codex:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -647,12 +567,10 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     openclaw: {
       name: "OpenClaw",
       cloudInitTier: "full",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}openclaw:latest`,
-      slowInstall: true,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: withDockerInstall(runner, "OpenClaw", `${DOCKER_IMAGE_PREFIX}openclaw:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "openclaw",
@@ -660,7 +578,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
@@ -677,8 +594,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     opencode: {
       name: "OpenCode",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}opencode:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -689,8 +605,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}kilocode:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -710,10 +625,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`,
-      slowInstall: true,
-      preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "ZeroClaw", `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`, async () => {
+      preProvision: detectGithubAuth,
+      install: async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
         // OOM during Rust compilation if --prefer-prebuilt falls back to source.
         await ensureSwapSpace(runner);
@@ -723,7 +636,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           `curl --proto '=https' -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
           600, // 10 min: swap-backed compilation is slower than the 5-min default
         );
-      }),
+      },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
@@ -736,8 +649,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     hermes: {
       name: "Hermes Agent",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}hermes:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -750,7 +662,27 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
         `OPENAI_API_KEY=${apiKey}`,
       ],
-      launchCmd: () => "source ~/.spawnrc 2>/dev/null; hermes",
+      launchCmd: () =>
+        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
+    },
+
+    junie: {
+      name: "Junie",
+      cloudInitTier: "node",
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Junie",
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ` +
+            "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
+            "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
+        ),
+      envVars: (apiKey) => [
+        `JUNIE_OPENROUTER_API_KEY=${apiKey}`,
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
     },
   };
 }

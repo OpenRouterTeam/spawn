@@ -18,12 +18,8 @@ spawn/
       src/index.ts               # CLI entry point (bun/TypeScript)
       src/manifest.ts            # Manifest fetch + cache logic
       src/commands/              # Per-command modules (interactive, list, run, etc.)
-      src/commands.ts            # Compatibility shim → re-exports from commands/
+      src/commands/index.ts       # Barrel re-export of all command modules
       package.json               # npm package (@openrouter/spawn)
-    shared/
-      src/parse.ts               # parseJsonWith(text, schema) and parseJsonRaw(text)
-      src/type-guards.ts         # isString, isNumber, hasStatus, hasMessage
-      package.json               # npm package (@openrouter/spawn-shared)
   sh/
     cli/
       install.sh                 # One-liner installer (bun → npm → auto-install bun)

@@ -51,7 +51,7 @@ const {
 });
 
 // Import commands after mock setup
-const { cmdInteractive } = await import("../commands.js");
+const { cmdInteractive } = await import("../commands/index.js");
 
 describe("cmdInteractive", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
