@@ -16,7 +16,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
+import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   defaultSpawnName,
   getSpawnCloudConfigPath,
@@ -222,7 +222,7 @@ export async function ensureSshKey(): Promise<void> {
       // HTTP 409 "uniqueness_error" means the key already exists under a different
       // name. Hetzner's error message says "SSH key not unique" which the API layer
       // throws as an Error before we can parse the response body.
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = getErrorMessage(err);
       if (/uniqueness_error|not unique|already/.test(errMsg)) {
         logInfo(`SSH key '${key.name}' already registered (different name)`);
         continue;

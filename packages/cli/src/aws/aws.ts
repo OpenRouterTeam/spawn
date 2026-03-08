@@ -18,6 +18,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
+import { getErrorMessage } from "../shared/type-guards";
 import {
   defaultSpawnName,
   getSpawnCloudConfigPath,
@@ -860,7 +861,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         userdata,
       ]);
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = getErrorMessage(err);
       logError(`Failed to create Lightsail instance: ${errMsg}`);
 
       if (isBillingError("aws", errMsg)) {
@@ -914,7 +915,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         }),
       );
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = getErrorMessage(err);
       logError(`Failed to create Lightsail instance: ${errMsg}`);
 
       if (isBillingError("aws", errMsg)) {
