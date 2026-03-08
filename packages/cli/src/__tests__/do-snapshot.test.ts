@@ -11,7 +11,6 @@ import { afterAll, afterEach, describe, expect, it, mock } from "bun:test";
 
 mock.module("../shared/oauth", () => ({
   getOrPromptApiKey: mock(() => Promise.resolve("sk-test")),
-  getModelIdInteractive: mock(() => Promise.resolve("openrouter/auto")),
 }));
 
 // ── Import under test ─────────────────────────────────────────────────────

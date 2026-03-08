@@ -9,9 +9,7 @@ export type CloudInitTier = "minimal" | "node" | "bun" | "full";
 
 export interface AgentConfig {
   name: string;
-  /** If true, prompt for model selection before provisioning. */
-  modelPrompt?: boolean;
-  /** Default model ID when modelPrompt is true. */
+  /** Default model ID passed to configure() (no interactive prompt — override via MODEL_ID env var). */
   modelDefault?: string;
   /** Pre-provision hook (runs before server creation, e.g., prompt for GitHub auth). */
   preProvision?: () => Promise<void>;

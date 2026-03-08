@@ -6,6 +6,7 @@ import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import {
@@ -859,13 +860,42 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         userdata,
       ]);
     } catch (err) {
-      logError("Failed to create Lightsail instance");
-      logWarn("Common issues:");
-      logWarn("  - Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate");
-      logWarn("  - Instance limit reached for your account");
-      logWarn("  - Bundle unavailable in region");
-      logWarn("  - AWS credentials lack Lightsail permissions");
-      logWarn(`  - Instance name '${name}' already in use`);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logError(`Failed to create Lightsail instance: ${errMsg}`);
+
+      if (isBillingError("aws", errMsg)) {
+        const shouldRetry = await handleBillingError("aws");
+        if (shouldRetry) {
+          logStep("Retrying instance creation...");
+          await awsCli([
+            "lightsail",
+            "create-instances",
+            "--instance-names",
+            name,
+            "--availability-zone",
+            az,
+            "--blueprint-id",
+            blueprint,
+            "--bundle-id",
+            bundle,
+            "--key-pair-name",
+            "spawn-key",
+            "--user-data",
+            userdata,
+          ]);
+          instanceName = name;
+          logInfo(`Instance creation initiated: ${name}`);
+          return;
+        }
+      } else {
+        showNonBillingError("aws", [
+          "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
+          "Instance limit reached for your account",
+          "Bundle unavailable in region",
+          "AWS credentials lack Lightsail permissions",
+          `Instance name '${name}' already in use`,
+        ]);
+      }
       throw err;
     }
   } else {
@@ -884,13 +914,39 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         }),
       );
     } catch (err) {
-      logError("Failed to create Lightsail instance");
-      logWarn("Common issues:");
-      logWarn("  - Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate");
-      logWarn("  - Instance limit reached for your account");
-      logWarn("  - Bundle unavailable in region");
-      logWarn("  - Credentials lack lightsail:CreateInstances permission");
-      logWarn(`  - Instance name '${name}' already in use`);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logError(`Failed to create Lightsail instance: ${errMsg}`);
+
+      if (isBillingError("aws", errMsg)) {
+        const shouldRetry = await handleBillingError("aws");
+        if (shouldRetry) {
+          logStep("Retrying instance creation...");
+          await lightsailRest(
+            "Lightsail_20161128.CreateInstances",
+            JSON.stringify({
+              instanceNames: [
+                name,
+              ],
+              availabilityZone: az,
+              blueprintId: blueprint,
+              bundleId: bundle,
+              keyPairName: "spawn-key",
+              userData: userdata,
+            }),
+          );
+          instanceName = name;
+          logInfo(`Instance creation initiated: ${name}`);
+          return;
+        }
+      } else {
+        showNonBillingError("aws", [
+          "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
+          "Instance limit reached for your account",
+          "Bundle unavailable in region",
+          "Credentials lack lightsail:CreateInstances permission",
+          `Instance name '${name}' already in use`,
+        ]);
+      }
       throw err;
     }
   }

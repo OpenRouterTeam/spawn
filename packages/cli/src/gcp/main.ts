@@ -9,6 +9,7 @@ import { runOrchestration } from "../shared/orchestrate";
 import { agents, resolveAgent } from "./agents";
 import {
   authenticate,
+  checkBillingEnabled,
   createInstance,
   ensureGcloudCli,
   getServerName,
@@ -47,6 +48,9 @@ async function main() {
       await ensureGcloudCli();
       await authenticate();
       await resolveProject();
+    },
+    async checkAccountReady() {
+      await checkBillingEnabled();
     },
     async promptSize() {
       machineType = await promptMachineType();

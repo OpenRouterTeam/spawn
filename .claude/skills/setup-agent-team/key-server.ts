@@ -24,6 +24,14 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+// --- Helpers ---
+function toRecord(val: unknown): Record<string, unknown> {
+  if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+    return val satisfies Record<string, unknown>;
+  }
+  return {};
+}
+
 // --- Config ---
 const PORT = Number.parseInt(process.env.KEY_SERVER_PORT ?? "8081", 10);
 const SECRET = process.env.KEY_SERVER_SECRET ?? "";
@@ -200,8 +208,10 @@ function getClouds() {
       helpUrl: string;
     }
   >();
-  for (const [k, c] of Object.entries(m.clouds as Record<string, any>)) {
-    const auth: string = c.auth ?? "";
+  const clouds = toRecord(m.clouds);
+  for (const [k, v] of Object.entries(clouds)) {
+    const c = toRecord(v);
+    const auth = typeof c.auth === "string" ? c.auth : "";
     if (/\b(login|configure|setup)\b/i.test(auth)) {
       continue;
     }
@@ -211,9 +221,9 @@ function getClouds() {
       .filter(Boolean);
     if (vars.length) {
       result.set(k, {
-        name: c.name ?? k,
+        name: typeof c.name === "string" ? c.name : k,
         envVars: vars,
-        helpUrl: c.url ?? "",
+        helpUrl: typeof c.url === "string" ? c.url : "",
       });
     }
   }
@@ -412,7 +422,10 @@ const server = Bun.serve({
       const requested: string[] = [];
       const skipped: string[] = [];
 
-      for (const pk of body.providers as string[]) {
+      const providers: unknown[] = Array.isArray(body.providers) ? body.providers : [];
+      for (const item of providers) {
+        if (typeof item !== "string") continue;
+        const pk = item;
         if (
           d.batches.some(
             (b) => now - b.emailedAt < day && b.providers.some((x) => x.provider === pk && x.status === "pending"),
@@ -591,7 +604,8 @@ const server = Bun.serve({
           const vals: Record<string, string> = {};
           let filled = 0;
           for (const v of pr.envVars) {
-            const val = ((fd.get(`${pr.provider}__${v.name}`) as string) ?? "").trim();
+            const raw = fd.get(`${pr.provider}__${v.name}`);
+            const val = (typeof raw === "string" ? raw : "").trim();
             if (val) {
               if (!validKeyVal(val)) {
                 return new Response(

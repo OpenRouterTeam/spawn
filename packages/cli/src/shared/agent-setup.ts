@@ -568,7 +568,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "OpenClaw",
       cloudInitTier: "full",
       preProvision: detectGithubAuth,
-      modelPrompt: true,
       modelDefault: "openrouter/auto",
       install: () =>
         installAgent(
