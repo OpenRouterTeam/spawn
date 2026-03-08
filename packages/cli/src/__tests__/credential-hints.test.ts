@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { credentialHints } from "../commands";
+import { credentialHints } from "../commands/index.js";
 
 /**
  * Tests for credentialHints() env-var-aware credential status.

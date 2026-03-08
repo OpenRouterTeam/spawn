@@ -149,17 +149,15 @@ _hetzner_exec_long() {
   local ip
   ip=$(cat "${ip_file}")
 
-  # Base64-encode the command to avoid shell injection via single-quote breakout
-  local encoded_cmd
-  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
-
-  ssh -o StrictHostKeyChecking=no \
+  # Pipe the command via stdin to avoid interpolating it into the remote
+  # command string — eliminates shell injection risk from base64 encoding.
+  printf '%s' "${cmd}" | ssh -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
       -o LogLevel=ERROR \
       -o BatchMode=yes \
       -o ConnectTimeout=10 \
       -o ServerAliveInterval=15 \
-      "root@${ip}" "timeout ${timeout_secs} bash -c \"\$(printf '%s' '${encoded_cmd}' | base64 -d)\""
+      "root@${ip}" "timeout ${timeout_secs} bash"
 }
 
 # ---------------------------------------------------------------------------

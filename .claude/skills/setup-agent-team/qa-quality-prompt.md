@@ -100,14 +100,14 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
    **b) Stale references**: Scripts or code referencing files that no longer exist
    - Shell scripts are under `sh/` (e.g., `sh/shared/`, `sh/e2e/`, `sh/test/`, `sh/{cloud}/`)
-   - TypeScript is under `packages/cli/src/` and `packages/shared/src/`
+   - TypeScript is under `packages/cli/src/`
    - Grep for paths that reference old locations or deleted files and fix them
 
    **c) Python usage**: Any `python3 -c` or `python -c` calls in shell scripts
    - Replace with `bun eval` or `jq` as appropriate per CLAUDE.md rules
 
    **d) Duplicate utilities**: Same helper function defined in multiple TypeScript cloud modules
-   - If identical, move to `packages/shared/src/` and have cloud modules import it
+   - If identical, move to `packages/cli/src/shared/` and have cloud modules import it
 
    **e) Stale comments**: Comments referencing removed infrastructure, old test files, or deleted functions
    - Remove or update these comments
@@ -166,7 +166,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
 ### Teammate 5: record-keeper (model=sonnet)
 
-**Task**: Keep README.md in sync with manifest.json (matrix table), commands.ts (commands table), and recurring user issues (troubleshooting). **Conservative by design — if nothing changed, do nothing.**
+**Task**: Keep README.md in sync with manifest.json (matrix table), commands/index.ts (commands table), and recurring user issues (troubleshooting). **Conservative by design — if nothing changed, do nothing.**
 
 **Protocol**:
 1. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/record-keeper -b qa/record-keeper origin/main`
@@ -180,10 +180,10 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - To check: parse `manifest.json`, count agents/clouds/implemented entries, compare against README matrix table rows and tagline numbers
 
    **Gate 2 — Commands drift**:
-   - Source of truth: `packages/cli/src/commands.ts` → `getHelpUsageSection()` (line ~3339)
+   - Source of truth: `packages/cli/src/commands/help.ts` → `getHelpUsageSection()`
    - README section: Commands table (lines ~42-66)
    - Triggers when: a command exists in code but not in the README table, or vice versa
-   - To check: read the help section from `commands.ts`, extract command patterns, compare against README commands table entries
+   - To check: read the help section from `commands/help.ts`, extract command patterns, compare against README commands table entries
 
    **Gate 3 — Troubleshooting gaps** (hardest gate — requires recurrence):
    - Source of truth: `gh issue list --repo OpenRouterTeam/spawn --state all --limit 30 --json title,body,labels,state`

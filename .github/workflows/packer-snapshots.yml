@@ -1,0 +1,155 @@
+name: Packer DO Snapshots
+
+on:
+  schedule:
+    # Nightly at 4 AM UTC (before tarball build at 5 AM)
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Single agent to build (leave empty for all)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    name: Generate matrix
+    runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.set.outputs.agents }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        run: |
+          SINGLE_AGENT="${SINGLE_AGENT_INPUT}"
+          if [ -n "$SINGLE_AGENT" ]; then
+            echo "agents=[\"${SINGLE_AGENT}\"]" >> "$GITHUB_OUTPUT"
+          else
+            AGENTS=$(jq -c 'keys' packer/agents.json)
+            echo "agents=${AGENTS}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SINGLE_AGENT_INPUT: ${{ inputs.agent }}
+
+  build:
+    name: "Build ${{ matrix.agent }}"
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: ${{ fromJson(needs.matrix.outputs.agents) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read agent config
+        id: config
+        run: |
+          TIER=$(jq -r --arg a "$AGENT_NAME" '.[$a].tier // "minimal"' packer/agents.json)
+          INSTALL=$(jq -c --arg a "$AGENT_NAME" '.[$a].install // []' packer/agents.json)
+          echo "tier=${TIER}" >> "$GITHUB_OUTPUT"
+          echo "install=${INSTALL}" >> "$GITHUB_OUTPUT"
+        env:
+          AGENT_NAME: ${{ matrix.agent }}
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: latest
+
+      - name: Init Packer plugins
+        run: packer init packer/digitalocean.pkr.hcl
+
+      - name: Generate variables file
+        run: |
+          jq -n \
+            --arg token "$DO_API_TOKEN" \
+            --arg agent "$AGENT_NAME" \
+            --arg tier "$TIER" \
+            --argjson install "$INSTALL_COMMANDS" \
+            '{
+              do_api_token: $token,
+              agent_name: $agent,
+              cloud_init_tier: $tier,
+              install_commands: $install
+            }' > packer/auto.pkrvars.json
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          AGENT_NAME: ${{ matrix.agent }}
+          TIER: ${{ steps.config.outputs.tier }}
+          INSTALL_COMMANDS: ${{ steps.config.outputs.install }}
+
+      - name: Build snapshot
+        run: packer build -var-file=packer/auto.pkrvars.json packer/digitalocean.pkr.hcl
+
+      - name: Cleanup old snapshots
+        if: success()
+        run: |
+          # DO snapshots don't support tags — filter by name prefix instead
+          PREFIX="spawn-${AGENT_NAME}-"
+          SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            "https://api.digitalocean.com/v2/images?private=true&per_page=100" \
+            | jq -r --arg prefix "$PREFIX" \
+              '[.images[] | select(.name | startswith($prefix))] | sort_by(.created_at) | reverse | .[1:] | .[].id')
+
+          for ID in $SNAPSHOTS; do
+            echo "Deleting old snapshot: ${ID}"
+            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+              "https://api.digitalocean.com/v2/images/${ID}" || true
+          done
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          AGENT_NAME: ${{ matrix.agent }}
+
+      - name: Submit to DO Marketplace
+        if: success()
+        run: |
+          # Skip if no marketplace app IDs configured
+          if [ -z "$MARKETPLACE_APP_IDS" ]; then
+            echo "No MARKETPLACE_APP_IDS secret — skipping marketplace submission"
+            exit 0
+          fi
+
+          # Look up this agent's app ID from the JSON map
+          APP_ID=$(echo "$MARKETPLACE_APP_IDS" | jq -r --arg a "$AGENT_NAME" '.[$a] // empty')
+          if [ -z "$APP_ID" ]; then
+            echo "No marketplace app ID for agent ${AGENT_NAME} — skipping"
+            exit 0
+          fi
+
+          # Extract snapshot ID from Packer manifest
+          # artifact_id format is "region:snapshot_id" (e.g. "sfo3:12345678")
+          IMG_ID=$(jq '.builds[-1].artifact_id | split(":")[1] | tonumber' packer/manifest.json)
+          if [ -z "$IMG_ID" ] || [ "$IMG_ID" = "null" ]; then
+            echo "Failed to extract snapshot ID from manifest"
+            exit 1
+          fi
+
+          echo "Submitting snapshot ${IMG_ID} for ${AGENT_NAME} (app: ${APP_ID})"
+
+          # PATCH the Vendor API — updates go to "pending" review.
+          # 400 = app already pending/in-review (expected for nightly runs), not an error.
+          HTTP_CODE=$(curl -s -o /tmp/mp-response.json -w "%{http_code}" \
+            -X PATCH \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            -d "$(jq -n \
+              --arg reason "Nightly rebuild — $(date -u '+%Y-%m-%d')" \
+              --argjson imageId "$IMG_ID" \
+              '{reasonForUpdate: $reason, imageId: $imageId}')" \
+            "https://api.digitalocean.com/api/v1/vendor-portal/apps/${APP_ID}")
+
+          case "$HTTP_CODE" in
+            200) echo "Marketplace submission accepted (pending review)" ;;
+            400) echo "App already pending review — skipping (expected for nightly runs)" ;;
+            *)   echo "Marketplace API returned ${HTTP_CODE}:"
+                 cat /tmp/mp-response.json
+                 exit 1 ;;
+          esac
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          AGENT_NAME: ${{ matrix.agent }}
+          MARKETPLACE_APP_IDS: ${{ secrets.MARKETPLACE_APP_IDS }}

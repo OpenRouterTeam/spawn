@@ -4,7 +4,6 @@ import type { Manifest } from "../manifest.js";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { authenticate as awsAuthenticate, destroyServer as awsDestroyServer, ensureAwsCli } from "../aws/aws.js";
-import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "../daytona/daytona.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
 import {
   authenticate as gcpAuthenticate,
@@ -56,9 +55,6 @@ async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
     case "aws":
       await ensureAwsCli();
       await awsAuthenticate();
-      break;
-    case "daytona":
-      await ensureDaytonaToken();
       break;
     case "sprite":
       await ensureSpriteCli();
@@ -161,12 +157,6 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
         await ensureAwsCli();
         await awsAuthenticate();
         await awsDestroyServer(id);
-      });
-
-    case "daytona":
-      return tryDelete(async () => {
-        await ensureDaytonaToken();
-        await daytonaDestroyServer(id);
       });
 
     case "sprite":

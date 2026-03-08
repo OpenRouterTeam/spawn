@@ -39,9 +39,18 @@ const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
 
 // ─── State ───────────────────────────────────────────────────────────────────
-let hcloudToken = "";
-let hetznerServerId = "";
-let hetznerServerIp = "";
+
+interface HetznerState {
+  hcloudToken: string;
+  serverId: string;
+  serverIp: string;
+}
+
+const _state: HetznerState = {
+  hcloudToken: "",
+  serverId: "",
+  serverIp: "",
+};
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
@@ -53,7 +62,7 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${hcloudToken}`,
+        Authorization: `Bearer ${_state.hcloudToken}`,
       };
       const opts: RequestInit = {
         method,
@@ -108,7 +117,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testHcloudToken(): Promise<boolean> {
-  if (!hcloudToken) {
+  if (!_state.hcloudToken) {
     return false;
   }
   try {
@@ -131,26 +140,26 @@ async function testHcloudToken(): Promise<boolean> {
 export async function ensureHcloudToken(): Promise<void> {
   // 1. Env var
   if (process.env.HCLOUD_TOKEN) {
-    hcloudToken = process.env.HCLOUD_TOKEN.trim();
+    _state.hcloudToken = process.env.HCLOUD_TOKEN.trim();
     if (await testHcloudToken()) {
       logInfo("Using Hetzner Cloud token from environment");
-      await saveTokenToConfig(hcloudToken);
+      await saveTokenToConfig(_state.hcloudToken);
       return;
     }
     logWarn("HCLOUD_TOKEN from environment is invalid");
-    hcloudToken = "";
+    _state.hcloudToken = "";
   }
 
   // 2. Saved config
   const saved = loadApiToken("hetzner");
   if (saved) {
-    hcloudToken = saved;
+    _state.hcloudToken = saved;
     if (await testHcloudToken()) {
       logInfo("Using saved Hetzner Cloud token");
       return;
     }
     logWarn("Saved Hetzner token is invalid or expired");
-    hcloudToken = "";
+    _state.hcloudToken = "";
   }
 
   // 3. Manual entry
@@ -163,14 +172,14 @@ export async function ensureHcloudToken(): Promise<void> {
       logError("Token cannot be empty");
       continue;
     }
-    hcloudToken = token.trim();
+    _state.hcloudToken = token.trim();
     if (await testHcloudToken()) {
-      await saveTokenToConfig(hcloudToken);
+      await saveTokenToConfig(_state.hcloudToken);
       logInfo("Hetzner Cloud token validated and saved");
       return;
     }
     logError("Token is invalid");
-    hcloudToken = "";
+    _state.hcloudToken = "";
   }
 
   logError("No valid token after 3 attempts");
@@ -205,13 +214,26 @@ export async function ensureSshKey(): Promise<void> {
       name: keyName,
       public_key: pubKey,
     });
-    const regResp = await hetznerApi("POST", "/ssh_keys", body);
+    let regResp: string;
+    try {
+      regResp = await hetznerApi("POST", "/ssh_keys", body);
+    } catch (err) {
+      // HTTP 409 "uniqueness_error" means the key already exists under a different
+      // name. Hetzner's error message says "SSH key not unique" which the API layer
+      // throws as an Error before we can parse the response body.
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (/uniqueness_error|not unique|already/.test(errMsg)) {
+        logInfo(`SSH key '${key.name}' already registered (different name)`);
+        continue;
+      }
+      throw err;
+    }
     const regData = parseJsonObj(regResp);
     const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
       // Key may already exist under a different name — non-fatal
-      if (/already/.test(regErrMsg)) {
+      if (/already|uniqueness|not unique/.test(regErrMsg)) {
         logInfo(`SSH key '${key.name}' already registered (different name)`);
         continue;
       }
@@ -253,12 +275,12 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
 
 // ─── Server Type Options ─────────────────────────────────────────────────────
 
-export interface ServerTypeTier {
+interface ServerTypeTier {
   id: string;
   label: string;
 }
 
-export const SERVER_TYPES: ServerTypeTier[] = [
+const SERVER_TYPES: ServerTypeTier[] = [
   {
     id: "cx23",
     label: "cx23 \u00b7 2 vCPU \u00b7 4 GB \u00b7 40 GB (~\u20AC3.49/mo, EU only)",
@@ -289,12 +311,12 @@ export const DEFAULT_SERVER_TYPE = "cx23";
 
 // ─── Location Options ────────────────────────────────────────────────────────
 
-export interface LocationOption {
+interface LocationOption {
   id: string;
   label: string;
 }
 
-export const LOCATIONS: LocationOption[] = [
+const LOCATIONS: LocationOption[] = [
   {
     id: "fsn1",
     label: "Falkenstein, Germany",
@@ -413,25 +435,25 @@ export async function createServer(
     throw new Error(`Server creation failed: ${errMsg}`);
   }
 
-  hetznerServerId = String(server.id);
+  _state.serverId = String(server.id);
   const publicNet = toRecord(server.public_net);
   const ipv4 = toRecord(publicNet?.ipv4);
-  hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
+  _state.serverIp = isString(ipv4?.ip) ? ipv4.ip : "";
 
-  if (!hetznerServerId || hetznerServerId === "null") {
+  if (!_state.serverId || _state.serverId === "null") {
     logError("Failed to extract server ID from API response");
     throw new Error("No server ID");
   }
-  if (!hetznerServerIp || hetznerServerIp === "null") {
+  if (!_state.serverIp || _state.serverIp === "null") {
     logError("Failed to extract server IP from API response");
     throw new Error("No server IP");
   }
 
-  logInfo(`Server created: ID=${hetznerServerId}, IP=${hetznerServerIp}`);
+  logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
   saveVmConnection(
-    hetznerServerIp,
+    _state.serverIp,
     "root",
-    hetznerServerId,
+    _state.serverId,
     name,
     "hetzner",
     undefined,
@@ -443,7 +465,7 @@ export async function createServer(
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
 export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
-  const serverIp = ip || hetznerServerIp;
+  const serverIp = ip || _state.serverIp;
   const selectedKeys = await ensureSshKeys();
   const keyOpts = getSshKeyOpts(selectedKeys);
   await sharedWaitForSsh({
@@ -497,7 +519,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
-  const serverIp = ip || hetznerServerIp;
+  const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
@@ -531,7 +553,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 }
 
 export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
-  const serverIp = ip || hetznerServerIp;
+  const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
@@ -571,7 +593,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 }
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
-  const serverIp = ip || hetznerServerIp;
+  const serverIp = ip || _state.serverIp;
   if (
     !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
     remotePath.includes("..") ||
@@ -599,14 +621,19 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
       ],
     },
   );
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`upload_file failed for ${remotePath}`);
+  const timer = setTimeout(() => killWithTimeout(proc), 120_000);
+  try {
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      throw new Error(`upload_file failed for ${remotePath}`);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
-  const serverIp = ip || hetznerServerIp;
+  const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
   const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
@@ -624,7 +651,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
 
   // Post-session summary
   process.stderr.write("\n");
-  logWarn(`Session ended. Your Hetzner server (ID: ${hetznerServerId}) is still running.`);
+  logWarn(`Session ended. Your Hetzner server (ID: ${_state.serverId}) is still running.`);
   logWarn("Remember to delete it when you're done to avoid ongoing charges.");
   logWarn("");
   logWarn("Manage or delete it in your dashboard:");
@@ -679,7 +706,7 @@ export async function promptSpawnName(): Promise<void> {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 export async function destroyServer(serverId?: string): Promise<void> {
-  const id = serverId || hetznerServerId;
+  const id = serverId || _state.serverId;
   if (!id) {
     logError("destroy_server: no server ID provided");
     throw new Error("No server ID");

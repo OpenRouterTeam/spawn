@@ -10,13 +10,13 @@ import { expandEqualsFlags, findUnknownFlag, KNOWN_FLAGS } from "../flags";
 
 describe("Unknown Flag Detection", () => {
   describe("detects unknown flags", () => {
-    it("should detect --json as unknown", () => {
+    it("should detect --foo as unknown", () => {
       expect(
         findUnknownFlag([
           "list",
-          "--json",
+          "--foo",
         ]),
-      ).toBe("--json");
+      ).toBe("--foo");
     });
 
     it("should detect --verbose as unknown (middle position)", () => {
@@ -50,20 +50,20 @@ describe("Unknown Flag Detection", () => {
     it("should detect unknown flag at the beginning", () => {
       expect(
         findUnknownFlag([
-          "--json",
+          "--foo",
           "list",
         ]),
-      ).toBe("--json");
+      ).toBe("--foo");
     });
 
     it("should return first unknown when multiple unknown flags", () => {
       expect(
         findUnknownFlag([
-          "--json",
+          "--foo",
           "--verbose",
           "list",
         ]),
-      ).toBe("--json");
+      ).toBe("--foo");
     });
   });
 
@@ -87,6 +87,8 @@ describe("Unknown Flag Detection", () => {
         "--debug",
         "--name",
         "--reauth",
+        "--prune",
+        "--json",
       ];
       for (const flag of knownFlagsToTest) {
         expect(
@@ -211,6 +213,8 @@ describe("KNOWN_FLAGS completeness", () => {
       "--clear",
       "--custom",
       "--reauth",
+      "--prune",
+      "--json",
     ];
     for (const flag of expected) {
       expect(KNOWN_FLAGS.has(flag)).toBe(true);

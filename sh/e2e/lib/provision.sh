@@ -189,6 +189,11 @@ CLOUD_ENV
         printf 'export KILO_OPEN_ROUTER_API_KEY=%q\n' "${api_key}"
       } >> "${env_tmp}"
       ;;
+    junie)
+      {
+        printf 'export JUNIE_OPENROUTER_API_KEY=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
   esac
 
   local env_b64

@@ -5,7 +5,6 @@ dist/
 *.tgz
 # Cloud provider bundles (built by build-clouds.ts)
 aws.js
-daytona.js
 digitalocean.js
 gcp.js
 hetzner.js

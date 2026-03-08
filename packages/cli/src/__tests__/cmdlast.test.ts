@@ -29,7 +29,7 @@ const {
 } = mockClackPrompts();
 
 // Import after mock setup
-const { cmdLast, buildRecordLabel, buildRecordSubtitle } = await import("../commands.js");
+const { cmdLast, buildRecordLabel, buildRecordSubtitle } = await import("../commands/index.js");
 const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Test Setup ──────────────────────────────────────────────────────────────────

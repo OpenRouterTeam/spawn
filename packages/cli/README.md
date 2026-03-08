@@ -30,7 +30,6 @@ cli/
 │   ├── index.ts        # Entry point (routes commands to handlers)
 │   ├── commands/       # Per-command modules (interactive, list, run, etc.)
 │   │   └── index.ts    # Barrel re-export
-│   ├── commands.ts     # Compatibility shim → re-exports from commands/index.ts
 │   ├── manifest.ts     # Manifest fetching and caching logic
 │   ├── update-check.ts # Auto-update check (once per day)
 │   └── __tests__/      # Test suite (Bun test runner)
@@ -199,8 +198,7 @@ bun run dev claude sprite
 **`src/commands/`**
 - Per-command modules: `interactive.ts`, `list.ts`, `run.ts`, `delete.ts`, `update.ts`, etc.
 - `shared.ts` — helpers, entity resolution, fuzzy matching, credential hints
-- `index.ts` — barrel re-export for backward compat
-- `commands.ts` at root is a thin shim that re-exports from `commands/index.ts`
+- `index.ts` — barrel re-export for backward compatibility with existing imports
 
 **`src/manifest.ts`**
 - Manifest fetching from GitHub

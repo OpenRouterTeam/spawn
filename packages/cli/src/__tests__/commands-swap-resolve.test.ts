@@ -31,7 +31,7 @@ const {
 } = mockClackPrompts();
 
 // Import commands after mock setup
-const { cmdRun } = await import("../commands.js");
+const { cmdRun } = await import("../commands/index.js");
 
 const mockManifest = createMockManifest();
 

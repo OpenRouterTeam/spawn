@@ -324,7 +324,9 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
         : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
 
       const linesPerOption = config.options.map((o) => (o.subtitle ? 2 : 1));
-      pickerHeight = 1 + linesPerOption.reduce((a, b) => a + b, 0) + 1;
+      // Add 1 blank separator line between each pair of adjacent options
+      const separatorCount = config.options.length > 1 ? config.options.length - 1 : 0;
+      pickerHeight = 1 + linesPerOption.reduce((a, b) => a + b, 0) + separatorCount + 1;
 
       render = (wr: WriteFn, first: boolean) => {
         if (!first) {
@@ -347,10 +349,14 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
               wr(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
             }
           } else {
-            wr(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}\r\n`);
+            wr(`  ${trunc(opt.label, maxW - 2)}\r\n`);
             if (opt.subtitle) {
               wr(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
             }
+          }
+          // Blank separator between entries for visual clarity
+          if (i < config.options.length - 1) {
+            wr("\r\n");
           }
         }
         wr(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);

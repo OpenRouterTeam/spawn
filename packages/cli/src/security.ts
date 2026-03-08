@@ -15,7 +15,7 @@ const IPV4_PATTERN = /^(\d{1,3}\.){3}\d{1,3}$/;
 // IPv6 address pattern (simplified - catches most valid IPv6 addresses)
 const IPV6_PATTERN = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
 
-// Hostname pattern: valid DNS hostnames (e.g., ssh.app.daytona.io)
+// Hostname pattern: valid DNS hostnames (e.g., compute.amazonaws.com)
 // Only allows safe characters: lowercase alphanumeric, hyphens, dots
 // Must have at least two labels (e.g., "host.domain")
 const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -27,7 +27,6 @@ const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 // Special connection sentinel values (not actual IPs)
 const CONNECTION_SENTINELS = [
   "sprite-console",
-  "daytona-sandbox",
   "localhost",
 ];
 
@@ -171,8 +170,8 @@ export function validateScriptContent(script: string): void {
  * Allows:
  * - Valid IPv4 addresses (e.g., "192.168.1.1")
  * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
- * - Valid hostnames (e.g., "ssh.app.daytona.io")
- * - Special sentinel values ("sprite-console", "daytona-sandbox", "localhost")
+ * - Valid hostnames (e.g., "compute.amazonaws.com")
+ * - Special sentinel values ("sprite-console", "localhost")
  *
  * @param ip - The IP address or sentinel to validate
  * @throws Error if validation fails
@@ -213,7 +212,7 @@ export function validateConnectionIP(ip: string): void {
     return;
   }
 
-  // Validate as hostname (e.g., ssh.app.daytona.io)
+  // Validate as hostname (e.g., compute.amazonaws.com)
   if (HOSTNAME_PATTERN.test(ip)) {
     return;
   }
@@ -708,12 +707,6 @@ export function validatePrompt(prompt: string): void {
       description: "file redirection to path",
       suggestion: "Ask the agent to save output instead of using redirection syntax",
     },
-    // Redirection to simple filenames without extensions (3+ chars to avoid math like "> 5")
-    {
-      pattern: />>?\s*[a-zA-Z_]\w{2,}/,
-      description: "file redirection to path",
-      suggestion: "Ask the agent to save output instead of using redirection syntax",
-    },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
@@ -729,21 +722,5 @@ export function validatePrompt(prompt: string): void {
           `  Write: "Fix the directory listing issues"`,
       );
     }
-  }
-
-  // Generic check for suspicious operator combinations
-  // Exclude comparison expressions (like "a > b && c < d") by checking for comparison context
-  // Pattern matches doubled operators but not when used in comparison expressions
-  const hasDoubledOperators = /[;&|<>]\s*[;&|<>]/.test(prompt);
-  const looksLikeComparison = /\w\s*[<>!=]=?\s*\w\s*&&\s*\w\s*[<>!=]=?\s*\w/.test(prompt);
-
-  if (hasDoubledOperators && !looksLikeComparison) {
-    throw new Error(
-      "Your prompt contains shell operators that could be unsafe.\n\n" +
-        "Please describe what you want in plain English without shell syntax.\n\n" +
-        "Example:\n" +
-        `  Instead of: "Build a web server && deploy it"\n` +
-        `  Write: "Build a web server and deploy it"`,
-    );
   }
 }

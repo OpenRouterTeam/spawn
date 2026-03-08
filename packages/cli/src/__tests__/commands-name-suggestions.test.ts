@@ -111,7 +111,7 @@ const {
 } = mockClackPrompts();
 
 // Import commands after mock setup
-const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } = await import("../commands.js");
+const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } = await import("../commands/index.js");
 
 describe("Display Name Suggestions in Validation Errors", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;

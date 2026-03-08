@@ -19,7 +19,7 @@ import { mockClackPrompts } from "./test-helpers";
 const { logError: mockLogError, logInfo: mockLogInfo } = mockClackPrompts();
 
 // Import after mocking
-const { checkEntity } = await import("../commands.js");
+const { checkEntity } = await import("../commands/index.js");
 
 // ── Test Fixtures ───────────────────────────────────────────────────────────
 

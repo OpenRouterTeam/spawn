@@ -192,7 +192,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
     const r = records[i];
     const name = r.name || r.connection?.server_name || "unnamed";
     console.log(pc.bold(name));
-    console.log(`  ${buildRecordSubtitle(r, manifest)}`);
+    console.log(pc.dim(`  ${buildRecordSubtitle(r, manifest)}`));
     if (i < records.length - 1) {
       console.log();
     }
@@ -284,12 +284,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     options.push({
       value: "reconnect",
       label: "SSH into VM",
-      hint:
-        conn.ip === "sprite-console"
-          ? `sprite console -s ${conn.server_name}`
-          : conn.ip === "daytona-sandbox"
-            ? `daytona ssh ${conn.server_id}`
-            : `ssh ${conn.user}@${conn.ip}`,
+      hint: conn.ip === "sprite-console" ? `sprite console -s ${conn.server_name}` : `ssh ${conn.user}@${conn.ip}`,
     });
   }
 
