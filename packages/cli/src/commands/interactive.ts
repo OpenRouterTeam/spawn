@@ -2,7 +2,9 @@ import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { getActiveServers } from "../history.js";
 import { agentKeys } from "../manifest.js";
+import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
   buildAgentPickerHints,
@@ -123,6 +125,38 @@ export { promptSpawnName, getAndValidateCloudChoices, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
+
+  // If the user has existing spawns, offer a top-level menu so they can
+  // reconnect without knowing about `spawn list` or `spawn last`.
+  const activeServers = getActiveServers();
+  if (activeServers.length > 0) {
+    const topChoice = await p.select({
+      message: "What would you like to do?",
+      options: [
+        {
+          value: "connect",
+          label: "Connect to existing server",
+        },
+        {
+          value: "create",
+          label: "Create a new server",
+        },
+      ],
+    });
+    if (p.isCancel(topChoice)) {
+      handleCancel();
+    }
+    if (topChoice === "connect") {
+      let manifest: Manifest | null = null;
+      try {
+        manifest = await loadManifestWithSpinner();
+      } catch (_err) {
+        // Manifest unavailable — show raw keys
+      }
+      await activeServerPicker(activeServers, manifest);
+      return;
+    }
+  }
 
   const manifest = await loadManifestWithSpinner();
   const agentChoice = await selectAgent(manifest);
