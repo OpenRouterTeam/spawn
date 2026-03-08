@@ -214,13 +214,26 @@ export async function ensureSshKey(): Promise<void> {
       name: keyName,
       public_key: pubKey,
     });
-    const regResp = await hetznerApi("POST", "/ssh_keys", body);
+    let regResp: string;
+    try {
+      regResp = await hetznerApi("POST", "/ssh_keys", body);
+    } catch (err) {
+      // HTTP 409 "uniqueness_error" means the key already exists under a different
+      // name. Hetzner's error message says "SSH key not unique" which the API layer
+      // throws as an Error before we can parse the response body.
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (/uniqueness_error|not unique|already/.test(errMsg)) {
+        logInfo(`SSH key '${key.name}' already registered (different name)`);
+        continue;
+      }
+      throw err;
+    }
     const regData = parseJsonObj(regResp);
     const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
       // Key may already exist under a different name — non-fatal
-      if (/already/.test(regErrMsg)) {
+      if (/already|uniqueness|not unique/.test(regErrMsg)) {
         logInfo(`SSH key '${key.name}' already registered (different name)`);
         continue;
       }

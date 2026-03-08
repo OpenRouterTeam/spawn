@@ -125,6 +125,20 @@ export function generateSshKey(): SshKeyPair {
     mode: 0o700,
   });
 
+  // If the key already exists (e.g. another concurrent process generated it),
+  // reuse it instead of failing. ssh-keygen prompts for overwrite on stdin,
+  // which fails when stdin is "ignore".
+  if (existsSync(privPath) && existsSync(pubPath)) {
+    logInfo("SSH key already exists, reusing");
+    const keyType = getKeyType(pubPath);
+    return {
+      privPath,
+      pubPath,
+      name: "id_ed25519",
+      type: keyType,
+    };
+  }
+
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
     [
@@ -147,6 +161,18 @@ export function generateSshKey(): SshKeyPair {
     },
   );
   if (result.exitCode !== 0) {
+    // Another process may have created the key between our check and ssh-keygen.
+    // Re-check before throwing.
+    if (existsSync(privPath) && existsSync(pubPath)) {
+      logInfo("SSH key created by another process, reusing");
+      const keyType = getKeyType(pubPath);
+      return {
+        privPath,
+        pubPath,
+        name: "id_ed25519",
+        type: keyType,
+      };
+    }
     throw new Error("SSH key generation failed");
   }
   logInfo("SSH key generated");

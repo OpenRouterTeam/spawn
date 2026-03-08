@@ -666,7 +666,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
         `OPENAI_API_KEY=${apiKey}`,
       ],
-      launchCmd: () => "source ~/.spawnrc 2>/dev/null; hermes",
+      launchCmd: () =>
+        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
     },
   };
 }
