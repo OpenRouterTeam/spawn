@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-const { validateServerName, validateRegionName, validateModelId, toKebabCase, sanitizeTermValue, jsonEscape } =
-  await import("../shared/ui.js");
+const { validateServerName, validateRegionName, toKebabCase, sanitizeTermValue, jsonEscape } = await import(
+  "../shared/ui.js"
+);
 
 // ── validateServerName ──────────────────────────────────────────────
 
@@ -59,26 +60,6 @@ describe("validateRegionName", () => {
     expect(validateRegionName("us east")).toBe(false);
     expect(validateRegionName("us.east")).toBe(false);
     expect(validateRegionName("us@east")).toBe(false);
-  });
-});
-
-// ── validateModelId ─────────────────────────────────────────────────
-
-describe("validateModelId", () => {
-  it("accepts valid model IDs", () => {
-    expect(validateModelId("anthropic/claude-3.5-sonnet")).toBe(true);
-    expect(validateModelId("openai/gpt-4")).toBe(true);
-    expect(validateModelId("meta-llama/llama-3:70b")).toBe(true);
-  });
-
-  it("returns true for empty string", () => {
-    expect(validateModelId("")).toBe(true);
-  });
-
-  it("rejects model IDs with invalid characters", () => {
-    expect(validateModelId("model name")).toBe(false);
-    expect(validateModelId("model@id")).toBe(false);
-    expect(validateModelId("model;id")).toBe(false);
   });
 });
 

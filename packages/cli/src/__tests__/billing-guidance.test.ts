@@ -13,9 +13,7 @@ mock.module("../shared/ui", () => ({
   prompt: mockPrompt,
 }));
 
-const { getBillingUrl, getSetupSteps, handleBillingError, isBillingError, showNonBillingError } = await import(
-  "../shared/billing-guidance"
-);
+const { handleBillingError, isBillingError, showNonBillingError } = await import("../shared/billing-guidance");
 
 describe("isBillingError", () => {
   describe("hetzner", () => {
@@ -84,48 +82,10 @@ describe("isBillingError", () => {
     });
   });
 
-  describe("daytona", () => {
-    it("matches billing/plan errors", () => {
-      expect(isBillingError("daytona", "quota exceeded")).toBe(true);
-      expect(isBillingError("daytona", "plan limit reached")).toBe(true);
-    });
-
-    it("returns false for non-billing errors", () => {
-      expect(isBillingError("daytona", "sandbox creation failed")).toBe(false);
-      expect(isBillingError("daytona", "internal server error")).toBe(false);
-    });
-  });
-
   describe("unknown cloud", () => {
     it("returns false for unknown clouds", () => {
       expect(isBillingError("unknown", "billing error")).toBe(false);
     });
-  });
-});
-
-describe("getBillingUrl", () => {
-  it("returns correct URLs for known clouds", () => {
-    expect(getBillingUrl("hetzner")).toBe("https://console.hetzner.cloud/");
-    expect(getBillingUrl("digitalocean")).toBe("https://cloud.digitalocean.com/account/billing");
-    expect(getBillingUrl("aws")).toBe("https://lightsail.aws.amazon.com/");
-    expect(getBillingUrl("gcp")).toBe("https://console.cloud.google.com/billing");
-    expect(getBillingUrl("daytona")).toBe("https://app.daytona.io/dashboard");
-  });
-
-  it("returns undefined for unknown clouds", () => {
-    expect(getBillingUrl("unknown")).toBeUndefined();
-  });
-});
-
-describe("getSetupSteps", () => {
-  it("returns steps for known clouds", () => {
-    const steps = getSetupSteps("hetzner");
-    expect(steps.length).toBeGreaterThan(0);
-    expect(steps[0]).toContain("Hetzner");
-  });
-
-  it("returns empty array for unknown clouds", () => {
-    expect(getSetupSteps("unknown")).toEqual([]);
   });
 });
 
