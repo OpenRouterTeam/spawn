@@ -141,7 +141,7 @@ export function killWithTimeout(
  * Returns true if the connection succeeds within `timeoutMs`, false otherwise.
  * This is much cheaper than a full SSH handshake attempt.
  */
-export function tcpCheck(host: string, port: number, timeoutMs = 2000): Promise<boolean> {
+function tcpCheck(host: string, port: number, timeoutMs = 2000): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect({
       host,
