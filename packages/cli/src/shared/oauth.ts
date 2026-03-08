@@ -16,7 +16,7 @@ const OAuthKeySchema = v.object({
 
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
-export async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
+async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
   if (!apiKey) {
     return false;
   }
