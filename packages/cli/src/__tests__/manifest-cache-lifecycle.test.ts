@@ -1,189 +1,28 @@
-import type { AgentDef, CloudDef, Manifest } from "../manifest";
+import type { Manifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentKeys, cloudKeys, countImplemented, isValidManifest, loadManifest, matrixStatus } from "../manifest";
+import { agentKeys, countImplemented, loadManifest } from "../manifest";
 import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 
 /**
- * Tests for manifest.ts edge cases not covered by manifest.test.ts.
+ * Tests for manifest.ts cache and network resilience.
  *
  * manifest.test.ts covers the core happy paths (fresh cache, stale fallback,
- * network error, validation). These tests cover:
+ * network error, pure function unit tests). These tests cover:
  *
- * - isValidManifest with malformed/partial/unusual input types
  * - Cache corruption recovery (corrupted JSON, wrong types in cache)
  * - fetchManifestFromGitHub with HTTP 403, 404, 500 and json() failures
- * - matrixStatus key composition edge cases (slashes, empty strings, long keys)
- * - countImplemented case sensitivity and non-standard status values
- * - agentKeys/cloudKeys insertion order preservation
  * - In-memory cache forceRefresh bypass
  * - Fallback chain: invalid fetch data + stale cache
+ * - countImplemented case sensitivity (not covered elsewhere)
  */
 
 const mockManifest = createMockManifest();
 
 describe("Manifest Cache Lifecycle", () => {
-  describe("isValidManifest validation", () => {
-    it("should accept a complete manifest", () => {
-      expect(isValidManifest(mockManifest)).toBeTruthy();
-    });
-
-    it("should reject null", () => {
-      expect(isValidManifest(null)).toBeFalsy();
-    });
-
-    it("should reject undefined", () => {
-      expect(isValidManifest(undefined)).toBeFalsy();
-    });
-
-    it("should reject empty object", () => {
-      expect(isValidManifest({})).toBeFalsy();
-    });
-
-    it("should reject manifest missing agents", () => {
-      expect(
-        isValidManifest({
-          clouds: {},
-          matrix: {},
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should reject manifest missing clouds", () => {
-      expect(
-        isValidManifest({
-          agents: {},
-          matrix: {},
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should reject manifest missing matrix", () => {
-      expect(
-        isValidManifest({
-          agents: {},
-          clouds: {},
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should accept manifest with empty but present fields", () => {
-      // Note: empty objects {} are truthy in JS, so this passes validation
-      expect(
-        isValidManifest({
-          agents: {},
-          clouds: {},
-          matrix: {},
-        }),
-      ).toBeTruthy();
-    });
-
-    it("should reject a string", () => {
-      expect(isValidManifest("not a manifest")).toBeFalsy();
-    });
-
-    it("should reject a number", () => {
-      expect(isValidManifest(42)).toBeFalsy();
-    });
-
-    it("should reject an array", () => {
-      expect(
-        isValidManifest([
-          1,
-          2,
-          3,
-        ]),
-      ).toBeFalsy();
-    });
-
-    it("should reject boolean true", () => {
-      expect(isValidManifest(true)).toBeFalsy();
-    });
-
-    it("should reject boolean false", () => {
-      expect(isValidManifest(false)).toBeFalsy();
-    });
-
-    it("should accept manifest with extra fields", () => {
-      expect(
-        isValidManifest({
-          agents: {
-            a: 1,
-          },
-          clouds: {
-            b: 2,
-          },
-          matrix: {
-            c: 3,
-          },
-          extra: "field",
-          version: 2,
-        }),
-      ).toBeTruthy();
-    });
-
-    it("should reject when agents is null", () => {
-      expect(
-        isValidManifest({
-          agents: null,
-          clouds: {},
-          matrix: {},
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should reject when clouds is 0 (falsy)", () => {
-      expect(
-        isValidManifest({
-          agents: {},
-          clouds: 0,
-          matrix: {},
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should reject when matrix is empty string (falsy)", () => {
-      expect(
-        isValidManifest({
-          agents: {},
-          clouds: {},
-          matrix: "",
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should reject when matrix is false", () => {
-      expect(
-        isValidManifest({
-          agents: {},
-          clouds: {},
-          matrix: false,
-        }),
-      ).toBeFalsy();
-    });
-
-    it("should accept when agents/clouds/matrix are arrays (truthy but wrong type)", () => {
-      // The function only checks truthiness, not actual types
-      // This is a known limitation - arrays are truthy
-      expect(
-        isValidManifest({
-          agents: [
-            1,
-          ],
-          clouds: [
-            2,
-          ],
-          matrix: [
-            3,
-          ],
-        }),
-      ).toBeTruthy();
-    });
-  });
-
   describe("cache file corruption recovery", () => {
     let env: TestEnvironment;
 
@@ -484,83 +323,7 @@ describe("Manifest Cache Lifecycle", () => {
     });
   });
 
-  describe("matrixStatus edge cases", () => {
-    it("should handle cloud/agent keys with hyphens", () => {
-      const manifest: Manifest = {
-        agents: {
-          "my-agent": mockManifest.agents.claude,
-        },
-        clouds: {
-          "my-cloud": mockManifest.clouds.sprite,
-        },
-        matrix: {
-          "my-cloud/my-agent": "implemented",
-        },
-      };
-      expect(matrixStatus(manifest, "my-cloud", "my-agent")).toBe("implemented");
-    });
-
-    it("should handle ambiguous slash in agent key", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {
-          "cloud/agent": "implemented",
-        },
-      };
-      // "cloud" + "sub/agent" => "cloud/sub/agent" which doesn't match "cloud/agent"
-      expect(matrixStatus(manifest, "cloud", "sub/agent")).toBe("missing");
-    });
-
-    it("should return missing for empty string cloud and agent", () => {
-      expect(matrixStatus(mockManifest, "", "")).toBe("missing");
-    });
-
-    it("should return missing for very long keys", () => {
-      const longKey = "a".repeat(200);
-      expect(matrixStatus(mockManifest, longKey, longKey)).toBe("missing");
-    });
-
-    it("should handle keys with underscores", () => {
-      const manifest: Manifest = {
-        agents: {
-          my_agent: mockManifest.agents.claude,
-        },
-        clouds: {
-          my_cloud: mockManifest.clouds.sprite,
-        },
-        matrix: {
-          "my_cloud/my_agent": "implemented",
-        },
-      };
-      expect(matrixStatus(manifest, "my_cloud", "my_agent")).toBe("implemented");
-    });
-
-    it("should distinguish between similar keys", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {
-          "sprite/claude": "implemented",
-          "sprite/claude-code": "missing",
-        },
-      };
-      expect(matrixStatus(manifest, "sprite", "claude")).toBe("implemented");
-      expect(matrixStatus(manifest, "sprite", "claude-code")).toBe("missing");
-    });
-
-    it("should use nullish coalescing to default to missing", () => {
-      // Verify that undefined matrix entries default to "missing" via ??
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {},
-      };
-      expect(matrixStatus(manifest, "any", "thing")).toBe("missing");
-    });
-  });
-
-  describe("countImplemented edge cases", () => {
+  describe("countImplemented case sensitivity", () => {
     it("should only count exact 'implemented' string (case-sensitive)", () => {
       const manifest: Manifest = {
         agents: {},
@@ -575,120 +338,6 @@ describe("Manifest Cache Lifecycle", () => {
         },
       };
       expect(countImplemented(manifest)).toBe(2);
-    });
-
-    it("should return 0 for matrix with non-standard status values only", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {
-          "a/b": "missing",
-          "c/d": "planned",
-          "e/f": "wip",
-          "g/h": "in-progress",
-        },
-      };
-      expect(countImplemented(manifest)).toBe(0);
-    });
-
-    it("should handle large matrix efficiently", () => {
-      const matrix: Record<string, string> = {};
-      for (let i = 0; i < 1000; i++) {
-        matrix[`cloud${i}/agent${i}`] = i % 3 === 0 ? "implemented" : "missing";
-      }
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix,
-      };
-      // i=0,3,6,...,999: (999-0)/3 + 1 = 334
-      expect(countImplemented(manifest)).toBe(334);
-    });
-
-    it("should count single implemented entry correctly", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {
-          "only/one": "implemented",
-        },
-      };
-      expect(countImplemented(manifest)).toBe(1);
-    });
-  });
-
-  describe("agentKeys and cloudKeys ordering", () => {
-    it("should preserve insertion order of agents", () => {
-      const manifest: Manifest = {
-        agents: {
-          zulu: mockManifest.agents.claude,
-          alpha: mockManifest.agents.codex,
-          mike: mockManifest.agents.claude,
-        },
-        clouds: {},
-        matrix: {},
-      };
-      expect(agentKeys(manifest)).toEqual([
-        "zulu",
-        "alpha",
-        "mike",
-      ]);
-    });
-
-    it("should preserve insertion order of clouds", () => {
-      const manifest: Manifest = {
-        agents: {},
-        clouds: {
-          zebra: mockManifest.clouds.sprite,
-          apple: mockManifest.clouds.hetzner,
-        },
-        matrix: {},
-      };
-      expect(cloudKeys(manifest)).toEqual([
-        "zebra",
-        "apple",
-      ]);
-    });
-
-    it("should handle manifest with many agents", () => {
-      const agents: Record<string, AgentDef> = {};
-      for (let i = 0; i < 50; i++) {
-        agents[`agent-${i}`] = mockManifest.agents.claude;
-      }
-      const manifest: Manifest = {
-        agents,
-        clouds: {},
-        matrix: {},
-      };
-      expect(agentKeys(manifest)).toHaveLength(50);
-      expect(agentKeys(manifest)[0]).toBe("agent-0");
-      expect(agentKeys(manifest)[49]).toBe("agent-49");
-    });
-
-    it("should handle manifest with many clouds", () => {
-      const clouds: Record<string, CloudDef> = {};
-      for (let i = 0; i < 30; i++) {
-        clouds[`cloud-${i}`] = mockManifest.clouds.sprite;
-      }
-      const manifest: Manifest = {
-        agents: {},
-        clouds,
-        matrix: {},
-      };
-      expect(cloudKeys(manifest)).toHaveLength(30);
-    });
-
-    it("should return single-element array for single agent", () => {
-      const manifest: Manifest = {
-        agents: {
-          solo: mockManifest.agents.claude,
-        },
-        clouds: {},
-        matrix: {},
-      };
-      expect(agentKeys(manifest)).toEqual([
-        "solo",
-      ]);
     });
   });
 });
