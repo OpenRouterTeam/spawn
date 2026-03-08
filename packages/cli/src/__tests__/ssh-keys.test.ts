@@ -221,7 +221,10 @@ describe("generateSshKey", () => {
     });
     const privPath = join(sshDir, "id_ed25519");
 
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
+    // Use mockImplementation so key files are written when ssh-keygen is
+    // "called", not at mock setup time. generateSshKey() checks existsSync()
+    // first — if the files already exist it reuses them instead of generating.
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(() => sshKeygenGenerateResult(privPath));
 
     const pair = generateSshKey();
     spawnSpy.mockRestore();
@@ -231,6 +234,21 @@ describe("generateSshKey", () => {
     expect(pair.pubPath).toContain("id_ed25519.pub");
     expect(existsSync(pair.privPath)).toBe(true);
     expect(existsSync(pair.pubPath)).toBe(true);
+  });
+
+  it("reuses existing key instead of regenerating (race condition safety)", () => {
+    // Simulate another process having already generated the key
+    const { privPath, pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+
+    // Mock getKeyType to return ED25519 for the existing key
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("ED25519"));
+
+    const pair = generateSshKey();
+    spawnSpy.mockRestore();
+    expect(pair.name).toBe("id_ed25519");
+    expect(pair.type).toBe("ED25519");
+    expect(pair.privPath).toBe(privPath);
+    expect(pair.pubPath).toBe(pubPath);
   });
 });
 
@@ -266,7 +284,10 @@ describe("ensureSshKeys", () => {
     });
     const privPath = join(sshDir, "id_ed25519");
 
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
+    // Use mockImplementation so key files are written when ssh-keygen is
+    // "called", not at mock setup time. This prevents the early-return path
+    // in generateSshKey() from triggering due to pre-existing files.
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(() => sshKeygenGenerateResult(privPath));
 
     const keys = await ensureSshKeys();
     spawnSpy.mockRestore();
