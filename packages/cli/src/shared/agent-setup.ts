@@ -669,6 +669,25 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
     },
+
+    junie: {
+      name: "Junie",
+      cloudInitTier: "node",
+      preProvision: promptGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Junie",
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ` +
+            "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
+            "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
+        ),
+      envVars: (apiKey) => [
+        `JUNIE_OPENROUTER_API_KEY=${apiKey}`,
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
+    },
   };
 }
 
