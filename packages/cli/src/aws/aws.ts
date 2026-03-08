@@ -1078,43 +1078,6 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   }
 }
 
-export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
-  const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const proc = Bun.spawn(
-    [
-      "ssh",
-      ...SSH_BASE_OPTS,
-      ...keyOpts,
-      `${SSH_USER}@${_state.instanceIp}`,
-      `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-    const [stdout] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server_capture failed (exit ${exitCode})`);
-    }
-    return stdout.trim();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
   if (
     !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||

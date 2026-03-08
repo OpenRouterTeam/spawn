@@ -552,46 +552,6 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
   }
 }
 
-export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
-  const serverIp = ip || _state.serverIp;
-  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
-  const keyOpts = getSshKeyOpts(await ensureSshKeys());
-
-  const proc = Bun.spawn(
-    [
-      "ssh",
-      ...SSH_BASE_OPTS,
-      ...keyOpts,
-      `root@${serverIp}`,
-      fullCmd,
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-
-  const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-    const [stdout] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server_capture failed (exit ${exitCode})`);
-    }
-    return stdout.trim();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
   if (
