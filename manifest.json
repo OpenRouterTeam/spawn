@@ -249,7 +249,7 @@
   "clouds": {
     "local": {
       "name": "Local Machine",
-      "description": "Run agents on your own machine — no cloud needed",
+      "description": "Your computer — no account or payment needed",
       "url": "https://github.com/OpenRouterTeam/spawn",
       "type": "local",
       "auth": "none",
@@ -260,7 +260,7 @@
     },
     "hetzner": {
       "name": "Hetzner Cloud",
-      "description": "Affordable European cloud servers from ~€3/mo",
+      "description": "European cloud servers from ~€3/mo (account required)",
       "url": "https://www.hetzner.com/cloud/",
       "type": "api",
       "auth": "HCLOUD_TOKEN",
@@ -276,7 +276,7 @@
     },
     "aws": {
       "name": "AWS Lightsail",
-      "description": "Simple AWS instances starting at $3.50/mo",
+      "description": "Amazon cloud servers from $3.50/mo (AWS account required)",
       "url": "https://aws.amazon.com/lightsail/",
       "type": "cli",
       "auth": "AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY",
@@ -293,7 +293,7 @@
     },
     "digitalocean": {
       "name": "DigitalOcean",
-      "description": "Developer-friendly Droplets from $4/mo",
+      "description": "Cloud servers from $4/mo (account + payment method required)",
       "url": "https://www.digitalocean.com/",
       "type": "api",
       "auth": "DO_API_TOKEN",
@@ -309,7 +309,7 @@
     },
     "gcp": {
       "name": "GCP Compute Engine",
-      "description": "Google Cloud VMs with $300 free trial credit",
+      "description": "Google cloud servers — $300 free trial (Google account required)",
       "url": "https://cloud.google.com/compute",
       "type": "cli",
       "auth": "gcloud auth login",
@@ -326,7 +326,7 @@
     },
     "sprite": {
       "name": "Sprite",
-      "description": "Managed cloud VMs — one command to deploy",
+      "description": "Managed cloud servers — one command to deploy",
       "url": "https://sprites.dev",
       "type": "cli",
       "auth": "sprite login",
