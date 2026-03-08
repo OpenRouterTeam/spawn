@@ -3,7 +3,7 @@
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonWith } from "./parse";
-import { logError, logInfo, logStep, logWarn, openBrowser, prompt, validateModelId } from "./ui";
+import { logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -284,39 +284,4 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
 
   logError("No valid API key after 3 attempts");
   throw new Error("API key acquisition failed");
-}
-
-// ─── Model Selection ─────────────────────────────────────────────────────────
-
-export async function getModelIdInteractive(defaultModel = "openrouter/auto", agentName?: string): Promise<string> {
-  // Check env var first
-  if (process.env.MODEL_ID) {
-    if (!validateModelId(process.env.MODEL_ID)) {
-      logError("MODEL_ID environment variable contains invalid characters");
-      throw new Error("Invalid MODEL_ID");
-    }
-    return process.env.MODEL_ID;
-  }
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    process.stderr.write("\n");
-    logInfo("Browse models at: https://openrouter.ai/models");
-    if (agentName) {
-      logInfo(`Which model would you like to use with ${agentName}?`);
-    } else {
-      logInfo("Which model would you like to use?");
-    }
-
-    const modelId = (await prompt(`Enter model ID [${defaultModel}]: `)) || defaultModel;
-
-    if (!validateModelId(modelId)) {
-      logError("Invalid characters in model ID, try again");
-      continue;
-    }
-
-    return modelId;
-  }
-
-  logError("No valid model after 3 attempts");
-  throw new Error("Model selection failed");
 }

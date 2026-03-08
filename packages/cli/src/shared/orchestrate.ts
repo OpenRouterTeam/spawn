@@ -8,7 +8,7 @@ import { generateSpawnId, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
-import { getModelIdInteractive, getOrPromptApiKey } from "./oauth";
+import { getOrPromptApiKey } from "./oauth";
 import { logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
 
 export interface CloudOrchestrator {
@@ -81,11 +81,8 @@ export async function runOrchestration(
   // 3. Get API key (before provisioning so user isn't waiting)
   const apiKey = await getOrPromptApiKey(agentName, cloud.cloudName);
 
-  // 4. Model selection (if agent needs it)
-  let modelId: string | undefined;
-  if (agent.modelPrompt) {
-    modelId = await getModelIdInteractive(agent.modelDefault || "openrouter/auto", agent.name);
-  }
+  // 4. Model ID (use agent default — no interactive prompt)
+  const modelId = agent.modelDefault || process.env.MODEL_ID;
 
   // 5. Size/bundle selection
   await cloud.promptSize();

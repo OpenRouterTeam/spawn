@@ -16,11 +16,9 @@ import { isNumber } from "../shared/type-guards.js";
 // ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
 
 const mockGetOrPromptApiKey = mock(() => Promise.resolve("sk-or-v1-test-key"));
-const mockGetModelIdInteractive = mock(() => Promise.resolve("openrouter/auto"));
 
 mock.module("../shared/oauth", () => ({
   getOrPromptApiKey: mockGetOrPromptApiKey,
-  getModelIdInteractive: mockGetModelIdInteractive,
 }));
 
 // ── Import the real module under test ─────────────────────────────────────
@@ -109,8 +107,6 @@ describe("runOrchestration", () => {
     });
     mockGetOrPromptApiKey.mockClear();
     mockGetOrPromptApiKey.mockImplementation(() => Promise.resolve("sk-or-v1-test-key"));
-    mockGetModelIdInteractive.mockClear();
-    mockGetModelIdInteractive.mockImplementation(() => Promise.resolve("openrouter/auto"));
     mockTryTarballInstall.mockClear();
     mockTryTarballInstall.mockImplementation(() => Promise.resolve(false));
   });
@@ -258,43 +254,53 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
-  // ── Model selection ─────────────────────────────────────────────────
+  // ── Model default ──────────────────────────────────────────────────
 
-  it("calls getModelIdInteractive when agent.modelPrompt is true", async () => {
+  it("passes modelDefault to configure without prompting", async () => {
+    const configure = mock(() => Promise.resolve());
     const cloud = createMockCloud();
     const agent = createMockAgent({
-      modelPrompt: true,
       modelDefault: "anthropic/claude-3",
+      configure,
     });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(mockGetModelIdInteractive).toHaveBeenCalledTimes(1);
-    expect(mockGetModelIdInteractive).toHaveBeenCalledWith("anthropic/claude-3", "TestAgent");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3");
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
 
-  it("uses 'openrouter/auto' as default model when modelDefault is not set", async () => {
+  it("uses MODEL_ID env var when modelDefault is not set", async () => {
+    const originalModelId = process.env.MODEL_ID;
+    process.env.MODEL_ID = "google/gemini-pro";
+    const configure = mock(() => Promise.resolve());
     const cloud = createMockCloud();
     const agent = createMockAgent({
-      modelPrompt: true,
-    }); // no modelDefault
+      configure,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(mockGetModelIdInteractive).toHaveBeenCalledWith("openrouter/auto", "TestAgent");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro");
+    process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
 
-  it("skips model selection when modelPrompt is falsy", async () => {
+  it("passes undefined modelId when neither modelDefault nor MODEL_ID is set", async () => {
+    const originalModelId = process.env.MODEL_ID;
+    delete process.env.MODEL_ID;
+    const configure = mock(() => Promise.resolve());
     const cloud = createMockCloud();
-    const agent = createMockAgent(); // modelPrompt undefined
+    const agent = createMockAgent({
+      configure,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(mockGetModelIdInteractive).not.toHaveBeenCalled();
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined);
+    process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });

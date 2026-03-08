@@ -22,7 +22,6 @@ beforeEach(() => {
 
 mock.module("../shared/oauth", () => ({
   getOrPromptApiKey: mock(() => Promise.resolve("sk-or-v1-test-key")),
-  getModelIdInteractive: mock(() => Promise.resolve("openrouter/auto")),
 }));
 
 // ── Import module under test ──────────────────────────────────────────────────
