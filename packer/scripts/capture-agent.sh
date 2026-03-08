@@ -43,6 +43,9 @@ case "${AGENT_NAME}" in
   hermes)
     echo "/root/.local/bin/hermes" >> "${PATHS_FILE}"
     echo "/root/.local/share/" >> "${PATHS_FILE}"
+    # The hermes installer (uv tool) creates the actual binary + venv under ~/.hermes/.
+    # Without this, the ~/.local/bin/hermes symlink is dangling after tarball extraction.
+    echo "/root/.hermes/" >> "${PATHS_FILE}"
     ;;
   *)
     echo "Unknown agent: ${AGENT_NAME}" >&2

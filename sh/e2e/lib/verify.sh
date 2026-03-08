@@ -546,7 +546,7 @@ verify_hermes() {
 
   # Binary check
   log_step "Checking hermes binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v hermes" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.hermes/hermes-agent/venv/bin:\$HOME/.bun/bin:\$PATH command -v hermes" >/dev/null 2>&1; then
     log_ok "hermes binary found"
   else
     log_err "hermes binary not found"
