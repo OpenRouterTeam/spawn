@@ -437,11 +437,22 @@ export async function createServer(
         const retryData = parseJsonObj(retryResp);
         const retryServer = toRecord(retryData?.server);
         if (retryServer) {
-          hetznerServerId = String(retryServer.id);
+          _state.serverId = String(retryServer.id);
           const retryNet = toRecord(retryServer.public_net);
           const retryIpv4 = toRecord(retryNet?.ipv4);
-          hetznerServerIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
-          if (hetznerServerId && hetznerServerId !== "null" && hetznerServerIp && hetznerServerIp !== "null") {
+          _state.serverIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
+          if (_state.serverId && _state.serverId !== "null" && _state.serverIp && _state.serverIp !== "null") {
+            logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
+            saveVmConnection(
+              _state.serverIp,
+              "root",
+              _state.serverId,
+              name,
+              "hetzner",
+              undefined,
+              undefined,
+              process.env.SPAWN_ID || undefined,
+            );
             return;
           }
         }
