@@ -235,7 +235,7 @@ async function testDoToken(): Promise<boolean> {
  * Throws if the account is locked (billing issue). Warns on other statuses.
  */
 export async function checkAccountStatus(): Promise<void> {
-  if (!doToken) {
+  if (!_state.token) {
     return;
   }
   try {
@@ -886,13 +886,13 @@ export async function createServer(
         const retryText = await doApi("POST", "/droplets", body);
         const retryData = parseJsonObj(retryText);
         if (retryData?.droplet?.id) {
-          doDropletId = String(retryData.droplet.id);
-          logInfo(`Droplet created: ID=${doDropletId}`);
-          await waitForDropletActive(doDropletId);
+          _state.dropletId = String(retryData.droplet.id);
+          logInfo(`Droplet created: ID=${_state.dropletId}`);
+          await waitForDropletActive(_state.dropletId);
           saveVmConnection(
-            doServerIp,
+            _state.serverIp,
             "root",
-            doDropletId,
+            _state.dropletId,
             name,
             "digitalocean",
             undefined,

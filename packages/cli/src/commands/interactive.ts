@@ -80,7 +80,7 @@ async function selectCloud(
   hintOverrides: Record<string, string>,
 ): Promise<string> {
   const cloudChoice = await p.autocomplete({
-    message: "Where should your agent run? (type to filter)",
+    message: "Select a cloud (type to filter)",
     options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
     placeholder: "Start typing to search...",
   });
