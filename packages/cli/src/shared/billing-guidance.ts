@@ -9,7 +9,6 @@ const BILLING_URLS: Record<string, string> = {
   digitalocean: "https://cloud.digitalocean.com/account/billing",
   aws: "https://lightsail.aws.amazon.com/",
   gcp: "https://console.cloud.google.com/billing",
-  daytona: "https://app.daytona.io/dashboard",
 };
 
 // ─── Setup steps per cloud ──────────────────────────────────────────────────
@@ -38,11 +37,6 @@ const SETUP_STEPS: Record<string, string[]> = {
     "2. Link a billing account to your project",
     "3. Enable the Compute Engine API",
     "4. Return here and press Enter to retry",
-  ],
-  daytona: [
-    "1. Open the Daytona dashboard",
-    "2. Complete account setup or upgrade your plan",
-    "3. Return here and press Enter to retry",
   ],
 };
 
@@ -76,13 +70,6 @@ const ERROR_PATTERNS: Record<string, RegExp[]> = {
     /project.*has.*no.*billing/i,
     /account[_ ](?:is[_ ])?(?:suspended|closed)/i,
   ],
-  daytona: [
-    /billing/i,
-    /payment/i,
-    /subscription/i,
-    /quota[_ ]exceeded/i,
-    /plan[_ ]limit/i,
-  ],
 };
 
 /** Check if an error message matches known billing error patterns for a cloud. */
@@ -92,16 +79,6 @@ export function isBillingError(cloud: string, errorMsg: string): boolean {
     return false;
   }
   return patterns.some((p) => p.test(errorMsg));
-}
-
-/** Get billing setup URL for a cloud. */
-export function getBillingUrl(cloud: string): string | undefined {
-  return BILLING_URLS[cloud];
-}
-
-/** Get setup steps for a cloud. */
-export function getSetupSteps(cloud: string): string[] {
-  return SETUP_STEPS[cloud] || [];
 }
 
 /**
