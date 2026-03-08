@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { generateEnvConfig } from "../shared/agents";
-import { hasMessage, hasStatus, toObjectArray, toRecord } from "../shared/type-guards";
+import { hasStatus, toObjectArray, toRecord } from "../shared/type-guards";
 
 // ─── generateEnvConfig ──────────────────────────────────────────────────────
 
@@ -216,56 +216,5 @@ describe("hasStatus", () => {
   it("returns false for primitives", () => {
     expect(hasStatus("string")).toBe(false);
     expect(hasStatus(42)).toBe(false);
-  });
-});
-
-// ─── hasMessage ─────────────────────────────────────────────────────────────
-
-describe("hasMessage", () => {
-  it("returns true for objects with string message", () => {
-    expect(
-      hasMessage({
-        message: "error",
-      }),
-    ).toBe(true);
-    expect(
-      hasMessage({
-        message: "",
-      }),
-    ).toBe(true);
-  });
-
-  it("returns false for null", () => {
-    expect(hasMessage(null)).toBe(false);
-  });
-
-  it("returns false for undefined", () => {
-    expect(hasMessage(undefined)).toBe(false);
-  });
-
-  it("returns false for objects without message", () => {
-    expect(
-      hasMessage({
-        error: "oops",
-      }),
-    ).toBe(false);
-  });
-
-  it("returns false for objects with non-string message", () => {
-    expect(
-      hasMessage({
-        message: 123,
-      }),
-    ).toBe(false);
-    expect(
-      hasMessage({
-        message: null,
-      }),
-    ).toBe(false);
-  });
-
-  it("returns false for primitives", () => {
-    expect(hasMessage("string")).toBe(false);
-    expect(hasMessage(42)).toBe(false);
   });
 });
