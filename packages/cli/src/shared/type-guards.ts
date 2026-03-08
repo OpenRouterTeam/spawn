@@ -22,6 +22,14 @@ export function hasMessage(err: unknown): err is {
 }
 
 /**
+ * Extract a human-readable error message from an unknown caught value.
+ * Uses duck-typing instead of instanceof to avoid prototype chain issues.
+ */
+export function getErrorMessage(err: unknown): string {
+  return err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+}
+
+/**
  * Safely narrow an unknown value to a Record<string, unknown> or return null.
  */
 export function toRecord(val: unknown): Record<string, unknown> | null {

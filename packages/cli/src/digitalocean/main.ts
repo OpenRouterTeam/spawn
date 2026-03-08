@@ -6,6 +6,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate";
 
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
+import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
 import {
   checkAccountStatus,
@@ -83,7 +84,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-  process.stderr.write(`\x1b[0;31mFatal: ${msg}\x1b[0m\n`);
+  process.stderr.write(`\x1b[0;31mFatal: ${getErrorMessage(err)}\x1b[0m\n`);
   process.exit(1);
 });

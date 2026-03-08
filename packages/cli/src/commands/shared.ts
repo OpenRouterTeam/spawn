@@ -8,7 +8,7 @@ import * as v from "valibot";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
-import { isString } from "../shared/type-guards.js";
+import { getErrorMessage, isString } from "../shared/type-guards.js";
 import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -23,10 +23,7 @@ export const PkgVersionSchema = v.object({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-export function getErrorMessage(err: unknown): string {
-  // Use duck typing instead of instanceof to avoid prototype chain issues
-  return err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-}
+export { getErrorMessage };
 
 export function handleCancel(): never {
   p.outro(pc.dim("Cancelled."));

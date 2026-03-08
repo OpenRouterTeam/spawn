@@ -28,13 +28,13 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
+import { getErrorMessage } from "./shared/type-guards.js";
 import { checkForUpdates } from "./update-check.js";
 
 const VERSION = pkg.version;
 
 function handleError(err: unknown): never {
-  // Use duck typing instead of instanceof to avoid prototype chain issues
-  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+  const msg = getErrorMessage(err);
   console.error(pc.red(`Error: ${msg}`));
   console.error(`\nRun ${pc.cyan("spawn help")} for usage information.`);
   process.exit(1);
@@ -302,8 +302,7 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
     console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
     console.error("\nProvide a path to a text file containing your prompt.");
   } else {
-    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-    console.error(pc.red(`Error reading prompt file '${promptFile}': ${msg}`));
+    console.error(pc.red(`Error reading prompt file '${promptFile}': ${getErrorMessage(err)}`));
   }
   process.exit(1);
 }
@@ -316,8 +315,7 @@ async function readPromptFile(promptFile: string): Promise<string> {
   try {
     validatePromptFilePath(promptFile);
   } catch (err) {
-    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-    console.error(pc.red(msg));
+    console.error(pc.red(getErrorMessage(err)));
     process.exit(1);
   }
 
@@ -329,8 +327,7 @@ async function readPromptFile(promptFile: string): Promise<string> {
     if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
       handlePromptFileError(promptFile, err);
     }
-    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-    console.error(pc.red(msg));
+    console.error(pc.red(getErrorMessage(err)));
     process.exit(1);
   }
 
@@ -898,12 +895,11 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     if (effectiveHeadless && outputFormat === "json") {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
       console.log(
         JSON.stringify({
           status: "error",
           error_code: "UNEXPECTED_ERROR",
-          error_message: msg,
+          error_message: getErrorMessage(err),
         }),
       );
       process.exit(1);

@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { saveVmConnection as saveVmConnectionToHistory } from "../history.js";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
-import { hasMessage } from "../shared/type-guards";
+import { getErrorMessage } from "../shared/type-guards";
 import {
   defaultSpawnName,
   logError,
@@ -72,7 +72,7 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (err) {
       lastError = err;
-      const msg = hasMessage(err) ? err.message : String(err);
+      const msg = getErrorMessage(err);
 
       if (attempt >= maxRetries) {
         break;

@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
 import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "./security.js";
-import { isString } from "./shared/type-guards";
+import { getErrorMessage, isString } from "./shared/type-guards";
 
 export interface VMConnection {
   ip: string;
@@ -422,10 +422,7 @@ function mergeLastConnection(): void {
       }
     } catch (err) {
       // Log validation failure and skip merging
-      // Use duck typing instead of instanceof to avoid prototype chain issues
-      console.error(
-        `Warning: Invalid connection data from bash script, skipping merge: ${err && typeof err === "object" && "message" in err ? String(err.message) : String(err)}`,
-      );
+      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${getErrorMessage(err)}`);
       unlinkSync(connPath);
       return;
     }
