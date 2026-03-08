@@ -192,7 +192,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
     const r = records[i];
     const name = r.name || r.connection?.server_name || "unnamed";
     console.log(pc.bold(name));
-    console.log(`  ${buildRecordSubtitle(r, manifest)}`);
+    console.log(pc.dim(`  ${buildRecordSubtitle(r, manifest)}`));
     if (i < records.length - 1) {
       console.log();
     }
