@@ -8,7 +8,7 @@ import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hasMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -200,44 +200,40 @@ function readHostGitConfig(key: string): string {
   return "";
 }
 
-async function promptGithubAuth(): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
-    return;
-  }
-  process.stderr.write("\n");
-  const choice = await prompt("Set up GitHub CLI (gh) on this machine? (y/N): ");
-  if (/^[Yy]$/.test(choice)) {
-    githubAuthRequested = true;
-    if (process.env.GITHUB_TOKEN) {
-      githubToken = process.env.GITHUB_TOKEN;
-    } else {
-      try {
-        const result = Bun.spawnSync(
-          [
-            "gh",
-            "auth",
-            "token",
+async function detectGithubAuth(): Promise<void> {
+  if (process.env.GITHUB_TOKEN) {
+    githubToken = process.env.GITHUB_TOKEN;
+  } else {
+    try {
+      const result = Bun.spawnSync(
+        [
+          "gh",
+          "auth",
+          "token",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
           ],
-          {
-            stdio: [
-              "ignore",
-              "pipe",
-              "ignore",
-            ],
-          },
-        );
-        if (result.exitCode === 0) {
-          githubToken = new TextDecoder().decode(result.stdout).trim();
-        }
-      } catch {
-        /* ignore */
+        },
+      );
+      if (result.exitCode === 0) {
+        githubToken = new TextDecoder().decode(result.stdout).trim();
       }
+    } catch {
+      /* ignore */
     }
-
-    // Capture host git identity to propagate to the remote VM
-    hostGitName = readHostGitConfig("user.name");
-    hostGitEmail = readHostGitConfig("user.email");
   }
+
+  if (githubToken) {
+    githubAuthRequested = true;
+  }
+
+  // Capture host git identity to propagate to the remote VM
+  hostGitName = readHostGitConfig("user.name");
+  hostGitEmail = readHostGitConfig("user.email");
 }
 
 export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
@@ -609,7 +605,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "Claude Code",
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}claude:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () => installClaudeCode(runner),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -628,7 +624,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "Codex CLI",
       cloudInitTier: "node",
       dockerImage: `${DOCKER_IMAGE_PREFIX}codex:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -649,7 +645,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       dockerImage: `${DOCKER_IMAGE_PREFIX}openclaw:latest`,
       slowInstall: true,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
       install: withDockerInstall(runner, "OpenClaw", `${DOCKER_IMAGE_PREFIX}openclaw:latest`, () =>
@@ -678,7 +674,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "OpenCode",
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}opencode:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -690,7 +686,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "Kilo Code",
       cloudInitTier: "node",
       dockerImage: `${DOCKER_IMAGE_PREFIX}kilocode:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -712,7 +708,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`,
       slowInstall: true,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: withDockerInstall(runner, "ZeroClaw", `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`, async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
         // OOM during Rust compilation if --prefer-prebuilt falls back to source.
@@ -737,7 +733,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "Hermes Agent",
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}hermes:latest`,
-      preProvision: promptGithubAuth,
+      preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
