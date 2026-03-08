@@ -5,7 +5,7 @@
 # Sourced by common.sh's load_cloud_driver() which wires these to generic names.
 #
 # Sprite uses its own CLI for execution — NO SSH is used.
-# All remote commands run via: sprite exec -s NAME -- bash -c '$1' _ "CMD"
+# All remote commands run via: printf CMD | sprite exec -s NAME -- bash
 #
 # Depends on: log_step, log_ok, log_err, log_warn, log_info, format_duration,
 #             untrack_app (provided by common.sh)
@@ -160,8 +160,7 @@ _sprite_provision_verify() {
 # _sprite_exec APP CMD
 #
 # Execute CMD on the Sprite instance via the sprite CLI.
-# Uses direct command embedding (not $1 positional) so tilde expansion
-# and compound operators (&&, ||) work correctly on the remote side.
+# Pipes CMD via stdin to bash to avoid shell injection from embedded strings.
 # Retries up to 3 times when the sprite CLI itself fails (config corruption).
 # Returns the exit code of the remote command.
 # ---------------------------------------------------------------------------
@@ -174,8 +173,10 @@ _sprite_exec() {
 
   while [ "${_attempt}" -lt "${_max}" ]; do
     _sprite_fix_config
+    # Pipe the command via stdin to avoid interpolating it into the remote
+    # command string — eliminates shell injection risk.
     # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${app}" -- bash -c "${cmd}" 2>"${_stderr_tmp}"
+    printf '%s' "${cmd}" | sprite $(_sprite_org_flags) exec -s "${app}" -- bash 2>"${_stderr_tmp}"
     local _rc=$?
     if [ "${_rc}" -eq 0 ]; then
       rm -f "${_stderr_tmp}"
