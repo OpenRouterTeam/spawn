@@ -225,7 +225,7 @@ export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
 if ! command -v bun &>/dev/null; then
     log_step "bun not found. Installing bun..."
-    curl -fsSL --proto '=https' https://bun.sh/install | bash
+    curl -fsSL --proto '=https' https://bun.sh/install?version=1.3.9 | bash
 
     # Re-export so bun is available in this session immediately.
     # Use hard-coded paths alongside BUN_INSTALL — the bun installer may
@@ -236,7 +236,7 @@ if ! command -v bun &>/dev/null; then
         log_error "Failed to install bun automatically"
         echo ""
         echo "Please install bun manually:"
-        echo "  curl -fsSL https://bun.sh/install | bash"
+        echo "  curl -fsSL https://bun.sh/install?version=1.3.9 | bash"
         echo ""
         echo "Then reopen your terminal and re-run:"
         echo "  curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash"
