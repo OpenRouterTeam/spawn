@@ -9,6 +9,7 @@ import {
   formatToolHistory,
   formatToolStats,
   loadState,
+  looksLikeHtml,
   markdownToSlack,
   parseStreamEvent,
   saveState,
@@ -571,5 +572,118 @@ describe("downloadSlackFile", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("returns Err when response Content-Type is text/html (auth redirect)", async () => {
+    const originalFetch = globalThis.fetch;
+    const htmlBody = "<!DOCTYPE html><html><head></head><body>Sign in</body></html>";
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(htmlBody, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        }),
+      ),
+    );
+
+    try {
+      const result = await downloadSlackFile(
+        "https://files.slack.com/image.png",
+        "image.png",
+        "thread-html-ct",
+        "xoxb-fake-token",
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toContain("HTML instead of file data");
+        expect(result.error.message).toContain("files:read");
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("returns Err when response body is HTML despite non-html Content-Type", async () => {
+    const originalFetch = globalThis.fetch;
+    const htmlBody = "<!DOCTYPE html><html><head></head><body>Login page</body></html>";
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(htmlBody, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+        }),
+      ),
+    );
+
+    try {
+      const result = await downloadSlackFile(
+        "https://files.slack.com/image.png",
+        "image.png",
+        "thread-html-body",
+        "xoxb-fake-token",
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toContain("contains HTML");
+        expect(result.error.message).toContain("auth redirect");
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("looksLikeHtml", () => {
+  it("detects <!DOCTYPE html> prefix", () => {
+    const buf = Buffer.from("<!DOCTYPE html><html><body></body></html>");
+    expect(looksLikeHtml(buf)).toBe(true);
+  });
+
+  it("detects <html> prefix", () => {
+    const buf = Buffer.from("<html lang='en'><body></body></html>");
+    expect(looksLikeHtml(buf)).toBe(true);
+  });
+
+  it("detects HTML with leading whitespace", () => {
+    const buf = Buffer.from("  \n  <!doctype html><html></html>");
+    expect(looksLikeHtml(buf)).toBe(true);
+  });
+
+  it("returns false for PNG magic bytes", () => {
+    const buf = Buffer.from([
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+    ]);
+    expect(looksLikeHtml(buf)).toBe(false);
+  });
+
+  it("returns false for JPEG magic bytes", () => {
+    const buf = Buffer.from([
+      0xff,
+      0xd8,
+      0xff,
+      0xe0,
+    ]);
+    expect(looksLikeHtml(buf)).toBe(false);
+  });
+
+  it("returns false for plain text", () => {
+    const buf = Buffer.from("Just some plain text content");
+    expect(looksLikeHtml(buf)).toBe(false);
+  });
+
+  it("returns false for empty buffer", () => {
+    const buf = Buffer.from("");
+    expect(looksLikeHtml(buf)).toBe(false);
   });
 });
