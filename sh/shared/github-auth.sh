@@ -3,11 +3,11 @@
 # Executable directly via curl|bash; also sourceable using the CDN URL with eval.
 #
 # Usage (via curl|bash — recommended):
-#   curl -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/shared/github-auth.sh | bash
+#   curl -fsSL --proto '=https' https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash
+#   curl -fsSL --proto '=https' https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/shared/github-auth.sh | bash
 #
 # Usage (sourced using absolute path or CDN URL):
-#   eval "$(curl -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh)"
+#   eval "$(curl -fsSL --proto '=https' https://openrouter.ai/labs/spawn/shared/github-auth.sh)"
 #   ensure_github_auth
 
 # ============================================================
