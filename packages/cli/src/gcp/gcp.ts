@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { saveVmConnection } from "../history.js";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import {
   killWithTimeout,
@@ -512,6 +513,53 @@ export async function resolveProject(): Promise<void> {
   logInfo(`Using GCP project: ${_state.project}`);
 }
 
+// ─── Billing Pre-Check ──────────────────────────────────────────────────────
+
+/**
+ * Check if billing is enabled for the current GCP project.
+ * Runs: gcloud billing projects describe PROJECT_ID --format=value(billingEnabled)
+ * Throws if billing is not enabled (so orchestrate.ts can catch and continue).
+ */
+export async function checkBillingEnabled(): Promise<void> {
+  if (!gcpProject) {
+    return;
+  }
+  try {
+    const result = gcloudSync([
+      "billing",
+      "projects",
+      "describe",
+      gcpProject,
+      "--format=value(billingEnabled)",
+    ]);
+    const output = result.stdout.trim().toLowerCase();
+    if (output === "false") {
+      logWarn(`Billing is not enabled for project '${gcpProject}'.`);
+      const shouldRetry = await handleBillingError("gcp");
+      if (!shouldRetry) {
+        throw new Error("GCP billing not enabled");
+      }
+      // Re-check
+      const retry = gcloudSync([
+        "billing",
+        "projects",
+        "describe",
+        gcpProject,
+        "--format=value(billingEnabled)",
+      ]);
+      if (retry.stdout.trim().toLowerCase() === "false") {
+        logWarn("Billing is still not enabled. Continuing anyway — instance creation may fail.");
+      }
+    }
+  } catch (err) {
+    // Re-throw our explicit billing error
+    if (err instanceof Error && err.message === "GCP billing not enabled") {
+      throw err;
+    }
+    // Permission errors or missing billing API — non-fatal, continue
+  }
+}
+
 // ─── Interactive Pickers ────────────────────────────────────────────────────
 
 export async function promptMachineType(): Promise<string> {
@@ -740,16 +788,35 @@ export async function createInstance(
   }
 
   if (result.exitCode !== 0) {
+    const errMsg = result.stderr || "Unknown error";
     logError("Failed to create GCP instance");
     if (result.stderr) {
       logError(`gcloud error: ${result.stderr}`);
     }
-    logWarn("Common issues:");
-    logWarn("  - Billing not enabled (enable at https://console.cloud.google.com/billing)");
-    logWarn("  - Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)");
-    logWarn("  - Instance quota exceeded (try different GCP_ZONE)");
-    logWarn("  - Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)");
-    throw new Error("Instance creation failed");
+
+    if (isBillingError("gcp", errMsg)) {
+      const shouldRetry = await handleBillingError("gcp");
+      if (shouldRetry) {
+        logStep("Retrying instance creation...");
+        const retryResult = await gcloud(args);
+        if (retryResult.exitCode === 0) {
+          // Fall through to IP extraction below
+        } else {
+          const retryErr = retryResult.stderr || "Unknown error";
+          logError(`Retry failed: ${retryErr}`);
+          throw new Error("Instance creation failed");
+        }
+      } else {
+        throw new Error("Instance creation failed");
+      }
+    } else {
+      showNonBillingError("gcp", [
+        "Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)",
+        "Instance quota exceeded (try different GCP_ZONE)",
+        "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
+      ]);
+      throw new Error("Instance creation failed");
+    }
   }
 
   // Get external IP

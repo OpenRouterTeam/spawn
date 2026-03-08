@@ -4,6 +4,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
 import { saveVmConnection } from "../history.js";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
 import {
@@ -425,13 +426,34 @@ export async function createServer(
   // so check for presence of .server object, not absence of "error" string.
   const server = toRecord(data?.server);
   if (!server) {
-    const errMsg = toRecord(data?.error)?.message || "Unknown error";
+    const errMsg = String(toRecord(data?.error)?.message || "Unknown error");
     logError(`Failed to create Hetzner server: ${errMsg}`);
-    logWarn("Common issues:");
-    logWarn("  - Insufficient account balance or payment method required");
-    logWarn("  - Server type/location unavailable");
-    logWarn("  - Server limit reached for your account");
-    logWarn(`Check your dashboard: ${HETZNER_DASHBOARD_URL}`);
+
+    if (isBillingError("hetzner", errMsg)) {
+      const shouldRetry = await handleBillingError("hetzner");
+      if (shouldRetry) {
+        logStep("Retrying server creation...");
+        const retryResp = await hetznerApi("POST", "/servers", body);
+        const retryData = parseJsonObj(retryResp);
+        const retryServer = toRecord(retryData?.server);
+        if (retryServer) {
+          hetznerServerId = String(retryServer.id);
+          const retryNet = toRecord(retryServer.public_net);
+          const retryIpv4 = toRecord(retryNet?.ipv4);
+          hetznerServerIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
+          if (hetznerServerId && hetznerServerId !== "null" && hetznerServerIp && hetznerServerIp !== "null") {
+            return;
+          }
+        }
+        const retryErr = String(toRecord(retryData?.error)?.message || "Unknown error");
+        logError(`Retry failed: ${retryErr}`);
+      }
+    } else {
+      showNonBillingError("hetzner", [
+        "Server type or location unavailable",
+        "Server limit reached for your account",
+      ]);
+    }
     throw new Error(`Server creation failed: ${errMsg}`);
   }
 

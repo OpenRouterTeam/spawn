@@ -9,6 +9,7 @@ import { runOrchestration } from "../shared/orchestrate";
 import { logStep } from "../shared/ui";
 import { agents, resolveAgent } from "./agents";
 import {
+  checkAccountStatus,
   createServer as createDroplet,
   ensureDoToken,
   ensureSshKey,
@@ -54,6 +55,9 @@ async function main() {
         logStep("Next step: OpenRouter authentication (opening browser in 5s)...");
         await new Promise((r) => setTimeout(r, 5000));
       }
+    },
+    async checkAccountReady() {
+      await checkAccountStatus();
     },
     async promptSize() {
       dropletSize = await promptDropletSize();

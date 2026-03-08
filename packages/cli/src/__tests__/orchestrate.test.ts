@@ -510,4 +510,57 @@ describe("runOrchestration", () => {
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
+
+  // ── checkAccountReady ──────────────────────────────────────────────
+
+  it("calls checkAccountReady between authenticate and preProvision", async () => {
+    const callOrder: string[] = [];
+    const cloud = createMockCloud({
+      authenticate: mock(async () => {
+        callOrder.push("authenticate");
+      }),
+      checkAccountReady: mock(async () => {
+        callOrder.push("checkAccountReady");
+      }),
+    });
+    const agent = createMockAgent({
+      preProvision: mock(async () => {
+        callOrder.push("preProvision");
+      }),
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(callOrder.indexOf("authenticate")).toBeLessThan(callOrder.indexOf("checkAccountReady"));
+    expect(callOrder.indexOf("checkAccountReady")).toBeLessThan(callOrder.indexOf("preProvision"));
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("continues when checkAccountReady throws (non-fatal)", async () => {
+    const cloud = createMockCloud({
+      checkAccountReady: mock(() => Promise.reject(new Error("billing check failed"))),
+    });
+    const agent = createMockAgent();
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    // Cloud lifecycle should still proceed despite checkAccountReady failure
+    expect(cloud.createServer).toHaveBeenCalledTimes(1);
+    expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("skips checkAccountReady when not defined on cloud", async () => {
+    const cloud = createMockCloud(); // no checkAccountReady
+    const agent = createMockAgent();
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(cloud.authenticate).toHaveBeenCalledTimes(1);
+    expect(cloud.createServer).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
 });

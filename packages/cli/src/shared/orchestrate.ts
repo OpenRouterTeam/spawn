@@ -18,6 +18,7 @@ export interface CloudOrchestrator {
   /** When true, skip tarball + agent install (e.g. booting from a pre-baked snapshot). */
   skipAgentInstall?: boolean;
   authenticate(): Promise<void>;
+  checkAccountReady?(): Promise<void>;
   promptSize(): Promise<void>;
   createServer(name: string, spawnId?: string): Promise<void>;
   getServerName(): Promise<string>;
@@ -68,6 +69,15 @@ export async function runOrchestration(
 
   // 1. Authenticate with cloud provider
   await cloud.authenticate();
+
+  // 1b. Pre-flight account readiness check (billing, email verification, etc.)
+  if (cloud.checkAccountReady) {
+    try {
+      await cloud.checkAccountReady();
+    } catch {
+      // non-fatal — let createServer be the final arbiter
+    }
+  }
 
   // 2. Pre-provision hooks
   if (agent.preProvision) {

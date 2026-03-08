@@ -4,6 +4,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
 import { saveVmConnection } from "../history.js";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
 import {
@@ -15,7 +16,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { isNumber, isString, toObjectArray } from "../shared/type-guards";
+import { isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   defaultSpawnName,
   getSpawnCloudConfigPath,
@@ -225,6 +226,56 @@ async function testDoToken(): Promise<boolean> {
     return text.includes('"uuid"');
   } catch {
     return false;
+  }
+}
+
+/**
+ * Check DigitalOcean account status for billing issues.
+ * Uses the /v2/account endpoint which is already called during token validation.
+ * Throws if the account is locked (billing issue). Warns on other statuses.
+ */
+export async function checkAccountStatus(): Promise<void> {
+  if (!doToken) {
+    return;
+  }
+  try {
+    const text = await doApi("GET", "/account", undefined, 1);
+    const data = parseJsonObj(text);
+    const rec = toRecord(data?.account);
+    if (!rec) {
+      return;
+    }
+    const status = isString(rec.status) ? rec.status : "";
+    const emailVerified = rec.email_verified;
+
+    if (status === "locked") {
+      logWarn("Your DigitalOcean account is locked (usually a billing issue).");
+      const shouldRetry = await handleBillingError("digitalocean");
+      if (!shouldRetry) {
+        throw new Error("DigitalOcean account is locked");
+      }
+      // Re-check after user says they fixed it
+      const retryText = await doApi("GET", "/account", undefined, 1);
+      const retryData = parseJsonObj(retryText);
+      const retryRec = toRecord(retryData?.account);
+      if (retryRec) {
+        if (isString(retryRec.status) && retryRec.status === "locked") {
+          logWarn("Account is still locked. Continuing anyway — server creation may fail.");
+        }
+      }
+    } else if (status === "warning") {
+      logWarn("Your DigitalOcean account has a warning status. You may experience limitations.");
+    }
+
+    if (emailVerified === false) {
+      logWarn("Your DigitalOcean email is not verified. Verify it to avoid account restrictions.");
+    }
+  } catch (err) {
+    // Only re-throw if it's our explicit lock error
+    if (err instanceof Error && err.message === "DigitalOcean account is locked") {
+      throw err;
+    }
+    // Otherwise non-fatal — let createServer be the final check
   }
 }
 
@@ -825,13 +876,40 @@ export async function createServer(
   const createData = parseJsonObj(createText);
 
   if (!createData?.droplet?.id) {
-    const errMsg = createData?.message || "Unknown error";
+    const errMsg = String(createData?.message || "Unknown error");
     logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
-    logWarn("Common issues:");
-    logWarn("  - Insufficient account balance or payment method required");
-    logWarn("  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)");
-    logWarn("  - Droplet limit reached (check account limits)");
-    logWarn(`Check your dashboard: ${DO_DASHBOARD_URL}`);
+
+    if (isBillingError("digitalocean", errMsg)) {
+      const shouldRetry = await handleBillingError("digitalocean");
+      if (shouldRetry) {
+        logStep("Retrying droplet creation...");
+        const retryText = await doApi("POST", "/droplets", body);
+        const retryData = parseJsonObj(retryText);
+        if (retryData?.droplet?.id) {
+          doDropletId = String(retryData.droplet.id);
+          logInfo(`Droplet created: ID=${doDropletId}`);
+          await waitForDropletActive(doDropletId);
+          saveVmConnection(
+            doServerIp,
+            "root",
+            doDropletId,
+            name,
+            "digitalocean",
+            undefined,
+            undefined,
+            process.env.SPAWN_ID || undefined,
+          );
+          return;
+        }
+        const retryErr = String(retryData?.message || "Unknown error");
+        logError(`Retry failed: ${retryErr}`);
+      }
+    } else {
+      showNonBillingError("digitalocean", [
+        "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
+        "Droplet limit reached (check account limits)",
+      ]);
+    }
     throw new Error("Droplet creation failed");
   }
 
