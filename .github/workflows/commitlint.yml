@@ -23,4 +23,6 @@ jobs:
       - name: Lint PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | bunx commitlint
+        run: |
+          printf '%s\n' "$PR_TITLE" > /tmp/pr_title.txt
+          bunx commitlint < /tmp/pr_title.txt
