@@ -883,7 +883,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
             "--user-data",
             userdata,
           ]);
-          instanceName = name;
+          _state.instanceName = name;
           logInfo(`Instance creation initiated: ${name}`);
           return;
         }
@@ -934,7 +934,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
               userData: userdata,
             }),
           );
-          instanceName = name;
+          _state.instanceName = name;
           logInfo(`Instance creation initiated: ${name}`);
           return;
         }

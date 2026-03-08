@@ -521,7 +521,7 @@ export async function resolveProject(): Promise<void> {
  * Throws if billing is not enabled (so orchestrate.ts can catch and continue).
  */
 export async function checkBillingEnabled(): Promise<void> {
-  if (!gcpProject) {
+  if (!_state.project) {
     return;
   }
   try {
@@ -529,12 +529,12 @@ export async function checkBillingEnabled(): Promise<void> {
       "billing",
       "projects",
       "describe",
-      gcpProject,
+      _state.project,
       "--format=value(billingEnabled)",
     ]);
     const output = result.stdout.trim().toLowerCase();
     if (output === "false") {
-      logWarn(`Billing is not enabled for project '${gcpProject}'.`);
+      logWarn(`Billing is not enabled for project '${_state.project}'.`);
       const shouldRetry = await handleBillingError("gcp");
       if (!shouldRetry) {
         throw new Error("GCP billing not enabled");
@@ -544,7 +544,7 @@ export async function checkBillingEnabled(): Promise<void> {
         "billing",
         "projects",
         "describe",
-        gcpProject,
+        _state.project,
         "--format=value(billingEnabled)",
       ]);
       if (retry.stdout.trim().toLowerCase() === "false") {
