@@ -1,12 +1,8 @@
 name: CLI Release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packages/cli/src/**'
-      - 'packages/cli/package.json'
-      - 'packages/cli/bun.lock'
+  release:
+    types: [published]
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +12,7 @@ concurrency:
 jobs:
   build:
     name: Build and release CLI
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'packages/cli-v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
