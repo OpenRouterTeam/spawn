@@ -69,7 +69,19 @@ provision_agent() {
       if [ -z "${_env_name}" ]; then
         continue
       fi
-      # Validate value against a safe character whitelist
+      # Block dangerous system env vars that could enable privilege escalation
+      case "${_env_name}" in
+        PATH|LD_PRELOAD|LD_LIBRARY_PATH|HOME|SHELL|USER|IFS|ENV|BASH_ENV|CDPATH)
+          log_err "Blocked dangerous env var: ${_env_name}"
+          continue
+          ;;
+      esac
+      # Validate env var name matches strict alphanumeric pattern
+      if ! printf '%s' "${_env_name}" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*$'; then
+        log_err "Invalid env var name: ${_env_name}"
+        continue
+      fi
+      # Validate value against a safe character whitelist BEFORE export
       if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
         log_err "Invalid characters in env value for ${_env_name}"
         continue
@@ -104,8 +116,12 @@ CLOUD_ENV
     pkill -P "${pid}" 2>/dev/null || true
     kill "${pid}" 2>/dev/null || true
     wait "${pid}" 2>/dev/null || true
-    # Also kill any lingering sprite exec processes for this specific app
-    pkill -f "sprite.*exec.*${app_name}" 2>/dev/null || true
+    # Also kill any lingering sprite exec processes for this specific app.
+    # Validate app_name is non-empty and contains only safe characters to
+    # prevent overly broad pkill -f patterns from killing unrelated processes.
+    if [ -n "${app_name}" ] && printf '%s' "${app_name}" | grep -qE '^[A-Za-z0-9._-]+$'; then
+      pkill -f "sprite exec.*${app_name}" 2>/dev/null || true
+    fi
     sleep 1
   fi
 
