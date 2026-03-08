@@ -205,6 +205,11 @@ input_test_hermes() {
   return 0
 }
 
+input_test_junie() {
+  log_warn "junie CLI input test not yet implemented — skipping"
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # run_input_test AGENT APP_NAME
 #
@@ -231,6 +236,7 @@ run_input_test() {
     opencode)  input_test_opencode          ;;
     kilocode)  input_test_kilocode          ;;
     hermes)    input_test_hermes            ;;
+    junie)     input_test_junie            ;;
     *)
       log_err "Unknown agent for input test: ${agent}"
       return 1
@@ -574,6 +580,40 @@ verify_hermes() {
   return "${failures}"
 }
 
+verify_junie() {
+  local app="$1"
+  local failures=0
+
+  # Binary check
+  log_step "Checking junie binary..."
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v junie" >/dev/null 2>&1; then
+    log_ok "junie binary found"
+  else
+    log_err "junie binary not found"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: JUNIE_OPENROUTER_API_KEY
+  log_step "Checking junie env (JUNIE_OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q JUNIE_OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "JUNIE_OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "JUNIE_OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENROUTER_API_KEY
+  log_step "Checking junie env (OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  return "${failures}"
+}
+
 # ---------------------------------------------------------------------------
 # verify_agent AGENT APP_NAME
 #
@@ -602,6 +642,7 @@ verify_agent() {
     opencode)  verify_opencode "${app}"  || agent_failures=$? ;;
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;
     hermes)    verify_hermes "${app}"    || agent_failures=$? ;;
+    junie)     verify_junie "${app}"    || agent_failures=$? ;;
     *)
       log_err "Unknown agent: ${agent}"
       return 1
