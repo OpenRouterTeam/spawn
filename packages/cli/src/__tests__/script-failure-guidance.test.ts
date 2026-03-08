@@ -211,7 +211,9 @@ describe("getScriptFailureGuidance", () => {
 
     it("should show specific env var name and setup hint for default case when authHint is provided", () => {
       const savedOR = process.env.OPENROUTER_API_KEY;
+      const savedDO = process.env.DO_API_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
+      delete process.env.DO_API_TOKEN;
       try {
         const lines = getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
         const joined = lines.join("\n");
@@ -222,6 +224,9 @@ describe("getScriptFailureGuidance", () => {
       } finally {
         if (savedOR !== undefined) {
           process.env.OPENROUTER_API_KEY = savedOR;
+        }
+        if (savedDO !== undefined) {
+          process.env.DO_API_TOKEN = savedDO;
         }
       }
     });
