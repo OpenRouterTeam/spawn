@@ -84,4 +84,4 @@ global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })
 
 ### Shared utilities
 - `packages/cli/src/shared/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonObj(text)`
-- `packages/cli/src/shared/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
+- `packages/cli/src/shared/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `getErrorMessage`, `toRecord`, `toObjectArray`

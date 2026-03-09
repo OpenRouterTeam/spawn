@@ -31,14 +31,16 @@ _sprite_fix_config() {
     # The sprite CLI's concurrent writes append an extra } at the end.
     # Use grep on the whole file for any line that is just }}
     if grep -q '^}}$' "${cfg}" 2>/dev/null; then
-      local tmp="${cfg}.fix$$"
+      local tmp
+      tmp=$(mktemp "${cfg}.XXXXXX") || return
       sed 's/^}}$/}/' "${cfg}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${cfg}" 2>/dev/null || rm -f "${tmp}"
     fi
     # Also check if last non-empty line ends with }}
     local last_content
     last_content=$(tail -5 "${cfg}" | grep -v '^$' | tail -1)
     if printf '%s' "${last_content}" | grep -q '}}$'; then
-      local tmp="${cfg}.fix$$"
+      local tmp
+      tmp=$(mktemp "${cfg}.XXXXXX") || return
       # Replace the LAST occurrence of }} with }
       sed '$ s/}}$/}/' "${cfg}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${cfg}" 2>/dev/null || rm -f "${tmp}"
     fi

@@ -315,9 +315,32 @@ wire_api = "responses"
 
 // ─── OpenClaw Config ─────────────────────────────────────────────────────────
 
+async function installChromeBrowser(runner: CloudRunner): Promise<void> {
+  // Install Google Chrome for OpenClaw's browser tool (recommended by OpenClaw docs).
+  // Snap Chromium on Ubuntu 24.04 fails — AppArmor confinement blocks CDP control.
+  // Google Chrome .deb bypasses snap entirely and lands at /usr/bin/google-chrome.
+  logStep("Installing Google Chrome for browser tool...");
+  try {
+    await runner.runServer(
+      "{ command -v google-chrome-stable >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1; } && { echo 'Chrome already installed'; exit 0; }; " +
+        "wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb && " +
+        "sudo dpkg -i /tmp/google-chrome.deb 2>/dev/null; sudo apt-get install -f -y -qq 2>/dev/null; " +
+        "rm -f /tmp/google-chrome.deb",
+      120,
+    );
+    logInfo("Google Chrome installed");
+  } catch {
+    logWarn("Google Chrome install failed (browser tool will be unavailable)");
+  }
+}
+
 async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
+
+  // Chrome must be installed before config is written (config references its path).
+  // This runs in configure() — not install() — so it works even with tarball installs.
+  await installChromeBrowser(runner);
 
   const gatewayToken = crypto.randomUUID().replace(/-/g, "");
   const escapedKey = jsonEscape(apiKey);
@@ -343,6 +366,19 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
   }
 }`;
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
+
+  // Configure browser via CLI (openclaw config set) — the supported way to set
+  // browser options. Writing JSON directly may not be picked up by all versions.
+  try {
+    await runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
+        "openclaw config set browser.noSandbox true; " +
+        "openclaw config set browser.headless true",
+    );
+  } catch {
+    logWarn("Browser config setup failed (non-fatal)");
+  }
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -569,14 +605,15 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       preProvision: detectGithubAuth,
       modelDefault: "openrouter/auto",
-      install: () =>
-        installAgent(
+      install: async () => {
+        await installAgent(
           runner,
           "openclaw",
           `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ` +
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
-        ),
+        );
+      },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,

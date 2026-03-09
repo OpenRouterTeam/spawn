@@ -311,7 +311,9 @@ ensure_gh_auth() {
         # GITHUB_TOKEN is already unset above so gh auth login won't refuse
         # with "The value of the GITHUB_TOKEN environment variable is being
         # used for authentication."
-        printf '%s\n' "${_gh_token}" | gh auth login --with-token || {
+        gh auth login --with-token <<EOF || {
+${_gh_token}
+EOF
             log_error "Failed to authenticate with GITHUB_TOKEN"
             export GITHUB_TOKEN="${_gh_token}"
             return 1

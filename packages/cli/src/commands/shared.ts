@@ -4,10 +4,10 @@ import type { Manifest } from "../manifest.js";
 import * as fs from "node:fs";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import * as v from "valibot";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
+import { PkgVersionSchema } from "../shared/parse.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
 import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
@@ -17,9 +17,7 @@ export const VERSION = pkg.version;
 export const FETCH_TIMEOUT = 10_000; // 10 seconds
 export const NAME_COLUMN_WIDTH = 18;
 
-export const PkgVersionSchema = v.object({
-  version: v.string(),
-});
+export { PkgVersionSchema };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -547,17 +545,6 @@ export function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): s
   return `Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`;
 }
 
-export async function confirmContinueWithMissingCreds(onlyOpenRouter: boolean): Promise<boolean> {
-  const confirmMsg = onlyOpenRouter
-    ? "Continue? You'll authenticate via browser."
-    : "Continue anyway? The script will prompt for missing credentials.";
-  const shouldContinue = await p.confirm({
-    message: confirmMsg,
-    initialValue: true,
-  });
-  return !p.isCancel(shouldContinue) && shouldContinue;
-}
-
 export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
   const cloudAuth = manifest.clouds[cloud].auth;
   if (cloudAuth.toLowerCase() === "none") {
@@ -576,12 +563,8 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
   p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
 
-  if (isInteractiveTTY()) {
-    const shouldContinue = await confirmContinueWithMissingCreds(onlyOpenRouter);
-    if (!shouldContinue) {
-      handleCancel();
-    }
-  }
+  // No confirmation needed — the warning + guidance above is sufficient.
+  // The orchestration pipeline will prompt for credentials as needed.
 }
 
 /** Build auth hint string from cloud auth field for error messages */
