@@ -10,7 +10,10 @@
  * bleed into with-retry-result.test.ts which tests the real wrapSshCall.
  */
 
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { mkdirSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { isNumber } from "../shared/type-guards.js";
 
 // ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
@@ -101,9 +104,18 @@ describe("runOrchestration", () => {
   let exitSpy: ReturnType<typeof spyOn>;
   let capturedExitCode: number | undefined;
   let stderrSpy: ReturnType<typeof spyOn>;
+  let testDir: string;
+  let savedSpawnHome: string | undefined;
 
   beforeEach(() => {
     capturedExitCode = undefined;
+    // Isolate history writes to a temp directory so tests never pollute ~/.spawn
+    testDir = join(homedir(), `.spawn-test-orch-${Date.now()}-${Math.random()}`);
+    mkdirSync(testDir, {
+      recursive: true,
+    });
+    savedSpawnHome = process.env.SPAWN_HOME;
+    process.env.SPAWN_HOME = testDir;
     // Skip GitHub auth prompts during tests
     process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -115,6 +127,22 @@ describe("runOrchestration", () => {
     mockGetOrPromptApiKey.mockImplementation(() => Promise.resolve("sk-or-v1-test-key"));
     mockTryTarballInstall.mockClear();
     mockTryTarballInstall.mockImplementation(() => Promise.resolve(false));
+  });
+
+  afterEach(() => {
+    if (savedSpawnHome !== undefined) {
+      process.env.SPAWN_HOME = savedSpawnHome;
+    } else {
+      delete process.env.SPAWN_HOME;
+    }
+    try {
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      });
+    } catch {
+      // best-effort cleanup
+    }
   });
 
   it("calls all cloud lifecycle methods in correct order", async () => {
