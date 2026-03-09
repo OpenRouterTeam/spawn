@@ -224,7 +224,8 @@ CLOUD_ENV
   fi
 
   if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
-    grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" >/dev/null 2>&1; then
+    for _rc in ~/.bashrc ~/.profile ~/.bash_profile; do \
+    grep -q 'source ~/.spawnrc' \"\$_rc\" 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> \"\$_rc\"; done" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
   else
     log_err "Failed to create manual .spawnrc"
