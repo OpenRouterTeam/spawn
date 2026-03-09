@@ -261,7 +261,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     }
   }
 
-  logStep("Installing and authenticating GitHub CLI...");
+  logStep("Installing and authenticating GitHub CLI on the remote server...");
   try {
     await runner.runServer(ghCmd);
   } catch {
@@ -278,7 +278,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
   // Propagate host git identity to the remote VM
   if (hostGitName || hostGitEmail) {
-    logStep("Configuring git identity...");
+    logStep("Configuring git identity on the remote server...");
     const cmds: string[] = [];
     if (hostGitName) {
       const escaped = hostGitName.replace(/'/g, "'\\''");
@@ -290,7 +290,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     }
     try {
       await runner.runServer(cmds.join(" && "));
-      logInfo("Git identity configured from host");
+      logInfo("Git identity configured on remote server");
     } catch {
       logWarn("Git identity setup failed (non-fatal, continuing)");
     }
