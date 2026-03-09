@@ -42,6 +42,8 @@ export function generateEnvConfig(pairs: string[]): string {
     "",
     "# [spawn:env]",
     "export IS_SANDBOX='1'",
+    "# Ensure agent binaries are in PATH on reconnect",
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH"',
   ];
   for (const pair of pairs) {
     const eqIdx = pair.indexOf("=");
