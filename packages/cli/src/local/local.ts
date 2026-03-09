@@ -3,7 +3,6 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
-import { getSpawnDir } from "../history.js";
 import { spawnInteractive } from "../shared/ssh";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
@@ -51,34 +50,4 @@ export async function interactiveSession(cmd: string): Promise<number> {
     "-c",
     cmd,
   ]);
-}
-
-// ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveLocalConnection(): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const hostname = Bun.spawnSync(
-    [
-      "hostname",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "ignore",
-      ],
-    },
-  );
-  const name = new TextDecoder().decode(hostname.stdout).trim() || "local";
-  const user = process.env.USER || "unknown";
-  const json = JSON.stringify({
-    ip: "localhost",
-    user,
-    server_name: name,
-    cloud: "local",
-  });
-  Bun.write(`${dir}/last-connection.json`, json + "\n");
 }

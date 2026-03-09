@@ -1,9 +1,9 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
+import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { saveVmConnection } from "../history.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
@@ -389,7 +389,7 @@ export async function createServer(
   serverType?: string,
   location?: string,
   tier?: CloudInitTier,
-): Promise<void> {
+): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   const loc = location || process.env.HETZNER_LOCATION || "fsn1";
   const image = "ubuntu-24.04";
@@ -443,17 +443,13 @@ export async function createServer(
           _state.serverIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
           if (_state.serverId && _state.serverId !== "null" && _state.serverIp && _state.serverIp !== "null") {
             logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
-            saveVmConnection(
-              _state.serverIp,
-              "root",
-              _state.serverId,
-              name,
-              "hetzner",
-              undefined,
-              undefined,
-              process.env.SPAWN_ID || undefined,
-            );
-            return;
+            return {
+              ip: _state.serverIp,
+              user: "root",
+              server_id: _state.serverId,
+              server_name: name,
+              cloud: "hetzner",
+            };
           }
         }
         const retryErr = String(toRecord(retryData?.error)?.message || "Unknown error");
@@ -483,16 +479,13 @@ export async function createServer(
   }
 
   logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
-  saveVmConnection(
-    _state.serverIp,
-    "root",
-    _state.serverId,
-    name,
-    "hetzner",
-    undefined,
-    undefined,
-    process.env.SPAWN_ID || undefined,
-  );
+  return {
+    ip: _state.serverIp,
+    user: "root",
+    server_id: _state.serverId,
+    server_name: name,
+    cloud: "hetzner",
+  };
 }
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────

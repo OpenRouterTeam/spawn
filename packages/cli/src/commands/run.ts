@@ -8,14 +8,7 @@ import pc from "picocolors";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guidance-data.js";
 import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.js";
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
-import {
-  validateConnectionIP,
-  validateIdentifier,
-  validatePrompt,
-  validateScriptContent,
-  validateServerIdentifier,
-  validateUsername,
-} from "../security.js";
+import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -910,79 +903,10 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     );
   }
 
-  // Read connection info from last-connection.json
-  const { getConnectionPath } = await import("../history.js");
-  const connectionInfo: {
-    ip?: string;
-    user?: string;
-    server_id?: string;
-    server_name?: string;
-  } = {};
-  try {
-    const connPath = getConnectionPath();
-    const { readFileSync, existsSync } = await import("node:fs");
-    if (existsSync(connPath)) {
-      const raw = JSON.parse(readFileSync(connPath, "utf-8"));
-
-      try {
-        // SECURITY: Validate connection fields before including in output
-        // Prevents injection via tampered last-connection.json files
-        if (raw.ip) {
-          validateConnectionIP(raw.ip);
-          connectionInfo.ip = raw.ip;
-        }
-        if (raw.user) {
-          validateUsername(raw.user);
-          connectionInfo.user = raw.user;
-        }
-        if (raw.server_id) {
-          validateServerIdentifier(raw.server_id);
-          connectionInfo.server_id = raw.server_id;
-        }
-        if (raw.server_name) {
-          validateServerIdentifier(raw.server_name);
-          connectionInfo.server_name = raw.server_name;
-        }
-      } catch (validationErr) {
-        // Validation failure is a security issue - report via headless error
-        headlessError(
-          resolvedAgent,
-          resolvedCloud,
-          "VALIDATION_ERROR",
-          `Connection info validation failed: ${getErrorMessage(validationErr)}`,
-          outputFormat,
-          1,
-        );
-      }
-    }
-  } catch {
-    // File read/parse errors - not fatal, just omit connection info
-  }
-
   const result: SpawnResult = {
     status: "success",
     cloud: resolvedCloud,
     agent: resolvedAgent,
-    ...(connectionInfo.ip
-      ? {
-          ip_address: connectionInfo.ip,
-        }
-      : {}),
-    ...(connectionInfo.user
-      ? {
-          ssh_user: connectionInfo.user,
-        }
-      : {}),
-    ...(connectionInfo.server_id
-      ? {
-          server_id: connectionInfo.server_id,
-        }
-      : {}),
-    ...(connectionInfo.server_name
-      ? {
-          server_name: connectionInfo.server_name,
-        }
-      : {}),
   };
 
   headlessOutput(result, outputFormat);

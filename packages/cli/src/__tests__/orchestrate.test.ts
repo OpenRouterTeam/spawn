@@ -44,11 +44,17 @@ function createMockCloud(overrides: Partial<CloudOrchestrator> = {}): CloudOrche
     runner: mockRunner,
     authenticate: mock(() => Promise.resolve()),
     promptSize: mock(() => Promise.resolve()),
-    createServer: mock(() => Promise.resolve()),
+    createServer: mock(() =>
+      Promise.resolve({
+        ip: "10.0.0.1",
+        user: "root",
+        server_name: "test-server-1",
+        cloud: "testcloud",
+      }),
+    ),
     getServerName: mock(() => Promise.resolve("test-server-1")),
     waitForReady: mock(() => Promise.resolve()),
     interactiveSession: mock(() => Promise.resolve(0)),
-    saveLaunchCmd: mock(() => {}),
     ...overrides,
   };
 }
@@ -126,6 +132,12 @@ describe("runOrchestration", () => {
       }),
       createServer: mock(async () => {
         callOrder.push("createServer");
+        return {
+          ip: "10.0.0.1",
+          user: "root",
+          server_name: "srv",
+          cloud: "testcloud",
+        };
       }),
       waitForReady: mock(async () => {
         callOrder.push("waitForReady");
@@ -133,9 +145,6 @@ describe("runOrchestration", () => {
       interactiveSession: mock(async () => {
         callOrder.push("interactiveSession");
         return 0;
-      }),
-      saveLaunchCmd: mock(() => {
-        callOrder.push("saveLaunchCmd");
       }),
     });
     const agent = createMockAgent({
@@ -151,8 +160,7 @@ describe("runOrchestration", () => {
     expect(callOrder.indexOf("getServerName")).toBeLessThan(callOrder.indexOf("createServer"));
     expect(callOrder.indexOf("createServer")).toBeLessThan(callOrder.indexOf("waitForReady"));
     expect(callOrder.indexOf("waitForReady")).toBeLessThan(callOrder.indexOf("install"));
-    expect(callOrder.indexOf("install")).toBeLessThan(callOrder.indexOf("saveLaunchCmd"));
-    expect(callOrder.indexOf("saveLaunchCmd")).toBeLessThan(callOrder.indexOf("interactiveSession"));
+    expect(callOrder.indexOf("install")).toBeLessThan(callOrder.indexOf("interactiveSession"));
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
@@ -430,24 +438,23 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
-  // ── saveLaunchCmd ───────────────────────────────────────────────────
+  // ── createServer returns VMConnection ────────────────────────────────
 
-  it("saves the raw launch command (not the restart-wrapped one)", async () => {
-    const saveLaunchCmd = mock(() => {});
+  it("createServer return value is used (VMConnection)", async () => {
     const cloud = createMockCloud({
       cloudName: "hetzner",
-      saveLaunchCmd,
+      createServer: mock(async () => ({
+        ip: "5.5.5.5",
+        user: "root",
+        server_name: "my-hetzner",
+        cloud: "hetzner",
+      })),
     });
-    const agent = createMockAgent({
-      launchCmd: mock(() => "my-agent --start"),
-    });
+    const agent = createMockAgent();
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(saveLaunchCmd).toHaveBeenCalledTimes(1);
-    const args = saveLaunchCmd.mock.calls[0];
-    expect(args[0]).toBe("my-agent --start");
-    expect(typeof args[1]).toBe("string"); // spawnId
+    expect(cloud.createServer).toHaveBeenCalledTimes(1);
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });

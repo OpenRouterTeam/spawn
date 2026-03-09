@@ -4,7 +4,6 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
-import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
@@ -13,10 +12,10 @@ import {
   ensureSpriteAuthenticated,
   ensureSpriteCli,
   getServerName,
+  getVmConnection,
   interactiveSession,
   promptSpawnName,
   runSprite,
-  saveVmConnection,
   setupShellEnvironment,
   uploadFileSprite,
   verifySpriteConnectivity,
@@ -45,17 +44,15 @@ async function main() {
       await ensureSpriteAuthenticated();
     },
     async promptSize() {},
-    async createServer(name: string, spawnId?: string) {
-      process.env.SPAWN_ID = spawnId || "";
+    async createServer(name: string) {
       await createSprite(name);
       await verifySpriteConnectivity();
       await setupShellEnvironment();
-      saveVmConnection();
+      return getVmConnection();
     },
     getServerName,
     async waitForReady() {},
     interactiveSession,
-    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

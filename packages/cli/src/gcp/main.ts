@@ -4,7 +4,6 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
-import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
@@ -57,16 +56,14 @@ async function main() {
       machineType = await promptMachineType();
       zone = await promptZone();
     },
-    async createServer(name: string, spawnId?: string) {
-      process.env.SPAWN_ID = spawnId || "";
-      await createInstance(name, zone, machineType, agent.cloudInitTier);
+    async createServer(name: string) {
+      return await createInstance(name, zone, machineType, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

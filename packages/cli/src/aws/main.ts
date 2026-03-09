@@ -4,7 +4,6 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
-import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
@@ -21,7 +20,6 @@ import {
   runServer,
   uploadFile,
   waitForCloudInit,
-  waitForInstance,
 } from "./aws";
 
 async function main() {
@@ -52,17 +50,14 @@ async function main() {
     async promptSize() {
       // Bundle selection handled during authenticate()
     },
-    async createServer(name: string, spawnId?: string) {
-      process.env.SPAWN_ID = spawnId || "";
-      await createInstance(name, agent.cloudInitTier);
+    async createServer(name: string) {
+      return await createInstance(name, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {
-      await waitForInstance();
       await waitForCloudInit();
     },
     interactiveSession,
-    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

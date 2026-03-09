@@ -3,8 +3,6 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
-import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "./security.js";
-import { getErrorMessage, isString } from "./shared/type-guards";
 
 export interface VMConnection {
   ip: string;
@@ -98,10 +96,6 @@ export function getHistoryPath(): string {
   return join(getSpawnDir(), "history.json");
 }
 
-export function getConnectionPath(): string {
-  return join(getSpawnDir(), "last-connection.json");
-}
-
 /** Write history records to disk in v1 format: { version: 1, records: [...] } */
 function writeHistory(records: SpawnRecord[]): void {
   writeFileSync(
@@ -118,89 +112,6 @@ function writeHistory(records: SpawnRecord[]): void {
       mode: 0o600,
     },
   );
-}
-
-/** Save VM connection info directly into history.json.
- *  Matches by spawnId for exact targeting. Falls back to heuristic matching
- *  for backward compatibility with records that have no id. */
-export function saveVmConnection(
-  ip: string,
-  user: string,
-  serverId: string,
-  serverName: string,
-  cloud: string,
-  launchCmd?: string,
-  metadata?: Record<string, string>,
-  spawnId?: string,
-): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-    mode: 0o700,
-  });
-
-  const connData: VMConnection = {
-    ip,
-    user,
-    server_id: serverId || undefined,
-    server_name: serverName || undefined,
-    cloud: cloud || undefined,
-    launch_cmd: launchCmd || undefined,
-    metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
-  };
-
-  const history = loadHistory();
-  let merged = false;
-
-  if (spawnId) {
-    // Exact match by spawn ID
-    const idx = history.findIndex((r) => r.id === spawnId);
-    if (idx >= 0) {
-      history[idx].connection = connData;
-      merged = true;
-    }
-  } else {
-    // Fallback: heuristic match for backward compatibility
-    for (let i = history.length - 1; i >= 0; i--) {
-      const r = history[i];
-      if (r.cloud === cloud && !r.connection) {
-        r.connection = connData;
-        merged = true;
-        break;
-      }
-    }
-  }
-
-  if (merged) {
-    writeHistory(history);
-  }
-
-  // Also write last-connection.json for backward compatibility
-  const json: Record<string, unknown> = {
-    ip,
-    user,
-  };
-  if (serverId) {
-    json.server_id = serverId;
-  }
-  if (serverName) {
-    json.server_name = serverName;
-  }
-  if (cloud) {
-    json.cloud = cloud;
-  }
-  if (launchCmd) {
-    json.launch_cmd = launchCmd;
-  }
-  if (metadata && Object.keys(metadata).length > 0) {
-    json.metadata = metadata;
-  }
-  if (spawnId) {
-    json.spawn_id = spawnId;
-  }
-  writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n", {
-    mode: 0o600,
-  });
 }
 
 /** Save launch command to a history record's connection.
@@ -231,18 +142,6 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
     if (found) {
       writeHistory(history);
     }
-  } catch {
-    // non-fatal
-  }
-
-  // Also update last-connection.json for backward compatibility
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n", {
-      mode: 0o600,
-    });
   } catch {
     // non-fatal
   }
@@ -366,99 +265,6 @@ export function clearHistory(): number {
   return count;
 }
 
-/** Check for pending connection data and merge it into the last history entry.
- *  Bash scripts write connection info to last-connection.json after successful spawn.
- *  This function merges that data into the history and persists it. */
-function mergeLastConnection(): void {
-  const connPath = getConnectionPath();
-  if (!existsSync(connPath)) {
-    return;
-  }
-
-  try {
-    const raw: unknown = JSON.parse(readFileSync(connPath, "utf-8"));
-    if (!raw || typeof raw !== "object" || !("ip" in raw) || !("user" in raw)) {
-      unlinkSync(connPath);
-      return;
-    }
-    const entries = Object.fromEntries(Object.entries(raw));
-    // Parse metadata if present
-    let metadata: Record<string, string> | undefined;
-    if (entries.metadata && typeof entries.metadata === "object" && !Array.isArray(entries.metadata)) {
-      metadata = {};
-      for (const [k, val] of Object.entries(entries.metadata)) {
-        if (isString(val)) {
-          metadata[k] = val;
-        }
-      }
-      if (Object.keys(metadata).length === 0) {
-        metadata = undefined;
-      }
-    }
-
-    const connData: VMConnection = {
-      ip: String(entries.ip ?? ""),
-      user: String(entries.user ?? ""),
-      server_id: isString(entries.server_id) ? entries.server_id : undefined,
-      server_name: isString(entries.server_name) ? entries.server_name : undefined,
-      cloud: isString(entries.cloud) ? entries.cloud : undefined,
-      launch_cmd: isString(entries.launch_cmd) ? entries.launch_cmd : undefined,
-      metadata,
-    };
-
-    // SECURITY: Validate connection data before merging into history
-    // This prevents malicious bash scripts from injecting invalid data
-    try {
-      validateConnectionIP(connData.ip);
-      validateUsername(connData.user);
-      if (connData.server_id) {
-        validateServerIdentifier(connData.server_id);
-      }
-      if (connData.server_name) {
-        validateServerIdentifier(connData.server_name);
-      }
-      if (connData.launch_cmd) {
-        validateLaunchCmd(connData.launch_cmd);
-      }
-    } catch (err) {
-      // Log validation failure and skip merging
-      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${getErrorMessage(err)}`);
-      unlinkSync(connPath);
-      return;
-    }
-
-    const history = loadHistory();
-
-    // Match by spawn_id if present in the connection file, else fall back to
-    // heuristic matching (most recent entry without a connection).
-    const spawnId = isString(entries.spawn_id) ? entries.spawn_id : undefined;
-    let merged = false;
-    if (spawnId) {
-      const idx = history.findIndex((r) => r.id === spawnId);
-      if (idx >= 0) {
-        history[idx].connection = connData;
-        merged = true;
-      }
-    } else {
-      for (let i = history.length - 1; i >= 0; i--) {
-        if (!history[i].connection) {
-          history[i].connection = connData;
-          merged = true;
-          break;
-        }
-      }
-    }
-    if (merged) {
-      writeHistory(history);
-    }
-
-    // Clean up the connection file after merging
-    unlinkSync(connPath);
-  } catch {
-    // Ignore errors - connection data is optional
-  }
-}
-
 /** Find a record's index by id, falling back to timestamp+agent+cloud for old records. */
 function findRecordIndex(history: SpawnRecord[], record: SpawnRecord): number {
   if (record.id) {
@@ -502,15 +308,11 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
 }
 
 export function getActiveServers(): SpawnRecord[] {
-  mergeLastConnection();
   const records = loadHistory();
   return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);
 }
 
 export function filterHistory(agentFilter?: string, cloudFilter?: string): SpawnRecord[] {
-  // Merge any pending connection data before filtering
-  mergeLastConnection();
-
   let records = loadHistory();
   if (agentFilter) {
     const lower = agentFilter.toLowerCase();

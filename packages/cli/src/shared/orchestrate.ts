@@ -1,10 +1,11 @@
 // shared/orchestrate.ts — Shared orchestration pipeline for deploying agents
 // Each cloud implements CloudOrchestrator and calls runOrchestration().
 
+import type { VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup";
 import type { AgentConfig } from "./agents";
 
-import { generateSpawnId, saveSpawnRecord } from "../history.js";
+import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
@@ -20,11 +21,10 @@ export interface CloudOrchestrator {
   authenticate(): Promise<void>;
   checkAccountReady?(): Promise<void>;
   promptSize(): Promise<void>;
-  createServer(name: string, spawnId?: string): Promise<void>;
+  createServer(name: string): Promise<VMConnection>;
   getServerName(): Promise<string>;
   waitForReady(): Promise<void>;
   interactiveSession(cmd: string): Promise<number>;
-  saveLaunchCmd(launchCmd: string, spawnId?: string): void;
 }
 
 /**
@@ -101,9 +101,9 @@ export async function runOrchestration(
   // 6. Provision server
   const spawnId = generateSpawnId();
   const serverName = await cloud.getServerName();
-  await cloud.createServer(serverName, spawnId);
+  const connection = await cloud.createServer(serverName);
 
-  // 6b. Record the spawn now that the server exists
+  // 6b. Record the spawn atomically with connection data
   const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
   saveSpawnRecord({
     id: spawnId,
@@ -115,6 +115,7 @@ export async function runOrchestration(
           name: spawnName,
         }
       : {}),
+    connection,
   });
 
   // 7. Wait for readiness
@@ -192,7 +193,7 @@ export async function runOrchestration(
   prepareStdinForHandoff();
 
   const launchCmd = agent.launchCmd();
-  cloud.saveLaunchCmd(launchCmd, spawnId);
+  saveLaunchCmd(launchCmd, spawnId);
 
   // Wrap in restart loop for cloud VMs — not for local execution
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);

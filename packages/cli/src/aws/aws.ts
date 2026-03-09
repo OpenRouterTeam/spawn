@@ -1,11 +1,11 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
+import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import * as v from "valibot";
-import { saveVmConnection } from "../history.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
@@ -828,7 +828,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
 
 // ─── Provisioning ───────────────────────────────────────────────────────────
 
-export async function createInstance(name: string, tier?: CloudInitTier): Promise<void> {
+export async function createInstance(name: string, tier?: CloudInitTier): Promise<VMConnection> {
   const bundle = _state.selectedBundle;
   const region = _state.region;
   const az = `${region}a`;
@@ -886,7 +886,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
           ]);
           _state.instanceName = name;
           logInfo(`Instance creation initiated: ${name}`);
-          return;
+          return await waitForInstance();
         }
       } else {
         showNonBillingError("aws", [
@@ -937,7 +937,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
           );
           _state.instanceName = name;
           logInfo(`Instance creation initiated: ${name}`);
-          return;
+          return await waitForInstance();
         }
       } else {
         showNonBillingError("aws", [
@@ -954,11 +954,14 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
 
   _state.instanceName = name;
   logInfo(`Instance creation initiated: ${name}`);
+
+  // Wait for instance to become running and get IP
+  return await waitForInstance();
 }
 
 // ─── Wait for Instance ──────────────────────────────────────────────────────
 
-export async function waitForInstance(maxAttempts = 60): Promise<void> {
+export async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
   logStep("Waiting for instance to become running...");
   const pollDelay = 5000;
 
@@ -1024,18 +1027,12 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
       logStepDone();
       logInfo(`Instance running: IP=${_state.instanceIp}`);
 
-      // Save connection info
-      saveVmConnection(
-        _state.instanceIp,
-        SSH_USER,
-        "",
-        _state.instanceName,
-        "aws",
-        undefined,
-        undefined,
-        process.env.SPAWN_ID || undefined,
-      );
-      return;
+      return {
+        ip: _state.instanceIp,
+        user: SSH_USER,
+        server_name: _state.instanceName,
+        cloud: "aws",
+      };
     }
 
     logStepInline(`Instance state: ${state || "pending"} (${attempt}/${maxAttempts})`);
