@@ -18,7 +18,7 @@ import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks 
  * - validateEntity (agent): display name suggestion when key suggestion fails
  * - validateEntity (cloud): display name suggestion when key suggestion fails
  * - Both key AND display name suggestions returning null (very different input)
- * - findClosestMatch with display names via the full cmdRun / cmdAgentInfo paths
+ * Note: raw findClosestMatch unit tests live in fuzzy-key-matching.test.ts
  */
 
 // Manifest with names very different from keys so key-based suggestion fails
@@ -60,6 +60,7 @@ const manifestWithDistinctNames = {
     sp: {
       name: "Sprite Cloud",
       description: "Lightweight VMs",
+      price: "test",
       url: "https://sprite.sh",
       type: "vm",
       auth: "token",
@@ -70,6 +71,7 @@ const manifestWithDistinctNames = {
     hz: {
       name: "Hetzner Cloud",
       description: "European cloud provider",
+      price: "test",
       url: "https://hetzner.com",
       type: "cloud",
       auth: "token",
@@ -80,6 +82,7 @@ const manifestWithDistinctNames = {
     dc: {
       name: "DigitalOcean",
       description: "Cloud infrastructure",
+      price: "test",
       url: "https://digitalocean.com",
       type: "cloud",
       auth: "token",
@@ -111,7 +114,7 @@ const {
 } = mockClackPrompts();
 
 // Import commands after mock setup
-const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } = await import("../commands/index.js");
+const { cmdRun, cmdAgentInfo, cmdCloudInfo } = await import("../commands/index.js");
 
 describe("Display Name Suggestions in Validation Errors", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -307,62 +310,6 @@ describe("Display Name Suggestions in Validation Errors", () => {
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
-    });
-  });
-
-  // ── findClosestMatch with display names ─────────────────────────────
-
-  describe("findClosestMatch with display name arrays", () => {
-    const displayNames = [
-      "Claude Code",
-      "Codex Pro",
-      "GPTMe",
-    ];
-
-    it("should match close display name (distance 1)", () => {
-      // "claude-code" vs "Claude Code" -> case-insensitive: "claude-code" vs "claude code" -> dist 1
-      expect(findClosestMatch("claude-code", displayNames)).toBe("Claude Code");
-    });
-
-    it("should match close display name with simple typo", () => {
-      // "codex pro" vs "Codex Pro" -> case-insensitive: exact match -> dist 0
-      expect(findClosestMatch("codex pro", displayNames)).toBe("Codex Pro");
-    });
-
-    it("should match close display name with minor typo", () => {
-      // "codex-pro" vs "Codex Pro" -> "codex-pro" vs "codex pro" -> dist 1
-      expect(findClosestMatch("codex-pro", displayNames)).toBe("Codex Pro");
-    });
-
-    it("should return null for display names too different", () => {
-      // "kubernetes" is far from all display names
-      expect(findClosestMatch("kubernetes", displayNames)).toBeNull();
-    });
-
-    it("should handle single-word display names", () => {
-      const names = [
-        "Sprite",
-        "Hetzner",
-        "Vultr",
-      ];
-      expect(findClosestMatch("sprit", names)).toBe("Sprite");
-      expect(findClosestMatch("hetzne", names)).toBe("Hetzner");
-    });
-
-    it("should handle case-insensitive comparison with display names", () => {
-      expect(findClosestMatch("CLAUDE CODE", displayNames)).toBe("Claude Code");
-      expect(findClosestMatch("CODEX PRO", displayNames)).toBe("Codex Pro");
-    });
-
-    it("should pick closest among multiple close display names", () => {
-      const names = [
-        "Codex",
-        "Codex Pro",
-        "Clin",
-      ];
-      // "codx" -> "codex" (dist 1), "codex pro" (dist 5), "clin" (dist 3)
-      // Codex is closest at dist 1
-      expect(findClosestMatch("codx", names)).toBe("Codex");
     });
   });
 

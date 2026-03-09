@@ -21,6 +21,7 @@ function makeManifest(cloudAuth: string): Manifest {
       testcloud: {
         name: "Test Cloud",
         description: "A test cloud",
+        price: "test",
         url: "https://test.cloud",
         type: "vps",
         auth: cloudAuth,

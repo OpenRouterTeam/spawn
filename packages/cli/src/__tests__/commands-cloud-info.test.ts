@@ -25,6 +25,7 @@ const manifestWithNotes = {
     emptycloud: {
       name: "Empty Cloud",
       description: "Cloud with no agents",
+      price: "test",
       url: "https://empty.cloud",
       type: "vm",
       auth: "token",

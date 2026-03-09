@@ -425,13 +425,16 @@ export function prioritizeCloudsByCredentials(
 
   const hintOverrides: Record<string, string> = {};
   for (const c of withCreds) {
-    hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
+    hintOverrides[c] = `${manifest.clouds[c].price ?? ""} — credentials detected`;
   }
   for (const c of featured) {
-    hintOverrides[c] = `recommended -- ${manifest.clouds[c].description}`;
+    hintOverrides[c] = `${manifest.clouds[c].price ?? ""} — recommended`;
   }
   for (const c of withCli) {
-    hintOverrides[c] = `CLI installed -- ${manifest.clouds[c].description}`;
+    hintOverrides[c] = `${manifest.clouds[c].price ?? ""} — CLI installed`;
+  }
+  for (const c of rest) {
+    hintOverrides[c] = `${manifest.clouds[c].price ?? ""} — ${manifest.clouds[c].description}`;
   }
 
   return {

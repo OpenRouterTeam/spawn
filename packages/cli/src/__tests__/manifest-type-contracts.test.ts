@@ -149,6 +149,11 @@ describe("Cloud required field types", () => {
         expect(cloud.description.length).toBeGreaterThan(0);
       });
 
+      it("price should be a non-empty string", () => {
+        expect(typeof cloud.price).toBe("string");
+        expect(cloud.price.length).toBeGreaterThan(0);
+      });
+
       it("url should be a valid URL string", () => {
         expect(typeof cloud.url).toBe("string");
         expect(cloud.url).toMatch(/^https?:\/\//);

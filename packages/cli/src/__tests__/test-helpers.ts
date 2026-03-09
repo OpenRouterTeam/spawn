@@ -34,6 +34,7 @@ export const createMockManifest = (): Manifest => ({
     sprite: {
       name: "Sprite",
       description: "Lightweight VMs",
+      price: "test",
       url: "https://sprite.sh",
       type: "vm",
       auth: "token",
@@ -44,6 +45,7 @@ export const createMockManifest = (): Manifest => ({
     hetzner: {
       name: "Hetzner Cloud",
       description: "European cloud provider",
+      price: "test",
       url: "https://hetzner.com",
       type: "cloud",
       auth: "token",

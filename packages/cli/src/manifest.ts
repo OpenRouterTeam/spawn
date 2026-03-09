@@ -46,6 +46,7 @@ export interface AgentDef {
 export interface CloudDef {
   name: string;
   description: string;
+  price: string;
   url: string;
   type: string;
   auth: string;

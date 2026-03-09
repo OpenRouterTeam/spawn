@@ -44,6 +44,7 @@ const manyCloudManifest = {
     sprite: {
       name: "Sprite",
       description: "Lightweight VMs",
+      price: "test",
       url: "https://sprite.sh",
       type: "vm",
       auth: "token",
@@ -54,6 +55,7 @@ const manyCloudManifest = {
     hetzner: {
       name: "Hetzner Cloud",
       description: "European cloud provider",
+      price: "test",
       url: "https://hetzner.com",
       type: "cloud",
       auth: "token",
@@ -64,6 +66,7 @@ const manyCloudManifest = {
     vultr: {
       name: "Vultr",
       description: "Cloud compute",
+      price: "test",
       url: "https://vultr.com",
       type: "cloud",
       auth: "token",
@@ -74,6 +77,7 @@ const manyCloudManifest = {
     linode: {
       name: "Linode",
       description: "Cloud hosting",
+      price: "test",
       url: "https://linode.com",
       type: "cloud",
       auth: "token",
@@ -84,6 +88,7 @@ const manyCloudManifest = {
     digitalocean: {
       name: "DigitalOcean",
       description: "Cloud infrastructure",
+      price: "test",
       url: "https://digitalocean.com",
       type: "cloud",
       auth: "token",

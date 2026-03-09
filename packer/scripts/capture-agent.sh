@@ -28,6 +28,7 @@ case "${AGENT_NAME}" in
   openclaw)
     echo "/root/.npm-global/" >> "${PATHS_FILE}"
     # Google Chrome for OpenClaw's browser tool (CDP automation)
+    echo "/usr/bin/google-chrome-stable" >> "${PATHS_FILE}"
     echo "/usr/bin/google-chrome" >> "${PATHS_FILE}"
     echo "/opt/google/chrome/" >> "${PATHS_FILE}"
     ;;

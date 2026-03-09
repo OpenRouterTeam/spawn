@@ -43,6 +43,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       hetzner: {
         name: "Hetzner Cloud",
         description: "German cloud provider",
+        price: "test",
         url: "https://hetzner.cloud",
         type: "api",
         auth: "HCLOUD_TOKEN",
@@ -53,6 +54,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       sprite: {
         name: "Sprite",
         description: "Instant cloud dev environments",
+        price: "test",
         url: "https://sprite.dev",
         type: "cli",
         auth: "sprite login",
@@ -63,6 +65,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       digitalocean: {
         name: "DigitalOcean",
         description: "Simple cloud hosting",
+        price: "test",
         url: "https://digitalocean.com",
         type: "api",
         auth: "DO_API_TOKEN",
@@ -73,6 +76,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       upcloud: {
         name: "UpCloud",
         description: "European cloud provider",
+        price: "test",
         url: "https://upcloud.com",
         type: "api",
         auth: "UPCLOUD_USERNAME + UPCLOUD_PASSWORD",
@@ -83,6 +87,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       localcloud: {
         name: "Local Machine",
         description: "Run locally",
+        price: "test",
         url: "",
         type: "local",
         auth: "none",
@@ -165,7 +170,7 @@ describe("prioritizeCloudsByCredentials", () => {
 
     expect(result.sortedClouds).toEqual(clouds);
     expect(result.credCount).toBe(0);
-    expect(Object.keys(result.hintOverrides)).toHaveLength(0);
+    expect(Object.keys(result.hintOverrides).length).toBeGreaterThanOrEqual(clouds.length);
   });
 
   it("should move clouds with credentials to front", () => {
@@ -211,8 +216,8 @@ describe("prioritizeCloudsByCredentials", () => {
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.hintOverrides["hetzner"]).toContain("credentials detected");
-    expect(result.hintOverrides["hetzner"]).toContain("German cloud provider");
-    expect(result.hintOverrides["digitalocean"]).toBeUndefined();
+    expect(result.hintOverrides["hetzner"]).toContain("test");
+    expect(result.hintOverrides["digitalocean"]).toBeDefined();
   });
 
   it("should handle multi-var auth (both vars must be set)", () => {

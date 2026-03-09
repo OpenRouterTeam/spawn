@@ -218,6 +218,7 @@ describe("getImplementedAgents", () => {
         newcloud: {
           name: "New Cloud",
           description: "Test",
+          price: "test",
           url: "",
           type: "vm",
           auth: "token",

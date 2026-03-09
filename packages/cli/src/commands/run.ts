@@ -116,11 +116,13 @@ function buildAgentLines(agentInfo: {
 
 function buildCloudLines(cloudInfo: {
   name: string;
+  price: string;
   description: string;
   defaults?: Record<string, string>;
 }): string[] {
   const lines = [
     `  Name:        ${cloudInfo.name}`,
+    `  Price:       ${cloudInfo.price}`,
     `  Description: ${cloudInfo.description}`,
   ];
   if (cloudInfo.defaults) {

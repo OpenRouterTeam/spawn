@@ -59,6 +59,7 @@ function createTestManifest(): Manifest {
       sprite: {
         name: "Sprite",
         description: "Lightweight VMs",
+        price: "test",
         url: "https://sprite.sh",
         type: "vm",
         auth: "SPRITE_TOKEN",
@@ -69,6 +70,7 @@ function createTestManifest(): Manifest {
       hetzner: {
         name: "Hetzner Cloud",
         description: "European cloud provider",
+        price: "test",
         url: "https://hetzner.com",
         type: "cloud",
         auth: "HCLOUD_TOKEN",
@@ -79,6 +81,7 @@ function createTestManifest(): Manifest {
       vultr: {
         name: "Vultr",
         description: "Cloud compute",
+        price: "test",
         url: "https://vultr.com",
         type: "cloud",
         auth: "VULTR_API_KEY",
@@ -377,6 +380,7 @@ describe("checkEntity", () => {
           "local-cloud": {
             name: "Local Cloud",
             description: "Local cloud provider",
+            price: "test",
             url: "",
             type: "local",
             auth: "none",

@@ -40,6 +40,7 @@ const manyCloudManifest = {
     vultr: {
       name: "Vultr",
       description: "Cloud compute",
+      price: "test",
       url: "https://vultr.com",
       type: "cloud",
       auth: "token",
@@ -50,6 +51,7 @@ const manyCloudManifest = {
     linode: {
       name: "Linode",
       description: "Cloud hosting",
+      price: "test",
       url: "https://linode.com",
       type: "cloud",
       auth: "token",
@@ -60,6 +62,7 @@ const manyCloudManifest = {
     digitalocean: {
       name: "DigitalOcean",
       description: "Cloud infrastructure",
+      price: "test",
       url: "https://digitalocean.com",
       type: "cloud",
       auth: "token",

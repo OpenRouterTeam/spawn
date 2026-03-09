@@ -251,7 +251,7 @@ export async function cmdClouds(): Promise<void> {
       }
       const credIndicator = formatCredentialIndicatorLocal(c.auth);
       console.log(
-        `    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`,
+        `    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.bold((c.price ?? "").padEnd(16))} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`,
       );
     }
   }
@@ -372,6 +372,9 @@ export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest):
 
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
+  if (c.price) {
+    console.log(`  ${pc.bold(c.price)}`);
+  }
   const credStatus = hasCloudCredentials(c.auth) ? pc.green("credentials detected") : pc.dim("no credentials set");
   console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}  |  `) + credStatus);
 

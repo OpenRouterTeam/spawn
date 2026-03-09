@@ -57,6 +57,7 @@ const smallManifest: Manifest = {
     sprite: {
       name: "Sprite",
       description: "Lightweight VMs",
+      price: "test",
       url: "https://sprite.sh",
       type: "vm",
       auth: "SPRITE_TOKEN",
@@ -67,6 +68,7 @@ const smallManifest: Manifest = {
     hetzner: {
       name: "Hetzner Cloud",
       description: "European cloud provider",
+      price: "test",
       url: "https://hetzner.com",
       type: "cloud",
       auth: "HCLOUD_TOKEN",
@@ -116,6 +118,7 @@ const multiTypeManifest: Manifest = {
     local: {
       name: "Local Machine",
       description: "Run agents on your own machine",
+      price: "test",
       url: "",
       type: "local",
       auth: "none",
