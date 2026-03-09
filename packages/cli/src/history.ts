@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
@@ -58,6 +67,12 @@ const HistoryFileV1Schema = v.object({
   records: v.array(SpawnRecordSchema),
 });
 
+/** Loose v1 schema — validates shape but not individual records */
+const HistoryFileV1LooseSchema = v.object({
+  version: v.literal(1),
+  records: v.array(v.unknown()),
+});
+
 /** Generate a unique spawn ID. */
 export function generateSpawnId(): string {
   return randomUUID();
@@ -96,22 +111,21 @@ export function getHistoryPath(): string {
   return join(getSpawnDir(), "history.json");
 }
 
+/** Atomically write a JSON file: write to .tmp, then rename into place. */
+function atomicWriteJson(filePath: string, data: unknown): void {
+  const tmpPath = filePath + ".tmp";
+  writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", {
+    mode: 0o600,
+  });
+  renameSync(tmpPath, filePath);
+}
+
 /** Write history records to disk in v1 format: { version: 1, records: [...] } */
 function writeHistory(records: SpawnRecord[]): void {
-  writeFileSync(
-    getHistoryPath(),
-    JSON.stringify(
-      {
-        version: HISTORY_SCHEMA_VERSION,
-        records,
-      },
-      null,
-      2,
-    ) + "\n",
-    {
-      mode: 0o600,
-    },
-  );
+  atomicWriteJson(getHistoryPath(), {
+    version: HISTORY_SCHEMA_VERSION,
+    records,
+  });
 }
 
 /** Save launch command to a history record's connection.
@@ -147,6 +161,45 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
   }
 }
 
+/** Back up a corrupted file before discarding it. Non-fatal. */
+function backupCorruptedFile(filePath: string): void {
+  try {
+    copyFileSync(filePath, `${filePath}.corrupt.${Date.now()}`);
+    console.error(`Warning: ${filePath} was corrupted. A backup has been saved with .corrupt suffix.`);
+  } catch {
+    // Non-fatal — best-effort backup
+  }
+}
+
+/** Attempt to recover records from archive files (history-*.json). */
+function recoverFromArchives(): SpawnRecord[] {
+  try {
+    const dir = getSpawnDir();
+    const files = readdirSync(dir)
+      .filter((f) => /^history-\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      .sort()
+      .reverse();
+    for (const file of files) {
+      try {
+        const text = readFileSync(join(dir, file), "utf-8");
+        const data: unknown = JSON.parse(text);
+        if (Array.isArray(data)) {
+          const valid = data.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+          if (valid.length > 0) {
+            console.error(`Recovered ${valid.length} record(s) from archive ${file}.`);
+            return valid;
+          }
+        }
+      } catch {
+        // Skip corrupted archives, try next
+      }
+    }
+  } catch {
+    // Non-fatal
+  }
+  return [];
+}
+
 export function loadHistory(): SpawnRecord[] {
   const path = getHistoryPath();
   if (!existsSync(path)) {
@@ -157,12 +210,31 @@ export function loadHistory(): SpawnRecord[] {
     if (!text.trim()) {
       return [];
     }
-    const raw: unknown = JSON.parse(text);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      // JSON parse failed — file is corrupted
+      backupCorruptedFile(path);
+      return recoverFromArchives();
+    }
 
-    // v1 format: { version: 1, records: [...] }
+    // v1 format: { version: 1, records: [...] } — strict check
     const v1 = v.safeParse(HistoryFileV1Schema, raw);
     if (v1.success) {
       return v1.output.records;
+    }
+
+    // Loose v1: version=1 but some individual records are malformed
+    const v1Loose = v.safeParse(HistoryFileV1LooseSchema, raw);
+    if (v1Loose.success) {
+      const allRecords = v1Loose.output.records;
+      const valid = allRecords.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+      const dropped = allRecords.length - valid.length;
+      if (dropped > 0) {
+        console.error(`Warning: Dropped ${dropped} malformed record(s) from history.`);
+      }
+      return valid;
     }
 
     // v0 format: bare array (pre-versioning; migrated to v1 on next write)
@@ -170,7 +242,9 @@ export function loadHistory(): SpawnRecord[] {
       return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
     }
 
-    return [];
+    // Unrecognized format
+    backupCorruptedFile(path);
+    return recoverFromArchives();
   } catch {
     return [];
   }
@@ -202,9 +276,7 @@ function archiveRecords(records: SpawnRecord[]): void {
       ...existing,
       ...records,
     ];
-    writeFileSync(archivePath, JSON.stringify(merged, null, 2) + "\n", {
-      mode: 0o600,
-    });
+    atomicWriteJson(archivePath, merged);
   } catch {
     // Non-fatal — archive failure should not block saving
   }

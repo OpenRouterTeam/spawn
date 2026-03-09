@@ -1,7 +1,7 @@
 import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -382,7 +382,7 @@ describe("history", () => {
       expect(data.records[1].agent).toBe("codex");
     });
 
-    it("recovers from corrupted existing history file", () => {
+    it("recovers from corrupted existing history file and creates backup", () => {
       writeFileSync(join(testDir, "history.json"), "corrupted{{{");
 
       saveSpawnRecord({
@@ -396,6 +396,11 @@ describe("history", () => {
       expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
       expect(data.records).toHaveLength(1);
       expect(data.records[0].agent).toBe("claude");
+
+      // Verify .corrupt backup was created
+      const files = readdirSync(testDir);
+      const corruptBackups = files.filter((f) => f.startsWith("history.json.corrupt."));
+      expect(corruptBackups.length).toBeGreaterThanOrEqual(1);
     });
   });
 
