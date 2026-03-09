@@ -42,6 +42,7 @@ export function wrapWithTmux(cmd: string): string {
     "|| {",
     "tmux new-session -s spawn -d &&",
     "tmux set -t spawn status off &&",
+    "tmux set -t spawn mouse on &&",
     `tmux send-keys -t spawn "${escaped}" Enter &&`,
     "tmux attach-session -t spawn;",
     "}",
