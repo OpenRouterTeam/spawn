@@ -374,7 +374,8 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
         "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
         "openclaw config set browser.noSandbox true; " +
-        "openclaw config set browser.headless true",
+        "openclaw config set browser.headless true; " +
+        "openclaw config set browser.defaultProfile openclaw",
     );
   } catch {
     logWarn("Browser config setup failed (non-fatal)");

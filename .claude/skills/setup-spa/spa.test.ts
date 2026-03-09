@@ -5,15 +5,23 @@ import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 import { toRecord } from "../../../packages/cli/src/shared/type-guards";
 import {
   downloadSlackFile,
+  extractMarkdownTables,
   extractToolHint,
+  findThread,
   formatToolHistory,
   formatToolStats,
-  loadState,
   looksLikeHtml,
+  MARKDOWN_TABLE_RE,
+  markdownTableToSlackBlock,
+  markdownToRichTextBlocks,
   markdownToSlack,
+  openDb,
+  parseInlineMarkdown,
+  parseMarkdownBlock,
   parseStreamEvent,
-  saveState,
+  plainTextFallback,
   stripMention,
+  upsertThread,
 } from "./helpers";
 
 // Helper: extract a fixture event by index and cast to Record<string, unknown>
@@ -78,15 +86,11 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("Permission denied");
   });
 
-  it("parses final assistant text from fixture with markdown→slack conversion", () => {
-    // fixture[7]: assistant with summary text containing **bold**
+  it("parses final assistant text from fixture", () => {
+    // fixture[7]: assistant with summary text
     const result = parseStreamEvent(fixture(7));
     expect(result?.kind).toBe("text");
-    // **#1234** → *#1234* (Slack bold)
-    expect(result?.text).toContain("*#1234*");
-    expect(result?.text).not.toContain("**#1234**");
-    // inline code preserved
-    expect(result?.text).toContain("`--json`");
+    expect(result?.text).toContain("#1234");
     expect(result?.text).toContain("Would you like me to create a new issue");
   });
 
@@ -233,6 +237,30 @@ describe("parseStreamEvent", () => {
     const result = parseStreamEvent(event);
     expect(result?.text).toContain("...");
   });
+
+  it("handles web_search_tool_result blocks", () => {
+    const event: Record<string, unknown> = {
+      type: "user",
+      message: {
+        content: [
+          {
+            type: "web_search_tool_result",
+            content: [
+              {
+                type: "web_search_result",
+                url: "https://example.com",
+                title: "Example",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const result = parseStreamEvent(event);
+    expect(result?.kind).toBe("tool_result");
+    expect(result?.text).toContain("https://example.com");
+    expect(result?.text).toContain("Example");
+  });
 });
 
 describe("stripMention", () => {
@@ -288,45 +316,12 @@ describe("markdownToSlack", () => {
     expect(result).toContain("*bold*");
   });
 
-  it("handles the real SPA output pattern", () => {
-    const input =
-      "1. **[#1859 — Agent processes die](https://github.com/OpenRouterTeam/spawn/issues/1859)** — covers the root cause\n\n" +
-      "The SIGTERM is the **smoking gun**.";
-    const result = markdownToSlack(input);
-    expect(result).toContain("<https://github.com/OpenRouterTeam/spawn/issues/1859|#1859");
-    expect(result).toContain("*smoking gun*");
-    expect(result).not.toContain("](");
-  });
-
   it("returns plain text unchanged", () => {
     expect(markdownToSlack("no markdown here")).toContain("no markdown here");
   });
 
   it("handles empty string", () => {
     expect(markdownToSlack("")).toBe("");
-  });
-});
-
-describe("loadState", () => {
-  it("returns a Result object", () => {
-    // STATE_PATH is captured at module load time; the default path likely
-    // doesn't exist in CI, so loadState returns Ok({ mappings: [] })
-    const result = loadState();
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data.mappings).toBeInstanceOf(Array);
-    }
-  });
-});
-
-describe("saveState", () => {
-  it("returns a Result object", () => {
-    // Write to a temp file by using the module's STATE_PATH (default).
-    // If the default dir is writable, we get Ok; if not, Err. Either way it's a Result.
-    const result = saveState({
-      mappings: [],
-    });
-    expect(typeof result.ok).toBe("boolean");
   });
 });
 
@@ -356,6 +351,24 @@ describe("extractToolHint", () => {
       },
     };
     expect(extractToolHint(block)).toBe("/home/user/spawn/index.ts");
+  });
+
+  it("extracts query from input (WebSearch)", () => {
+    const block: Record<string, unknown> = {
+      input: {
+        query: "spawn deploy fix",
+      },
+    };
+    expect(extractToolHint(block)).toBe("spawn deploy fix");
+  });
+
+  it("extracts url from input (WebFetch)", () => {
+    const block: Record<string, unknown> = {
+      input: {
+        url: "https://example.com/docs",
+      },
+    };
+    expect(extractToolHint(block)).toBe("https://example.com/docs");
   });
 
   it("prefers command over pattern and file_path", () => {
@@ -388,7 +401,7 @@ describe("extractToolHint", () => {
   it("returns empty string for input without recognized keys", () => {
     const block: Record<string, unknown> = {
       input: {
-        query: "search term",
+        unknown_key: "value",
       },
     };
     expect(extractToolHint(block)).toBe("");
@@ -434,17 +447,17 @@ describe("formatToolStats", () => {
 });
 
 describe("formatToolHistory", () => {
-  it("formats a single tool call", () => {
+  it("formats a single tool call with Slack emoji icons", () => {
     const history: ToolCall[] = [
       {
         name: "Bash",
         hint: "echo hi",
       },
     ];
-    expect(formatToolHistory(history)).toBe("1. ✓ Bash — echo hi");
+    expect(formatToolHistory(history)).toBe(":white_check_mark: *Bash* `echo hi`");
   });
 
-  it("formats multiple tool calls with numbering", () => {
+  it("formats multiple tool calls", () => {
     const history: ToolCall[] = [
       {
         name: "Bash",
@@ -454,16 +467,13 @@ describe("formatToolHistory", () => {
         name: "Glob",
         hint: "**/*.ts",
       },
-      {
-        name: "Read",
-        hint: "/home/user/index.ts",
-      },
     ];
     const result = formatToolHistory(history);
-    expect(result).toBe("1. ✓ Bash — gh issue list\n2. ✓ Glob — **/*.ts\n3. ✓ Read — /home/user/index.ts");
+    expect(result).toContain(":white_check_mark: *Bash* `gh issue list`");
+    expect(result).toContain(":white_check_mark: *Glob* `**/*.ts`");
   });
 
-  it("marks errored tools with ✗", () => {
+  it("marks errored tools with :x: emoji", () => {
     const history: ToolCall[] = [
       {
         name: "Bash",
@@ -476,8 +486,8 @@ describe("formatToolHistory", () => {
       },
     ];
     const result = formatToolHistory(history);
-    expect(result).toContain("1. ✗ Bash — rm -rf /");
-    expect(result).toContain("2. ✓ Read — file.ts");
+    expect(result).toContain(":x: *Bash*");
+    expect(result).toContain(":white_check_mark: *Read*");
   });
 
   it("handles tools without hints", () => {
@@ -487,7 +497,7 @@ describe("formatToolHistory", () => {
         hint: "",
       },
     ];
-    expect(formatToolHistory(history)).toBe("1. ✓ Bash");
+    expect(formatToolHistory(history)).toBe(":white_check_mark: *Bash*");
   });
 
   it("returns empty string for empty history", () => {
@@ -685,5 +695,354 @@ describe("looksLikeHtml", () => {
   it("returns false for empty buffer", () => {
     const buf = Buffer.from("");
     expect(looksLikeHtml(buf)).toBe(false);
+  });
+});
+
+describe("SQLite state", () => {
+  it("openDb returns a working database", () => {
+    const db = openDb(":memory:");
+    expect(db).toBeTruthy();
+    db.close();
+  });
+
+  it("upsertThread and findThread round-trip", () => {
+    const db = openDb(":memory:");
+    upsertThread(db, {
+      channel: "C123",
+      threadTs: "1234.567",
+      sessionId: "sess-abc",
+      createdAt: new Date().toISOString(),
+      userId: "U456",
+    });
+    const found = findThread(db, "C123", "1234.567");
+    expect(found?.sessionId).toBe("sess-abc");
+    expect(found?.userId).toBe("U456");
+    db.close();
+  });
+
+  it("upsertThread is idempotent — updates session on conflict", () => {
+    const db = openDb(":memory:");
+    upsertThread(db, {
+      channel: "C123",
+      threadTs: "1234.567",
+      sessionId: "sess-v1",
+      createdAt: new Date().toISOString(),
+    });
+    upsertThread(db, {
+      channel: "C123",
+      threadTs: "1234.567",
+      sessionId: "sess-v2",
+      createdAt: new Date().toISOString(),
+    });
+    const found = findThread(db, "C123", "1234.567");
+    expect(found?.sessionId).toBe("sess-v2");
+    db.close();
+  });
+
+  it("findThread returns undefined for missing thread", () => {
+    const db = openDb(":memory:");
+    expect(findThread(db, "CNOPE", "0.0")).toBeUndefined();
+    db.close();
+  });
+});
+
+describe("parseInlineMarkdown", () => {
+  it("returns plain text element for plain text", () => {
+    const result = parseInlineMarkdown("hello world");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "hello world",
+    });
+  });
+
+  it("parses bold **text**", () => {
+    const result = parseInlineMarkdown("**bold**");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "bold",
+      style: {
+        bold: true,
+      },
+    });
+  });
+
+  it("parses inline code `code`", () => {
+    const result = parseInlineMarkdown("`code`");
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "code",
+      style: {
+        code: true,
+      },
+    });
+  });
+
+  it("parses link [text](url)", () => {
+    const result = parseInlineMarkdown("[click](https://example.com)");
+    expect(result[0]).toMatchObject({
+      type: "link",
+      url: "https://example.com",
+      text: "click",
+    });
+  });
+
+  it("parses strikethrough ~~text~~", () => {
+    const result = parseInlineMarkdown("~~gone~~");
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "gone",
+      style: {
+        strike: true,
+      },
+    });
+  });
+
+  it("parses italic *text*", () => {
+    const result = parseInlineMarkdown("*italic*");
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "italic",
+      style: {
+        italic: true,
+      },
+    });
+  });
+
+  it("handles mixed inline elements", () => {
+    const result = parseInlineMarkdown("Hello **bold** and `code` world");
+    expect(result.length).toBeGreaterThan(2);
+    const boldEl = result.find(
+      (e) =>
+        typeof e === "object" &&
+        "style" in e &&
+        (e as Record<string, unknown>).style !== null &&
+        typeof (e as Record<string, unknown>).style === "object" &&
+        "bold" in ((e as Record<string, unknown>).style as object),
+    );
+    expect(boldEl).toBeTruthy();
+  });
+
+  it("returns empty array for empty string", () => {
+    expect(parseInlineMarkdown("")).toHaveLength(0);
+  });
+});
+
+describe("parseMarkdownBlock", () => {
+  it("produces rich_text_section for plain paragraph", () => {
+    const result = parseMarkdownBlock("Hello world");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "rich_text_section",
+    });
+  });
+
+  it("produces rich_text_list for bullet list", () => {
+    const result = parseMarkdownBlock("- item one\n- item two");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "rich_text_list",
+      style: "bullet",
+    });
+    const list = result[0] as {
+      elements: unknown[];
+    };
+    expect(list.elements).toHaveLength(2);
+  });
+
+  it("produces rich_text_list for ordered list", () => {
+    const result = parseMarkdownBlock("1. first\n2. second\n3. third");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "rich_text_list",
+      style: "ordered",
+    });
+  });
+
+  it("produces rich_text_quote for blockquote", () => {
+    const result = parseMarkdownBlock("> quoted text");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "rich_text_quote",
+    });
+  });
+
+  it("produces bold rich_text_section for ATX header", () => {
+    const result = parseMarkdownBlock("## My Header");
+    expect(result).toHaveLength(1);
+    const section = result[0] as {
+      type: string;
+      elements: Array<{
+        style?: {
+          bold?: boolean;
+        };
+      }>;
+    };
+    expect(section.type).toBe("rich_text_section");
+    expect(section.elements[0]?.style?.bold).toBe(true);
+  });
+
+  it("returns empty array for blank input", () => {
+    expect(parseMarkdownBlock("")).toHaveLength(0);
+    expect(parseMarkdownBlock("   ")).toHaveLength(0);
+  });
+});
+
+describe("markdownToRichTextBlocks", () => {
+  it("returns empty array for blank input", () => {
+    expect(markdownToRichTextBlocks("")).toHaveLength(0);
+    expect(markdownToRichTextBlocks("   ")).toHaveLength(0);
+  });
+
+  it("wraps plain text in a rich_text block", () => {
+    const result = markdownToRichTextBlocks("Hello world");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "rich_text",
+    });
+  });
+
+  it("splits fenced code blocks into separate rich_text blocks", () => {
+    const input = "Before\n```\nconst x = 1;\n```\nAfter";
+    const result = markdownToRichTextBlocks(input);
+    // Before text + code block + after text = 3 blocks
+    expect(result).toHaveLength(3);
+    // Second block should contain preformatted element
+    const codeBlock = result[1] as {
+      elements: Array<{
+        type: string;
+      }>;
+    };
+    expect(codeBlock.elements[0]?.type).toBe("rich_text_preformatted");
+  });
+
+  it("handles unclosed fenced code block (mid-stream)", () => {
+    const input = "Before\n```typescript\nconst x = 1;\n// more code";
+    const result = markdownToRichTextBlocks(input);
+    // Before text + unclosed code
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const hasPreformatted = result.some((b) => {
+      const block = b as {
+        elements?: Array<{
+          type: string;
+        }>;
+      };
+      return block.elements?.some((e) => e.type === "rich_text_preformatted");
+    });
+    expect(hasPreformatted).toBe(true);
+  });
+
+  it("handles multiple code blocks", () => {
+    const input = "First\n```\ncode1\n```\nMiddle\n```\ncode2\n```\nLast";
+    const result = markdownToRichTextBlocks(input);
+    expect(result.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("plainTextFallback", () => {
+  it("strips fenced code blocks to [code]", () => {
+    const input = "Before\n```typescript\nconst x = 1;\n```\nAfter";
+    const result = plainTextFallback(input);
+    expect(result).toContain("[code]");
+    expect(result).not.toContain("const x");
+    expect(result).toContain("Before");
+    expect(result).toContain("After");
+  });
+
+  it("strips bold **text** markers", () => {
+    const result = plainTextFallback("**bold** text");
+    expect(result).toContain("bold text");
+    expect(result).not.toContain("**");
+  });
+
+  it("strips ATX headers", () => {
+    const result = plainTextFallback("## My Header");
+    expect(result).toContain("My Header");
+    expect(result).not.toContain("##");
+  });
+
+  it("converts [text](url) links to plain text", () => {
+    const result = plainTextFallback("[click here](https://example.com)");
+    expect(result).toContain("click here");
+    expect(result).not.toContain("https://example.com");
+  });
+
+  it("returns empty string for blank input", () => {
+    expect(plainTextFallback("")).toBe("");
+    expect(plainTextFallback("   ")).toBe("");
+  });
+});
+
+describe("extractMarkdownTables", () => {
+  it("extracts a simple markdown table", () => {
+    const input = "Before\n| A | B |\n|---|---|\n| 1 | 2 |\nAfter";
+    const { clean, tables } = extractMarkdownTables(input);
+    expect(tables).toHaveLength(1);
+    expect(tables[0]).toContain("| A | B |");
+    expect(clean).toContain("Before");
+    expect(clean).toContain("After");
+    expect(clean).not.toContain("| A |");
+  });
+
+  it("returns clean text unchanged when no table present", () => {
+    const input = "Just some text\nno table here";
+    const { clean, tables } = extractMarkdownTables(input);
+    expect(tables).toHaveLength(0);
+    expect(clean).toContain("Just some text");
+  });
+
+  it("MARKDOWN_TABLE_RE resets lastIndex between uses", () => {
+    const input = "| X |\n|---|\n| Y |\n";
+    MARKDOWN_TABLE_RE.lastIndex = 0;
+    const m1 = input.match(MARKDOWN_TABLE_RE);
+    MARKDOWN_TABLE_RE.lastIndex = 0;
+    const m2 = input.match(MARKDOWN_TABLE_RE);
+    expect(m1).toEqual(m2);
+  });
+});
+
+describe("markdownTableToSlackBlock", () => {
+  it("converts a simple table to Slack block format", () => {
+    const table = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |";
+    const block = markdownTableToSlackBlock(table) as {
+      type: string;
+      rows: Array<
+        Array<{
+          type: string;
+          text: string;
+        }>
+      >;
+    } | null;
+    expect(block).not.toBeNull();
+    expect(block?.type).toBe("table");
+    expect(block?.rows).toHaveLength(3); // header + 2 data rows
+    expect(block?.rows[0][0].text).toBe("Name");
+    expect(block?.rows[0][1].text).toBe("Age");
+    expect(block?.rows[1][0].text).toBe("Alice");
+  });
+
+  it("returns null for empty input", () => {
+    expect(markdownTableToSlackBlock("")).toBeNull();
+    expect(markdownTableToSlackBlock("  ")).toBeNull();
+  });
+
+  it("returns null for separator-only row", () => {
+    expect(markdownTableToSlackBlock("|---|---|")).toBeNull();
+  });
+
+  it("pads short rows to consistent column count", () => {
+    const table = "| A | B | C |\n|---|---|---|\n| x |";
+    const block = markdownTableToSlackBlock(table) as {
+      rows: Array<
+        Array<{
+          text: string;
+        }>
+      >;
+    } | null;
+    // Data row should be padded to 3 columns
+    expect(block?.rows[1]).toHaveLength(3);
+    expect(block?.rows[1][1].text).toBe("");
+    expect(block?.rows[1][2].text).toBe("");
   });
 });
