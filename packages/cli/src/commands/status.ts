@@ -112,6 +112,9 @@ async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
   }
 
   const serverId = conn.server_id || conn.server_name || "";
+  if (!serverId) {
+    return "unknown";
+  }
 
   switch (conn.cloud) {
     case "hetzner": {
