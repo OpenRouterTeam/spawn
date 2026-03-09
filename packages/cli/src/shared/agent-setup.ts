@@ -334,6 +334,11 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
       "token": ${escapedToken}
     }
   },
+  "browser": {
+    "executablePath": "/usr/bin/google-chrome",
+    "noSandbox": true,
+    "headless": true
+  },
   "agents": {
     "defaults": {
       "model": {
@@ -577,11 +582,18 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         );
-        // Install Playwright Chromium for OpenClaw's browser tool (headless, no snap dependency)
+        // Install Google Chrome for OpenClaw's browser tool (recommended by OpenClaw docs).
+        // Snap Chromium on Ubuntu 24.04 fails — AppArmor confinement blocks CDP control.
+        // Google Chrome .deb bypasses snap entirely and lands at /usr/bin/google-chrome.
         try {
-          await runner.runServer("npx playwright install chromium --with-deps 2>/dev/null", 300);
+          await runner.runServer(
+            "wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb && " +
+              "sudo dpkg -i /tmp/google-chrome.deb 2>/dev/null; sudo apt-get install -f -y -qq 2>/dev/null; " +
+              "rm -f /tmp/google-chrome.deb",
+            120,
+          );
         } catch {
-          logWarn("Playwright Chromium install failed (browser tool will be unavailable)");
+          logWarn("Google Chrome install failed (browser tool will be unavailable)");
         }
       },
       envVars: (apiKey) => [
