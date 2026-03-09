@@ -11,10 +11,18 @@ const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
 const YELLOW = "\x1b[1;33m";
 const CYAN = "\x1b[0;36m";
+const DIM = "\x1b[2m";
 const NC = "\x1b[0m";
 
 export function logInfo(msg: string): void {
   process.stderr.write(`${GREEN}${msg}${NC}\n`);
+}
+
+/** Log a debug message to stderr (dim text). Only visible when SPAWN_DEBUG=1. */
+export function logDebug(msg: string): void {
+  if (process.env.SPAWN_DEBUG === "1") {
+    process.stderr.write(`${DIM}[debug] ${msg}${NC}\n`);
+  }
 }
 
 export function logWarn(msg: string): void {

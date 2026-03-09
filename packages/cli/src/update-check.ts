@@ -9,7 +9,8 @@ import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
-import { hasStatus } from "./shared/type-guards";
+import { getErrorMessage, hasStatus } from "./shared/type-guards";
+import { logDebug, logWarn } from "./shared/ui";
 
 const VERSION = pkg.version;
 
@@ -277,17 +278,18 @@ export async function checkForUpdates(): Promise<void> {
   }
 
   // Always fetch the latest version on every run
-  try {
-    const latestVersion = await fetchLatestVersion();
-    if (!latestVersion) {
-      return;
-    }
+  const latestVersion = await fetchLatestVersion();
+  if (!latestVersion) {
+    return;
+  }
 
-    // Auto-update if newer version is available
-    if (compareVersions(VERSION, latestVersion)) {
+  // Auto-update if newer version is available
+  if (compareVersions(VERSION, latestVersion)) {
+    try {
       performAutoUpdate(latestVersion);
+    } catch (err) {
+      logWarn("Auto-update encountered an error");
+      logDebug(getErrorMessage(err));
     }
-  } catch {
-    // Silently fail - update check is non-critical
   }
 }

@@ -5,8 +5,8 @@ import { dirname } from "node:path";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonWith } from "./parse";
-import { isString } from "./type-guards";
-import { getSpawnCloudConfigPath, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
+import { getErrorMessage, isString } from "./type-guards";
+import { getSpawnCloudConfigPath, logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -237,8 +237,9 @@ async function saveOpenRouterKey(key: string): Promise<void> {
         mode: 0o600,
       },
     );
-  } catch {
-    // non-fatal — key still works in memory for this session
+  } catch (err) {
+    logWarn("Could not save API key — you may need to re-authenticate next run");
+    logDebug(getErrorMessage(err));
   }
 }
 

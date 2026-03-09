@@ -10,7 +10,8 @@ import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
-import { logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
+import { getErrorMessage } from "./type-guards";
+import { logDebug, logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -74,8 +75,9 @@ export async function runOrchestration(
   if (cloud.checkAccountReady) {
     try {
       await cloud.checkAccountReady();
-    } catch {
-      // non-fatal — let createServer be the final arbiter
+    } catch (err) {
+      logWarn("Account readiness check failed — proceeding anyway");
+      logDebug(getErrorMessage(err));
     }
   }
 
@@ -87,8 +89,9 @@ export async function runOrchestration(
   if (agent.preProvision) {
     try {
       await agent.preProvision();
-    } catch {
-      // non-fatal
+    } catch (err) {
+      logWarn("Pre-provision hook failed — continuing");
+      logDebug(getErrorMessage(err));
     }
   }
 

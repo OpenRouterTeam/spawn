@@ -5,7 +5,8 @@
 import type { CloudRunner } from "./agent-setup";
 
 import * as v from "valibot";
-import { logInfo, logStep, logWarn } from "./ui";
+import { getErrorMessage } from "./type-guards";
+import { logDebug, logInfo, logStep, logWarn } from "./ui";
 
 const REPO = "OpenRouterTeam/spawn";
 
@@ -33,6 +34,10 @@ export async function tryTarballInstall(
   const tag = `agent-${agentName}-latest`;
   logStep(`Checking for pre-built tarball (${tag})...`);
 
+  // Phase 1: Fetch + parse tarball metadata
+  let x86Url: string;
+  let armUrl: string;
+  let url: string;
   try {
     // Query GitHub Releases API for the rolling release tag
     const resp = await fetchFn(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
@@ -64,43 +69,50 @@ export async function tryTarballInstall(
       return false;
     }
 
-    // Build arch-aware download: remote VM detects its own arch and picks the right URL
-    const x86Url = x86Asset?.browser_download_url || "";
-    const armUrl = armAsset?.browser_download_url || "";
-    const url = x86Url || armUrl;
-
-    // SECURITY: Validate URLs match expected GitHub releases pattern.
-    // Prevents shell injection via crafted API responses.
-    const urlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/;
-    if ((x86Url && !urlPattern.test(x86Url)) || (armUrl && !urlPattern.test(armUrl))) {
-      logWarn("Tarball URL failed safety validation");
-      return false;
-    }
-
-    logStep("Downloading pre-built agent tarball...");
-
-    // Build arch-aware download command: remote VM picks the right URL based on uname -m
-    // Use sudo for tar extraction — on clouds like AWS Lightsail, SSH user is 'ubuntu' (non-root)
-    // but tarballs extract to /root/. The ubuntu user has passwordless sudo.
-    const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
-    let downloadCmd: string;
-    if (x86Url && armUrl) {
-      downloadCmd =
-        "_arch=$(uname -m); " +
-        `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
-        `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
-        `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
-    } else {
-      downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
-    }
-
-    // Download and extract on the remote VM
-    await runner.runServer(downloadCmd, 150);
-
-    logInfo("Agent installed from pre-built tarball");
-    return true;
-  } catch {
-    logWarn("Tarball install failed, falling back to live install");
+    x86Url = x86Asset?.browser_download_url || "";
+    armUrl = armAsset?.browser_download_url || "";
+    url = x86Url || armUrl;
+  } catch (err) {
+    logWarn("Failed to fetch pre-built tarball metadata");
+    logDebug(getErrorMessage(err));
     return false;
   }
+
+  // Phase 2: URL validation + command building (deterministic — no try/catch needed)
+  // SECURITY: Validate URLs match expected GitHub releases pattern.
+  // Prevents shell injection via crafted API responses.
+  const urlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/;
+  if ((x86Url && !urlPattern.test(x86Url)) || (armUrl && !urlPattern.test(armUrl))) {
+    logWarn("Tarball URL failed safety validation");
+    return false;
+  }
+
+  logStep("Downloading pre-built agent tarball...");
+
+  // Build arch-aware download command: remote VM picks the right URL based on uname -m
+  // Use sudo for tar extraction — on clouds like AWS Lightsail, SSH user is 'ubuntu' (non-root)
+  // but tarballs extract to /root/. The ubuntu user has passwordless sudo.
+  const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+  let downloadCmd: string;
+  if (x86Url && armUrl) {
+    downloadCmd =
+      "_arch=$(uname -m); " +
+      `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
+      `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
+      `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+  } else {
+    downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+  }
+
+  // Phase 3: Remote execution
+  try {
+    await runner.runServer(downloadCmd, 150);
+  } catch (err) {
+    logWarn("Tarball download/extract failed on remote VM");
+    logDebug(getErrorMessage(err));
+    return false;
+  }
+
+  logInfo("Agent installed from pre-built tarball");
+  return true;
 }

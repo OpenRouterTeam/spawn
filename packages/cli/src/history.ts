@@ -13,6 +13,8 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
 import { tryCatch } from "./shared/result.js";
+import { getErrorMessage } from "./shared/type-guards.js";
+import { logDebug, logWarn } from "./shared/ui.js";
 
 export interface VMConnection {
   ip: string;
@@ -132,8 +134,7 @@ function writeHistory(records: SpawnRecord[]): void {
 /** Save launch command to a history record's connection.
  *  Matches by spawnId when provided; falls back to most recent record with a connection. */
 export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
-  // non-fatal — discard errors
-  tryCatch(() => {
+  const result = tryCatch(() => {
     const history = loadHistory();
     let found = false;
 
@@ -159,14 +160,21 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
       writeHistory(history);
     }
   });
+  if (!result.ok) {
+    logWarn("Could not save launch command");
+    logDebug(getErrorMessage(result.error));
+  }
 }
 
 /** Back up a corrupted file before discarding it. Non-fatal (best-effort). */
 function backupCorruptedFile(filePath: string): void {
-  tryCatch(() => {
+  const result = tryCatch(() => {
     copyFileSync(filePath, `${filePath}.corrupt.${Date.now()}`);
     console.error(`Warning: ${filePath} was corrupted. A backup has been saved with .corrupt suffix.`);
   });
+  if (!result.ok) {
+    logDebug(`Could not back up corrupted file: ${getErrorMessage(result.error)}`);
+  }
 }
 
 /** Try to parse valid records from a single archive file. */
@@ -241,6 +249,8 @@ export function loadHistory(): SpawnRecord[] {
   }
   const readResult = tryCatch(() => readFileSync(path, "utf-8"));
   if (!readResult.ok) {
+    logWarn("Could not read spawn history");
+    logDebug(getErrorMessage(readResult.error));
     return [];
   }
   const text = readResult.data;
