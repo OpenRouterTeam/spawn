@@ -66,6 +66,10 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn delete` | Interactively select and destroy a cloud server |
 | `spawn delete -a <agent>` | Filter servers to delete by agent |
 | `spawn delete -c <cloud>` | Filter servers to delete by cloud |
+| `spawn status` | Show live state of cloud servers |
+| `spawn status -a <agent>` | Filter status by agent |
+| `spawn status -c <cloud>` | Filter status by cloud |
+| `spawn status --prune` | Remove gone servers from history |
 | `spawn help` | Show help message |
 | `spawn version` | Show version |
 
