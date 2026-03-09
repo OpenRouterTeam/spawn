@@ -206,11 +206,11 @@ export const ENTITY_DEFS: Record<"agent" | "cloud", EntityDef> = {
   },
 };
 
-export function getEntityCollection(manifest: Manifest, kind: "agent" | "cloud") {
+function getEntityCollection(manifest: Manifest, kind: "agent" | "cloud") {
   return kind === "agent" ? manifest.agents : manifest.clouds;
 }
 
-export function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
+function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
   return kind === "agent" ? agentKeys(manifest) : cloudKeys(manifest);
 }
 
@@ -479,7 +479,7 @@ export function parseAuthEnvVars(auth: string): string[] {
 }
 
 /** Format an auth env var line showing whether it's already set or needs to be exported */
-export function formatAuthVarLine(varName: string, urlHint?: string): string {
+function formatAuthVarLine(varName: string, urlHint?: string): string {
   if (process.env[varName]) {
     return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
   }
@@ -506,7 +506,7 @@ export function formatCredStatusLine(varName: string, urlHint?: string): string 
 }
 
 /** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
-export function hasCloudConfigCredentials(cloud: string): boolean {
+function hasCloudConfigCredentials(cloud: string): boolean {
   try {
     const configPath = getSpawnCloudConfigPath(cloud);
     if (!fs.existsSync(configPath)) {
@@ -541,7 +541,7 @@ export function collectMissingCredentials(authVars: string[], cloud?: string): s
   return missing;
 }
 
-export function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): string {
+function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): string {
   if (onlyOpenRouter) {
     return "The script will open your browser to authenticate with OpenRouter.";
   }
@@ -691,13 +691,13 @@ export function printGroupedList(
   }
 }
 
-export function checkAllCredentialsReady(auth: string): boolean {
+function checkAllCredentialsReady(auth: string): boolean {
   const hasCreds = hasCloudCredentials(auth);
   const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
   return hasOpenRouterKey && (hasCreds || auth.toLowerCase() === "none");
 }
 
-export function printAuthVariableStatus(authVars: string[], cloudUrl?: string): void {
+function printAuthVariableStatus(authVars: string[], cloudUrl?: string): void {
   console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
   for (let i = 0; i < authVars.length; i++) {
     console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudUrl : undefined));
