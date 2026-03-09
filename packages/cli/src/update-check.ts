@@ -6,10 +6,9 @@ import fs from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import pc from "picocolors";
-import * as v from "valibot";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
-import { parseJsonWith } from "./shared/parse";
+import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { hasStatus } from "./shared/type-guards";
 
 const VERSION = pkg.version;
@@ -23,12 +22,6 @@ export const executor = {
 
 const FETCH_TIMEOUT = 10000; // 10 seconds
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
-
-// ── Schemas ──────────────────────────────────────────────────────────────────
-
-const PkgVersionSchema = v.object({
-  version: v.string(),
-});
 
 // Use ASCII-safe symbols when unicode is disabled (SSH, dumb terminals)
 const isAscii = process.env.TERM === "linux";
