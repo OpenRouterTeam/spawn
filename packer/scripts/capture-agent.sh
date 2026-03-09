@@ -25,7 +25,13 @@ PATHS_FILE="/tmp/spawn-tarball-paths.txt"
 
 # Map agent -> filesystem paths to capture (all relative to /)
 case "${AGENT_NAME}" in
-  openclaw|codex|kilocode)
+  openclaw)
+    echo "/root/.npm-global/" >> "${PATHS_FILE}"
+    # Google Chrome for OpenClaw's browser tool (CDP automation)
+    echo "/usr/bin/google-chrome" >> "${PATHS_FILE}"
+    echo "/opt/google/chrome/" >> "${PATHS_FILE}"
+    ;;
+  codex|kilocode)
     echo "/root/.npm-global/" >> "${PATHS_FILE}"
     ;;
   claude)

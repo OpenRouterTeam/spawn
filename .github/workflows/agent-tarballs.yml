@@ -99,7 +99,7 @@ jobs:
           echo "==> Installing agent..."
 
           # Allowed domains for curl/wget downloads (official agent vendor domains)
-          ALLOWED_DOMAINS="claude.ai|opencode.ai|raw.githubusercontent.com|registry.npmjs.org|crates.io|github.com"
+          ALLOWED_DOMAINS="claude.ai|opencode.ai|raw.githubusercontent.com|registry.npmjs.org|crates.io|github.com|dl.google.com"
 
           CMD_COUNT=$(jq -r --arg a "${AGENT_NAME}" '.[$a].install | length' packer/agents.json)
           i=0

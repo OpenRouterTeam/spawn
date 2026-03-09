@@ -316,20 +316,9 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
       return key;
     }
 
-    // OAuth failed, offer manual entry
+    // OAuth failed — fall through to manual entry
     process.stderr.write("\n");
-    logWarn("Browser-based OAuth login was not completed.");
-    logInfo("You can paste an API key instead. Create one at: https://openrouter.ai/settings/keys");
-    process.stderr.write("\n");
-
-    const choice = await prompt("Paste your API key manually? (Y/n): ");
-    if (/^[Nn]$/.test(choice)) {
-      logError("Authentication cancelled. An OpenRouter API key is required.");
-      throw new Error("No API key");
-    }
-
-    process.stderr.write("\n");
-    logInfo("Manual API Key Entry");
+    logWarn("Browser-based login was not completed.");
     logInfo("Get your API key from: https://openrouter.ai/settings/keys");
     process.stderr.write("\n");
 
