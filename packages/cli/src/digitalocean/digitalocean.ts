@@ -576,6 +576,14 @@ export async function ensureDoToken(): Promise<boolean> {
   }
 
   // 3. Try OAuth browser flow
+  // Show payment method reminder for first-time users (no saved config, no env token)
+  if (!saved && !process.env.DO_API_TOKEN) {
+    process.stderr.write("\n");
+    logWarn("DigitalOcean requires a payment method before you can create servers.");
+    logWarn("If you haven't added one yet, visit: https://cloud.digitalocean.com/account/billing");
+    process.stderr.write("\n");
+  }
+
   const oauthToken = await tryDoOAuth();
   if (oauthToken) {
     _state.token = oauthToken;
