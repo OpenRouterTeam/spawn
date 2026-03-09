@@ -731,9 +731,11 @@ export async function createInstance(
 
   logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone})...`);
 
-  // Write startup script to a temp file
-  const tmpFile = `/tmp/spawn_startup_${Date.now()}.sh`;
-  writeFileSync(tmpFile, getStartupScript(username, tier));
+  // Write startup script to a temp file (random suffix prevents collisions and predictable paths)
+  const tmpFile = `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
+  writeFileSync(tmpFile, getStartupScript(username, tier), {
+    mode: 0o600,
+  });
 
   const args = [
     "compute",
@@ -752,70 +754,74 @@ export async function createInstance(
     "--quiet",
   ];
 
-  let result = await gcloud(args);
-
-  // Auto-reauth on expired tokens
-  if (
-    result.exitCode !== 0 &&
-    /reauthentication|refresh.*auth|token.*expired|credentials.*invalid/i.test(result.stderr)
-  ) {
-    logWarn("Auth tokens expired -- running gcloud auth login...");
-    const reauth = await gcloudInteractive([
-      "auth",
-      "login",
-    ]);
-    if (reauth === 0) {
-      await gcloudInteractive([
-        "config",
-        "set",
-        "project",
-        _state.project,
-      ]);
-      logInfo("Re-authenticated, retrying instance creation...");
-      result = await gcloud(args);
-    }
-  }
-
-  // Clean up temp file
+  // Wrap all gcloud calls in try/finally so the temp file is cleaned up
+  // even when billing retry re-uses it (the args array references tmpFile).
   try {
-    Bun.spawnSync([
-      "rm",
-      "-f",
-      tmpFile,
-    ]);
-  } catch {
-    /* ignore */
-  }
+    let result = await gcloud(args);
 
-  if (result.exitCode !== 0) {
-    const errMsg = result.stderr || "Unknown error";
-    logError("Failed to create GCP instance");
-    if (result.stderr) {
-      logError(`gcloud error: ${result.stderr}`);
+    // Auto-reauth on expired tokens
+    if (
+      result.exitCode !== 0 &&
+      /reauthentication|refresh.*auth|token.*expired|credentials.*invalid/i.test(result.stderr)
+    ) {
+      logWarn("Auth tokens expired -- running gcloud auth login...");
+      const reauth = await gcloudInteractive([
+        "auth",
+        "login",
+      ]);
+      if (reauth === 0) {
+        await gcloudInteractive([
+          "config",
+          "set",
+          "project",
+          _state.project,
+        ]);
+        logInfo("Re-authenticated, retrying instance creation...");
+        result = await gcloud(args);
+      }
     }
 
-    if (isBillingError("gcp", errMsg)) {
-      const shouldRetry = await handleBillingError("gcp");
-      if (shouldRetry) {
-        logStep("Retrying instance creation...");
-        const retryResult = await gcloud(args);
-        if (retryResult.exitCode === 0) {
-          // Fall through to IP extraction below
+    if (result.exitCode !== 0) {
+      const errMsg = result.stderr || "Unknown error";
+      logError("Failed to create GCP instance");
+      if (result.stderr) {
+        logError(`gcloud error: ${result.stderr}`);
+      }
+
+      if (isBillingError("gcp", errMsg)) {
+        const shouldRetry = await handleBillingError("gcp");
+        if (shouldRetry) {
+          logStep("Retrying instance creation...");
+          const retryResult = await gcloud(args);
+          if (retryResult.exitCode === 0) {
+            // Fall through to IP extraction below
+          } else {
+            const retryErr = retryResult.stderr || "Unknown error";
+            logError(`Retry failed: ${retryErr}`);
+            throw new Error("Instance creation failed");
+          }
         } else {
-          const retryErr = retryResult.stderr || "Unknown error";
-          logError(`Retry failed: ${retryErr}`);
           throw new Error("Instance creation failed");
         }
       } else {
+        showNonBillingError("gcp", [
+          "Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)",
+          "Instance quota exceeded (try different GCP_ZONE)",
+          "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
+        ]);
         throw new Error("Instance creation failed");
       }
-    } else {
-      showNonBillingError("gcp", [
-        "Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)",
-        "Instance quota exceeded (try different GCP_ZONE)",
-        "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
+    }
+  } finally {
+    // Clean up temp file after all retry paths have completed
+    try {
+      Bun.spawnSync([
+        "rm",
+        "-f",
+        tmpFile,
       ]);
-      throw new Error("Instance creation failed");
+    } catch {
+      /* ignore */
     }
   }
 
