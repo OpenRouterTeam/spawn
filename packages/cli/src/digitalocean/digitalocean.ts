@@ -702,7 +702,7 @@ const DROPLET_SIZES: DropletSize[] = [
   },
 ];
 
-export const DEFAULT_DROPLET_SIZE = "s-2vcpu-4gb";
+export const DEFAULT_DROPLET_SIZE = "s-2vcpu-2gb";
 
 // ─── Region Options ──────────────────────────────────────────────────────────
 
@@ -831,7 +831,7 @@ export async function createServer(
   region?: string,
   snapshotId?: string,
 ): Promise<void> {
-  const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
+  const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-2gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
 
   if (!validateRegionName(effectiveRegion)) {

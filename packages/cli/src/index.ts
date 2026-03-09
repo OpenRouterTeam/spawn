@@ -96,7 +96,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
     console.error(`    ${pc.cyan("--custom")}            Show interactive size/region pickers`);
     console.error(`    ${pc.cyan("--zone, --region")}    Set zone/region (e.g. us-east1-b, nyc3)`);
-    console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-4gb)`);
+    console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-2gb)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);

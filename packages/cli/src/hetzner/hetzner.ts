@@ -340,7 +340,7 @@ const LOCATIONS: LocationOption[] = [
   },
 ];
 
-export const DEFAULT_LOCATION = "nbg1";
+export const DEFAULT_LOCATION = "fsn1";
 
 // ─── Interactive Pickers ─────────────────────────────────────────────────────
 
@@ -391,7 +391,7 @@ export async function createServer(
   tier?: CloudInitTier,
 ): Promise<void> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
-  const loc = location || process.env.HETZNER_LOCATION || "nbg1";
+  const loc = location || process.env.HETZNER_LOCATION || "fsn1";
   const image = "ubuntu-24.04";
 
   if (!validateRegionName(loc)) {
