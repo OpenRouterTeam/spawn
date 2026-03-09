@@ -497,7 +497,7 @@ export async function createServer(
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
+export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
   const serverIp = ip || _state.serverIp;
   const selectedKeys = await ensureSshKeys();
   const keyOpts = getSshKeyOpts(selectedKeys);
@@ -509,7 +509,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
   });
 
   logStep("Waiting for cloud-init to complete...");
-  for (let attempt = 1; attempt <= 60; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
         [
@@ -541,12 +541,12 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
     } catch {
       // ignore
     }
-    if (attempt >= 60) {
+    if (attempt >= maxAttempts) {
       logStepDone();
       logWarn("Cloud-init marker not found, continuing anyway...");
       return;
     }
-    logStepInline(`Cloud-init in progress (${attempt}/60)`);
+    logStepInline(`Cloud-init in progress (${attempt}/${maxAttempts})`);
     await sleep(5000);
   }
 }

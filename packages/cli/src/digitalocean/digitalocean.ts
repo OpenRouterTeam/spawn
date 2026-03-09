@@ -1009,7 +1009,7 @@ export async function waitForSshOnly(ip?: string): Promise<void> {
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
+export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
   const serverIp = ip || _state.serverIp;
   const selectedKeys = await ensureSshKeys();
   const keyOpts = getSshKeyOpts(selectedKeys);
@@ -1062,7 +1062,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
   }
 
   // Fallback poll if streaming failed (e.g. log file not yet created)
-  for (let attempt = 1; attempt <= 20; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
         [
@@ -1093,7 +1093,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
     } catch {
       /* ignore */
     }
-    logStepInline(`Cloud-init in progress (${attempt}/20)`);
+    logStepInline(`Cloud-init in progress (${attempt}/${maxAttempts})`);
     await sleep(5000);
   }
   logStepDone();

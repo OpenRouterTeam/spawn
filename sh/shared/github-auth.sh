@@ -319,7 +319,10 @@ EOF
             return 1
         }
         # Restrict token file permissions to owner-only (prevents exposure on multi-user systems)
-        chmod 600 "${HOME}/.config/gh/hosts.yml" 2>/dev/null || true
+        chmod 600 "${HOME}/.config/gh/hosts.yml" || {
+            log_error "Failed to restrict token file permissions — aborting to prevent credential exposure"
+            return 1
+        }
         export GITHUB_TOKEN="${_gh_token}"
     elif gh auth status &>/dev/null; then
         log_info "Authenticated with GitHub CLI"
