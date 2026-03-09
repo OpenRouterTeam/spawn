@@ -14,13 +14,15 @@
       "name": "spawn-slack-bot",
       "dependencies": {
         "@slack/bolt": "4.6.0",
+        "@slack/types": "^2.14.0",
+        "@slack/web-api": "^7.14.1",
         "slackify-markdown": "^5.0.0",
         "valibot": "1.2.0",
       },
     },
     "packages/cli": {
       "name": "@openrouter/spawn",
-      "version": "0.15.3",
+      "version": "0.15.27",
       "bin": {
         "spawn": "cli.js",
       },
