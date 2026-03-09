@@ -1,9 +1,10 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
+import type { VMConnection } from "../history.js";
+
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { saveVmConnection as saveVmConnectionToHistory } from "../history.js";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { getErrorMessage } from "../shared/type-guards";
 import {
@@ -433,17 +434,13 @@ export async function setupShellEnvironment(): Promise<void> {
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
 
-export function saveVmConnection(): void {
-  saveVmConnectionToHistory(
-    "sprite-console",
-    process.env.USER || "root",
-    "",
-    _state.name,
-    "sprite",
-    undefined,
-    undefined,
-    process.env.SPAWN_ID || undefined,
-  );
+export function getVmConnection(): VMConnection {
+  return {
+    ip: "sprite-console",
+    user: process.env.USER || "root",
+    server_name: _state.name,
+    cloud: "sprite",
+  };
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────

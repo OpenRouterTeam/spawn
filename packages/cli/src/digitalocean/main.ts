@@ -4,7 +4,6 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
-import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
@@ -59,14 +58,13 @@ async function main() {
       dropletSize = await promptDropletSize();
       region = await promptDoRegion();
     },
-    async createServer(name: string, spawnId?: string) {
-      process.env.SPAWN_ID = spawnId || "";
+    async createServer(name: string) {
       // Check for a pre-built snapshot before provisioning
       snapshotId = await findSpawnSnapshot(agentName);
       if (snapshotId) {
         cloud.skipAgentInstall = true;
       }
-      await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId ?? undefined);
+      return await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId ?? undefined);
     },
     getServerName,
     async waitForReady() {
@@ -77,7 +75,6 @@ async function main() {
       }
     },
     interactiveSession,
-    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

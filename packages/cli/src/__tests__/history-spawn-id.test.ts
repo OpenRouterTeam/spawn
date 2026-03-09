@@ -3,7 +3,6 @@
  *
  * Verifies that:
  * - Every saved record gets a unique id
- * - saveVmConnection matches by spawnId (not heuristic)
  * - saveLaunchCmd matches by spawnId (not heuristic)
  * - removeRecord / markRecordDeleted match by id
  * - Concurrent spawns on the same cloud don't cross-contaminate
@@ -13,20 +12,17 @@
 import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   generateSpawnId,
-  getActiveServers,
-  getConnectionPath,
   getHistoryPath,
   loadHistory,
   markRecordDeleted,
   removeRecord,
   saveLaunchCmd,
   saveSpawnRecord,
-  saveVmConnection,
 } from "../history.js";
 
 describe("history spawn IDs", () => {
@@ -120,94 +116,27 @@ describe("history spawn IDs", () => {
       expect(history).toHaveLength(2);
       expect(history[0].id).not.toBe(history[1].id);
     });
-  });
 
-  // ── saveVmConnection matches by spawnId ──────────────────────────────
-
-  describe("saveVmConnection with spawnId", () => {
-    it("attaches connection to the correct record by spawnId", () => {
-      const id1 = generateSpawnId();
-      const id2 = generateSpawnId();
-
-      // Save two records for the same cloud
-      saveSpawnRecord({
-        id: id1,
-        agent: "claude",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-      saveSpawnRecord({
-        id: id2,
-        agent: "codex",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:01:00.000Z",
-      });
-
-      // Attach connection to the FIRST record by id
-      saveVmConnection("1.2.3.4", "root", "srv-1", "my-server", "gcp", undefined, undefined, id1);
-
-      const history = loadHistory();
-      expect(history[0].connection?.ip).toBe("1.2.3.4");
-      expect(history[0].connection?.server_name).toBe("my-server");
-      // Second record should NOT have a connection
-      expect(history[1].connection).toBeUndefined();
-    });
-
-    it("does not cross-contaminate concurrent spawns on the same cloud", () => {
-      const id1 = generateSpawnId();
-      const id2 = generateSpawnId();
-
-      saveSpawnRecord({
-        id: id1,
-        agent: "claude",
-        cloud: "hetzner",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-      saveSpawnRecord({
-        id: id2,
-        agent: "codex",
-        cloud: "hetzner",
-        timestamp: "2026-01-01T00:01:00.000Z",
-      });
-
-      // Each connection targets its own record
-      saveVmConnection("10.0.0.1", "root", "srv-a", "server-a", "hetzner", undefined, undefined, id1);
-      saveVmConnection("10.0.0.2", "root", "srv-b", "server-b", "hetzner", undefined, undefined, id2);
-
-      const history = loadHistory();
-      expect(history[0].connection?.ip).toBe("10.0.0.1");
-      expect(history[0].connection?.server_name).toBe("server-a");
-      expect(history[1].connection?.ip).toBe("10.0.0.2");
-      expect(history[1].connection?.server_name).toBe("server-b");
-    });
-
-    it("writes spawn_id to last-connection.json", () => {
+    it("saves connection data atomically with the record", () => {
       const id = generateSpawnId();
       saveSpawnRecord({
         id,
         agent: "claude",
         cloud: "gcp",
         timestamp: "2026-01-01T00:00:00.000Z",
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          server_name: "my-server",
+          cloud: "gcp",
+        },
       });
-      saveVmConnection("1.2.3.4", "root", "", "srv", "gcp", undefined, undefined, id);
-
-      const connFile = JSON.parse(readFileSync(getConnectionPath(), "utf-8"));
-      expect(connFile.spawn_id).toBe(id);
-    });
-
-    it("falls back to heuristic when spawnId is not provided", () => {
-      saveSpawnRecord({
-        id: generateSpawnId(),
-        agent: "claude",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-
-      // No spawnId — should match the most recent gcp record without connection
-      saveVmConnection("5.6.7.8", "user", "", "fallback-srv", "gcp");
 
       const history = loadHistory();
-      expect(history[0].connection?.ip).toBe("5.6.7.8");
+      expect(history).toHaveLength(1);
+      expect(history[0].connection?.ip).toBe("1.2.3.4");
+      expect(history[0].connection?.server_name).toBe("my-server");
+      expect(history[0].connection?.cloud).toBe("gcp");
     });
   });
 
@@ -223,17 +152,25 @@ describe("history spawn IDs", () => {
         agent: "claude",
         cloud: "gcp",
         timestamp: "2026-01-01T00:00:00.000Z",
+        connection: {
+          ip: "1.1.1.1",
+          user: "root",
+          server_name: "srv1",
+          cloud: "gcp",
+        },
       });
       saveSpawnRecord({
         id: id2,
         agent: "codex",
         cloud: "gcp",
         timestamp: "2026-01-01T00:01:00.000Z",
+        connection: {
+          ip: "2.2.2.2",
+          user: "root",
+          server_name: "srv2",
+          cloud: "gcp",
+        },
       });
-
-      // Attach connections to both
-      saveVmConnection("1.1.1.1", "root", "", "srv1", "gcp", undefined, undefined, id1);
-      saveVmConnection("2.2.2.2", "root", "", "srv2", "gcp", undefined, undefined, id2);
 
       // Update launch command for the FIRST record only
       saveLaunchCmd("claude --start", id1);
@@ -250,8 +187,13 @@ describe("history spawn IDs", () => {
         agent: "claude",
         cloud: "gcp",
         timestamp: "2026-01-01T00:00:00.000Z",
+        connection: {
+          ip: "1.1.1.1",
+          user: "root",
+          server_name: "srv",
+          cloud: "gcp",
+        },
       });
-      saveVmConnection("1.1.1.1", "root", "", "srv", "gcp", undefined, undefined, id);
 
       saveLaunchCmd("fallback-cmd");
 
@@ -369,17 +311,27 @@ describe("history spawn IDs", () => {
         agent: "claude",
         cloud: "gcp",
         timestamp: "2026-01-01T00:00:00.000Z",
+        connection: {
+          ip: "1.1.1.1",
+          user: "root",
+          server_id: "srv1",
+          server_name: "server1",
+          cloud: "gcp",
+        },
       });
       saveSpawnRecord({
         id: id2,
         agent: "codex",
         cloud: "gcp",
         timestamp: "2026-01-01T00:01:00.000Z",
+        connection: {
+          ip: "2.2.2.2",
+          user: "root",
+          server_id: "srv2",
+          server_name: "server2",
+          cloud: "gcp",
+        },
       });
-
-      // Attach connections to both
-      saveVmConnection("1.1.1.1", "root", "srv1", "server1", "gcp", undefined, undefined, id1);
-      saveVmConnection("2.2.2.2", "root", "srv2", "server2", "gcp", undefined, undefined, id2);
 
       // Mark only the first as deleted
       const result = markRecordDeleted({
@@ -412,73 +364,6 @@ describe("history spawn IDs", () => {
         timestamp: "2026-01-01T00:00:00.000Z",
       });
       expect(result).toBe(false);
-    });
-  });
-
-  // ── mergeLastConnection uses spawn_id ─────────────────────────────────
-
-  describe("mergeLastConnection via getActiveServers", () => {
-    it("merges connection to correct record using spawn_id in last-connection.json", () => {
-      const id1 = generateSpawnId();
-      const id2 = generateSpawnId();
-
-      saveSpawnRecord({
-        id: id1,
-        agent: "claude",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-      saveSpawnRecord({
-        id: id2,
-        agent: "codex",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:01:00.000Z",
-      });
-
-      // Manually write last-connection.json with spawn_id targeting the second record
-      const connData = {
-        ip: "9.9.9.9",
-        user: "root",
-        server_name: "targeted-srv",
-        cloud: "gcp",
-        spawn_id: id2,
-      };
-      writeFileSync(getConnectionPath(), JSON.stringify(connData) + "\n");
-
-      // getActiveServers triggers mergeLastConnection
-      const servers = loadHistory();
-      // Force merge by calling getActiveServers (it calls mergeLastConnection internally)
-      getActiveServers();
-
-      const history = loadHistory();
-      // The first record should NOT have the connection
-      expect(history[0].connection).toBeUndefined();
-      // The second record should have it
-      expect(history[1].connection?.ip).toBe("9.9.9.9");
-      expect(history[1].connection?.server_name).toBe("targeted-srv");
-    });
-
-    it("falls back to heuristic when last-connection.json has no spawn_id", () => {
-      const id1 = generateSpawnId();
-      saveSpawnRecord({
-        id: id1,
-        agent: "claude",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-
-      // Write last-connection.json WITHOUT spawn_id
-      const connData = {
-        ip: "8.8.8.8",
-        user: "root",
-        cloud: "gcp",
-      };
-      writeFileSync(getConnectionPath(), JSON.stringify(connData) + "\n");
-
-      getActiveServers();
-
-      const history = loadHistory();
-      expect(history[0].connection?.ip).toBe("8.8.8.8");
     });
   });
 });

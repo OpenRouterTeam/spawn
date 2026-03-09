@@ -116,114 +116,133 @@ describe("checkEntity", () => {
   // ── Non-existent entities: no close match (distance > 3) ───────────────
 
   describe("non-existent entities with no close match", () => {
-    it("should return false for completely unknown agent 'kubernetes'", () => {
-      expect(checkEntity(manifest, "kubernetes", "agent")).toBe(false);
-    });
-
-    it("should return false for completely unknown cloud 'amazonaws'", () => {
-      expect(checkEntity(manifest, "amazonaws", "cloud")).toBe(false);
-    });
-
-    it("should return false for unknown agent 'terraform'", () => {
-      expect(checkEntity(manifest, "terraform", "agent")).toBe(false);
-    });
-
-    it("should return false for unknown cloud 'googlecloud'", () => {
-      expect(checkEntity(manifest, "googlecloud", "cloud")).toBe(false);
-    });
-
-    it("should return false for strings far from any candidate", () => {
-      expect(checkEntity(manifest, "zzzzzzz", "agent")).toBe(false);
-      expect(checkEntity(manifest, "zzzzzzz", "cloud")).toBe(false);
-    });
+    const cases: Array<
+      [
+        string,
+        "agent" | "cloud",
+      ]
+    > = [
+      [
+        "kubernetes",
+        "agent",
+      ],
+      [
+        "terraform",
+        "agent",
+      ],
+      [
+        "zzzzzzz",
+        "agent",
+      ],
+      [
+        "amazonaws",
+        "cloud",
+      ],
+      [
+        "googlecloud",
+        "cloud",
+      ],
+      [
+        "zzzzzzz",
+        "cloud",
+      ],
+    ];
+    for (const [input, kind] of cases) {
+      it(`should return false for unknown ${kind} '${input}'`, () => {
+        expect(checkEntity(manifest, input, kind)).toBe(false);
+      });
+    }
   });
 
   // ── Fuzzy match: close typos that should return false ──────────────────
 
   describe("fuzzy match for close typos", () => {
-    it("should return false for 'claud' (typo of claude, distance 1)", () => {
-      expect(checkEntity(manifest, "claud", "agent")).toBe(false);
-    });
+    const agentTypos = [
+      "claud",
+      "claudee",
+      "codx",
+      "codexs",
+      "clin",
+      "claue",
+    ];
+    const cloudTypos = [
+      "sprit",
+      "spritee",
+      "hetzne",
+      "vulr",
+      "vultrr",
+      "sprt",
+    ];
 
-    it("should return false for 'claudee' (typo of claude, distance 1)", () => {
-      expect(checkEntity(manifest, "claudee", "agent")).toBe(false);
-    });
+    for (const typo of agentTypos) {
+      it(`should return false for agent typo '${typo}'`, () => {
+        expect(checkEntity(manifest, typo, "agent")).toBe(false);
+      });
+    }
 
-    it("should return false for 'codx' (typo of codex, distance 1)", () => {
-      expect(checkEntity(manifest, "codx", "agent")).toBe(false);
-    });
-
-    it("should return false for 'codexs' (typo of codex, distance 1)", () => {
-      expect(checkEntity(manifest, "codexs", "agent")).toBe(false);
-    });
-
-    it("should return false for 'clin' (typo of cline, distance 1)", () => {
-      expect(checkEntity(manifest, "clin", "agent")).toBe(false);
-    });
-
-    it("should return false for 'sprit' (typo of sprite, distance 1)", () => {
-      expect(checkEntity(manifest, "sprit", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'spritee' (typo of sprite, distance 1)", () => {
-      expect(checkEntity(manifest, "spritee", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'hetzne' (typo of hetzner, distance 1)", () => {
-      expect(checkEntity(manifest, "hetzne", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'vulr' (typo of vultr, distance 1)", () => {
-      expect(checkEntity(manifest, "vulr", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'vultrr' (typo of vultr, distance 1)", () => {
-      expect(checkEntity(manifest, "vultrr", "cloud")).toBe(false);
-    });
-
-    it("should return false for multi-character distance typos", () => {
-      // "claue" has distance 2 from "claude" — still within threshold 3
-      expect(checkEntity(manifest, "claue", "agent")).toBe(false);
-      // "sprt" has distance 2 from "sprite"
-      expect(checkEntity(manifest, "sprt", "cloud")).toBe(false);
-    });
+    for (const typo of cloudTypos) {
+      it(`should return false for cloud typo '${typo}'`, () => {
+        expect(checkEntity(manifest, typo, "cloud")).toBe(false);
+      });
+    }
   });
 
   // ── Empty and boundary inputs ──────────────────────────────────────────
 
   describe("empty and boundary inputs", () => {
-    it("should return false for empty string as agent", () => {
-      expect(checkEntity(manifest, "", "agent")).toBe(false);
-    });
-
-    it("should return false for empty string as cloud", () => {
-      expect(checkEntity(manifest, "", "cloud")).toBe(false);
-    });
-
-    it("should handle single character input without crashing", () => {
-      expect(checkEntity(manifest, "a", "agent")).toBe(false);
-    });
-
-    it("should handle single character input for cloud without crashing", () => {
-      expect(checkEntity(manifest, "x", "cloud")).toBe(false);
-    });
-
-    it("should handle very long input without crashing", () => {
-      const longInput = "a".repeat(100);
-      expect(checkEntity(manifest, longInput, "agent")).toBe(false);
-    });
-
-    it("should handle input with special characters", () => {
-      expect(checkEntity(manifest, "claude-code", "agent")).toBe(false);
-    });
-
-    it("should handle input with underscores", () => {
-      expect(checkEntity(manifest, "open_gptme", "agent")).toBe(false);
-    });
-
-    it("should handle numeric input", () => {
-      expect(checkEntity(manifest, "123", "agent")).toBe(false);
-    });
+    const cases: Array<
+      [
+        string,
+        "agent" | "cloud",
+        string,
+      ]
+    > = [
+      [
+        "",
+        "agent",
+        "empty string as agent",
+      ],
+      [
+        "",
+        "cloud",
+        "empty string as cloud",
+      ],
+      [
+        "a",
+        "agent",
+        "single character agent",
+      ],
+      [
+        "x",
+        "cloud",
+        "single character cloud",
+      ],
+      [
+        "a".repeat(100),
+        "agent",
+        "very long input",
+      ],
+      [
+        "claude-code",
+        "agent",
+        "input with hyphens",
+      ],
+      [
+        "open_gptme",
+        "agent",
+        "input with underscores",
+      ],
+      [
+        "123",
+        "agent",
+        "numeric input",
+      ],
+    ];
+    for (const [input, kind, label] of cases) {
+      it(`should return false for ${label}`, () => {
+        expect(checkEntity(manifest, input, kind)).toBe(false);
+      });
+    }
   });
 
   // ── Edge cases with minimal manifest ───────────────────────────────────
@@ -251,21 +270,13 @@ describe("checkEntity", () => {
       expect(checkEntity(emptyClouds, "sprite", "cloud")).toBe(false);
     });
 
-    it("should not crash on completely empty manifest (agent check)", () => {
+    it("should not crash on completely empty manifest", () => {
       const empty: Manifest = {
         agents: {},
         clouds: {},
         matrix: {},
       };
       expect(checkEntity(empty, "test", "agent")).toBe(false);
-    });
-
-    it("should not crash on completely empty manifest (cloud check)", () => {
-      const empty: Manifest = {
-        agents: {},
-        clouds: {},
-        matrix: {},
-      };
       expect(checkEntity(empty, "test", "cloud")).toBe(false);
     });
 
@@ -325,37 +336,48 @@ describe("checkEntity", () => {
   // ── Cross-kind fuzzy match: detect swapped args with typos ──────────
 
   describe("cross-kind fuzzy match for swapped args with typos", () => {
-    it("should return false for 'htzner' as agent (close to cloud 'hetzner')", () => {
-      expect(checkEntity(manifest, "htzner", "agent")).toBe(false);
-    });
-
-    it("should return false for 'sprit' as agent (close to cloud 'sprite')", () => {
-      expect(checkEntity(manifest, "sprit", "agent")).toBe(false);
-    });
-
-    it("should return false for 'vulr' as agent (close to cloud 'vultr')", () => {
-      expect(checkEntity(manifest, "vulr", "agent")).toBe(false);
-    });
-
-    it("should return false for 'claud' as cloud (close to agent 'claude')", () => {
-      expect(checkEntity(manifest, "claud", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'codx' as cloud (close to agent 'codex')", () => {
-      expect(checkEntity(manifest, "codx", "cloud")).toBe(false);
-    });
-
-    it("should return false for 'clin' as cloud (close to agent 'cline')", () => {
-      expect(checkEntity(manifest, "clin", "cloud")).toBe(false);
-    });
+    const crossKindCases: Array<
+      [
+        string,
+        "agent" | "cloud",
+      ]
+    > = [
+      [
+        "htzner",
+        "agent",
+      ], // close to cloud "hetzner"
+      [
+        "sprit",
+        "agent",
+      ], // close to cloud "sprite"
+      [
+        "vulr",
+        "agent",
+      ], // close to cloud "vultr"
+      [
+        "claud",
+        "cloud",
+      ], // close to agent "claude"
+      [
+        "codx",
+        "cloud",
+      ], // close to agent "codex"
+      [
+        "clin",
+        "cloud",
+      ], // close to agent "cline"
+    ];
+    for (const [typo, kind] of crossKindCases) {
+      it(`should return false for '${typo}' as ${kind} (cross-kind typo)`, () => {
+        expect(checkEntity(manifest, typo, kind)).toBe(false);
+      });
+    }
 
     it("should prefer same-kind match over cross-kind match", () => {
-      // "cline" checked as agent should match exactly (same-kind), not cross-kind
       expect(checkEntity(manifest, "cline", "agent")).toBe(true);
     });
 
     it("should not suggest cross-kind match for values far from any candidate", () => {
-      // "zzzzzzz" is far from all agent and cloud names
       expect(checkEntity(manifest, "zzzzzzz", "agent")).toBe(false);
       expect(checkEntity(manifest, "zzzzzzz", "cloud")).toBe(false);
     });
