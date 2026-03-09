@@ -272,14 +272,6 @@ export function validateRegionName(region: string): boolean {
   return /^[a-zA-Z0-9_-]{1,63}$/.test(region);
 }
 
-/** Validate model ID format. */
-export function validateModelId(id: string): boolean {
-  if (!id) {
-    return true;
-  }
-  return /^[a-zA-Z0-9/_:.-]+$/.test(id);
-}
-
 /** Convert display name to kebab-case. */
 export function toKebabCase(name: string): string {
   return name

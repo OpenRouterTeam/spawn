@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { saveVmConnection } from "../history.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
+import { OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
 import {
   killWithTimeout,
@@ -16,7 +17,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
+import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   defaultSpawnName,
   getSpawnCloudConfigPath,
@@ -280,9 +281,6 @@ export async function checkAccountStatus(): Promise<void> {
 }
 
 // ─── DO OAuth Flow ──────────────────────────────────────────────────────────
-
-const OAUTH_CSS =
-  "*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}";
 
 const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
@@ -651,7 +649,7 @@ export async function ensureSshKey(): Promise<void> {
     try {
       regText = await doApi("POST", "/account/keys", body);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = getErrorMessage(err);
       // Key may already exist under a different name — non-fatal
       if (msg.includes("already been taken") || msg.includes("already in use")) {
         logInfo(`SSH key '${key.name}' already registered (under a different name)`);

@@ -73,12 +73,19 @@ bun test src/__tests__/manifest.test.ts
 
 ### Cloud-specific
 - `aws.test.ts` — AWS credential cache, SigV4 signing helpers
+- `billing-guidance.test.ts` — `isBillingError`, `handleBillingError`, `showNonBillingError`
 - `cloud-init.test.ts` — `getPackagesForTier`, `needsNode`, `needsBun`, `NODE_INSTALL_CMD`
 - `check-entity.test.ts` / `check-entity-messages.test.ts` — Entity validation
 - `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
 - `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
 - `do-snapshot.test.ts` — `findSpawnSnapshot`: DigitalOcean snapshot lookup, filtering, error handling
-- `ui-utils.test.ts` — `validateServerName`, `validateRegionName`, `validateModelId`, `toKebabCase`, `sanitizeTermValue`, `jsonEscape`
+- `ui-utils.test.ts` — `validateServerName`, `validateRegionName`, `toKebabCase`, `sanitizeTermValue`, `jsonEscape`
+
+### Agent-specific
+- `junie-agent.test.ts` — Junie CLI agent configuration validation
+
+### Shared helpers
+- `shared-helpers.test.ts` — `generateEnvConfig`, `hasStatus`, `toObjectArray`, `toRecord`
 
 ### OAuth and auth
 - `oauth-code-validation.test.ts` — `OAUTH_CODE_REGEX` format validation

@@ -212,10 +212,18 @@ CLOUD_ENV
       ;;
   esac
 
-  # Pipe base64-encoded credentials directly to cloud_exec via stdin.
-  # No intermediate shell variable — avoids leaking credentials to process
-  # listings, debug output, or shell traces.
-  if base64 < "${env_tmp}" | tr -d '\n' | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
+  # Base64-encode credentials, validate the output, then pipe to cloud_exec.
+  local env_b64
+  env_b64=$(base64 < "${env_tmp}" | tr -d '\n')
+
+  # Validate base64 output contains only safe characters (defense-in-depth)
+  if ! printf '%s' "${env_b64}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+    log_err "Invalid base64 encoding"
+    rm -f "${env_tmp}"
+    return 1
+  fi
+
+  if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
     grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
   else
