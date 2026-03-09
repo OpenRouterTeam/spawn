@@ -17,7 +17,7 @@ bun test src/__tests__/manifest.test.ts
 ## Test Files
 
 ### Core manifest
-- `manifest.test.ts` — `agentKeys`, `cloudKeys`, `matrixStatus`, `countImplemented`, `loadManifest` (cache/network)
+- `manifest.test.ts` — `agentKeys`, `cloudKeys`, `matrixStatus`, `countImplemented`, `loadManifest` (cache/network), `stripDangerousKeys`
 - `manifest-integrity.test.ts` — Structural validation: script files exist for implemented entries, no orphans
 - `manifest-type-contracts.test.ts` — Field type precision for every agent/cloud in the real manifest
 - `manifest-cache-lifecycle.test.ts` — Cache TTL, expiry, forced refresh
@@ -46,9 +46,7 @@ bun test src/__tests__/manifest.test.ts
 - `run-path-credential-display.test.ts` — `prioritizeCloudsByCredentials`, run-path validation
 
 ### Security
-- `security.test.ts` — `validateIdentifier`, `validateScriptContent`, `validatePrompt` (core cases)
-- `security-edge-cases.test.ts` — Boundary conditions and character-level edge cases
-- `security-encoding.test.ts` — Encoding edge cases, `stripDangerousKeys`
+- `security.test.ts` — `validateIdentifier`, `validateScriptContent`, `validatePrompt` (core, boundary, encoding edge cases)
 - `security-connection-validation.test.ts` — `validateConnectionIP`, `validateUsername`, `validateServerIdentifier`, `validateLaunchCmd`
 - `prompt-file-security.test.ts` — `validatePromptFilePath`, `validatePromptFileStats`
 
