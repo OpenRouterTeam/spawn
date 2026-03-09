@@ -543,7 +543,7 @@ export function collectMissingCredentials(authVars: string[], cloud?: string): s
 
 function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): string {
   if (onlyOpenRouter) {
-    return "The script will open your browser to authenticate with OpenRouter.";
+    return "You will be prompted to authenticate with OpenRouter during setup.";
   }
   return `Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`;
 }
