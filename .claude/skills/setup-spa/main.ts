@@ -1,7 +1,7 @@
 // SPA (Spawn's Personal Agent) — Slack bot entry point.
 // Pipes Slack threads into Claude Code sessions and streams responses back.
 
-import type { ContextBlock, KnownBlock, SectionBlock } from "@slack/bolt";
+import type { ActionsBlock, ContextBlock, KnownBlock, SectionBlock } from "@slack/bolt";
 import type { State, ToolCall } from "./helpers";
 
 import { App } from "@slack/bolt";
@@ -40,6 +40,13 @@ for (const [name, value] of Object.entries({
     process.exit(1);
   }
 }
+
+// #endregion
+
+// #region Constants
+
+/** Matches GitHub PR URLs like https://github.com/owner/repo/pull/123 */
+const PR_URL_REGEX = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g;
 
 // #endregion
 
@@ -377,6 +384,7 @@ async function runClaudeAndStream(
 
   // ─── Streaming state ─────────────────────────────────────────────────
   let mainText = "";
+  let fullText = ""; // accumulates all text output across the entire run (for PR URL detection)
   const toolHistory: ToolCall[] = [];
   const toolCounts = new Map<string, number>();
   let currentTool: ToolCall | null = null;
@@ -386,6 +394,70 @@ async function runClaudeAndStream(
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL_MS = 2000;
   let dirty = false;
+
+  // ─── Immediate PR button ──────────────────────────────────────────────
+  // attemptedPrUrls: URLs for which we've already started a Slack post. Checked synchronously
+  //   to avoid duplicate fire-and-forget calls during rapid text segment processing.
+  // prBtnTs: ts of the single PR button message; reused on update so we edit in-place
+  //   instead of posting a new message for each additional URL.
+  // prButtonPromise: tracks the latest in-flight postOrUpdate call so the end-of-run code
+  //   can await it before deleting+reposting — eliminates the race where prBtnTs is still
+  //   undefined when we reach the push-to-latest block.
+  const attemptedPrUrls = new Set<string>();
+  let prBtnTs: string | undefined;
+  let prButtonPromise: Promise<void> = Promise.resolve();
+
+  /**
+   * Build a Slack actions block with buttons for the given PR URLs.
+   */
+  const buildPrButtonBlock = (urls: string[]): ActionsBlock => ({
+    type: "actions",
+    elements: urls.slice(0, 5).map((url, i) => ({
+      type: "button",
+      text: {
+        type: "plain_text",
+        text: `🔗 View PR${urls.length > 1 ? ` #${i + 1}` : ""}`,
+        emoji: true,
+      },
+      url,
+      action_id: `view_pr_${i}`,
+    })),
+  });
+
+  /**
+   * Fire-and-forget: if `fullText` contains PR URLs not yet attempted, immediately
+   * post (or update) a button block so the team gets the link without waiting for
+   * the run to finish.
+   *
+   * - Uses `attemptedPrUrls` to gate concurrent calls (synchronous, prevents duplicate posts).
+   * - Stores the in-flight Promise in `prButtonPromise` so the end-of-run push-to-latest
+   *   block can await it, guaranteeing `prBtnTs` is set before the delete/repost.
+   * - Passes `prBtnTs` to `postOrUpdate` so additional URLs update the existing message
+   *   in-place rather than spawning a fresh one each time.
+   */
+  const firePrButtonIfNew = (): void => {
+    PR_URL_REGEX.lastIndex = 0;
+    const detected = new Set(fullText.match(PR_URL_REGEX) ?? []);
+    const newUrls = [
+      ...detected,
+    ].filter((u) => !attemptedPrUrls.has(u));
+    if (newUrls.length === 0) {
+      return;
+    }
+    for (const u of newUrls) {
+      attemptedPrUrls.add(u);
+    }
+    const allUrls = [
+      ...attemptedPrUrls,
+    ];
+    prButtonPromise = postOrUpdate(client, channel, threadTs, prBtnTs, allUrls[0] ?? "PR ready for review", [
+      buildPrButtonBlock(allUrls),
+    ]).then((ts) => {
+      if (ts) {
+        prBtnTs = ts;
+      }
+    });
+  };
 
   /** Post or update the Slack message with current blocks. */
   async function updateMessage(loading: boolean): Promise<void> {
@@ -463,6 +535,8 @@ async function runClaudeAndStream(
 
         if (segment.kind === "text") {
           mainText += segment.text;
+          fullText += segment.text;
+          firePrButtonIfNew(); // post button immediately if a new PR URL just appeared
           dirty = true;
         } else if (segment.kind === "tool_use" && segment.toolName) {
           const tool: ToolCall = {
@@ -528,6 +602,34 @@ async function runClaudeAndStream(
       doneCtx,
     ];
     msgTs = await postOrUpdate(client, channel, threadTs, msgTs, "Done", doneBlocks);
+  }
+
+  // ─── PR button: push to latest position ──────────────────────────────
+  // During streaming, `firePrButtonIfNew()` posts the button immediately as a fire-and-forget
+  // so the team gets the link without waiting. At end-of-run we always delete the mid-stream
+  // button (if any) and re-post fresh so the button lands as the very last message in the thread,
+  // after all final content. This also serves as a safety net for URLs that never appeared in a
+  // text segment or whose fire-and-forget Slack call failed silently.
+  // Ensure the last fire-and-forget postOrUpdate has resolved so prBtnTs is set
+  // before we attempt to delete it — eliminates the race flagged in code review.
+  await prButtonPromise;
+
+  PR_URL_REGEX.lastIndex = 0;
+  const prUrls = [
+    ...new Set(fullText.match(PR_URL_REGEX) ?? []),
+  ];
+  if (prUrls.length > 0) {
+    if (prBtnTs) {
+      await client.chat
+        .delete({
+          channel,
+          ts: prBtnTs,
+        })
+        .catch(() => {});
+    }
+    await postOrUpdate(client, channel, threadTs, undefined, prUrls[0] ?? "PR ready for review", [
+      buildPrButtonBlock(prUrls),
+    ]);
   }
 
   console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId})`);
