@@ -12,6 +12,7 @@ import {
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
+import { tryCatch } from "./shared/result.js";
 
 export interface VMConnection {
   ip: string;
@@ -131,7 +132,8 @@ function writeHistory(records: SpawnRecord[]): void {
 /** Save launch command to a history record's connection.
  *  Matches by spawnId when provided; falls back to most recent record with a connection. */
 export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
-  try {
+  // non-fatal — discard errors
+  tryCatch(() => {
     const history = loadHistory();
     let found = false;
 
@@ -156,48 +158,80 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
     if (found) {
       writeHistory(history);
     }
-  } catch {
-    // non-fatal
-  }
+  });
 }
 
-/** Back up a corrupted file before discarding it. Non-fatal. */
+/** Back up a corrupted file before discarding it. Non-fatal (best-effort). */
 function backupCorruptedFile(filePath: string): void {
-  try {
+  tryCatch(() => {
     copyFileSync(filePath, `${filePath}.corrupt.${Date.now()}`);
     console.error(`Warning: ${filePath} was corrupted. A backup has been saved with .corrupt suffix.`);
-  } catch {
-    // Non-fatal — best-effort backup
+  });
+}
+
+/** Try to parse valid records from a single archive file. */
+function parseArchiveFile(dir: string, file: string): SpawnRecord[] | null {
+  const result = tryCatch(() => {
+    const text = readFileSync(join(dir, file), "utf-8");
+    const data: unknown = JSON.parse(text);
+    if (Array.isArray(data)) {
+      return data.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    }
+    return [];
+  });
+  if (!result.ok) {
+    return null;
   }
+  return result.data.length > 0 ? result.data : null;
 }
 
 /** Attempt to recover records from archive files (history-*.json). */
 function recoverFromArchives(): SpawnRecord[] {
-  try {
+  const result = tryCatch(() => {
     const dir = getSpawnDir();
     const files = readdirSync(dir)
       .filter((f) => /^history-\d{4}-\d{2}-\d{2}\.json$/.test(f))
       .sort()
       .reverse();
     for (const file of files) {
-      try {
-        const text = readFileSync(join(dir, file), "utf-8");
-        const data: unknown = JSON.parse(text);
-        if (Array.isArray(data)) {
-          const valid = data.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
-          if (valid.length > 0) {
-            console.error(`Recovered ${valid.length} record(s) from archive ${file}.`);
-            return valid;
-          }
-        }
-      } catch {
-        // Skip corrupted archives, try next
+      const records = parseArchiveFile(dir, file);
+      if (records) {
+        console.error(`Recovered ${records.length} record(s) from archive ${file}.`);
+        return records;
       }
     }
-  } catch {
-    // Non-fatal
+    return [];
+  });
+  return result.ok ? result.data : [];
+}
+
+/** Parse raw JSON into SpawnRecord[], handling all format versions. */
+function parseHistoryData(raw: unknown): SpawnRecord[] | null {
+  // v1 format: { version: 1, records: [...] } — strict check
+  const v1 = v.safeParse(HistoryFileV1Schema, raw);
+  if (v1.success) {
+    return v1.output.records;
   }
-  return [];
+
+  // Loose v1: version=1 but some individual records are malformed
+  const v1Loose = v.safeParse(HistoryFileV1LooseSchema, raw);
+  if (v1Loose.success) {
+    const allRecords = v1Loose.output.records;
+    const valid = allRecords.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    const dropped = allRecords.length - valid.length;
+    if (dropped > 0) {
+      console.error(`Warning: Dropped ${dropped} malformed record(s) from history.`);
+    }
+    return valid;
+  }
+
+  // v0 format: bare array (pre-versioning; migrated to v1 on next write)
+  if (Array.isArray(raw)) {
+    return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+  }
+
+  // Unrecognized format
+  return null;
 }
 
 export function loadHistory(): SpawnRecord[] {
@@ -205,81 +239,64 @@ export function loadHistory(): SpawnRecord[] {
   if (!existsSync(path)) {
     return [];
   }
-  try {
-    const text = readFileSync(path, "utf-8");
-    if (!text.trim()) {
-      return [];
-    }
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      // JSON parse failed — file is corrupted
-      backupCorruptedFile(path);
-      return recoverFromArchives();
-    }
-
-    // v1 format: { version: 1, records: [...] } — strict check
-    const v1 = v.safeParse(HistoryFileV1Schema, raw);
-    if (v1.success) {
-      return v1.output.records;
-    }
-
-    // Loose v1: version=1 but some individual records are malformed
-    const v1Loose = v.safeParse(HistoryFileV1LooseSchema, raw);
-    if (v1Loose.success) {
-      const allRecords = v1Loose.output.records;
-      const valid = allRecords.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
-      const dropped = allRecords.length - valid.length;
-      if (dropped > 0) {
-        console.error(`Warning: Dropped ${dropped} malformed record(s) from history.`);
-      }
-      return valid;
-    }
-
-    // v0 format: bare array (pre-versioning; migrated to v1 on next write)
-    if (Array.isArray(raw)) {
-      return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
-    }
-
-    // Unrecognized format
-    backupCorruptedFile(path);
-    return recoverFromArchives();
-  } catch {
+  const readResult = tryCatch(() => readFileSync(path, "utf-8"));
+  if (!readResult.ok) {
     return [];
   }
+  const text = readResult.data;
+  if (!text.trim()) {
+    return [];
+  }
+
+  const parseResult = tryCatch((): unknown => JSON.parse(text));
+  if (!parseResult.ok) {
+    // JSON parse failed — file is corrupted
+    backupCorruptedFile(path);
+    return recoverFromArchives();
+  }
+
+  const records = parseHistoryData(parseResult.data);
+  if (records !== null) {
+    return records;
+  }
+
+  // Unrecognized format
+  backupCorruptedFile(path);
+  return recoverFromArchives();
 }
 
 const MAX_HISTORY_ENTRIES = 100;
+
+/** Read existing records from an archive file, returning [] if missing or corrupted. */
+function readExistingArchive(archivePath: string): SpawnRecord[] {
+  if (!existsSync(archivePath)) {
+    return [];
+  }
+  const result = tryCatch((): unknown => JSON.parse(readFileSync(archivePath, "utf-8")));
+  if (result.ok && Array.isArray(result.data)) {
+    return result.data;
+  }
+  // Corrupted archive — overwrite
+  return [];
+}
 
 /** Archive evicted records to a dated backup file so nothing is permanently lost. */
 function archiveRecords(records: SpawnRecord[]): void {
   if (records.length === 0) {
     return;
   }
-  try {
+  // Non-fatal — archive failure should not block saving
+  tryCatch(() => {
     const dir = getSpawnDir();
     const date = new Date().toISOString().slice(0, 10);
     const archivePath = join(dir, `history-${date}.json`);
-    let existing: SpawnRecord[] = [];
-    if (existsSync(archivePath)) {
-      try {
-        const data = JSON.parse(readFileSync(archivePath, "utf-8"));
-        if (Array.isArray(data)) {
-          existing = data;
-        }
-      } catch {
-        // Corrupted archive — overwrite
-      }
-    }
+    const existing = readExistingArchive(archivePath);
     const merged = [
       ...existing,
       ...records,
     ];
     atomicWriteJson(archivePath, merged);
-  } catch {
-    // Non-fatal — archive failure should not block saving
-  }
+  });
 }
 
 export function saveSpawnRecord(record: SpawnRecord): void {

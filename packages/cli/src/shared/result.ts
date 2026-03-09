@@ -22,3 +22,12 @@ export const Err = <T>(error: Error): Result<T> => ({
   ok: false,
   error,
 });
+
+/** Wrap a synchronous function call into a Result — no try/catch at the call site. */
+export function tryCatch<T>(fn: () => T): Result<T> {
+  try {
+    return Ok(fn());
+  } catch (e) {
+    return Err(e instanceof Error ? e : new Error(String(e)));
+  }
+}
