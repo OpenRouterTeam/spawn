@@ -323,8 +323,8 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   try {
     await runner.runServer(
       "{ command -v google-chrome-stable >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1; } && { echo 'Chrome already installed'; exit 0; }; " +
-        "wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb && " +
-        "sudo dpkg -i /tmp/google-chrome.deb 2>/dev/null; sudo apt-get install -f -y -qq 2>/dev/null; " +
+        "curl --proto '=https' -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o /tmp/google-chrome.deb && " +
+        "sudo dpkg -i /tmp/google-chrome.deb; sudo apt-get install -f -y -qq; " +
         "rm -f /tmp/google-chrome.deb",
       120,
     );
