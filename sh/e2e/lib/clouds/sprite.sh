@@ -173,17 +173,12 @@ _sprite_exec() {
   local _max=3
   local _stderr_tmp="/tmp/sprite-exec-err.$$"
 
-  # Base64-encode the command to prevent shell metacharacters from being
-  # interpreted during transport — matches the defense-in-depth pattern.
-  local _encoded
-  _encoded=$(printf '%s' "${cmd}" | base64)
-
   while [ "${_attempt}" -lt "${_max}" ]; do
     _sprite_fix_config
-    # Send base64-encoded command; decode and execute on the remote side.
-    # This ensures no shell metacharacters can break out of context.
+    # Pipe the command via stdin to avoid interpolating it into the remote
+    # command string — eliminates shell injection risk.
     # shellcheck disable=SC2046
-    printf '%s' "printf '%s' '${_encoded}' | base64 -d | bash" | sprite $(_sprite_org_flags) exec -s "${app}" -- bash 2>"${_stderr_tmp}"
+    printf '%s' "${cmd}" | sprite $(_sprite_org_flags) exec -s "${app}" -- bash 2>"${_stderr_tmp}"
     local _rc=$?
     if [ "${_rc}" -eq 0 ]; then
       rm -f "${_stderr_tmp}"
@@ -224,17 +219,12 @@ _sprite_exec_long() {
   local _max=3
   local _stderr_tmp="/tmp/sprite-execl-err.$$"
 
-  # Base64-encode the command to prevent shell metacharacters from being
-  # interpreted during transport — matches the defense-in-depth pattern.
-  local _encoded
-  _encoded=$(printf '%s' "${cmd}" | base64)
-
   while [ "${_attempt}" -lt "${_max}" ]; do
     _sprite_fix_config
-    # Send base64-encoded command; decode and execute on the remote side.
-    # This ensures no shell metacharacters can break out of context.
+    # Pipe the command via stdin to avoid interpolating it into the remote
+    # command string — eliminates shell injection risk from base64 encoding.
     # shellcheck disable=SC2046
-    printf '%s' "printf '%s' '${_encoded}' | base64 -d | bash" | sprite $(_sprite_org_flags) exec -s "${app}" -- timeout "${timeout}" bash 2>"${_stderr_tmp}"
+    printf '%s' "${cmd}" | sprite $(_sprite_org_flags) exec -s "${app}" -- timeout "${timeout}" bash 2>"${_stderr_tmp}"
     local _rc=$?
     if [ "${_rc}" -eq 0 ]; then
       rm -f "${_stderr_tmp}"
