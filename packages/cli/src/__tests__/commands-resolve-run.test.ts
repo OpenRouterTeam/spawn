@@ -312,17 +312,7 @@ describe("cmdRun - display name resolution", () => {
   // ── validateImplementation: > 3 clouds available suggestion ─────────
 
   describe("validateImplementation - many clouds suggestion", () => {
-    it("should show 'see all N options' when > 3 clouds available and combination missing", async () => {
-      await setManifestAndScript(manyCloudManifest);
-
-      // claude has 5 implemented clouds; request a cloud that doesn't exist
-      // Actually we need a cloud that exists but where the combination is "missing"
-      // In manyCloudManifest, codex is only on sprite; hetzner/codex is missing
-      // But codex only has 1 implemented cloud so it won't trigger "> 3"
-      // claude has 5 clouds, but all are implemented so it won't trigger
-      // Let's use the manifest differently: request a non-implemented combo
-      // We need an agent with > 3 implemented clouds but where a specific cloud is missing
-
+    it("should show 'see all N options' and at most 3 example commands when > 3 clouds available", async () => {
       // Create a manifest where claude has 4 implemented clouds but digitalocean is missing
       const partialManifest = {
         ...manyCloudManifest,
@@ -342,32 +332,11 @@ describe("cmdRun - display name resolution", () => {
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should show the "see all N options" message since claude has 4 implemented clouds
       expect(infoCalls.some((msg: string) => msg.includes("4") && msg.includes("cloud"))).toBe(true);
-      // Should also suggest up to 3 example commands
-      const exampleCmds = infoCalls.filter((msg: string) => msg.includes("spawn claude"));
-      expect(exampleCmds.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("should show at most 3 example commands when many clouds available", async () => {
-      const partialManifest = {
-        ...manyCloudManifest,
-        matrix: {
-          ...manyCloudManifest.matrix,
-          "digitalocean/claude": "missing",
-        },
-      };
-      await setManifestAndScript(partialManifest);
-
-      try {
-        await cmdRun("claude", "digitalocean");
-      } catch {
-        // Expected
-      }
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
-      // Count example spawn commands (not the "see all" hint)
+      // Should suggest up to 3 example commands
       const exampleCmds = infoCalls.filter(
         (msg: string) => msg.includes("spawn claude") && !msg.includes("see all") && !msg.includes("to see"),
       );
+      expect(exampleCmds.length).toBeGreaterThanOrEqual(1);
       expect(exampleCmds.length).toBeLessThanOrEqual(3);
     });
 
@@ -391,7 +360,7 @@ describe("cmdRun - display name resolution", () => {
   // ── validateImplementation: no implemented clouds ──────────────────
 
   describe("validateImplementation - no implemented clouds", () => {
-    it("should show 'no implemented cloud providers' for agent with zero clouds", async () => {
+    it("should show 'no implemented cloud providers' and suggest 'spawn matrix'", async () => {
       await setManifestAndScript(noCloudManifest);
 
       try {
@@ -402,18 +371,6 @@ describe("cmdRun - display name resolution", () => {
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
-    });
-
-    it("should suggest 'spawn matrix' when no clouds available", async () => {
-      await setManifestAndScript(noCloudManifest);
-
-      try {
-        await cmdRun("codex", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
   });

@@ -152,46 +152,26 @@ describe("Display Name Suggestions in Validation Errors", () => {
   // ── validateEntity (agent): display name suggestion path ────────────
 
   describe("validateEntity (agent) - display name suggestion", () => {
-    it("should suggest key via display name when key-based suggestion fails", async () => {
-      // "codex" is far from keys ["cc", "ap", "oi"] (all distance > 3)
-      // But "Codex Pro" display name is close to "codex" via findClosestMatch
-      // on display names: findClosestMatch("codex", ["Claude Code", "Codex Pro", "GPTMe"])
-      // "codex" vs "Codex Pro" -> lowercase: "codex" vs "codex pro" -> distance 4 (too far)
-      // Let's use a closer typo: "codex-pro" would match "ap" display name "Codex Pro"
-      // Actually, findClosestMatch is case-insensitive and max distance 3.
-      // So we need a name within distance 3 of a display name.
-      // "codex-pr" is 6 chars, "Codex Pro" is 9 chars. Distance too high.
-      // Let's try: user types "claude-cod" (10 chars), display name "Claude Code" (11 chars) -> distance 2.
-      // But validateIdentifier rejects hyphens... wait no, hyphens are valid in identifiers.
+    it("should suggest key via display name and show Unknown agent error", async () => {
       // User types "claude-code" -> key check fails (no key "claude-code"),
-      // findClosestMatch("claude-code", ["cc", "ap", "oi"]) -> all distance > 3 -> null.
-      // findClosestMatch("claude-code", ["Claude Code", "Codex Pro", "GPTMe"]):
-      //   "claude-code" vs "claude code" -> distance 1 (hyphen vs space)
-      //   That's within threshold 3 -> returns "Claude Code"
+      // findClosestMatch on display names: "claude-code" vs "claude code" -> distance 1 -> match!
       // Then it looks up the key for "Claude Code" -> "cc"
-      // This tests the nameSuggestion branch!
       await expect(cmdRun("claude-code", "sp")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should suggest "cc" (the key for "Claude Code") with the display name
       expect(infoCalls.some((msg: string) => msg.includes("cc") && msg.includes("Claude Code"))).toBe(true);
+
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
+      expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
     it("should suggest key via display name for close display name typo", async () => {
-      // "gptme-x" (7 chars) vs display name "GPTMe" (5 chars) -> distance 2 (close enough)
-      // Let's try "codex-pro" -> display "Codex Pro":
-      //   "codex-pro" vs "codex pro" -> distance 1 -> match!
+      // "codex-pro" vs display "Codex Pro": "codex-pro" vs "codex pro" -> distance 1 -> match!
       await expect(cmdRun("codex-pro", "sp")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("ap") && msg.includes("Codex Pro"))).toBe(true);
-    });
-
-    it("should show 'Unknown agent' error even with display name suggestion", async () => {
-      await expect(cmdRun("claude-code", "sp")).rejects.toThrow("process.exit");
-
-      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
     it("should not show display name suggestion when both key and name fail", async () => {
@@ -223,7 +203,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
   // ── validateEntity (cloud): display name suggestion path ────────────
 
   describe("validateEntity (cloud) - display name suggestion", () => {
-    it("should suggest key via display name when key-based suggestion fails", async () => {
+    it("should suggest key via display name and show Unknown cloud error", async () => {
       // "hetzner-cloud" -> display name "Hetzner Cloud":
       //   "hetzner-cloud" vs "hetzner cloud" -> distance 1 -> match!
       // But key "hz" is far (distance > 3) from "hetzner-cloud"
@@ -231,6 +211,9 @@ describe("Display Name Suggestions in Validation Errors", () => {
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("hz") && msg.includes("Hetzner Cloud"))).toBe(true);
+
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
+      expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
     });
 
     it("should suggest key via display name for digitalocean typo", async () => {
@@ -241,13 +224,6 @@ describe("Display Name Suggestions in Validation Errors", () => {
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("dc") && msg.includes("DigitalOcean"))).toBe(true);
-    });
-
-    it("should show 'Unknown cloud' error even with display name suggestion", async () => {
-      await expect(cmdRun("cc", "hetzner-cloud")).rejects.toThrow("process.exit");
-
-      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
     });
 
     it("should not show display name suggestion when both key and name fail", async () => {

@@ -114,32 +114,23 @@ describe("Commands Error Paths", () => {
   // ── cmdRun: unknown agent/cloud ───────────────────────────────────────
 
   describe("cmdRun - unknown agent or cloud", () => {
-    it("should exit with error for unknown agent", async () => {
+    it("should exit with error and suggest spawn agents for unknown agent", async () => {
       await expect(cmdRun("nonexistent", "sprite")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      // Should show "Unknown agent" error via @clack/prompts log.error
       const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
-    });
-
-    it("should suggest spawn agents command for unknown agent", async () => {
-      await expect(cmdRun("nonexistent", "sprite")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn agents"))).toBe(true);
     });
 
-    it("should exit with error for unknown cloud", async () => {
+    it("should exit with error and suggest spawn clouds for unknown cloud", async () => {
       await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
       const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
-    });
-
-    it("should suggest spawn clouds command for unknown cloud", async () => {
-      await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
@@ -149,25 +140,14 @@ describe("Commands Error Paths", () => {
   // ── cmdRun: unimplemented combination ─────────────────────────────────
 
   describe("cmdRun - unimplemented combination", () => {
-    it("should exit with error for unimplemented agent/cloud combination", async () => {
-      // hetzner/codex is "missing" in mock manifest
+    it("should exit with error and suggest available clouds for unimplemented combo", async () => {
+      // hetzner/codex is "missing" in mock manifest, but sprite/codex is "implemented"
       await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should suggest available clouds when combination is not implemented", async () => {
-      // hetzner/codex is "missing", but sprite/codex is "implemented"
-      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should suggest sprite as an alternative
       expect(infoCalls.some((msg: string) => msg.includes("spawn codex sprite"))).toBe(true);
-    });
-
-    it("should show how many clouds are available", async () => {
-      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // codex has 1 implemented cloud (sprite)
       expect(infoCalls.some((msg: string) => msg.includes("1 cloud"))).toBe(true);
     });
