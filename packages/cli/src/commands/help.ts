@@ -26,6 +26,10 @@ function getHelpUsageSection(): string {
   spawn delete                       Delete a previously spawned server (aliases: rm, destroy, kill)
   spawn delete -a <agent>            Filter servers by agent
   spawn delete -c <cloud>            Filter servers by cloud
+  spawn status                       Show live state of cloud servers (aliases: ps)
+  spawn status -a <agent>            Filter status by agent (or --agent)
+  spawn status -c <cloud>            Filter status by cloud (or --cloud)
+  spawn status --prune               Remove gone servers from history
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
