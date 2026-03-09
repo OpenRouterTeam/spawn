@@ -5,6 +5,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { getHistoryPath } from "../history.js";
 import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
+import { wrapWithTmux } from "../shared/orchestrate.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { getErrorMessage } from "./shared.js";
@@ -161,9 +162,10 @@ export async function cmdEnterAgent(
     );
   }
 
-  // Standard SSH connection with agent launch
+  // Standard SSH connection with agent launch (wrapped in tmux for session persistence)
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
-  const escapedRemoteCmd = remoteCmd.replace(/'/g, "'\\''");
+  const tmuxCmd = wrapWithTmux(remoteCmd);
+  const escapedTmuxCmd = tmuxCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   return runInteractiveCommand(
     "ssh",
@@ -172,9 +174,9 @@ export async function cmdEnterAgent(
       ...keyOpts,
       `${connection.user}@${connection.ip}`,
       "--",
-      `bash -lc '${escapedRemoteCmd}'`,
+      `bash -lc '${escapedTmuxCmd}'`,
     ],
     `Failed to enter ${agentName}`,
-    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${escapedRemoteCmd}'`,
+    `ssh -t ${connection.user}@${connection.ip}`,
   );
 }

@@ -28,29 +28,23 @@ export interface CloudOrchestrator {
 }
 
 /**
- * Wrap a launch command in a restart loop for cloud VMs.
- * Restarts the agent on non-zero exit (crash, SIGTERM, OOM) up to MAX_RESTARTS times.
- * Clean exits (exit code 0) break out of the loop immediately.
+ * Wrap a launch command in a tmux session for cloud VMs.
+ * - First connect: creates tmux session "spawn", runs the agent inside it
+ * - Reconnect: attaches to existing session (picks up where user left off)
+ * - Ctrl+C exits the agent → user lands at a shell prompt inside tmux
+ * - SSH disconnect → tmux session persists, `spawn last` reattaches
  * Skipped for local execution where the user controls the process directly.
  */
-function wrapWithRestartLoop(cmd: string): string {
-  // Shell restart loop — bash 3.x compatible (no ((var++)), no set -u)
+export function wrapWithTmux(cmd: string): string {
+  const escaped = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`");
   return [
-    "_spawn_restarts=0",
-    "_spawn_max=10",
-    'while [ "$_spawn_restarts" -lt "$_spawn_max" ]; do',
-    `  ${cmd}`,
-    "  _spawn_exit=$?",
-    '  if [ "$_spawn_exit" -eq 0 ]; then break; fi',
-    "  _spawn_restarts=$((_spawn_restarts + 1))",
-    '  printf "\\n[spawn] Agent exited with code %d. Restarting in 5s (%d/%d)...\\n" "$_spawn_exit" "$_spawn_restarts" "$_spawn_max" >&2',
-    "  sleep 5",
-    "done",
-    'if [ "$_spawn_restarts" -ge "$_spawn_max" ]; then',
-    '  printf "\\n[spawn] Agent crashed %d times. Giving up.\\n" "$_spawn_max" >&2',
-    "fi",
-    'exit "${_spawn_exit:-0}"',
-  ].join("\n");
+    "tmux attach-session -t spawn 2>/dev/null",
+    "|| {",
+    "tmux new-session -s spawn -d &&",
+    `tmux send-keys -t spawn "${escaped}" Enter &&`,
+    "tmux attach-session -t spawn;",
+    "}",
+  ].join(" ");
 }
 
 /** Options for runOrchestration (used in tests to inject mock dependencies). */
@@ -147,7 +141,8 @@ export async function runOrchestration(
           cloud.runner.runServer(
             `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
               `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
-              `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+              `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc; ` +
+              "command -v tmux >/dev/null 2>&1 || { sudo apt-get install -y -qq tmux 2>/dev/null || apt-get install -y -qq tmux 2>/dev/null; }",
           ),
         ),
       2,
@@ -194,8 +189,8 @@ export async function runOrchestration(
   const launchCmd = agent.launchCmd();
   cloud.saveLaunchCmd(launchCmd, spawnId);
 
-  // Wrap in restart loop for cloud VMs — not for local execution
-  const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
+  // Wrap in tmux for cloud VMs — Ctrl+C lands at shell, SSH reconnect reattaches
+  const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithTmux(launchCmd);
   const exitCode = await cloud.interactiveSession(sessionCmd);
   process.exit(exitCode);
 }

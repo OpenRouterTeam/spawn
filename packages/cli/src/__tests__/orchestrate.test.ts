@@ -384,9 +384,9 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
-  // ── Restart loop wrapping (non-local cloud) ─────────────────────────
+  // ── tmux session wrapping (non-local cloud) ────────────────────────
 
-  it("wraps launch command in restart loop for non-local clouds", async () => {
+  it("wraps launch command in tmux session for non-local clouds", async () => {
     let capturedCmd = "";
     const cloud = createMockCloud({
       cloudName: "hetzner",
@@ -401,10 +401,9 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(capturedCmd).toContain("_spawn_restarts=0");
-    expect(capturedCmd).toContain("_spawn_max=10");
+    expect(capturedCmd).toContain("tmux attach-session -t spawn");
+    expect(capturedCmd).toContain("tmux new-session -s spawn -d");
     expect(capturedCmd).toContain("my-agent --run");
-    expect(capturedCmd).toContain("Restarting in 5s");
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
@@ -425,14 +424,14 @@ describe("runOrchestration", () => {
     await runOrchestrationSafe(cloud, agent, "testagent");
 
     expect(capturedCmd).toBe("my-agent --run");
-    expect(capturedCmd).not.toContain("_spawn_restarts");
+    expect(capturedCmd).not.toContain("tmux");
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
 
   // ── saveLaunchCmd ───────────────────────────────────────────────────
 
-  it("saves the raw launch command (not the restart-wrapped one)", async () => {
+  it("saves the raw launch command (not the tmux-wrapped one)", async () => {
     const saveLaunchCmd = mock(() => {});
     const cloud = createMockCloud({
       cloudName: "hetzner",

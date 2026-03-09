@@ -68,6 +68,15 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "-t",
 ];
 
+/**
+ * SSH tunnel options for agents that need port forwarding (e.g. OpenClaw gateway dashboard on :18789).
+ * These are appended to SSH_INTERACTIVE_OPTS only for agents that explicitly require them.
+ */
+export const SSH_TUNNEL_OPTS: string[] = [
+  "-L",
+  "18789:localhost:18789",
+];
+
 // ─── Interactive Spawn ───────────────────────────────────────────────────────
 
 /**
