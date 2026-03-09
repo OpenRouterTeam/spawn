@@ -586,9 +586,12 @@ async function dispatchStatusCommand(filteredArgs: string[]): Promise<void> {
   const args = filteredArgs.slice(1);
   const prune = args.includes("--prune");
   const json = args.includes("--json");
+  const { agentFilter, cloudFilter } = parseListFilters(args);
   await cmdStatus({
     prune,
     json,
+    agentFilter,
+    cloudFilter,
   });
 }
 

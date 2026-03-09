@@ -247,8 +247,10 @@ function renderStatusJson(results: ServerStatusResult[]): void {
 
 // ── Main command ─────────────────────────────────────────────────────────────
 
-export async function cmdStatus(opts: { prune?: boolean; json?: boolean } = {}): Promise<void> {
-  const records = filterHistory();
+export async function cmdStatus(
+  opts: { prune?: boolean; json?: boolean; agentFilter?: string; cloudFilter?: string } = {},
+): Promise<void> {
+  const records = filterHistory(opts.agentFilter, opts.cloudFilter);
 
   const candidates = records.filter(
     (r) => r.connection && !r.connection.deleted && r.connection.cloud && r.connection.cloud !== "local",
