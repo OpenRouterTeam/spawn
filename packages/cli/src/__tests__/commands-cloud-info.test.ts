@@ -196,16 +196,12 @@ describe("cmdCloudInfo", () => {
   // ── Error paths: unknown cloud ────────────────────────────────────
 
   describe("unknown cloud", () => {
-    it("should exit with error for unknown cloud", async () => {
+    it("should exit with error and suggest spawn clouds for unknown cloud", async () => {
       await expect(cmdCloudInfo("nonexistent")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
       const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
-    });
-
-    it("should suggest spawn clouds command", async () => {
-      await expect(cmdCloudInfo("nonexistent")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
