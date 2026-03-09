@@ -120,6 +120,7 @@ type WriteFn = (s: string) => void;
 
 interface KeyLoopCallbacks<T> {
   fallback: () => T;
+  cancel: () => T;
   init: (w: WriteFn, cols: number) => void;
   handleKey: (
     key: string,
@@ -223,6 +224,7 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
   // ── key loop ────────────────────────────────────────────────────────────
   const buf = Buffer.alloc(8);
   let finalResult: T | undefined;
+  let cancelled = false;
 
   try {
     while (true) {
@@ -238,8 +240,9 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
 
       const key = buf.slice(0, n).toString("binary");
 
-      // Ctrl-C / Escape — universal cancel
+      // Ctrl-C / Escape — explicit user cancel (not a TTY failure)
       if (key === "\x03" || key === "\x1b") {
+        cancelled = true;
         break;
       }
 
@@ -253,7 +256,10 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
     restore();
   }
 
-  return finalResult !== undefined ? finalResult : callbacks.fallback();
+  if (finalResult !== undefined) {
+    return finalResult;
+  }
+  return cancelled ? callbacks.cancel() : callbacks.fallback();
 }
 
 // ── TTY picker ────────────────────────────────────────────────────────────────
@@ -316,6 +322,7 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
 
   return withTTYKeyLoop<PickResult>({
     fallback,
+    cancel: () => cancel,
 
     init(w, cols) {
       maxW = cols - 1;
