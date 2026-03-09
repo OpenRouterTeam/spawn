@@ -205,6 +205,15 @@ build_and_install() {
         exit 1
     fi
 
+    if [ -n "${SPAWN_INSTALL_DIR:-}" ]; then
+        case "${SPAWN_INSTALL_DIR}" in
+            /*) ;;  # absolute path OK
+            *) log_error "SPAWN_INSTALL_DIR must be an absolute path"; exit 1 ;;
+        esac
+        case "${SPAWN_INSTALL_DIR}" in
+            *..*) log_error "SPAWN_INSTALL_DIR must not contain .. path components"; exit 1 ;;
+        esac
+    fi
     INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
     mkdir -p "${INSTALL_DIR}"
     cp "${tmpdir}/cli.js" "${INSTALL_DIR}/spawn"
