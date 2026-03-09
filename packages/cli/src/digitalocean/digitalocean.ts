@@ -1,9 +1,9 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
+import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { saveVmConnection } from "../history.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { OAUTH_CSS } from "../shared/oauth";
@@ -830,7 +830,7 @@ export async function createServer(
   dropletSize?: string,
   region?: string,
   snapshotId?: string,
-): Promise<void> {
+): Promise<VMConnection> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-2gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
 
@@ -887,17 +887,13 @@ export async function createServer(
           _state.dropletId = String(retryData.droplet.id);
           logInfo(`Droplet created: ID=${_state.dropletId}`);
           await waitForDropletActive(_state.dropletId);
-          saveVmConnection(
-            _state.serverIp,
-            "root",
-            _state.dropletId,
-            name,
-            "digitalocean",
-            undefined,
-            undefined,
-            process.env.SPAWN_ID || undefined,
-          );
-          return;
+          return {
+            ip: _state.serverIp,
+            user: "root",
+            server_id: _state.dropletId,
+            server_name: name,
+            cloud: "digitalocean",
+          };
         }
         const retryErr = String(retryData?.message || "Unknown error");
         logError(`Retry failed: ${retryErr}`);
@@ -917,16 +913,13 @@ export async function createServer(
   // Wait for droplet to become active and get IP
   await waitForDropletActive(_state.dropletId);
 
-  saveVmConnection(
-    _state.serverIp,
-    "root",
-    _state.dropletId,
-    name,
-    "digitalocean",
-    undefined,
-    undefined,
-    process.env.SPAWN_ID || undefined,
-  );
+  return {
+    ip: _state.serverIp,
+    user: "root",
+    server_id: _state.dropletId,
+    server_name: name,
+    cloud: "digitalocean",
+  };
 }
 
 async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promise<void> {

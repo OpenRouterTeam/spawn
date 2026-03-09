@@ -4,11 +4,10 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
-import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
-import { interactiveSession, runLocal, saveLocalConnection, uploadFile } from "./local";
+import { interactiveSession, runLocal, uploadFile } from "./local";
 
 async function main() {
   const agentName = process.argv[2];
@@ -27,12 +26,14 @@ async function main() {
       runServer: runLocal,
       uploadFile: async (l: string, r: string) => uploadFile(l, r),
     },
-    async authenticate() {
-      saveLocalConnection();
-    },
+    async authenticate() {},
     async promptSize() {},
-    async createServer(_name: string, spawnId?: string) {
-      process.env.SPAWN_ID = spawnId || "";
+    async createServer(_name: string) {
+      return {
+        ip: "localhost",
+        user: process.env.USER || "local",
+        cloud: "local",
+      };
     },
     async getServerName() {
       const result = Bun.spawnSync(
@@ -51,7 +52,6 @@ async function main() {
     },
     async waitForReady() {},
     interactiveSession,
-    saveLaunchCmd: (cmd: string, sid?: string) => saveLaunchCmd(cmd, sid),
   };
 
   await runOrchestration(cloud, agent, agentName);

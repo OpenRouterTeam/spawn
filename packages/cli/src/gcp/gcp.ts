@@ -1,11 +1,11 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
+import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { saveVmConnection } from "../history.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import {
@@ -720,7 +720,7 @@ export async function createInstance(
   zone: string,
   machineType: string,
   tier?: CloudInitTier,
-): Promise<void> {
+): Promise<VMConnection> {
   const username = resolveUsername();
   const pubKeys = await ensureSshKey();
   // Build ssh-keys metadata: one "user:key" entry per line
@@ -842,20 +842,16 @@ export async function createInstance(
 
   logInfo(`Instance created: IP=${_state.serverIp}`);
 
-  // Save connection info with zone/project for later deletion
-  saveVmConnection(
-    _state.serverIp,
-    username,
-    "",
-    name,
-    "gcp",
-    undefined,
-    {
+  return {
+    ip: _state.serverIp,
+    user: username,
+    server_name: name,
+    cloud: "gcp",
+    metadata: {
       zone,
       project: _state.project,
     },
-    process.env.SPAWN_ID || undefined,
-  );
+  };
 }
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
