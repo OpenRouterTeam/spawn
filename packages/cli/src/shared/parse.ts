@@ -17,6 +17,11 @@ export function parseJsonWith<T extends v.BaseSchema<unknown, unknown, v.BaseIss
   }
 }
 
+/** Schema for responses containing a `version` field (npm registry, GitHub releases). */
+export const PkgVersionSchema = v.object({
+  version: v.string(),
+});
+
 /**
  * Parse a JSON string and return it as a Record<string, unknown> or null.
  * Rejects non-object results (arrays, primitives).

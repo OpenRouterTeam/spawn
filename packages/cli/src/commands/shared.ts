@@ -4,10 +4,10 @@ import type { Manifest } from "../manifest.js";
 import * as fs from "node:fs";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import * as v from "valibot";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
+import { PkgVersionSchema } from "../shared/parse.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
 import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
@@ -17,9 +17,7 @@ export const VERSION = pkg.version;
 export const FETCH_TIMEOUT = 10_000; // 10 seconds
 export const NAME_COLUMN_WIDTH = 18;
 
-export const PkgVersionSchema = v.object({
-  version: v.string(),
-});
+export { PkgVersionSchema };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
