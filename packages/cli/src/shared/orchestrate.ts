@@ -4,14 +4,17 @@
 import type { VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup";
 import type { AgentConfig } from "./agents";
+import type { SshTunnelHandle } from "./ssh";
 
 import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
+import { startSshTunnel } from "./ssh";
+import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
-import { logDebug, logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
+import { logDebug, logInfo, logStep, logWarn, openBrowser, prepareStdinForHandoff, withRetry } from "./ui";
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -26,6 +29,11 @@ export interface CloudOrchestrator {
   getServerName(): Promise<string>;
   waitForReady(): Promise<void>;
   interactiveSession(cmd: string): Promise<number>;
+  /** Return SSH connection info for tunnel support. Omit for non-SSH clouds. */
+  getConnectionInfo?(): {
+    host: string;
+    user: string;
+  };
 }
 
 /**
@@ -179,7 +187,41 @@ export async function runOrchestration(
     await agent.preLaunch();
   }
 
-  // 11b. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
+  // 11b. SSH tunnel for web dashboard
+  let tunnelHandle: SshTunnelHandle | undefined;
+  if (agent.tunnel) {
+    if (cloud.getConnectionInfo) {
+      // SSH-based cloud: tunnel the remote port to localhost
+      try {
+        const conn = cloud.getConnectionInfo();
+        const keys = await ensureSshKeys();
+        tunnelHandle = await startSshTunnel({
+          host: conn.host,
+          user: conn.user,
+          remotePort: agent.tunnel.remotePort,
+          sshKeyOpts: getSshKeyOpts(keys),
+        });
+        if (agent.tunnel.browserUrl) {
+          const url = agent.tunnel.browserUrl(tunnelHandle.localPort);
+          if (url) {
+            openBrowser(url);
+          }
+        }
+      } catch {
+        logWarn("Web dashboard tunnel failed — use the TUI instead");
+      }
+    } else if (cloud.cloudName === "local") {
+      // Local: no tunnel needed, open browser directly
+      if (agent.tunnel.browserUrl) {
+        const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
+        if (url) {
+          openBrowser(url);
+        }
+      }
+    }
+  }
+
+  // 11c. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
   if (agent.preLaunchMsg) {
     process.stderr.write("\n");
     logInfo(`Tip: ${agent.preLaunchMsg}`);
@@ -202,5 +244,9 @@ export async function runOrchestration(
   // Wrap in restart loop for cloud VMs — not for local execution
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
   const exitCode = await cloud.interactiveSession(sessionCmd);
+
+  if (tunnelHandle) {
+    tunnelHandle.stop();
+  }
   process.exit(exitCode);
 }

@@ -155,6 +155,17 @@ const _state: GcpState = {
   username: "",
 };
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: _state.serverIp,
+    user: resolveUsername(),
+  };
+}
+
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
 
 function getGcloudCmd(): string | null {
