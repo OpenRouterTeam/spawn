@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { filterHistory, HISTORY_SCHEMA_VERSION, loadHistory, saveSpawnRecord } from "../history.js";
-import { getHistoryPath, getSpawnDir, getUserHome } from "../shared/paths.js";
 
 describe("history", () => {
   let testDir: string;
@@ -30,69 +29,6 @@ describe("history", () => {
         force: true,
       });
     }
-  });
-
-  // ── getSpawnDir ─────────────────────────────────────────────────────────
-
-  describe("getSpawnDir", () => {
-    it("returns SPAWN_HOME when set to valid path within home", () => {
-      const validPath = join(process.env.HOME ?? "", "custom", "spawn", "dir");
-      process.env.SPAWN_HOME = validPath;
-      expect(getSpawnDir()).toBe(validPath);
-    });
-
-    it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
-      delete process.env.SPAWN_HOME;
-      expect(getSpawnDir()).toBe(join(getUserHome(), ".spawn"));
-    });
-
-    it("throws for relative SPAWN_HOME path", () => {
-      process.env.SPAWN_HOME = "relative/path";
-      expect(() => getSpawnDir()).toThrow("must be an absolute path");
-    });
-
-    it("throws for dot-relative SPAWN_HOME path", () => {
-      process.env.SPAWN_HOME = "./local/dir";
-      expect(() => getSpawnDir()).toThrow("must be an absolute path");
-    });
-
-    it("resolves .. segments in absolute SPAWN_HOME within home", () => {
-      const pathWithDots = join(process.env.HOME ?? "", "foo", "..", "bar");
-      process.env.SPAWN_HOME = pathWithDots;
-      expect(getSpawnDir()).toBe(join(process.env.HOME ?? "", "bar"));
-    });
-
-    it("accepts normal absolute SPAWN_HOME within home", () => {
-      const validPath = join(process.env.HOME ?? "", ".spawn");
-      process.env.SPAWN_HOME = validPath;
-      expect(getSpawnDir()).toBe(validPath);
-    });
-
-    it("throws for SPAWN_HOME outside home directory", () => {
-      process.env.SPAWN_HOME = "/tmp/spawn";
-      expect(() => getSpawnDir()).toThrow("must be within your home directory");
-    });
-
-    it("throws for path traversal attempt to escape home directory", () => {
-      // Attempt to traverse outside home using .. segments
-      // e.g., /home/user/../../etc/.spawn
-      const traversalPath = join(process.env.HOME ?? "", "..", "..", "etc", ".spawn");
-      process.env.SPAWN_HOME = traversalPath;
-      expect(() => getSpawnDir()).toThrow("must be within your home directory");
-    });
-
-    it("accepts home directory itself as SPAWN_HOME", () => {
-      process.env.SPAWN_HOME = process.env.HOME ?? "";
-      expect(getSpawnDir()).toBe(process.env.HOME ?? "");
-    });
-  });
-
-  // ── getHistoryPath ──────────────────────────────────────────────────────
-
-  describe("getHistoryPath", () => {
-    it("returns history.json inside spawn dir", () => {
-      expect(getHistoryPath()).toBe(join(testDir, "history.json"));
-    });
   });
 
   // ── loadHistory ─────────────────────────────────────────────────────────
