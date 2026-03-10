@@ -616,7 +616,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "OpenClaw",
       cloudInitTier: "full",
       preProvision: detectGithubAuth,
-      modelDefault: "openrouter/auto",
+      modelDefault: "moonshotai/kimi-k2.5",
       install: async () => {
         await installAgent(
           runner,
@@ -629,7 +629,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `ANTHROPIC_API_KEY=${apiKey}`,
         "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
       ],
-      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto"),
+      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5"),
       preLaunch: () => startGateway(runner),
       preLaunchMsg:
         "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
