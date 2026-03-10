@@ -66,9 +66,11 @@ if (file.endsWith(".sh")) {
     fail(`echo -e detected in ${file} — use printf instead (macOS bash 3.x compat)`);
   }
 
-  // Check for set -u without set -eo pipefail
-  if (/set\s+-.*u/.test(content) && !/set\s+-eo\s+pipefail/.test(content)) {
-    fail(`set -u (nounset) detected in ${file} — use set -eo pipefail instead`);
+  // Check for set -u (nounset) — always banned, even alongside set -eo pipefail.
+  // Only match lines that actually invoke set (not comments or string literals).
+  const setUPattern = /^\s*set\s+-[a-z]*u/m;
+  if (setUPattern.test(content)) {
+    fail(`set -u (nounset) detected in ${file} — use \${VAR:-} for optional vars instead`);
   }
 }
 
