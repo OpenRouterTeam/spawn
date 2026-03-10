@@ -24,10 +24,10 @@ NC='\033[0m'
 
 CYAN='\033[0;36m'
 
-log_info()  { printf "${GREEN}[spawn]${NC} %s\n" "$1"; }
-log_step()  { printf "${CYAN}[spawn]${NC} %s\n" "$1"; }
-log_warn()  { printf "${YELLOW}[spawn]${NC} %s\n" "$1"; }
-log_error() { printf "${RED}[spawn]${NC} %s\n" "$1"; }
+log_info()  { printf '%b[spawn]%b %s\n' "$GREEN" "$NC" "$1"; }
+log_step()  { printf '%b[spawn]%b %s\n' "$CYAN" "$NC" "$1"; }
+log_warn()  { printf '%b[spawn]%b %s\n' "$YELLOW" "$NC" "$1"; }
+log_error() { printf '%b[spawn]%b %s\n' "$RED" "$NC" "$1"; }
 
 # --- Helper: compare semver strings ---
 # Returns 0 (true) if $1 >= $2
@@ -239,9 +239,9 @@ ensure_in_path() {
         all_ready=false
     fi
     if [ "$all_ready" = true ]; then
-        printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
+        printf '%b[spawn]%b Run %bspawn%b to get started\n' "$GREEN" "$NC" "$BOLD" "$NC"
     else
-        printf "${GREEN}[spawn]${NC} To start using spawn, run:\n"
+        printf '%b[spawn]%b To start using spawn, run:\n' "$GREEN" "$NC"
         echo ""
         echo "    exec \$SHELL"
         echo ""
