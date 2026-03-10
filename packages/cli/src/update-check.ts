@@ -3,14 +3,13 @@ import type { ExecFileSyncOptions } from "node:child_process";
 
 import { execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { getErrorMessage, hasStatus } from "./shared/type-guards";
-import { logDebug, logWarn } from "./shared/ui";
+import { getUserHome, logDebug, logWarn } from "./shared/ui";
 
 const VERSION = pkg.version;
 
@@ -84,7 +83,7 @@ function compareVersions(current: string, latest: string): boolean {
 // ── Failure Backoff ──────────────────────────────────────────────────────────
 
 function getUpdateFailedPath(): string {
-  return path.join(process.env.HOME || homedir(), ".config", "spawn", ".update-failed");
+  return path.join(getUserHome(), ".config", "spawn", ".update-failed");
 }
 
 function isUpdateBackedOff(): boolean {

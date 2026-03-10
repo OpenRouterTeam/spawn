@@ -12,7 +12,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { isNumber } from "../shared/type-guards.js";
 
@@ -110,7 +109,7 @@ describe("runOrchestration", () => {
   beforeEach(() => {
     capturedExitCode = undefined;
     // Isolate history writes to a temp directory so tests never pollute ~/.spawn
-    testDir = join(homedir(), `.spawn-test-orch-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-orch-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });

@@ -2,7 +2,6 @@ import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadHistory, saveSpawnRecord } from "../history.js";
 
@@ -12,7 +11,7 @@ describe("history corruption recovery", () => {
   let consoleErrorSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    testDir = join(homedir(), `.spawn-test-corrupt-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-corrupt-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });

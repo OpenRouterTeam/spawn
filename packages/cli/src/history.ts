@@ -9,12 +9,11 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import * as v from "valibot";
 import { tryCatch } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
-import { logDebug, logWarn } from "./shared/ui.js";
+import { getUserHome, logDebug, logWarn } from "./shared/ui.js";
 
 export interface VMConnection {
   ip: string;
@@ -87,7 +86,7 @@ export function generateSpawnId(): string {
 export function getSpawnDir(): string {
   const spawnHome = process.env.SPAWN_HOME;
   if (!spawnHome) {
-    return join(homedir(), ".spawn");
+    return join(getUserHome(), ".spawn");
   }
   // Require absolute path to prevent path traversal via relative paths
   if (!isAbsolute(spawnHome)) {
@@ -102,7 +101,7 @@ export function getSpawnDir(): string {
   // Even though the path is absolute, resolve() can normalize paths like
   // /tmp/../../root/.spawn to /root/.spawn, potentially allowing unauthorized
   // file writes to sensitive directories.
-  const userHome = homedir();
+  const userHome = getUserHome();
   if (!resolved.startsWith(userHome + "/") && resolved !== userHome) {
     throw new Error("SPAWN_HOME must be within your home directory.\n" + `Got: ${resolved}\n` + `Home: ${userHome}`);
   }

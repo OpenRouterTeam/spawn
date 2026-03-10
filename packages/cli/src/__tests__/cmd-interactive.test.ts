@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { homedir } from "node:os";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -65,7 +64,7 @@ describe("cmdInteractive", () => {
 
     // Isolate from host history so getActiveServers() returns []
     originalSpawnHome = process.env.SPAWN_HOME;
-    process.env.SPAWN_HOME = `${homedir()}/.spawn-test-${Date.now()}`;
+    process.env.SPAWN_HOME = `${process.env.HOME ?? ""}/.spawn-test-${Date.now()}`;
     mockLogError.mockClear();
     mockLogInfo.mockClear();
     mockLogStep.mockClear();

@@ -1,9 +1,9 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
 import { copyFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { spawnInteractive } from "../shared/ssh";
+import { getUserHome } from "../shared/ui";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export async function runLocal(cmd: string): Promise<void> {
 
 /** Copy a file locally, expanding ~ in the destination path. */
 export function uploadFile(localPath: string, remotePath: string): void {
-  const expanded = remotePath.replace(/^~/, process.env.HOME || homedir());
+  const expanded = remotePath.replace(/^~/, getUserHome());
   mkdirSync(dirname(expanded), {
     recursive: true,
   });
