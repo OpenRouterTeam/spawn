@@ -120,7 +120,11 @@ CLOUD_ENV
     # Validate app_name is non-empty and contains only safe characters to
     # prevent overly broad pkill -f patterns from killing unrelated processes.
     if [ -n "${app_name}" ] && printf '%s' "${app_name}" | grep -qE '^[A-Za-z0-9._-]+$'; then
-      pkill -f "sprite exec.*${app_name}" 2>/dev/null || true
+      # Escape regex metacharacters in app_name before using in pkill -f
+      # pattern to prevent unintended process termination (#2409)
+      local escaped_name
+      escaped_name=$(printf '%s' "${app_name}" | sed 's/[.[\*^$]/\\&/g')
+      pkill -f "sprite exec.*${escaped_name}" 2>/dev/null || true
     fi
     sleep 1
   fi
