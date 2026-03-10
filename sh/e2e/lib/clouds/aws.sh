@@ -144,45 +144,6 @@ _aws_exec() {
 }
 
 # ---------------------------------------------------------------------------
-# _aws_exec_long APP CMD TIMEOUT
-#
-# Same as _aws_exec but with ServerAliveInterval keep-alives and the remote
-# command wrapped in `timeout` for long-running operations.
-# ---------------------------------------------------------------------------
-_aws_exec_long() {
-  local app="$1"
-  local cmd="$2"
-  local timeout="${3:-120}"
-
-  # Resolve instance IP (cached per app)
-  if [ "${_AWS_INSTANCE_APP}" != "${app}" ] || [ -z "${_AWS_INSTANCE_IP}" ]; then
-    if [ -n "${LOG_DIR:-}" ] && [ -f "${LOG_DIR}/${app}.ip" ]; then
-      _AWS_INSTANCE_IP=$(cat "${LOG_DIR}/${app}.ip")
-    else
-      _AWS_INSTANCE_IP=$(aws lightsail get-instance \
-        --instance-name "${app}" \
-        --region "${AWS_REGION:-us-east-1}" \
-        --query 'instance.publicIpAddress' \
-        --output text 2>/dev/null || true)
-    fi
-    _AWS_INSTANCE_APP="${app}"
-    if [ -z "${_AWS_INSTANCE_IP}" ] || [ "${_AWS_INSTANCE_IP}" = "None" ]; then
-      log_err "Could not resolve IP for instance ${app}"
-      return 1
-    fi
-  fi
-
-  local alive_count=$((timeout / 15 + 1))
-
-  # Pipe the command via stdin to avoid interpolating it into the remote
-  # command string — eliminates shell injection risk from base64 encoding.
-  printf '%s' "${cmd}" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      -o "ServerAliveInterval=15" -o "ServerAliveCountMax=${alive_count}" \
-      "ubuntu@${_AWS_INSTANCE_IP}" "timeout ${timeout} bash"
-}
-
-# ---------------------------------------------------------------------------
 # _aws_teardown APP
 #
 # Delete the Lightsail instance, verify deletion, and untrack it.

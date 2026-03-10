@@ -155,39 +155,6 @@ _digitalocean_exec() {
 }
 
 # ---------------------------------------------------------------------------
-# _digitalocean_exec_long APP CMD TIMEOUT
-#
-# Same as _digitalocean_exec but with ServerAliveInterval for long-running
-# commands, and wraps the command in `timeout`.
-# ---------------------------------------------------------------------------
-_digitalocean_exec_long() {
-  local app="$1"
-  local cmd="$2"
-  local timeout_secs="${3:-120}"
-
-  local ip_file="${LOG_DIR:-/tmp}/${app}.ip"
-  if [ ! -f "${ip_file}" ]; then
-    log_err "IP file not found: ${ip_file}"
-    return 1
-  fi
-
-  local ip
-  ip=$(cat "${ip_file}")
-
-  if [ -z "${ip}" ]; then
-    log_err "Empty IP in ${ip_file}"
-    return 1
-  fi
-
-  # Pipe the command via stdin to avoid interpolating it into the remote
-  # command string — eliminates shell injection risk from base64 encoding.
-  printf '%s' "${cmd}" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      -o "ServerAliveInterval=15" -o "ServerAliveCountMax=$((timeout_secs / 15 + 1))" \
-      "root@${ip}" "timeout ${timeout_secs} bash"
-}
-
-# ---------------------------------------------------------------------------
 # _digitalocean_teardown APP
 #
 # Deletes the droplet by its ID (read from the .meta file) and untracks it.
