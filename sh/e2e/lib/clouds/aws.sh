@@ -145,9 +145,16 @@ _aws_exec() {
     fi
   fi
 
+  # Base64-encode the command to prevent shell injection when passed as an
+  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to embed in single quotes. Stdin is preserved for callers
+  # that pipe data into cloud_exec.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "ubuntu@${_AWS_INSTANCE_IP}" "${cmd}"
+      "ubuntu@${_AWS_INSTANCE_IP}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
