@@ -1,7 +1,7 @@
 import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -382,26 +382,7 @@ describe("history", () => {
       expect(data.records[1].agent).toBe("codex");
     });
 
-    it("recovers from corrupted existing history file and creates backup", () => {
-      writeFileSync(join(testDir, "history.json"), "corrupted{{{");
-
-      saveSpawnRecord({
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-
-      // loadHistory returns [] for corrupted files, so saveSpawnRecord starts fresh
-      const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data.version).toBe(HISTORY_SCHEMA_VERSION);
-      expect(data.records).toHaveLength(1);
-      expect(data.records[0].agent).toBe("claude");
-
-      // Verify .corrupt backup was created
-      const files = readdirSync(testDir);
-      const corruptBackups = files.filter((f) => f.startsWith("history.json.corrupt."));
-      expect(corruptBackups.length).toBeGreaterThanOrEqual(1);
-    });
+    // Corruption recovery and backup tests are in history-corruption.test.ts
   });
 
   // ── filterHistory ───────────────────────────────────────────────────────
