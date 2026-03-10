@@ -88,12 +88,8 @@ export async function runOrchestration(
   // 5. Size/bundle selection
   await cloud.promptSize();
 
-  // 6. Provision server
+  // 6. Record spawn + provision server
   const spawnId = generateSpawnId();
-  const serverName = await cloud.getServerName();
-  await cloud.createServer(serverName, spawnId);
-
-  // 6b. Record the spawn now that the server exists
   const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
   saveSpawnRecord({
     id: spawnId,
@@ -106,6 +102,9 @@ export async function runOrchestration(
         }
       : {}),
   });
+
+  const serverName = await cloud.getServerName();
+  await cloud.createServer(serverName, spawnId);
 
   // 7. Wait for readiness
   await cloud.waitForReady();
