@@ -357,6 +357,25 @@ async function setupOpenclawConfig(
   }
 }`;
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
+
+  // Write USER.md bootstrap file — guides users to the web dashboard for
+  // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  const userMd = [
+    "# User",
+    "",
+    "## Web Dashboard",
+    "",
+    "This machine has a web dashboard running on port 18791.",
+    "When helping the user set up channels that require QR code scanning",
+    "(WhatsApp, Telegram, etc.), always guide them to use the web dashboard",
+    "instead of the TUI — QR codes cannot be scanned from a terminal.",
+    "",
+    "The dashboard URL is: http://localhost:18791",
+    "(It may also be SSH-tunneled to the user's local machine automatically.)",
+    "",
+  ].join("\n");
+  await runner.runServer("mkdir -p ~/.openclaw/workspace");
+  await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
