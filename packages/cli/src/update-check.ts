@@ -8,8 +8,9 @@ import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
+import { getUpdateFailedPath } from "./shared/paths";
 import { getErrorMessage, hasStatus } from "./shared/type-guards";
-import { getUserHome, logDebug, logWarn } from "./shared/ui";
+import { logDebug, logWarn } from "./shared/ui";
 
 const VERSION = pkg.version;
 
@@ -81,10 +82,6 @@ function compareVersions(current: string, latest: string): boolean {
 }
 
 // ── Failure Backoff ──────────────────────────────────────────────────────────
-
-function getUpdateFailedPath(): string {
-  return path.join(getUserHome(), ".config", "spawn", ".update-failed");
-}
 
 function isUpdateBackedOff(): boolean {
   try {

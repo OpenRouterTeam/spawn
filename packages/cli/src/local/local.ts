@@ -2,8 +2,8 @@
 
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { getUserHome } from "../shared/paths";
 import { spawnInteractive } from "../shared/ssh";
-import { getUserHome } from "../shared/ui";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 

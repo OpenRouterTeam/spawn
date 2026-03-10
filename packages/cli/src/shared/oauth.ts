@@ -5,8 +5,9 @@ import { dirname } from "node:path";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonWith } from "./parse";
+import { getSpawnCloudConfigPath } from "./paths";
 import { getErrorMessage, isString } from "./type-guards";
-import { getSpawnCloudConfigPath, logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
+import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 

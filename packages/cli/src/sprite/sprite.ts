@@ -4,11 +4,11 @@ import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { getUserHome } from "../shared/paths";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
-  getUserHome,
   logError,
   logInfo,
   logStep,

@@ -3,14 +3,8 @@ import type { SpawnRecord } from "../history.js";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  filterHistory,
-  getHistoryPath,
-  getSpawnDir,
-  HISTORY_SCHEMA_VERSION,
-  loadHistory,
-  saveSpawnRecord,
-} from "../history.js";
+import { filterHistory, HISTORY_SCHEMA_VERSION, loadHistory, saveSpawnRecord } from "../history.js";
+import { getHistoryPath, getSpawnDir, getUserHome } from "../shared/paths.js";
 
 describe("history", () => {
   let testDir: string;
@@ -49,7 +43,7 @@ describe("history", () => {
 
     it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
       delete process.env.SPAWN_HOME;
-      expect(getSpawnDir()).toBe(join(process.env.HOME ?? "", ".spawn"));
+      expect(getSpawnDir()).toBe(join(getUserHome(), ".spawn"));
     });
 
     it("throws for relative SPAWN_HOME path", () => {
