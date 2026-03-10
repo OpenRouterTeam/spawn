@@ -499,15 +499,9 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     if (filtered.length === 0) {
       const historyRecords = filterHistory(agentFilter, cloudFilter);
       if (historyRecords.length > 0) {
-        p.log.info("No active servers found.");
-        p.log.info(
-          pc.dim(
-            `${historyRecords.length} spawn${historyRecords.length !== 1 ? "s" : ""} in history but without active connections.`,
-          ),
-        );
-        p.log.info(
-          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view full history with ${pc.cyan("spawn list | cat")}`,
-        );
+        p.log.info("No active servers found. Showing spawn history:");
+        renderListTable(historyRecords, manifest);
+        showListFooter(historyRecords, agentFilter, cloudFilter);
       } else {
         await showEmptyListMessage(agentFilter, cloudFilter);
       }
