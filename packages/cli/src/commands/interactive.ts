@@ -20,14 +20,14 @@ import {
   VERSION,
 } from "./shared.js";
 
-// Prompt user to select an agent with hints and type-ahead filtering
+// Prompt user to select an agent via arrow-key navigation
 async function selectAgent(manifest: Manifest): Promise<string> {
   const agents = agentKeys(manifest);
   const agentHints = buildAgentPickerHints(manifest);
-  const agentChoice = await p.autocomplete({
-    message: "Select an agent (type to filter)",
+  const agentChoice = await p.select({
+    message: "Select an agent",
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
-    placeholder: "Start typing to search...",
+    initialValue: agents.includes("openclaw") ? "openclaw" : agents[0],
   });
   if (p.isCancel(agentChoice)) {
     handleCancel();
@@ -73,16 +73,16 @@ function getAndValidateCloudChoices(
   };
 }
 
-// Prompt user to select a cloud from the sorted list with type-ahead filtering
+// Prompt user to select a cloud via arrow-key navigation
 async function selectCloud(
   manifest: Manifest,
   cloudList: string[],
   hintOverrides: Record<string, string>,
 ): Promise<string> {
-  const cloudChoice = await p.autocomplete({
-    message: "Select a cloud (type to filter)",
+  const cloudChoice = await p.select({
+    message: "Select a cloud",
     options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
-    placeholder: "Start typing to search...",
+    initialValue: cloudList[0],
   });
   if (p.isCancel(cloudChoice)) {
     handleCancel();

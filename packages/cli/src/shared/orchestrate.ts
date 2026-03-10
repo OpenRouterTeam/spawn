@@ -5,8 +5,9 @@ import type { VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup";
 import type { AgentConfig } from "./agents";
 
+import { isCancel, multiselect } from "@clack/prompts";
 import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
-import { offerGithubAuth, wrapSshCall } from "./agent-setup";
+import { isGithubAuthDetected, offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
@@ -101,6 +102,27 @@ export async function runOrchestration(
   // 5. Size/bundle selection
   await cloud.promptSize();
 
+  // 5b. Optional setup steps (checkboxes, all ON by default)
+  let enabledSteps: Set<string> | undefined;
+  if (agent.optionalSteps && agent.optionalSteps.length > 0) {
+    // Filter out GitHub option if no token was detected on the host
+    const steps = agent.optionalSteps.filter((s) => s.value !== "github" || isGithubAuthDetected());
+    if (steps.length > 0) {
+      const allValues = steps.map((s) => s.value);
+      const selected = await multiselect({
+        message: "Setup options (space to toggle, enter to confirm)",
+        options: steps.map((s) => ({
+          value: s.value,
+          label: s.label,
+          hint: s.hint,
+        })),
+        initialValues: allValues,
+        required: false,
+      });
+      enabledSteps = new Set(isCancel(selected) ? allValues : selected);
+    }
+  }
+
   // 6. Provision server
   const spawnId = generateSpawnId();
   const serverName = await cloud.getServerName();
@@ -165,14 +187,16 @@ export async function runOrchestration(
   // 10. Agent-specific configuration
   if (agent.configure) {
     try {
-      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId)), 2, 5);
+      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5);
     } catch {
       logWarn("Agent configuration failed (continuing with defaults)");
     }
   }
 
-  // GitHub CLI setup
-  await offerGithubAuth(cloud.runner);
+  // GitHub CLI setup (skipped if user unchecked it in setup options)
+  if (!enabledSteps || enabledSteps.has("github")) {
+    await offerGithubAuth(cloud.runner);
+  }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
   if (agent.preLaunch) {

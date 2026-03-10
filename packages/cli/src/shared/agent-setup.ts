@@ -164,6 +164,11 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
 // ─── GitHub Auth ─────────────────────────────────────────────────────────────
 
 let githubAuthRequested = false;
+
+/** Returns true if GitHub auth was detected on the host (token or `gh` CLI). */
+export function isGithubAuthDetected(): boolean {
+  return githubAuthRequested;
+}
 let githubToken = "";
 let hostGitName = "";
 let hostGitEmail = "";
@@ -334,13 +339,20 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
-async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
+async function setupOpenclawConfig(
+  runner: CloudRunner,
+  apiKey: string,
+  modelId: string,
+  enabledSteps?: Set<string>,
+): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
   // Chrome must be installed before config is written (config references its path).
   // This runs in configure() — not install() — so it works even with tarball installs.
-  await installChromeBrowser(runner);
+  if (!enabledSteps || enabledSteps.has("browser")) {
+    await installChromeBrowser(runner);
+  }
 
   const gatewayToken = crypto.randomUUID().replace(/-/g, "");
   const escapedKey = jsonEscape(apiKey);
@@ -593,6 +605,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupClaudeCodeConfig(runner, apiKey),
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     codex: {
@@ -610,6 +629,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey) => setupCodexConfig(runner, apiKey),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     openclaw: {
@@ -629,12 +655,25 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `ANTHROPIC_API_KEY=${apiKey}`,
         "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
       ],
-      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5"),
+      configure: (apiKey, modelId, enabledSteps) =>
+        setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", enabledSteps),
       preLaunch: () => startGateway(runner),
       preLaunchMsg:
         "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+        {
+          value: "browser",
+          label: "Chrome browser",
+          hint: "~400 MB — needed for web tools",
+        },
+      ],
     },
 
     opencode: {
@@ -646,6 +685,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     kilocode: {
@@ -664,6 +710,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     zeroclaw: {
@@ -688,6 +741,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
         "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     hermes: {
@@ -708,6 +768,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
 
     junie: {
@@ -725,6 +792,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
+      optionalSteps: [
+        {
+          value: "github",
+          label: "GitHub CLI",
+          hint: "authenticate gh on the remote",
+        },
+      ],
     },
   };
 }

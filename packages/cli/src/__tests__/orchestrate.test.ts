@@ -15,6 +15,21 @@ import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { isNumber } from "../shared/type-guards.js";
 
+// ── Mock @clack/prompts multiselect (returns all initialValues by default) ──
+
+const mockMultiselect = mock(async (opts: { initialValues?: string[] }) =>
+  opts?.initialValues
+    ? [
+        ...opts.initialValues,
+      ]
+    : [],
+);
+
+mock.module("@clack/prompts", () => ({
+  multiselect: mockMultiselect,
+  isCancel: () => false,
+}));
+
 // ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
 
 const mockGetOrPromptApiKey = mock(() => Promise.resolve("sk-or-v1-test-key"));
@@ -326,7 +341,10 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3");
+    expect(configure).toHaveBeenCalledTimes(1);
+    const args = configure.mock.calls[0];
+    expect(args[0]).toBe("sk-or-v1-test-key");
+    expect(args[1]).toBe("anthropic/claude-3");
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
@@ -342,7 +360,10 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro");
+    expect(configure).toHaveBeenCalledTimes(1);
+    const args = configure.mock.calls[0];
+    expect(args[0]).toBe("sk-or-v1-test-key");
+    expect(args[1]).toBe("google/gemini-pro");
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -359,7 +380,10 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined);
+    expect(configure).toHaveBeenCalledTimes(1);
+    const args = configure.mock.calls[0];
+    expect(args[0]).toBe("sk-or-v1-test-key");
+    expect(args[1]).toBe(undefined);
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -625,6 +649,77 @@ describe("runOrchestration", () => {
 
     expect(cloud.authenticate).toHaveBeenCalledTimes(1);
     expect(cloud.createServer).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  // ── multiselect setup steps ─────────────────────────────────────────
+
+  it("shows multiselect when agent has optionalSteps", async () => {
+    mockMultiselect.mockClear();
+    const cloud = createMockCloud();
+    const agent = createMockAgent({
+      optionalSteps: [
+        {
+          value: "browser",
+          label: "Chrome browser",
+          hint: "~400 MB",
+        },
+      ],
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(mockMultiselect).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("does not show multiselect when agent has no optionalSteps", async () => {
+    mockMultiselect.mockClear();
+    const cloud = createMockCloud();
+    const agent = createMockAgent(); // no optionalSteps
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(mockMultiselect).not.toHaveBeenCalled();
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("passes enabledSteps to agent.configure", async () => {
+    mockMultiselect.mockClear();
+    mockMultiselect.mockImplementation(async () => [
+      "browser",
+    ]);
+    const configure = mock(() => Promise.resolve());
+    const cloud = createMockCloud();
+    const agent = createMockAgent({
+      configure,
+      optionalSteps: [
+        {
+          value: "browser",
+          label: "Chrome browser",
+        },
+      ],
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(configure).toHaveBeenCalledTimes(1);
+    const enabledSteps: Set<string> = configure.mock.calls[0][2];
+    expect(enabledSteps).toBeInstanceOf(Set);
+    expect(enabledSteps.has("browser")).toBe(true);
+    expect(enabledSteps.has("github")).toBe(false);
+
+    // Restore default mock behavior
+    mockMultiselect.mockImplementation(async (opts: { initialValues?: string[] }) =>
+      opts?.initialValues
+        ? [
+            ...opts.initialValues,
+          ]
+        : [],
+    );
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });

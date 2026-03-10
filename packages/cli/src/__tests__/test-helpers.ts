@@ -139,7 +139,13 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
     autocomplete: mock(async () => "claude"),
     text: mock(async () => undefined),
     confirm: mock(async () => true),
-    multiselect: mock(() => Promise.resolve([])),
+    multiselect: mock(async (opts: { initialValues?: string[] }) =>
+      opts?.initialValues
+        ? [
+            ...opts.initialValues,
+          ]
+        : [],
+    ),
     isCancel: () => false,
     ...overrides,
   };

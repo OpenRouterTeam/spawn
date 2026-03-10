@@ -7,6 +7,13 @@ import { logError } from "./ui";
 /** Cloud-init dependency tier: what packages to pre-install on the VM. */
 export type CloudInitTier = "minimal" | "node" | "bun" | "full";
 
+/** An optional post-provision setup step the user can toggle on/off. */
+export interface OptionalStep {
+  value: string;
+  label: string;
+  hint?: string;
+}
+
 export interface AgentConfig {
   name: string;
   /** Default model ID passed to configure() (no interactive prompt — override via MODEL_ID env var). */
@@ -18,7 +25,7 @@ export interface AgentConfig {
   /** Return env var pairs for .spawnrc. */
   envVars: (apiKey: string) => string[];
   /** Agent-specific configuration (settings files, etc.). */
-  configure?: (apiKey: string, modelId?: string) => Promise<void>;
+  configure?: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) => Promise<void>;
   /** Pre-launch hook (e.g., start gateway daemon). */
   preLaunch?: () => Promise<void>;
   /** Optional tip or warning shown to the user just before the agent launches. */
@@ -29,6 +36,8 @@ export interface AgentConfig {
   cloudInitTier?: CloudInitTier;
   /** Skip tarball install attempt (e.g., already using snapshot). */
   skipTarball?: boolean;
+  /** Optional post-provision steps (shown as checkboxes, all ON by default). */
+  optionalSteps?: OptionalStep[];
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
