@@ -29,7 +29,7 @@ function fail(msg: string): never {
 
 // Find repo root — try extracting a worktree path from the command, else use git
 let repoRoot: string;
-const worktreeMatch = command.match(/\/tmp\/spawn-worktrees\/[^\s/]+/);
+const worktreeMatch = command.match(/\/tmp\/spawn-worktrees\/[^\s]+/);
 if (worktreeMatch) {
   repoRoot = worktreeMatch[0];
 } else {
