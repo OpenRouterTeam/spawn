@@ -37,39 +37,42 @@ _TRACKED_APPS=""
 # Logging (with optional cloud prefix for parallel output)
 # ---------------------------------------------------------------------------
 log_header() {
-  printf "\n${BOLD}${BLUE}%s=== %s ===${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '\n%b%b%s=== %s ===%b\n' "$BOLD" "$BLUE" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 log_step() {
-  printf "${CYAN}%s  -> %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '%b%s  -> %s%b\n' "$CYAN" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 log_ok() {
-  printf "${GREEN}%s  [PASS] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '%b%s  [PASS] %s%b\n' "$GREEN" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 log_err() {
-  printf "${RED}%s  [FAIL] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '%b%s  [FAIL] %s%b\n' "$RED" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 log_warn() {
-  printf "${YELLOW}%s  [WARN] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '%b%s  [WARN] %s%b\n' "$YELLOW" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 log_info() {
-  printf "${BLUE}%s  [INFO] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
+  printf '%b%s  [INFO] %s%b\n' "$BLUE" "${CLOUD_LOG_PREFIX}" "$1" "$NC"
 }
 
 # ---------------------------------------------------------------------------
 # load_cloud_driver CLOUD
 #
 # Sources the cloud-specific driver and sets ACTIVE_CLOUD for wrapper dispatch.
+# NOTE: Uses BASH_SOURCE and source with a filesystem path. This is intentional —
+# e2e scripts are always run from the filesystem, never via bash <(curl ...).
 # ---------------------------------------------------------------------------
 load_cloud_driver() {
   local cloud="$1"
   ACTIVE_CLOUD="${cloud}"
 
-  # Resolve driver file (relative to this script's location)
+  # Resolve driver file (relative to this script's location).
+  # BASH_SOURCE[0] is safe here — e2e scripts run from disk, not curl|bash.
   local driver_dir
   driver_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/clouds"
   local driver_file="${driver_dir}/${cloud}.sh"
@@ -79,6 +82,7 @@ load_cloud_driver() {
     return 1
   fi
 
+  # shellcheck source=/dev/null  # driver path is dynamic
   source "${driver_file}"
 
   log_step "Loaded cloud driver: ${cloud}"
