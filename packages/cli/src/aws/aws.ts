@@ -20,7 +20,7 @@ import {
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import { getErrorMessage } from "../shared/type-guards";
 import {
-  defaultSpawnName,
+  getServerNameFromEnv,
   getSpawnCloudConfigPath,
   jsonEscape,
   logError,
@@ -30,11 +30,10 @@ import {
   logStepInline,
   logWarn,
   prompt,
+  promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
-  toKebabCase,
   validateRegionName,
-  validateServerName,
 } from "../shared/ui";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
@@ -1202,39 +1201,11 @@ export async function interactiveSession(cmd: string): Promise<number> {
 // ─── Server Name ────────────────────────────────────────────────────────────
 
 export async function getServerName(): Promise<string> {
-  if (process.env.LIGHTSAIL_SERVER_NAME) {
-    const name = process.env.LIGHTSAIL_SERVER_NAME;
-    if (!validateServerName(name)) {
-      logError(`Invalid LIGHTSAIL_SERVER_NAME: '${name}'`);
-      throw new Error("Invalid server name");
-    }
-    logInfo(`Using instance name from environment: ${name}`);
-    return name;
-  }
-
-  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  return kebab || defaultSpawnName();
+  return getServerNameFromEnv("LIGHTSAIL_SERVER_NAME");
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) {
-    return;
-  }
-
-  let kebab: string;
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();
-  } else {
-    const derived = process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "";
-    const fallback = derived || defaultSpawnName();
-    process.stderr.write("\n");
-    const answer = await prompt(`AWS instance name [${fallback}]: `);
-    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
-  }
-
-  process.env.SPAWN_NAME_DISPLAY = kebab;
-  process.env.SPAWN_NAME_KEBAB = kebab;
-  logInfo(`Using resource name: ${kebab}`);
+  return promptSpawnNameShared("AWS instance");
 }
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────

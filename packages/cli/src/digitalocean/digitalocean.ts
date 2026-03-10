@@ -20,6 +20,7 @@ import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-k
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   defaultSpawnName,
+  getServerNameFromEnv,
   getSpawnCloudConfigPath,
   loadApiToken,
   logError,
@@ -1209,18 +1210,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
 export async function getServerName(): Promise<string> {
-  if (process.env.DO_DROPLET_NAME) {
-    const name = process.env.DO_DROPLET_NAME;
-    if (!validateServerName(name)) {
-      logError(`Invalid DO_DROPLET_NAME: '${name}'`);
-      throw new Error("Invalid server name");
-    }
-    logInfo(`Using droplet name from environment: ${name}`);
-    return name;
-  }
-
-  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  return kebab || defaultSpawnName();
+  return getServerNameFromEnv("DO_DROPLET_NAME");
 }
 
 export async function promptSpawnName(): Promise<void> {

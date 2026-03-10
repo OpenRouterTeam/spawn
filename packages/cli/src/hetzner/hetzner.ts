@@ -18,7 +18,7 @@ import {
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
-  defaultSpawnName,
+  getServerNameFromEnv,
   getSpawnCloudConfigPath,
   jsonEscape,
   loadApiToken,
@@ -29,11 +29,10 @@ import {
   logStepInline,
   logWarn,
   prompt,
+  promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
-  toKebabCase,
   validateRegionName,
-  validateServerName,
 } from "../shared/ui";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -654,39 +653,11 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
 export async function getServerName(): Promise<string> {
-  if (process.env.HETZNER_SERVER_NAME) {
-    const name = process.env.HETZNER_SERVER_NAME;
-    if (!validateServerName(name)) {
-      logError(`Invalid HETZNER_SERVER_NAME: '${name}'`);
-      throw new Error("Invalid server name");
-    }
-    logInfo(`Using server name from environment: ${name}`);
-    return name;
-  }
-
-  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  return kebab || defaultSpawnName();
+  return getServerNameFromEnv("HETZNER_SERVER_NAME");
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) {
-    return;
-  }
-
-  let kebab: string;
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();
-  } else {
-    const derived = process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "";
-    const fallback = derived || defaultSpawnName();
-    process.stderr.write("\n");
-    const answer = await prompt(`Hetzner server name [${fallback}]: `);
-    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
-  }
-
-  process.env.SPAWN_NAME_DISPLAY = kebab;
-  process.env.SPAWN_NAME_KEBAB = kebab;
-  logInfo(`Using resource name: ${kebab}`);
+  return promptSpawnNameShared("Hetzner server");
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
