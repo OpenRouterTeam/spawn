@@ -13,6 +13,7 @@
     ".claude/skills/setup-spa": {
       "name": "spawn-slack-bot",
       "dependencies": {
+        "@openrouter/spawn-shared": "workspace:*",
         "@slack/bolt": "4.6.0",
         "@slack/types": "^2.14.0",
         "@slack/web-api": "^7.14.1",
@@ -22,18 +23,26 @@
     },
     "packages/cli": {
       "name": "@openrouter/spawn",
-      "version": "0.15.27",
+      "version": "0.15.32",
       "bin": {
         "spawn": "cli.js",
       },
       "dependencies": {
         "@clack/prompts": "1.0.0",
+        "@openrouter/spawn-shared": "workspace:*",
         "picocolors": "1.1.1",
         "valibot": "1.2.0",
       },
       "devDependencies": {
         "@biomejs/biome": "2.4.3",
         "@types/bun": "1.3.8",
+      },
+    },
+    "packages/shared": {
+      "name": "@openrouter/spawn-shared",
+      "version": "0.2.0",
+      "dependencies": {
+        "valibot": "1.2.0",
       },
     },
   },
@@ -61,6 +70,8 @@
     "@clack/prompts": ["@clack/prompts@1.0.0", "", { "dependencies": { "@clack/core": "1.0.0", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-rWPXg9UaCFqErJVQ+MecOaWsozjaxol4yjnmYcGNipAWzdaWa2x+VJmKfGq7L0APwBohQOYdHC+9RO4qRXej+A=="],
 
     "@openrouter/spawn": ["@openrouter/spawn@workspace:packages/cli"],
+
+    "@openrouter/spawn-shared": ["@openrouter/spawn-shared@workspace:packages/shared"],
 
     "@slack/bolt": ["@slack/bolt@4.6.0", "", { "dependencies": { "@slack/logger": "^4.0.0", "@slack/oauth": "^3.0.4", "@slack/socket-mode": "^2.0.5", "@slack/types": "^2.18.0", "@slack/web-api": "^7.12.0", "axios": "^1.12.0", "express": "^5.0.0", "path-to-regexp": "^8.1.0", "raw-body": "^3", "tsscmp": "^1.0.6" }, "peerDependencies": { "@types/express": "^5.0.0" } }, "sha512-xPgfUs2+OXSugz54Ky07pA890+Qydk22SYToi8uGpXeHSt1JWwFJkRyd/9Vlg5I1AdfdpGXExDpwnbuN9Q/2dQ=="],
 

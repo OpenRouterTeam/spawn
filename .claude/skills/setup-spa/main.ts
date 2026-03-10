@@ -5,9 +5,9 @@ import type { ActionsBlock, ContextBlock, KnownBlock, SectionBlock } from "@slac
 import type { Block } from "@slack/types";
 import type { ToolCall } from "./helpers";
 
+import { isString, toRecord } from "@openrouter/spawn-shared";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
-import { isString, toRecord } from "../../../packages/cli/src/shared/type-guards";
 import {
   downloadSlackFile,
   findThread,
