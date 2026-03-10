@@ -105,6 +105,17 @@ const _state: DigitalOceanState = {
   serverIp: "",
 };
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: doServerIp,
+    user: "root",
+  };
+}
+
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function doApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {

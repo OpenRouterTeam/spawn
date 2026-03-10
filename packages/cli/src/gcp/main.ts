@@ -12,6 +12,7 @@ import {
   checkBillingEnabled,
   createInstance,
   ensureGcloudCli,
+  getConnectionInfo,
   getServerName,
   interactiveSession,
   promptMachineType,
@@ -64,6 +65,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
+    getConnectionInfo,
   };
 
   await runOrchestration(cloud, agent, agentName);

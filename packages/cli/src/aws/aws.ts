@@ -198,6 +198,17 @@ export function getState() {
   };
 }
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: instanceIp,
+    user: SSH_USER,
+  };
+}
+
 // ─── SSH Config ─────────────────────────────────────────────────────────────
 
 const SSH_USER = "ubuntu";

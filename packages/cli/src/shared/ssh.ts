@@ -164,6 +164,76 @@ function tcpCheck(host: string, port: number, timeoutMs = 2000): Promise<boolean
   });
 }
 
+// ─── SSH Tunnel ──────────────────────────────────────────────────────────
+
+export interface SshTunnelHandle {
+  localPort: number;
+  stop: () => void;
+  exited: Promise<number>;
+}
+
+/**
+ * Start an SSH tunnel forwarding a remote port to localhost.
+ * Tries local ports starting from `remotePort` up to `remotePort + 10`.
+ * Throws if no port is available or the SSH connection fails immediately.
+ */
+export async function startSshTunnel(opts: {
+  host: string;
+  user: string;
+  remotePort: number;
+  localPort?: number;
+  sshKeyOpts?: string[];
+}): Promise<SshTunnelHandle> {
+  const { host, user, remotePort, sshKeyOpts } = opts;
+
+  // Find available local port
+  let localPort = opts.localPort ?? remotePort;
+  let found = false;
+  for (let p = localPort; p <= localPort + 10; p++) {
+    const inUse = await tcpCheck("127.0.0.1", p, 500);
+    if (!inUse) {
+      localPort = p;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    throw new Error(`No available local port in range ${remotePort}-${remotePort + 10}`);
+  }
+
+  const args = [
+    "ssh",
+    ...SSH_BASE_OPTS,
+    ...(sshKeyOpts ?? []),
+    "-N",
+    "-L",
+    `${localPort}:127.0.0.1:${remotePort}`,
+    `${user}@${host}`,
+  ];
+
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "ignore",
+      "ignore",
+      "pipe",
+    ],
+  });
+
+  // Wait briefly to detect immediate failures (bad auth, connection refused)
+  await sleep(1500);
+
+  if (proc.exitCode !== null) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`SSH tunnel failed: ${stderr.trim() || `exit code ${proc.exitCode}`}`);
+  }
+
+  return {
+    localPort,
+    stop: () => killWithTimeout(proc),
+    exited: proc.exited,
+  };
+}
+
 // ─── SSH Wait ────────────────────────────────────────────────────────────────
 
 export interface WaitForSshOpts {

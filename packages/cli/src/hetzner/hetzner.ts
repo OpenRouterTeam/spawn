@@ -52,6 +52,17 @@ const _state: HetznerState = {
   serverIp: "",
 };
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: hetznerServerIp,
+    user: "root",
+  };
+}
+
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function hetznerApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {

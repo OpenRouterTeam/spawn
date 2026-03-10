@@ -334,7 +334,12 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
-async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
+async function setupOpenclawConfig(
+  runner: CloudRunner,
+  apiKey: string,
+  modelId: string,
+  token?: string,
+): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
@@ -342,7 +347,7 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
   // This runs in configure() — not install() — so it works even with tarball installs.
   await installChromeBrowser(runner);
 
-  const gatewayToken = crypto.randomUUID().replace(/-/g, "");
+  const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
   const escapedKey = jsonEscape(apiKey);
   const escapedToken = jsonEscape(gatewayToken);
   const escapedModel = jsonEscape(modelId);
@@ -380,6 +385,25 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
   } catch {
     logWarn("Browser config setup failed (non-fatal)");
   }
+
+  // Write USER.md bootstrap file — guides users to the web dashboard for
+  // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  const userMd = [
+    "# User",
+    "",
+    "## Web Dashboard",
+    "",
+    "This machine has a web dashboard running on port 18791.",
+    "When helping the user set up channels that require QR code scanning",
+    "(WhatsApp, Telegram, etc.), always guide them to use the web dashboard",
+    "instead of the TUI — QR codes cannot be scanned from a terminal.",
+    "",
+    "The dashboard URL is: http://localhost:18791",
+    "(It may also be SSH-tunneled to the user's local machine automatically.)",
+    "",
+  ].join("\n");
+  await runner.runServer("mkdir -p ~/.openclaw/workspace");
+  await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -612,30 +636,38 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
     },
 
-    openclaw: {
-      name: "OpenClaw",
-      cloudInitTier: "full",
-      preProvision: detectGithubAuth,
-      modelDefault: "moonshotai/kimi-k2.5",
-      install: async () => {
-        await installAgent(
-          runner,
-          "openclaw",
-          `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ${NPM_GLOBAL_PATH_PERSIST}`,
-        );
-      },
-      envVars: (apiKey) => [
-        `OPENROUTER_API_KEY=${apiKey}`,
-        `ANTHROPIC_API_KEY=${apiKey}`,
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
-      ],
-      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5"),
-      preLaunch: () => startGateway(runner),
-      preLaunchMsg:
-        "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
-    },
+    openclaw: (() => {
+      const dashboardToken = crypto.randomUUID().replace(/-/g, "");
+      return {
+        name: "OpenClaw",
+        cloudInitTier: "full" satisfies AgentConfig["cloudInitTier"],
+        preProvision: detectGithubAuth,
+        modelDefault: "moonshotai/kimi-k2.5",
+        install: async () => {
+          await installAgent(
+            runner,
+            "openclaw",
+            `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ${NPM_GLOBAL_PATH_PERSIST}`,
+          );
+        },
+        envVars: (apiKey: string) => [
+          `OPENROUTER_API_KEY=${apiKey}`,
+          `ANTHROPIC_API_KEY=${apiKey}`,
+          "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
+        ],
+        configure: (apiKey: string, modelId?: string) =>
+          setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken),
+        preLaunch: () => startGateway(runner),
+        preLaunchMsg:
+          "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
+        launchCmd: () =>
+          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        tunnel: {
+          remotePort: 18791,
+          browserUrl: (localPort: number) => `http://localhost:${localPort}/?token=${dashboardToken}`,
+        },
+      };
+    })(),
 
     opencode: {
       name: "OpenCode",
