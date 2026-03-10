@@ -541,12 +541,59 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   });
 }
 
+// ─── Keep-Alive ───────────────────────────────────────────────────────────────
+
+/**
+ * Download and install sprite-keep-running on the remote sprite.
+ * This script wraps a command and keeps the sprite alive (via Sprite's /v1/tasks API)
+ * as long as the agent is running — preventing inactivity shutdown.
+ *
+ * Non-fatal: logs a warning if download fails so deployment still proceeds.
+ * Reference: https://kurt-claw-f.sprites.app/sprite-keep-running.sh
+ */
+export async function installSpriteKeepAlive(): Promise<void> {
+  logStep("Installing Sprite keep-alive...");
+  const scriptUrl = "https://kurt-claw-f.sprites.app/sprite-keep-running.sh";
+  try {
+    await runSprite(
+      "mkdir -p ~/.local/bin && " +
+        `curl -fsSL '${scriptUrl}' -o ~/.local/bin/sprite-keep-running && ` +
+        "chmod +x ~/.local/bin/sprite-keep-running",
+      60,
+    );
+    logInfo("Sprite keep-alive installed");
+  } catch {
+    logWarn("Could not install Sprite keep-alive — sprite may shut down during inactivity");
+  }
+}
+
 /**
  * Launch an interactive session on the sprite.
  * Uses -tty for interactive mode, plain exec when SPAWN_PROMPT is set.
+ *
+ * The session command is base64-encoded and written to a temp file to avoid
+ * quoting issues with multi-line restart loop scripts. If sprite-keep-running
+ * is installed, it wraps the command to keep the sprite alive via Sprite's
+ * /v1/tasks API for the duration of the session.
  */
 export async function interactiveSession(cmd: string): Promise<number> {
   const spriteCmd = getSpriteCmd()!;
+
+  // Encode the session command to handle multi-line restart loop scripts safely
+  const cmdB64 = Buffer.from(cmd).toString("base64");
+
+  // Write cmd to a temp file and exec with keep-alive wrapper if available
+  const sessionScript = [
+    "_f=$(mktemp /tmp/spawn_XXXXXX.sh)",
+    `printf '%s' '${cmdB64}' | base64 -d > "$_f"`,
+    'chmod +x "$_f"',
+    "trap 'rm -f \"$_f\"' EXIT INT TERM",
+    "if command -v sprite-keep-running >/dev/null 2>&1; then",
+    '  sprite-keep-running bash "$_f"',
+    "else",
+    '  bash "$_f"',
+    "fi",
+  ].join("\n");
 
   const args = process.env.SPAWN_PROMPT
     ? [
@@ -558,7 +605,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
         "--",
         "bash",
         "-c",
-        cmd,
+        sessionScript,
       ]
     : [
         spriteCmd,
@@ -570,7 +617,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
         "--",
         "bash",
         "-c",
-        cmd,
+        sessionScript,
       ];
 
   const exitCode = spawnInteractive(args);
