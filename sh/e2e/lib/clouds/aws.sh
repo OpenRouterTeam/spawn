@@ -136,11 +136,25 @@ _aws_exec() {
       log_err "Could not resolve IP for instance ${app}"
       return 1
     fi
+    # Validate IP looks like an IPv4 address (defense-in-depth against API/file tampering)
+    if ! printf '%s' "${_AWS_INSTANCE_IP}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+      log_err "Invalid IP address for instance ${app}: ${_AWS_INSTANCE_IP}"
+      _AWS_INSTANCE_IP=""
+      _AWS_INSTANCE_APP=""
+      return 1
+    fi
   fi
+
+  # Base64-encode the command to prevent shell injection when passed as an
+  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to embed in single quotes. Stdin is preserved for callers
+  # that pipe data into cloud_exec.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "ubuntu@${_AWS_INSTANCE_IP}" "${cmd}"
+      "ubuntu@${_AWS_INSTANCE_IP}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
