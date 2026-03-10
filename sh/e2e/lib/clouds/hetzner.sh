@@ -129,38 +129,6 @@ _hetzner_exec() {
 }
 
 # ---------------------------------------------------------------------------
-# _hetzner_exec_long APP CMD TIMEOUT
-#
-# Execute a long-running command on the server via SSH with keepalive
-# and a remote-side timeout.
-# ---------------------------------------------------------------------------
-_hetzner_exec_long() {
-  local app="$1"
-  local cmd="$2"
-  local timeout_secs="$3"
-  local log_dir="${LOG_DIR:-/tmp}"
-
-  local ip_file="${log_dir}/${app}.ip"
-  if [ ! -f "${ip_file}" ]; then
-    log_err "No IP file found for ${app} at ${ip_file}"
-    return 1
-  fi
-
-  local ip
-  ip=$(cat "${ip_file}")
-
-  # Pipe the command via stdin to avoid interpolating it into the remote
-  # command string — eliminates shell injection risk from base64 encoding.
-  printf '%s' "${cmd}" | ssh -o StrictHostKeyChecking=no \
-      -o UserKnownHostsFile=/dev/null \
-      -o LogLevel=ERROR \
-      -o BatchMode=yes \
-      -o ConnectTimeout=10 \
-      -o ServerAliveInterval=15 \
-      "root@${ip}" "timeout ${timeout_secs} bash"
-}
-
-# ---------------------------------------------------------------------------
 # _hetzner_teardown APP
 #
 # Delete the server via Hetzner API using the stored server ID.
