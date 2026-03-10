@@ -11,9 +11,9 @@
  *
  * SANDBOXING STRATEGY:
  * 1. Creates a unique temp directory for each test run
- * 2. Sets process.env.HOME and all XDG_* variables to temp paths
+ * 2. Sets process.env.HOME, SPAWN_HOME, and all XDG_* variables to temp paths
  * 3. Mocks os.homedir() to return the sandboxed HOME
- * 4. Pre-creates common directories (~/.config, ~/.ssh, ~/.claude, etc.)
+ * 4. Pre-creates common directories (~/.config, ~/.ssh, ~/.claude, ~/.spawn, etc.)
  * 5. Cleans up the temp directory on process exit
  *
  * This ensures that:
@@ -83,7 +83,14 @@ process.env.XDG_DATA_HOME = join(TEST_HOME, ".local", "share");
 // cannot fix `import { homedir } from "node:os"` in other modules.
 os.homedir = () => TEST_HOME;
 
+// Set SPAWN_HOME so history/config writes go to the sandbox even if a test
+// forgets to set it. Individual tests can override this, but the default is safe.
+process.env.SPAWN_HOME = join(TEST_HOME, ".spawn");
+
 // Pre-create common directories tests might expect
+mkdirSync(join(TEST_HOME, ".spawn"), {
+  recursive: true,
+});
 mkdirSync(join(TEST_HOME, ".cache"), {
   recursive: true,
 });
