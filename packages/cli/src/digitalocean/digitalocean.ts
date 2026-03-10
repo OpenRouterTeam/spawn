@@ -8,6 +8,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
+import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -21,7 +22,6 @@ import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "..
 import {
   defaultSpawnName,
   getServerNameFromEnv,
-  getSpawnCloudConfigPath,
   loadApiToken,
   logError,
   logInfo,

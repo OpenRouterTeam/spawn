@@ -9,6 +9,7 @@ import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
+import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -21,7 +22,6 @@ import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
-  getSpawnCloudConfigPath,
   jsonEscape,
   logError,
   logInfo,

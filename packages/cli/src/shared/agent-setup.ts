@@ -5,8 +5,8 @@ import type { AgentConfig } from "./agents";
 import type { Result } from "./ui";
 
 import { unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { getTmpDir } from "./paths";
 import { getErrorMessage } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
@@ -61,7 +61,7 @@ async function installAgent(
  * Upload a config file to the remote machine via a temp file and mv.
  */
 async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
-  const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  const tmpFile = join(getTmpDir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, {
     mode: 0o600,
   });
@@ -243,7 +243,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
   let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
-    localTmpFile = join(tmpdir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    localTmpFile = join(getTmpDir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
     writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, {
       mode: 0o600,
     });

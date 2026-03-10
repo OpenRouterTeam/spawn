@@ -16,13 +16,13 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   generateSpawnId,
-  getHistoryPath,
   loadHistory,
   markRecordDeleted,
   removeRecord,
   saveLaunchCmd,
   saveSpawnRecord,
 } from "../history.js";
+import { getHistoryPath } from "../shared/paths.js";
 
 describe("history spawn IDs", () => {
   let testDir: string;

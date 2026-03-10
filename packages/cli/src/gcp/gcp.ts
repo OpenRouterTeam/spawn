@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
+import { getUserHome } from "../shared/paths";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -18,7 +19,6 @@ import {
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import {
   getServerNameFromEnv,
-  getUserHome,
   logError,
   logInfo,
   logStep,
