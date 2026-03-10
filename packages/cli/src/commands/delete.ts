@@ -231,8 +231,10 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
           `${servers.length} active server${servers.length !== 1 ? "s" : ""} found, but none matched your filters.`,
         ),
       );
+      p.log.info(`Run ${pc.cyan("spawn delete")} without filters to see all servers.`);
+    } else {
+      p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create a spawn first.`);
     }
-    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create a spawn first.`);
     return;
   }
 
