@@ -1053,7 +1053,16 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
         ],
       },
     );
-    const exitCode = await proc.exited;
+    // The remote script has its own 5-min timeout (150 × 2s), but if the
+    // network drops mid-stream `await proc.exited` blocks forever. Kill
+    // after 330s (5min + 30s grace) to match the remote timeout.
+    const streamTimer = setTimeout(() => killWithTimeout(proc), 330_000);
+    let exitCode: number;
+    try {
+      exitCode = await proc.exited;
+    } finally {
+      clearTimeout(streamTimer);
+    }
     if (exitCode === 0) {
       logInfo("Cloud-init complete");
       return;
@@ -1082,12 +1091,23 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
           ],
         },
       );
+      // Per-process timeout: if the network drops during cloud-init polling,
+      // `await proc.exited` blocks forever. Kill after 30s so the retry loop
+      // can continue and the user isn't left with a hung CLI.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      const [stdout] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      if ((await proc.exited) === 0 && stdout.includes("done")) {
+      let stdout: string;
+      let pollExitCode: number;
+      try {
+        [stdout] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        pollExitCode = await proc.exited;
+      } finally {
+        clearTimeout(timer);
+      }
+      if (pollExitCode === 0 && stdout.includes("done")) {
         logStepDone();
         logInfo("Cloud-init complete");
         return;

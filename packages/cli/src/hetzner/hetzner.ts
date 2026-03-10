@@ -519,12 +519,22 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
           ],
         },
       );
+      // Per-process timeout: if the network drops during cloud-init polling,
+      // `await proc.exited` blocks forever. Kill after 30s so the retry loop
+      // can continue and the user isn't left with a hung CLI.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      const [stdout] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
+      let stdout: string;
+      let exitCode: number;
+      try {
+        [stdout] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        exitCode = await proc.exited;
+      } finally {
+        clearTimeout(timer);
+      }
       if (exitCode === 0 && stdout.includes("done")) {
         logStepDone();
         logInfo("Cloud-init complete");
