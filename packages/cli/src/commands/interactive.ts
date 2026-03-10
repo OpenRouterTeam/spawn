@@ -181,7 +181,7 @@ async function promptSetupOptions(agentKey: string): Promise<string | undefined>
   return selected.join(",");
 }
 
-export { promptSpawnName, getAndValidateCloudChoices, selectCloud };
+export { promptSpawnName, promptSetupOptions, getAndValidateCloudChoices, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
