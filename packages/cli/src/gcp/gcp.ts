@@ -18,7 +18,7 @@ import {
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import {
-  defaultSpawnName,
+  getServerNameFromEnv,
   logError,
   logInfo,
   logStep,
@@ -26,10 +26,9 @@ import {
   logStepInline,
   logWarn,
   prompt,
+  promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
-  toKebabCase,
-  validateServerName,
 } from "../shared/ui";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
@@ -644,39 +643,11 @@ function resolveUsername(): string {
 // ─── Server Name ────────────────────────────────────────────────────────────
 
 export async function getServerName(): Promise<string> {
-  if (process.env.GCP_INSTANCE_NAME) {
-    const name = process.env.GCP_INSTANCE_NAME;
-    if (!validateServerName(name)) {
-      logError(`Invalid GCP_INSTANCE_NAME: '${name}'`);
-      throw new Error("Invalid server name");
-    }
-    logInfo(`Using instance name from environment: ${name}`);
-    return name;
-  }
-
-  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  return kebab || defaultSpawnName();
+  return getServerNameFromEnv("GCP_INSTANCE_NAME");
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) {
-    return;
-  }
-
-  let kebab: string;
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();
-  } else {
-    const derived = process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "";
-    const fallback = derived || defaultSpawnName();
-    process.stderr.write("\n");
-    const answer = await prompt(`GCP instance name [${fallback}]: `);
-    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
-  }
-
-  process.env.SPAWN_NAME_DISPLAY = kebab;
-  process.env.SPAWN_NAME_KEBAB = kebab;
-  logInfo(`Using resource name: ${kebab}`);
+  return promptSpawnNameShared("GCP instance");
 }
 
 // ─── Cloud Init Startup Script ──────────────────────────────────────────────
