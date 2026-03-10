@@ -5,6 +5,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { filterHistory, markRecordDeleted } from "../history.js";
 import { loadManifest } from "../manifest.js";
+import { validateServerIdentifier } from "../security.js";
 import { parseJsonObj } from "../shared/parse.js";
 import { isString, toRecord } from "../shared/type-guards.js";
 import { loadApiToken } from "../shared/ui.js";
@@ -113,6 +114,11 @@ async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
 
   const serverId = conn.server_id || conn.server_name || "";
   if (!serverId) {
+    return "unknown";
+  }
+  try {
+    validateServerIdentifier(serverId);
+  } catch {
     return "unknown";
   }
 
