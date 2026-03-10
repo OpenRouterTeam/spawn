@@ -658,8 +658,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         configure: (apiKey: string, modelId?: string) =>
           setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken),
         preLaunch: () => startGateway(runner),
-        preLaunchMsg:
-          "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
+        preLaunchMsg: "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
         tunnel: {
