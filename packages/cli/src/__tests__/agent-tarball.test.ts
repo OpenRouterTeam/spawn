@@ -84,11 +84,14 @@ describe("tryTarballInstall", () => {
     const result = await tryTarballInstall(runner, "openclaw", fetchFn);
 
     expect(result).toBe(true);
-    expect(runner.runServer).toHaveBeenCalledTimes(1);
+    // 2 calls: download+extract, then mirror files for non-root users
+    expect(runner.runServer).toHaveBeenCalledTimes(2);
     const cmd = String(runner.runServer.mock.calls[0][0]);
     expect(cmd).toContain("curl -fsSL");
     expect(cmd).toContain("tar xz -C /");
     expect(cmd).toContain(".spawn-tarball");
+    const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+    expect(mirrorCmd).toContain("cp -a");
   });
 
   it("returns false when release does not exist (404)", async () => {

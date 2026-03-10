@@ -113,6 +113,27 @@ export async function tryTarballInstall(
     return false;
   }
 
+  // Phase 4: Mirror /root/ files to $HOME/ for non-root SSH users (e.g. GCP, AWS Lightsail).
+  // Tarballs are built with absolute /root/ paths, but some clouds SSH as a regular user
+  // whose $HOME is /home/<user>/, not /root/. Without this, binaries are unreachable.
+  const mirrorCmd = [
+    'if [ "$(id -u)" != "0" ]; then',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "/root/$_d" ]; then',
+    '      mkdir -p "$HOME/$_d"',
+    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    "    fi",
+    "  done",
+    "  # Copy marker file",
+    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "fi",
+  ].join("\n");
+  try {
+    await runner.runServer(mirrorCmd, 30);
+  } catch {
+    logWarn("Tarball file mirroring failed (non-fatal)");
+  }
+
   logInfo("Agent installed from pre-built tarball");
   return true;
 }
