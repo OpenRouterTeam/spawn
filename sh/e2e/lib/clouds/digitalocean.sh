@@ -149,6 +149,12 @@ _digitalocean_exec() {
     return 1
   fi
 
+  # Validate IP looks like an IPv4 address (defense-in-depth against file tampering)
+  if ! printf '%s' "${ip}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    log_err "Invalid IP address in ${ip_file}: ${ip}"
+    return 1
+  fi
+
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       "root@${ip}" "${cmd}"
@@ -182,6 +188,9 @@ _digitalocean_teardown() {
     untrack_app "${app}"
     return 0
   fi
+
+  # Validate droplet ID is numeric (defense-in-depth against metadata tampering)
+  case "${droplet_id}" in ''|*[!0-9]*) log_warn "Non-numeric droplet ID: ${droplet_id}"; untrack_app "${app}"; return 0 ;; esac
 
   # Retry DELETE up to 3 times with --max-time to prevent hangs
   local attempt=0
@@ -280,6 +289,9 @@ _digitalocean_cleanup_stale() {
     droplet_id=$(printf '%s' "${line}" | cut -d' ' -f1)
     local droplet_name
     droplet_name=$(printf '%s' "${line}" | cut -d' ' -f2)
+
+    # Validate droplet ID is numeric before using it in API URL
+    case "${droplet_id}" in ''|*[!0-9]*) log_warn "Skipping ${line} — non-numeric droplet ID"; skipped=$((skipped + 1)); continue ;; esac
 
     # Extract timestamp from name: e2e-AGENT-TIMESTAMP
     # The timestamp is the last dash-separated segment

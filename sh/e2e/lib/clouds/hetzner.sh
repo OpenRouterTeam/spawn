@@ -54,10 +54,14 @@ _hetzner_provision_verify() {
   local app="$1"
   local log_dir="$2"
 
+  # URL-encode the app name to prevent query parameter injection
+  local encoded_app
+  encoded_app=$(jq -rn --arg v "${app}" '$v|@uri')
+
   local response
   response=$(curl -sf \
     -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-    "${_HETZNER_API}/servers?name=${app}" 2>/dev/null || true)
+    "${_HETZNER_API}/servers?name=${encoded_app}" 2>/dev/null || true)
 
   if [ -z "${response}" ]; then
     log_err "Failed to query Hetzner API for server ${app}"
@@ -120,6 +124,17 @@ _hetzner_exec() {
   local ip
   ip=$(cat "${ip_file}")
 
+  if [ -z "${ip}" ]; then
+    log_err "Empty IP in ${ip_file}"
+    return 1
+  fi
+
+  # Validate IP looks like an IPv4 address (defense-in-depth against file tampering)
+  if ! printf '%s' "${ip}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    log_err "Invalid IP address in ${ip_file}: ${ip}"
+    return 1
+  fi
+
   ssh -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
       -o LogLevel=ERROR \
@@ -152,6 +167,9 @@ _hetzner_teardown() {
     untrack_app "${app}"
     return 0
   fi
+
+  # Validate server ID is numeric (defense-in-depth against metadata tampering)
+  case "${server_id}" in ''|*[!0-9]*) log_warn "Non-numeric server ID: ${server_id}"; untrack_app "${app}"; return 0 ;; esac
 
   log_step "Deleting Hetzner server ${app} (id=${server_id})"
 
@@ -219,6 +237,9 @@ _hetzner_cleanup_stale() {
 
     local server_name
     server_name=$(printf '%s' "${entry}" | cut -d: -f2-)
+
+    # Validate server ID is numeric before using it in API URL
+    case "${server_id}" in ''|*[!0-9]*) log_warn "Skipping ${entry} — non-numeric server ID"; skipped=$((skipped + 1)); continue ;; esac
 
     # Extract timestamp from name: e2e-AGENT-TIMESTAMP
     local ts

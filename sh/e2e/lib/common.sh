@@ -9,6 +9,11 @@ ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode hermes junie"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-720}"
 INSTALL_WAIT="${INSTALL_WAIT:-600}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
+# Validate numeric env vars that get interpolated into remote command strings.
+# A non-numeric value here could lead to shell injection via SSH commands.
+case "${PROVISION_TIMEOUT}" in ''|*[!0-9]*) PROVISION_TIMEOUT=720 ;; esac
+case "${INSTALL_WAIT}" in ''|*[!0-9]*) INSTALL_WAIT=600 ;; esac
+case "${INPUT_TEST_TIMEOUT}" in ''|*[!0-9]*) INPUT_TEST_TIMEOUT=120 ;; esac
 
 # Active cloud (set by load_cloud_driver)
 ACTIVE_CLOUD=""
