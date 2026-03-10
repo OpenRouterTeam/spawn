@@ -138,6 +138,7 @@ export async function cmdEnterAgent(
       const sep = acc.trimEnd().endsWith("&") ? " " : "; ";
       return acc + sep + part;
     }, "");
+    validateLaunchCmd(remoteCmd);
   }
 
   const agentName = agentDef?.name || agentKey;
