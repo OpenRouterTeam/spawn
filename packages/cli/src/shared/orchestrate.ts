@@ -102,10 +102,14 @@ export async function runOrchestration(
   // 5. Size/bundle selection
   await cloud.promptSize();
 
-  // 5b. Optional setup steps (checkboxes, all ON by default)
+  // 5b. Optional setup steps — read from env var (set by interactive.ts) or prompt
   let enabledSteps: Set<string> | undefined;
-  if (agent.optionalSteps && agent.optionalSteps.length > 0) {
-    // Filter out GitHub option if no token was detected on the host
+  const envSteps = process.env.SPAWN_ENABLED_STEPS;
+  if (envSteps !== undefined) {
+    // Already decided by the interactive prompt — parse the comma-separated list
+    enabledSteps = new Set(envSteps ? envSteps.split(",") : []);
+  } else if (agent.optionalSteps && agent.optionalSteps.length > 0) {
+    // Direct TypeScript path (no interactive.ts) — show multiselect
     const steps = agent.optionalSteps.filter((s) => s.value !== "github" || isGithubAuthDetected());
     if (steps.length > 0) {
       const allValues = steps.map((s) => s.value);

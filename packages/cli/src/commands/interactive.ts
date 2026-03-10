@@ -1,9 +1,11 @@
 import type { Manifest } from "../manifest.js";
+import type { OptionalStep } from "../shared/agents.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { agentKeys } from "../manifest.js";
+import { getAgentOptionalSteps } from "../shared/agents.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
@@ -121,6 +123,64 @@ async function promptSpawnName(): Promise<string | undefined> {
   return spawnName || undefined;
 }
 
+/** Check if user has a GitHub token on the host machine. */
+function hasLocalGithubToken(): boolean {
+  if (process.env.GITHUB_TOKEN) {
+    return true;
+  }
+  try {
+    const result = Bun.spawnSync(
+      [
+        "gh",
+        "auth",
+        "token",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    );
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Show multiselect for optional setup steps. Returns comma-separated string for env var, or undefined. */
+async function promptSetupOptions(agentKey: string): Promise<string | undefined> {
+  const steps = getAgentOptionalSteps(agentKey);
+  if (steps.length === 0) {
+    return undefined;
+  }
+
+  // Filter out GitHub option if no token detected on host
+  const hasGh = hasLocalGithubToken();
+  const filtered: OptionalStep[] = steps.filter((s) => s.value !== "github" || hasGh);
+  if (filtered.length === 0) {
+    return undefined;
+  }
+
+  const allValues = filtered.map((s) => s.value);
+  const selected = await p.multiselect({
+    message: "Setup options (space to toggle, enter to confirm)",
+    options: filtered.map((s) => ({
+      value: s.value,
+      label: s.label,
+      hint: s.hint,
+    })),
+    initialValues: allValues,
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return allValues.join(",");
+  }
+  return selected.join(",");
+}
+
 export { promptSpawnName, getAndValidateCloudChoices, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
@@ -165,6 +225,11 @@ export async function cmdInteractive(): Promise<void> {
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const setupSteps = await promptSetupOptions(agentChoice);
+  if (setupSteps !== undefined) {
+    process.env.SPAWN_ENABLED_STEPS = setupSteps;
+  }
 
   const spawnName = await promptSpawnName();
 
@@ -211,6 +276,11 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   }
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const setupSteps = await promptSetupOptions(resolvedAgent);
+  if (setupSteps !== undefined) {
+    process.env.SPAWN_ENABLED_STEPS = setupSteps;
+  }
 
   const spawnName = await promptSpawnName();
 

@@ -40,6 +40,51 @@ export interface AgentConfig {
   optionalSteps?: OptionalStep[];
 }
 
+// ─── Static optional steps (no CloudRunner needed) ──────────────────────────
+
+const GITHUB_STEP: OptionalStep = {
+  value: "github",
+  label: "GitHub CLI",
+  hint: "authenticate gh on the remote",
+};
+
+const AGENT_OPTIONAL_STEPS: Record<string, OptionalStep[]> = {
+  claude: [
+    GITHUB_STEP,
+  ],
+  codex: [
+    GITHUB_STEP,
+  ],
+  openclaw: [
+    GITHUB_STEP,
+    {
+      value: "browser",
+      label: "Chrome browser",
+      hint: "~400 MB — needed for web tools",
+    },
+  ],
+  opencode: [
+    GITHUB_STEP,
+  ],
+  kilocode: [
+    GITHUB_STEP,
+  ],
+  zeroclaw: [
+    GITHUB_STEP,
+  ],
+  hermes: [
+    GITHUB_STEP,
+  ],
+  junie: [
+    GITHUB_STEP,
+  ],
+};
+
+/** Return optional setup steps for an agent key (static, no CloudRunner needed). */
+export function getAgentOptionalSteps(agentKey: string): OptionalStep[] {
+  return AGENT_OPTIONAL_STEPS[agentKey] ?? [];
+}
+
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
 
 /**

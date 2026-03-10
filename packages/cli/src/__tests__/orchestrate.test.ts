@@ -120,6 +120,7 @@ describe("runOrchestration", () => {
   let stderrSpy: ReturnType<typeof spyOn>;
   let testDir: string;
   let savedSpawnHome: string | undefined;
+  let savedEnabledSteps: string | undefined;
 
   beforeEach(() => {
     capturedExitCode = undefined;
@@ -132,6 +133,9 @@ describe("runOrchestration", () => {
     process.env.SPAWN_HOME = testDir;
     // Skip GitHub auth prompts during tests
     process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
+    // Ensure multiselect tests aren't affected by env var from interactive.ts
+    savedEnabledSteps = process.env.SPAWN_ENABLED_STEPS;
+    delete process.env.SPAWN_ENABLED_STEPS;
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     exitSpy = spyOn(process, "exit").mockImplementation((code) => {
       capturedExitCode = isNumber(code) ? code : 0;
@@ -144,6 +148,11 @@ describe("runOrchestration", () => {
   });
 
   afterEach(() => {
+    if (savedEnabledSteps !== undefined) {
+      process.env.SPAWN_ENABLED_STEPS = savedEnabledSteps;
+    } else {
+      delete process.env.SPAWN_ENABLED_STEPS;
+    }
     if (savedSpawnHome !== undefined) {
       process.env.SPAWN_HOME = savedSpawnHome;
     } else {
