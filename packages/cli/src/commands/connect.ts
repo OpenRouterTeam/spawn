@@ -3,8 +3,8 @@ import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { getHistoryPath } from "../history.js";
 import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
+import { getHistoryPath } from "../shared/paths.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { getErrorMessage } from "./shared.js";

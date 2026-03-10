@@ -8,8 +8,8 @@ import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
 import { PkgVersionSchema } from "../shared/parse.js";
+import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
-import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

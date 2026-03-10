@@ -3,7 +3,8 @@ import type { SpawnRecord } from "../history.js";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { clearHistory, filterHistory, getHistoryPath, loadHistory, saveSpawnRecord } from "../history.js";
+import { clearHistory, filterHistory, loadHistory, saveSpawnRecord } from "../history.js";
+import { getHistoryPath } from "../shared/paths.js";
 import { mockClackPrompts } from "./test-helpers";
 
 /**

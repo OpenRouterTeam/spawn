@@ -2,22 +2,9 @@
 // @clack/prompts is bundled into cli.js at build time.
 
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import * as p from "@clack/prompts";
+import { getSpawnCloudConfigPath } from "./paths";
 import { isString } from "./type-guards";
-
-/**
- * Return the user's home directory, preferring process.env.HOME.
- *
- * Bun's os.homedir() reads from getpwuid() and ignores runtime changes to
- * process.env.HOME. Named imports (`import { homedir } from "node:os"`)
- * capture a binding to the native function that cannot be patched by test
- * preloads. Using process.env.HOME first ensures the test sandbox is respected.
- */
-export function getUserHome(): string {
-  return process.env.HOME || homedir();
-}
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
@@ -237,14 +224,6 @@ export async function withRetry<T>(
     await new Promise((r) => setTimeout(r, delaySec * 1000));
   }
   throw new Error("unreachable");
-}
-
-/**
- * Return the path to the per-cloud config file: ~/.config/spawn/{cloud}.json
- * Shared by all cloud modules to avoid repeating the same path construction.
- */
-export function getSpawnCloudConfigPath(cloud: string): string {
-  return join(getUserHome(), ".config", "spawn", `${cloud}.json`);
 }
 
 /**

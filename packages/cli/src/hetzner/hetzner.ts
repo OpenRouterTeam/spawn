@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
+import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -19,7 +20,6 @@ import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-k
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
-  getSpawnCloudConfigPath,
   jsonEscape,
   loadApiToken,
   logError,

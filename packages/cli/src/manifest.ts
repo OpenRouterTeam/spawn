@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getCacheDir, getCacheFile } from "./shared/paths.js";
 import { getErrorMessage } from "./shared/type-guards.js";
-import { getUserHome } from "./shared/ui.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -72,13 +72,6 @@ const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main` as const;
 const SPAWN_CDN = "https://openrouter.ai/labs/spawn" as const;
 /** Static URL for version checks — GitHub release artifact, never changes with repo structure */
 const VERSION_URL = `https://github.com/${REPO}/releases/download/cli-latest/version` as const;
-// Dynamic getters so tests can override XDG_CACHE_HOME at runtime
-function getCacheDir(): string {
-  return join(process.env.XDG_CACHE_HOME || join(getUserHome(), ".cache"), "spawn");
-}
-function getCacheFile(): string {
-  return join(getCacheDir(), "manifest.json");
-}
 const CACHE_TTL = 3600; // 1 hour in seconds
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
