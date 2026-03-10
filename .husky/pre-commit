@@ -1,0 +1,1 @@
+cd packages/cli && bunx @biomejs/biome check src/

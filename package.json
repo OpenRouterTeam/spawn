@@ -5,5 +5,13 @@
     "packages/*",
     ".claude/skills/setup-spa",
     ".claude/scripts"
-  ]
+  ],
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
+    "husky": "^9.1.7"
+  }
 }
