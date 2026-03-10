@@ -4,6 +4,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { agentKeys } from "../manifest.js";
+import { getAgentOptionalSteps } from "../shared/agents.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
@@ -20,14 +21,14 @@ import {
   VERSION,
 } from "./shared.js";
 
-// Prompt user to select an agent with hints and type-ahead filtering
+// Prompt user to select an agent with arrow-key navigation
 async function selectAgent(manifest: Manifest): Promise<string> {
   const agents = agentKeys(manifest);
   const agentHints = buildAgentPickerHints(manifest);
-  const agentChoice = await p.autocomplete({
-    message: "Select an agent (type to filter)",
+  const agentChoice = await p.select({
+    message: "Select an agent",
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
-    placeholder: "Start typing to search...",
+    initialValue: agents.includes("openclaw") ? "openclaw" : agents[0],
   });
   if (p.isCancel(agentChoice)) {
     handleCancel();
@@ -73,16 +74,16 @@ function getAndValidateCloudChoices(
   };
 }
 
-// Prompt user to select a cloud from the sorted list with type-ahead filtering
+// Prompt user to select a cloud with arrow-key navigation
 async function selectCloud(
   manifest: Manifest,
   cloudList: string[],
   hintOverrides: Record<string, string>,
 ): Promise<string> {
-  const cloudChoice = await p.autocomplete({
-    message: "Select a cloud (type to filter)",
+  const cloudChoice = await p.select({
+    message: "Select a cloud",
     options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
-    placeholder: "Start typing to search...",
+    initialValue: cloudList[0],
   });
   if (p.isCancel(cloudChoice)) {
     handleCancel();
@@ -121,7 +122,66 @@ async function promptSpawnName(): Promise<string | undefined> {
   return spawnName || undefined;
 }
 
-export { promptSpawnName, getAndValidateCloudChoices, selectCloud };
+/** Check whether the local host has a GitHub token (env or `gh auth`). */
+function hasLocalGithubToken(): boolean {
+  if (process.env.GITHUB_TOKEN) {
+    return true;
+  }
+  try {
+    const result = Bun.spawnSync(
+      [
+        "gh",
+        "auth",
+        "token",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    );
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Show a multiselect prompt for optional post-provision setup steps.
+ * Returns a Set of enabled step values, or undefined if there are no steps.
+ * On cancel, returns all steps enabled (safe default).
+ */
+async function promptSetupOptions(agentName: string): Promise<Set<string> | undefined> {
+  const steps = getAgentOptionalSteps(agentName);
+
+  // Filter GitHub option if no local token detected
+  const filteredSteps = hasLocalGithubToken() ? steps : steps.filter((s) => s.value !== "github");
+
+  if (filteredSteps.length === 0) {
+    return undefined;
+  }
+
+  const allValues = filteredSteps.map((s) => s.value);
+  const selected = await p.multiselect({
+    message: "Setup options",
+    options: filteredSteps.map((s) => ({
+      value: s.value,
+      label: s.label,
+      hint: s.hint,
+    })),
+    initialValues: allValues,
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return new Set(allValues);
+  }
+  return new Set(selected);
+}
+
+export { promptSpawnName, promptSetupOptions, getAndValidateCloudChoices, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
@@ -165,6 +225,13 @@ export async function cmdInteractive(): Promise<void> {
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const enabledSteps = await promptSetupOptions(agentChoice);
+  if (enabledSteps) {
+    process.env.SPAWN_ENABLED_STEPS = [
+      ...enabledSteps,
+    ].join(",");
+  }
 
   const spawnName = await promptSpawnName();
 
@@ -211,6 +278,13 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   }
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const enabledSteps = await promptSetupOptions(resolvedAgent);
+  if (enabledSteps) {
+    process.env.SPAWN_ENABLED_STEPS = [
+      ...enabledSteps,
+    ].join(",");
+  }
 
   const spawnName = await promptSpawnName();
 

@@ -117,6 +117,8 @@ describe("runOrchestration", () => {
     process.env.SPAWN_HOME = testDir;
     // Skip GitHub auth prompts during tests
     process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
+    // Ensure no stale SPAWN_ENABLED_STEPS leaks between tests
+    delete process.env.SPAWN_ENABLED_STEPS;
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     exitSpy = spyOn(process, "exit").mockImplementation((code) => {
       capturedExitCode = isNumber(code) ? code : 0;
@@ -326,7 +328,7 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3", undefined);
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
@@ -342,7 +344,7 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro", undefined);
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -359,7 +361,7 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined);
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined, undefined);
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();

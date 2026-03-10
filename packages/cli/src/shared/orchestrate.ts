@@ -170,17 +170,26 @@ export async function runOrchestration(
     logWarn("Environment setup had errors");
   }
 
-  // 10. Agent-specific configuration
+  // 10. Parse enabled setup steps from env (set by interactive/run prompts)
+  let enabledSteps: Set<string> | undefined;
+  const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
+  if (stepsEnv !== undefined) {
+    enabledSteps = new Set(stepsEnv.split(",").filter(Boolean));
+  }
+
+  // 10b. Agent-specific configuration
   if (agent.configure) {
     try {
-      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId)), 2, 5);
+      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5);
     } catch {
       logWarn("Agent configuration failed (continuing with defaults)");
     }
   }
 
-  // GitHub CLI setup
-  await offerGithubAuth(cloud.runner);
+  // GitHub CLI setup (skip if user unchecked in setup options)
+  if (!enabledSteps || enabledSteps.has("github")) {
+    await offerGithubAuth(cloud.runner);
+  }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
   if (agent.preLaunch) {

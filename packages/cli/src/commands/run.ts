@@ -10,7 +10,7 @@ import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.j
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
-import { promptSpawnName } from "./interactive.js";
+import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
 import {
   buildRetryCommand,
@@ -934,6 +934,13 @@ export async function cmdRun(
   }
 
   await preflightCredentialCheck(manifest, cloud);
+
+  const enabledSteps = await promptSetupOptions(agent);
+  if (enabledSteps) {
+    process.env.SPAWN_ENABLED_STEPS = [
+      ...enabledSteps,
+    ].join(",");
+  }
 
   const spawnName = await promptSpawnName();
 

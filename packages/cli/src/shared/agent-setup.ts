@@ -339,13 +339,17 @@ async function setupOpenclawConfig(
   apiKey: string,
   modelId: string,
   token?: string,
+  enabledSteps?: Set<string>,
 ): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
   // Chrome must be installed before config is written (config references its path).
   // This runs in configure() — not install() — so it works even with tarball installs.
-  await installChromeBrowser(runner);
+  // Gate with enabledSteps — user can skip ~400 MB download via setup checkboxes.
+  if (!enabledSteps || enabledSteps.has("browser")) {
+    await installChromeBrowser(runner);
+  }
 
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
   const escapedKey = jsonEscape(apiKey);
@@ -655,8 +659,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           `ANTHROPIC_API_KEY=${apiKey}`,
           "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
         ],
-        configure: (apiKey: string, modelId?: string) =>
-          setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken),
+        configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
+          setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken, enabledSteps),
         preLaunch: () => startGateway(runner),
         preLaunchMsg: "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
         launchCmd: () =>
