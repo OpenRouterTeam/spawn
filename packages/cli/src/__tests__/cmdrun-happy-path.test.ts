@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { HISTORY_SCHEMA_VERSION } from "../history.js";
 import { loadManifest } from "../manifest";
@@ -134,7 +133,7 @@ describe("cmdRun happy-path pipeline", () => {
     originalFetch = global.fetch;
 
     // Set up isolated history directory
-    historyDir = join(homedir(), `spawn-test-history-${Date.now()}-${Math.random()}`);
+    historyDir = join(process.env.HOME ?? "", `spawn-test-history-${Date.now()}-${Math.random()}`);
     mkdirSync(historyDir, {
       recursive: true,
     });
@@ -340,7 +339,7 @@ describe("cmdRun happy-path pipeline", () => {
 
     it("should still execute script when history save fails", async () => {
       // Make history dir read-only to force saveSpawnRecord failure
-      const readOnlyDir = join(homedir(), `spawn-test-readonly-${Date.now()}`);
+      const readOnlyDir = join(process.env.HOME ?? "", `spawn-test-readonly-${Date.now()}`);
       mkdirSync(readOnlyDir, {
         recursive: true,
       });

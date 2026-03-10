@@ -13,7 +13,6 @@ import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   generateSpawnId,
@@ -30,7 +29,7 @@ describe("history spawn IDs", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });

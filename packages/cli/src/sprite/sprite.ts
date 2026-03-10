@@ -3,12 +3,12 @@
 import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
+  getUserHome,
   logError,
   logInfo,
   logStep,
@@ -112,7 +112,7 @@ function getSpriteCmd(): string | null {
     return "sprite";
   }
   const commonPaths = [
-    join(process.env.HOME || homedir(), ".local/bin/sprite"),
+    join(getUserHome(), ".local/bin/sprite"),
     "/data/data/com.termux/files/usr/bin/sprite",
     "/usr/local/bin/sprite",
     "/usr/bin/sprite",
@@ -168,7 +168,7 @@ export async function ensureSpriteCli(): Promise<void> {
   }
 
   // Add to PATH
-  const localBin = join(process.env.HOME || homedir(), ".local/bin");
+  const localBin = join(getUserHome(), ".local/bin");
   if (!process.env.PATH?.includes(localBin)) {
     process.env.PATH = `${localBin}:${process.env.PATH}`;
   }

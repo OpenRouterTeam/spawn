@@ -2,7 +2,6 @@ import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { clearHistory, filterHistory, getHistoryPath, loadHistory, saveSpawnRecord } from "../history.js";
 import { mockClackPrompts } from "./test-helpers";
@@ -21,7 +20,7 @@ describe("clearHistory", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });
@@ -294,7 +293,7 @@ describe("cmdListClear", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });

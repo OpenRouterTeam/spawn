@@ -2,7 +2,6 @@ import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   filterHistory,
@@ -19,7 +18,7 @@ describe("history", () => {
 
   beforeEach(() => {
     // Use a directory within home directory for testing (required by security validation)
-    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });
@@ -43,14 +42,14 @@ describe("history", () => {
 
   describe("getSpawnDir", () => {
     it("returns SPAWN_HOME when set to valid path within home", () => {
-      const validPath = join(homedir(), "custom", "spawn", "dir");
+      const validPath = join(process.env.HOME ?? "", "custom", "spawn", "dir");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
     });
 
     it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
       delete process.env.SPAWN_HOME;
-      expect(getSpawnDir()).toBe(join(homedir(), ".spawn"));
+      expect(getSpawnDir()).toBe(join(process.env.HOME ?? "", ".spawn"));
     });
 
     it("throws for relative SPAWN_HOME path", () => {
@@ -64,13 +63,13 @@ describe("history", () => {
     });
 
     it("resolves .. segments in absolute SPAWN_HOME within home", () => {
-      const pathWithDots = join(homedir(), "foo", "..", "bar");
+      const pathWithDots = join(process.env.HOME ?? "", "foo", "..", "bar");
       process.env.SPAWN_HOME = pathWithDots;
-      expect(getSpawnDir()).toBe(join(homedir(), "bar"));
+      expect(getSpawnDir()).toBe(join(process.env.HOME ?? "", "bar"));
     });
 
     it("accepts normal absolute SPAWN_HOME within home", () => {
-      const validPath = join(homedir(), ".spawn");
+      const validPath = join(process.env.HOME ?? "", ".spawn");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
     });
@@ -83,14 +82,14 @@ describe("history", () => {
     it("throws for path traversal attempt to escape home directory", () => {
       // Attempt to traverse outside home using .. segments
       // e.g., /home/user/../../etc/.spawn
-      const traversalPath = join(homedir(), "..", "..", "etc", ".spawn");
+      const traversalPath = join(process.env.HOME ?? "", "..", "..", "etc", ".spawn");
       process.env.SPAWN_HOME = traversalPath;
       expect(() => getSpawnDir()).toThrow("must be within your home directory");
     });
 
     it("accepts home directory itself as SPAWN_HOME", () => {
-      process.env.SPAWN_HOME = homedir();
-      expect(getSpawnDir()).toBe(homedir());
+      process.env.SPAWN_HOME = process.env.HOME ?? "";
+      expect(getSpawnDir()).toBe(process.env.HOME ?? "");
     });
   });
 
@@ -247,7 +246,7 @@ describe("history", () => {
 
   describe("saveSpawnRecord", () => {
     it("creates directory and file when neither exist", () => {
-      const nestedDir = join(homedir(), ".spawn-test", "nested", "spawn");
+      const nestedDir = join(process.env.HOME ?? "", ".spawn-test", "nested", "spawn");
       process.env.SPAWN_HOME = nestedDir;
 
       saveSpawnRecord({
@@ -263,7 +262,7 @@ describe("history", () => {
       expect(data.records[0].agent).toBe("claude");
 
       // Clean up
-      rmSync(join(homedir(), ".spawn-test"), {
+      rmSync(join(process.env.HOME ?? "", ".spawn-test"), {
         recursive: true,
         force: true,
       });

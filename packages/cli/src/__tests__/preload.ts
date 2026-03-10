@@ -24,7 +24,7 @@
  */
 
 import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ── Stray test file cleanup ──────────────────────────────────────────────────
@@ -66,6 +66,22 @@ process.env.HOME = TEST_HOME;
 process.env.XDG_CACHE_HOME = join(TEST_HOME, ".cache");
 process.env.XDG_CONFIG_HOME = join(TEST_HOME, ".config");
 process.env.XDG_DATA_HOME = join(TEST_HOME, ".local", "share");
+
+// ── IMPORTANT: Bun's os.homedir() ignores process.env.HOME ──────────────
+//
+// Bun's os.homedir() reads from getpwuid() and never re-checks env vars.
+// Named imports (`import { homedir } from "node:os"`) capture a binding to
+// the native function, so patching `os.homedir` on the default export does
+// NOT propagate to other modules' destructured imports.
+//
+// The ONLY reliable way to sandbox homedir in tests is to ensure all code
+// uses `process.env.HOME` (which the preload controls) rather than calling
+// `homedir()` directly. Production code uses `getUserHome()` from
+// shared/ui.ts; test files should use `process.env.HOME ?? ""`.
+//
+// This default-export patch catches direct `os.homedir()` calls (rare) but
+// cannot fix `import { homedir } from "node:os"` in other modules.
+os.homedir = () => TEST_HOME;
 
 // Pre-create common directories tests might expect
 mkdirSync(join(TEST_HOME, ".cache"), {

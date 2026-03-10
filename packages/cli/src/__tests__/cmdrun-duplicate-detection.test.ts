@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
@@ -100,7 +99,7 @@ describe("cmdRun --name duplicate detection", () => {
     originalSpawnHome = process.env.SPAWN_HOME;
     originalSpawnName = process.env.SPAWN_NAME;
 
-    historyDir = join(homedir(), `spawn-dup-test-${Date.now()}-${Math.random()}`);
+    historyDir = join(process.env.HOME ?? "", `spawn-dup-test-${Date.now()}-${Math.random()}`);
     mkdirSync(historyDir, {
       recursive: true,
     });

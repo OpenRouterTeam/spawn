@@ -2,7 +2,6 @@ import type { SpawnRecord } from "../history";
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
@@ -63,7 +62,7 @@ describe("cmdList integration", () => {
   }
 
   beforeEach(async () => {
-    testDir = join(homedir(), `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
+    testDir = join(process.env.HOME ?? "", `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
     });
