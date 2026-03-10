@@ -87,6 +87,61 @@ has_passwordless_sudo() {
     return 1
 }
 
+# --- Helper: verify symlink target is safe before overwriting ---
+# Returns 0 if the path doesn't exist, is not a symlink, or points to a safe location.
+# Returns 1 if it's a symlink pointing to an unexpected location (potential hijack).
+# Safe prefixes: $HOME/.local, $HOME/.bun, /usr/local, $HOME/.npm-global
+verify_symlink_safe() {
+    local target_path="$1"
+    # No file at all — safe to create
+    if [ ! -e "$target_path" ] && [ ! -L "$target_path" ]; then
+        return 0
+    fi
+    # Not a symlink (regular file or dir) — safe to overwrite with -f
+    if [ ! -L "$target_path" ]; then
+        return 0
+    fi
+    # It's a symlink — read where it points (portable: readlink without -f)
+    local link_target
+    link_target="$(readlink "$target_path" 2>/dev/null || true)"
+    if [ -z "$link_target" ]; then
+        # Could not read symlink — treat as suspicious
+        return 1
+    fi
+    # Check against safe prefixes
+    case "$link_target" in
+        "${HOME}/.local/"*|"${HOME}/.bun/"*|"/usr/local/"*|"${HOME}/.npm-global/"*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# --- Helper: create symlink only if existing target is safe ---
+# Usage: safe_ln_sf <source> <dest> [sudo]
+# Warns and skips if dest is a symlink pointing to an unexpected location.
+safe_ln_sf() {
+    local src="$1"
+    local dest="$2"
+    local use_sudo="${3:-}"
+    local name
+    name="$(basename "$dest")"
+    if ! verify_symlink_safe "$dest"; then
+        local existing
+        existing="$(readlink "$dest" 2>/dev/null || true)"
+        log_warn "Skipping ${dest}: existing symlink points to unexpected location (${existing})"
+        log_warn "Remove it manually if you trust the target: rm ${dest}"
+        return 1
+    fi
+    if [ "$use_sudo" = "sudo" ]; then
+        sudo ln -sf "$src" "$dest"
+    else
+        ln -sf "$src" "$dest"
+    fi
+}
+
 # --- Helper: ensure spawn works immediately and in future sessions ---
 # Installs to ~/.local/bin. If that's not already in PATH, also symlinks
 # to /usr/local/bin for immediate availability (without prompting for a
@@ -115,21 +170,21 @@ ensure_in_path() {
     bun_path="$(command -v bun 2>/dev/null || true)"
     if [ "$spawn_in_path" = false ]; then
         if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
-            ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
+            safe_ln_sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
             if [ -n "$bun_path" ] && [ ! -x /usr/local/bin/bun ]; then
-                ln -sf "$bun_path" /usr/local/bin/bun 2>/dev/null || true
+                safe_ln_sf "$bun_path" /usr/local/bin/bun 2>/dev/null || true
             fi
         elif has_passwordless_sudo; then
-            sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn 2>/dev/null && linked=true
+            safe_ln_sf "${install_dir}/spawn" /usr/local/bin/spawn sudo 2>/dev/null && linked=true
             if [ -n "$bun_path" ] && [ ! -x /usr/local/bin/bun ]; then
-                sudo ln -sf "$bun_path" /usr/local/bin/bun 2>/dev/null || true
+                safe_ln_sf "$bun_path" /usr/local/bin/bun sudo 2>/dev/null || true
             fi
         elif command -v sudo &>/dev/null; then
             # Last resort: ask for password
             log_step "Adding spawn to /usr/local/bin (may require your password)..."
-            sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true || true
+            safe_ln_sf "${install_dir}/spawn" /usr/local/bin/spawn sudo && linked=true || true
             if [ "$linked" = true ] && [ -n "$bun_path" ] && [ ! -x /usr/local/bin/bun ]; then
-                sudo ln -sf "$bun_path" /usr/local/bin/bun 2>/dev/null || true
+                safe_ln_sf "$bun_path" /usr/local/bin/bun sudo 2>/dev/null || true
             fi
         fi
     fi

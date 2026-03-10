@@ -86,7 +86,6 @@ cloud_validate_env()     { "_${ACTIVE_CLOUD}_validate_env" "$@"; }
 cloud_headless_env()     { "_${ACTIVE_CLOUD}_headless_env" "$@"; }
 cloud_provision_verify() { "_${ACTIVE_CLOUD}_provision_verify" "$@"; }
 cloud_exec()             { "_${ACTIVE_CLOUD}_exec" "$@"; }
-cloud_exec_long()        { "_${ACTIVE_CLOUD}_exec_long" "$@"; }
 cloud_teardown()         { "_${ACTIVE_CLOUD}_teardown" "$@"; }
 cloud_cleanup_stale()    { "_${ACTIVE_CLOUD}_cleanup_stale" "$@"; }
 
