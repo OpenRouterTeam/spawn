@@ -2,7 +2,7 @@ import type { ToolCall } from "./helpers";
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
-import { toRecord } from "../../../packages/cli/src/shared/type-guards";
+import { toRecord } from "@openrouter/spawn-shared";
 import {
   downloadSlackFile,
   extractMarkdownTables,

@@ -7,7 +7,7 @@ import type { ToolCall } from "./helpers";
 
 import { App } from "@slack/bolt";
 import * as v from "valibot";
-import { isString, toRecord } from "../../../packages/cli/src/shared/type-guards";
+import { isString, toRecord } from "@openrouter/spawn-shared";
 import {
   downloadSlackFile,
   findThread,
