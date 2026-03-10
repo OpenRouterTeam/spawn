@@ -960,7 +960,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
 
 // ─── Wait for Instance ──────────────────────────────────────────────────────
 
-export async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
+async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
   logStep("Waiting for instance to become running...");
   const pollDelay = 5000;
 

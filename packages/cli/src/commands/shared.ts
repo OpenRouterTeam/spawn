@@ -28,7 +28,7 @@ export function handleCancel(): never {
   process.exit(0);
 }
 
-export async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
+async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
   const s = p.spinner();
   s.start(msg);
   try {
@@ -191,7 +191,7 @@ interface EntityDef {
   listCmd: string;
   opposite: string;
 }
-export const ENTITY_DEFS: Record<"agent" | "cloud", EntityDef> = {
+const ENTITY_DEFS: Record<"agent" | "cloud", EntityDef> = {
   agent: {
     label: "agent",
     labelPlural: "agents",

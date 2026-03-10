@@ -5,13 +5,13 @@
 
 import pc from "picocolors";
 
-export interface SignalEntry {
+interface SignalEntry {
   header: string;
   causes: string[];
   includeDashboard: boolean;
 }
 
-export interface ExitCodeEntry {
+interface ExitCodeEntry {
   header: string;
   lines: string[];
   includeDashboard: boolean;
