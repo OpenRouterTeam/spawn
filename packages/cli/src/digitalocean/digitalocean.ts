@@ -688,11 +688,9 @@ export async function ensureSshKey(): Promise<void> {
       name: `spawn-${key.name}`,
       public_key: pubKey,
     });
-    let regText: string;
-    try {
-      regText = await doApi("POST", "/account/keys", body);
-    } catch (err) {
-      const msg = getErrorMessage(err);
+    const regResult = await asyncTryCatch(async () => doApi("POST", "/account/keys", body));
+    if (!regResult.ok) {
+      const msg = getErrorMessage(regResult.error);
       // Key may already exist under a different name — non-fatal
       if (msg.includes("already been taken") || msg.includes("already in use")) {
         logInfo(`SSH key '${key.name}' already registered (under a different name)`);
@@ -701,6 +699,7 @@ export async function ensureSshKey(): Promise<void> {
       logWarn(`SSH key '${key.name}' registration may have failed, continuing...`);
       continue;
     }
+    const regText = regResult.data;
 
     if (regText.includes('"id"')) {
       logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
