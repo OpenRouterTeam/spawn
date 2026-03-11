@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { getUserHome } from "../shared/paths";
+import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -796,15 +797,13 @@ export async function createInstance(
     }
   } finally {
     // Clean up temp file after all retry paths have completed
-    try {
+    tryCatch(() =>
       Bun.spawnSync([
         "rm",
         "-f",
         tmpFile,
-      ]);
-    } catch {
-      /* ignore */
-    }
+      ]),
+    );
   }
 
   // Get external IP
@@ -857,7 +856,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -889,13 +888,12 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
       } finally {
         clearTimeout(timer);
       }
-      if (exitCode === 0) {
-        logStepDone();
-        logInfo("Startup script completed");
-        return;
-      }
-    } catch {
-      // ignore
+      return exitCode;
+    });
+    if (pollResult.ok && pollResult.data === 0) {
+      logStepDone();
+      logInfo("Startup script completed");
+      return;
     }
     logStepInline(`Startup script running (${attempt}/${maxAttempts})`);
     await sleep(5000);

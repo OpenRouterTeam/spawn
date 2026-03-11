@@ -1,5 +1,6 @@
 // shared/billing-guidance.ts — Billing error detection, guidance, and browser-based retry flow
 
+import { asyncTryCatch, unwrapOr } from "./result.js";
 import { logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Billing URLs per cloud ─────────────────────────────────────────────────
@@ -106,12 +107,13 @@ export async function handleBillingError(cloud: string): Promise<boolean> {
   }
 
   process.stderr.write("\n");
-  try {
-    await prompt("Press Enter after adding a payment method to retry (or Ctrl+C to exit)");
-    return true;
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    await asyncTryCatch(async () => {
+      await prompt("Press Enter after adding a payment method to retry (or Ctrl+C to exit)");
+      return true;
+    }),
+    false,
+  );
 }
 
 /**

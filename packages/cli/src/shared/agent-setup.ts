@@ -7,7 +7,7 @@ import type { Result } from "./ui";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getTmpDir } from "./paths";
-import { asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
+import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
@@ -49,9 +49,10 @@ async function installAgent(
   timeoutSecs?: number,
 ): Promise<void> {
   logStep(`Installing ${agentName}...`);
-  try {
-    await withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10);
-  } catch {
+  const r = await asyncTryCatch(() =>
+    withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10),
+  );
+  if (!r.ok) {
     logError(`${agentName} installation failed`);
     throw new Error(`${agentName} install failed`);
   }
@@ -117,13 +118,12 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     "exit 1",
   ].join("\n");
 
-  try {
-    await runner.runServer(script, 300);
-    logInfo("Claude Code installed");
-  } catch {
+  const r = await asyncTryCatch(() => runner.runServer(script, 300));
+  if (!r.ok) {
     logError("Claude Code installation failed");
     throw new Error("Claude Code install failed");
   }
+  logInfo("Claude Code installed");
 }
 
 async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {

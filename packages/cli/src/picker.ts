@@ -19,6 +19,7 @@
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import { tryCatch, unwrapOr } from "./shared/result.js";
 
 export interface PickOption {
   value: string;
@@ -87,31 +88,34 @@ const trunc = (s: string, max: number): string => (s.length <= max ? s : s.slice
 
 /** Get terminal column width from a tty file descriptor. */
 function getTTYCols(ttyFd: number): number {
-  try {
-    const res = spawnSync(
-      "stty",
-      [
-        "size",
-      ],
-      {
-        stdio: [
-          ttyFd,
-          "pipe",
-          "pipe",
+  return unwrapOr(
+    tryCatch(() => {
+      const res = spawnSync(
+        "stty",
+        [
+          "size",
         ],
-      },
-    );
-    if (res.status === 0 && res.stdout) {
-      const parts = res.stdout.toString().trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const c = Number.parseInt(parts[1], 10);
-        if (c > 0) {
-          return c;
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+      if (res.status === 0 && res.stdout) {
+        const parts = res.stdout.toString().trim().split(/\s+/);
+        if (parts.length >= 2) {
+          const c = Number.parseInt(parts[1], 10);
+          if (c > 0) {
+            return c;
+          }
         }
       }
-    }
-  } catch {}
-  return 80;
+      return 80;
+    }),
+    80,
+  );
 }
 
 // ── Shared TTY key-loop infrastructure ───────────────────────────────────────
@@ -140,12 +144,11 @@ interface KeyLoopCallbacks<T> {
  */
 function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
   // ── open /dev/tty ────────────────────────────────────────────────────────
-  let ttyFd: number;
-  try {
-    ttyFd = fs.openSync("/dev/tty", "r+");
-  } catch {
+  const openResult = tryCatch(() => fs.openSync("/dev/tty", "r+"));
+  if (!openResult.ok) {
     return callbacks.fallback();
   }
+  const ttyFd = openResult.data;
 
   // ── save terminal settings ──────────────────────────────────────────────
   const savedRes = spawnSync(
@@ -189,13 +192,11 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
 
   // ── helpers ─────────────────────────────────────────────────────────────
   const w: WriteFn = (s) => {
-    try {
-      fs.writeSync(ttyFd, s);
-    } catch {}
+    tryCatch(() => fs.writeSync(ttyFd, s));
   };
 
   const restore = () => {
-    try {
+    tryCatch(() =>
       spawnSync(
         "stty",
         [
@@ -208,12 +209,10 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
             "pipe",
           ],
         },
-      );
-    } catch {}
+      ),
+    );
     w(A.showC);
-    try {
-      fs.closeSync(ttyFd);
-    } catch {}
+    tryCatch(() => fs.closeSync(ttyFd));
   };
 
   // ── init (first render) ─────────────────────────────────────────────────
@@ -228,12 +227,11 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
 
   try {
     while (true) {
-      let n: number;
-      try {
-        n = fs.readSync(ttyFd, buf, 0, 8, null);
-      } catch {
+      const readResult = tryCatch(() => fs.readSync(ttyFd, buf, 0, 8, null));
+      if (!readResult.ok) {
         break;
       }
+      const n = readResult.data;
       if (n === 0) {
         continue;
       }
@@ -464,31 +462,24 @@ export function pickFallback(config: PickConfig): string | null {
   // Attempt to read from /dev/tty (stdin may be piped with options)
   let inputFd = 0;
   let openedTTY = false;
-  try {
-    const fd = fs.openSync("/dev/tty", "r");
-    inputFd = fd;
+  const ttyOpenResult = tryCatch(() => fs.openSync("/dev/tty", "r"));
+  if (ttyOpenResult.ok) {
+    inputFd = ttyOpenResult.data;
     openedTTY = true;
-  } catch {
-    // fall through: read from stdin (fd 0)
   }
 
-  let line = "";
-  try {
+  const readLineResult = tryCatch(() => {
     const lb = Buffer.alloc(256);
     const n = fs.readSync(inputFd, lb, 0, 255, null);
-    line = lb
+    return lb
       .slice(0, n)
       .toString()
       .replace(/[\r\n]/g, "")
       .trim();
-  } catch {
-    // ignore
-  } finally {
-    if (openedTTY) {
-      try {
-        fs.closeSync(inputFd);
-      } catch {}
-    }
+  });
+  const line = readLineResult.ok ? readLineResult.data : "";
+  if (openedTTY) {
+    tryCatch(() => fs.closeSync(inputFd));
   }
 
   const choice = Number.parseInt(line, 10);

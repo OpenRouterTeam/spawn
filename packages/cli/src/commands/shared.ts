@@ -9,6 +9,7 @@ import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "
 import { validateIdentifier, validatePrompt } from "../security.js";
 import { PkgVersionSchema } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
+import { isFileError, tryCatchIf, unwrapOr } from "../shared/result.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -507,19 +508,19 @@ export function formatCredStatusLine(varName: string, urlHint?: string): string 
 
 /** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
 function hasCloudConfigCredentials(cloud: string): boolean {
-  try {
-    const configPath = getSpawnCloudConfigPath(cloud);
-    if (!fs.existsSync(configPath)) {
-      return false;
-    }
-    const content = fs.readFileSync(configPath, "utf-8");
-    const config = JSON.parse(content);
-    // Check if config has any non-empty credentials
-    return Object.values(config).some((v) => isString(v) && v.trim().length > 0);
-  } catch {
-    // If config can't be read, assume no saved credentials
-    return false;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const configPath = getSpawnCloudConfigPath(cloud);
+      if (!fs.existsSync(configPath)) {
+        return false;
+      }
+      const content = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(content);
+      // Check if config has any non-empty credentials
+      return Object.values(config).some((v) => isString(v) && v.trim().length > 0);
+    }),
+    false,
+  );
 }
 
 export function collectMissingCredentials(authVars: string[], cloud?: string): string[] {

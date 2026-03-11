@@ -8,7 +8,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
-import { asyncTryCatchIf, isNetworkError, unwrapOr } from "../shared/result.js";
+import { asyncTryCatch, asyncTryCatchIf, isNetworkError, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -71,7 +71,7 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
 
   let interval = 2;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
+    const r = await asyncTryCatch(async () => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${_state.hcloudToken}`,
@@ -93,21 +93,27 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
         logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
-        continue;
+        return undefined;
       }
       if (!resp.ok) {
         throw new Error(`Hetzner API error (HTTP ${resp.status}): ${text.slice(0, 200)}`);
       }
       return text;
-    } catch (err) {
-      const e = err instanceof Error ? err : new Error(String(err));
-      if (!isNetworkError(e) || attempt >= maxRetries) {
-        throw err;
-      }
-      logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
-      await sleep(interval * 1000);
-      interval = Math.min(interval * 2, 30);
+    });
+    if (r.ok && r.data !== undefined) {
+      return r.data;
     }
+    if (r.ok) {
+      // retry signal (status 429/5xx returned undefined)
+      continue;
+    }
+    const e = r.error instanceof Error ? r.error : new Error(String(r.error));
+    if (!isNetworkError(e) || attempt >= maxRetries) {
+      throw r.error;
+    }
+    logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
+    await sleep(interval * 1000);
+    interval = Math.min(interval * 2, 30);
   }
   throw new Error("hetznerApi: unreachable");
 }
@@ -228,20 +234,19 @@ export async function ensureSshKey(): Promise<void> {
       name: keyName,
       public_key: pubKey,
     });
-    let regResp: string;
-    try {
-      regResp = await hetznerApi("POST", "/ssh_keys", body);
-    } catch (err) {
+    const regResult = await asyncTryCatch(() => hetznerApi("POST", "/ssh_keys", body));
+    if (!regResult.ok) {
       // HTTP 409 "uniqueness_error" means the key already exists under a different
       // name. Hetzner's error message says "SSH key not unique" which the API layer
       // throws as an Error before we can parse the response body.
-      const errMsg = getErrorMessage(err);
+      const errMsg = getErrorMessage(regResult.error);
       if (/uniqueness_error|not unique|already/.test(errMsg)) {
         logInfo(`SSH key '${key.name}' already registered (different name)`);
         continue;
       }
-      throw err;
+      throw regResult.error;
     }
+    const regResp = regResult.data;
     const regData = parseJsonObj(regResp);
     const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
@@ -516,7 +521,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 
   logStep("Waiting for cloud-init to complete...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -549,13 +554,15 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
       } finally {
         clearTimeout(timer);
       }
-      if (exitCode === 0 && stdout.includes("done")) {
-        logStepDone();
-        logInfo("Cloud-init complete");
-        return;
-      }
-    } catch {
-      // ignore
+      return {
+        stdout,
+        exitCode,
+      };
+    });
+    if (pollResult.ok && pollResult.data.exitCode === 0 && pollResult.data.stdout.includes("done")) {
+      logStepDone();
+      logInfo("Cloud-init complete");
+      return;
     }
     if (attempt >= maxAttempts) {
       logStepDone();
