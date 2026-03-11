@@ -8,6 +8,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
+import { asyncTryCatchIf, isNetworkError, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -99,7 +100,8 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (!isNetworkError(e) || attempt >= maxRetries) {
         throw err;
       }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
@@ -131,19 +133,20 @@ async function testHcloudToken(): Promise<boolean> {
   if (!_state.hcloudToken) {
     return false;
   }
-  try {
-    const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
-    const data = parseJsonObj(resp);
-    // Hetzner returns { "error": { ... } } on auth failure.
-    // Success responses may contain "error": null inside action objects,
-    // so check for a real error object with a message.
-    if (toRecord(data?.error)?.message) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
+      const data = parseJsonObj(resp);
+      // Hetzner returns { "error": { ... } } on auth failure.
+      // Success responses may contain "error": null inside action objects,
+      // so check for a real error object with a message.
+      if (toRecord(data?.error)?.message) {
+        return false;
+      }
+      return true;
+    }),
+    false,
+  );
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────

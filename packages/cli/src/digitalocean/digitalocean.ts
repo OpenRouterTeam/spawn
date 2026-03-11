@@ -9,6 +9,7 @@ import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../sh
 import { OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatchIf, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -152,7 +153,8 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (!isNetworkError(e) || attempt >= maxRetries) {
         throw err;
       }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
@@ -166,11 +168,10 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
 function loadConfig(): Record<string, unknown> | null {
-  try {
-    return parseJsonObj(readFileSync(getSpawnCloudConfigPath("digitalocean"), "utf-8"));
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => parseJsonObj(readFileSync(getSpawnCloudConfigPath("digitalocean"), "utf-8"))),
+    null,
+  );
 }
 
 async function saveConfig(values: Record<string, unknown>): Promise<void> {
@@ -234,12 +235,13 @@ async function testDoToken(): Promise<boolean> {
   if (!_state.token) {
     return false;
   }
-  try {
-    const text = await doApi("GET", "/account", undefined, 1);
-    return text.includes('"uuid"');
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const text = await doApi("GET", "/account", undefined, 1);
+      return text.includes('"uuid"');
+    }),
+    false,
+  );
 }
 
 /**

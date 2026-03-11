@@ -11,6 +11,7 @@ import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
+import { asyncTryCatchIf, isOperationalError } from "./result.js";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
@@ -89,6 +90,7 @@ export async function runOrchestration(
   await cloud.authenticate();
 
   // 1b. Pre-flight account readiness check (billing, email verification, etc.)
+  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (cloud.checkAccountReady) {
     try {
       await cloud.checkAccountReady();
@@ -103,6 +105,7 @@ export async function runOrchestration(
   const apiKey = await getOrPromptApiKey(agentName, cloud.cloudName);
 
   // 3. Pre-provision hooks (e.g., GitHub auth prompt — non-fatal)
+  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (agent.preProvision) {
     try {
       await agent.preProvision();
@@ -214,7 +217,7 @@ export async function runOrchestration(
   if (agent.tunnel) {
     if (cloud.getConnectionInfo) {
       // SSH-based cloud: tunnel the remote port to localhost
-      try {
+      const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
         const conn = cloud.getConnectionInfo();
         const keys = await ensureSshKeys();
         tunnelHandle = await startSshTunnel({
@@ -229,7 +232,8 @@ export async function runOrchestration(
             openBrowser(url);
           }
         }
-      } catch {
+      });
+      if (!tunnelResult.ok) {
         logWarn("Web dashboard tunnel failed — use the TUI instead");
       }
     } else if (cloud.cloudName === "local") {
