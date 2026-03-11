@@ -8,6 +8,7 @@ import {
   validateConnectionIP,
   validateLaunchCmd,
   validateMetadataValue,
+  validatePreLaunchCmd,
   validateServerIdentifier,
   validateUsername,
 } from "../security.js";
@@ -277,6 +278,84 @@ describe("validateLaunchCmd", () => {
 
     it("should reject uppercase binary names (not in agent-setup.ts)", () => {
       expect(() => validateLaunchCmd("Claude")).toThrow(/Invalid launch command/);
+    });
+  });
+});
+
+describe("validatePreLaunchCmd", () => {
+  describe("valid inputs — background daemon patterns", () => {
+    it("should accept openclaw gateway pre_launch from manifest (#2474)", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept nohup with simple binary and backgrounding", () => {
+      expect(() => validatePreLaunchCmd("nohup myagent server &")).not.toThrow();
+    });
+
+    it("should accept binary with redirect and backgrounding (no nohup)", () => {
+      expect(() => validatePreLaunchCmd("myagent server > /tmp/myagent.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept simple backgrounded command", () => {
+      expect(() => validatePreLaunchCmd("myagent daemon &")).not.toThrow();
+    });
+
+    it("should accept nohup with append redirect", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway >> /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept redirect without stderr merge", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw.log &")).not.toThrow();
+    });
+
+    it("should accept empty/blank commands", () => {
+      expect(() => validatePreLaunchCmd("")).not.toThrow();
+      expect(() => validatePreLaunchCmd("   ")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs — injection attempts", () => {
+    it("should reject command substitution $()", () => {
+      expect(() => validatePreLaunchCmd("$(whoami) &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject backtick command substitution", () => {
+      expect(() => validatePreLaunchCmd("`id` &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject pipe operators", () => {
+      expect(() => validatePreLaunchCmd("nohup agent | tee /tmp/log &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject redirect to non-tmp paths", () => {
+      expect(() => validatePreLaunchCmd("nohup agent > /etc/cron.d/evil 2>&1 &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject commands without backgrounding (&)", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw.log 2>&1")).toThrow(
+        /Invalid pre_launch/,
+      );
+    });
+
+    it("should reject commands that are too long", () => {
+      const longCmd = "nohup agent " + "a".repeat(1015) + " &";
+      expect(() => validatePreLaunchCmd(longCmd)).toThrow(/too long/);
+    });
+
+    it("should reject semicolon chaining", () => {
+      expect(() => validatePreLaunchCmd("curl evil.com; nohup agent &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject && chaining", () => {
+      expect(() => validatePreLaunchCmd("curl evil.com && nohup agent &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject path traversal via .. in log paths", () => {
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../etc/cron.d/evil &")).toThrow(/Invalid pre_launch/);
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../../root/.ssh/authorized_keys &")).toThrow(
+        /Invalid pre_launch/,
+      );
+      expect(() => validatePreLaunchCmd("nohup agent >> /tmp/../etc/passwd &")).toThrow(/Invalid pre_launch/);
     });
   });
 });

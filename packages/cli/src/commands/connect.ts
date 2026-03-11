@@ -3,7 +3,13 @@ import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
+import {
+  validateConnectionIP,
+  validateLaunchCmd,
+  validatePreLaunchCmd,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
@@ -128,6 +134,13 @@ export async function cmdEnterAgent(
   } else {
     const launchCmd = agentDef?.launch ?? agentKey;
     const preLaunch = agentDef?.pre_launch;
+    // Validate pre_launch and launch separately — pre_launch may contain
+    // shell redirections (>, 2>&1) and backgrounding (&) that are invalid
+    // in a launch command but valid for background daemon setup (#2474)
+    if (preLaunch) {
+      validatePreLaunchCmd(preLaunch);
+    }
+    validateLaunchCmd(`source ~/.spawnrc 2>/dev/null; ${launchCmd}`);
     const parts = [
       "source ~/.spawnrc 2>/dev/null",
     ];
@@ -142,7 +155,6 @@ export async function cmdEnterAgent(
       const sep = acc.trimEnd().endsWith("&") ? " " : "; ";
       return acc + sep + part;
     }, "");
-    validateLaunchCmd(remoteCmd);
   }
 
   const agentName = agentDef?.name || agentKey;
