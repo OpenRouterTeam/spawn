@@ -3,8 +3,7 @@
 // $_ is an AST wildcard — it matches any subtree regardless of how many lines
 // it spans, so single-line and multiline try blocks are both caught.
 //
-// shared/result.ts and shared/parse.ts are excluded because that is where
-// tryCatch/asyncTryCatch are implemented, using actual try/catch internally.
+// Files that legitimately need try/catch use biome-ignore comments.
 language js(typescript)
 
 or {
@@ -13,10 +12,6 @@ or {
   `try { $_ } catch ($err) { $_ } finally { $_ }`,
   `try { $_ } catch { $_ } finally { $_ }`
 } as $expr where {
-  $filename <: not includes "shared/src/result.ts",
-  $filename <: not includes "shared/src/parse.ts",
-  $filename <: not includes "shared/result.ts",
-  $filename <: not includes "shared/parse.ts",
   register_diagnostic(
     span = $expr,
     message = "Avoid try/catch — use tryCatch / asyncTryCatch from @openrouter/spawn-shared. Sync: const r = tryCatch(() => expr); if (!r.ok) { ... }. Async: const r = await asyncTryCatch(() => fn()); if (!r.ok) { ... }.",

@@ -2,7 +2,5 @@ language js(typescript)
 
 `$value as $type` as $expr where {
   ! $expr <: `$_ as const`,
-  $filename <: not includes "type-guards.ts",
-  $filename <: not includes "result.ts",
   register_diagnostic(span=$expr, message="Type assertions (`as`) are banned. Use schema validation (parseJsonWith), type guards, or `satisfies` instead.", severity="error")
 }

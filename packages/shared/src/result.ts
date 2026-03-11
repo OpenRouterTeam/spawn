@@ -1,4 +1,5 @@
 // shared/result.ts — Lightweight Result monad for retry-aware error handling.
+// biome-ignore-all lint/plugin: this file implements tryCatch/asyncTryCatch and error predicates that require raw try/catch, typeof, and `as`
 //
 // Returning Err() signals a retryable failure; throwing signals a non-retryable one.
 // Used with withRetry() so callers decide at the point of failure whether an error

@@ -6,15 +6,10 @@
 // Guidance: asyncTryCatch() never throws (it returns a Result), so cleanup
 // code can simply run sequentially on the next line — no nesting needed.
 //
-// shared/result.ts and shared/parse.ts are excluded because that is where
-// tryCatch/asyncTryCatch are implemented, using actual try/catch internally.
+// Files that legitimately need try/finally use biome-ignore comments.
 language js(typescript)
 
 `try { $_ } finally { $_ }` as $expr where {
-  $filename <: not includes "shared/src/result.ts",
-  $filename <: not includes "shared/src/parse.ts",
-  $filename <: not includes "shared/result.ts",
-  $filename <: not includes "shared/parse.ts",
   register_diagnostic(
     span = $expr,
     message = "Avoid try/finally — asyncTryCatch() from @openrouter/spawn-shared never throws, so cleanup just runs sequentially. Before: try { await fn(); } finally { cleanup(); }. After: await asyncTryCatch(() => fn()); cleanup();.",
