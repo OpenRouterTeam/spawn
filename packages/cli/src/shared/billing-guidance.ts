@@ -82,34 +82,51 @@ export function isBillingError(cloud: string, errorMsg: string): boolean {
   return patterns.some((p) => p.test(errorMsg));
 }
 
+/** Dependencies for billing-guidance functions (injectable for testing). */
+export interface BillingGuidanceDeps {
+  logInfo: typeof logInfo;
+  logStep: typeof logStep;
+  logWarn: typeof logWarn;
+  openBrowser: typeof openBrowser;
+  prompt: typeof prompt;
+}
+
+const defaultDeps: BillingGuidanceDeps = {
+  logInfo,
+  logStep,
+  logWarn,
+  openBrowser,
+  prompt,
+};
+
 /**
  * Show billing guidance, open the billing page, and prompt user to retry.
  * Returns true if user wants to retry, false otherwise.
  */
-export async function handleBillingError(cloud: string): Promise<boolean> {
+export async function handleBillingError(cloud: string, deps: BillingGuidanceDeps = defaultDeps): Promise<boolean> {
   const billingUrl = BILLING_URLS[cloud];
   const steps = SETUP_STEPS[cloud] || [];
 
   process.stderr.write("\n");
-  logWarn("Your account needs a payment method to create servers.");
+  deps.logWarn("Your account needs a payment method to create servers.");
 
   if (steps.length > 0) {
     process.stderr.write("\n");
     for (const step of steps) {
-      logStep(`  ${step}`);
+      deps.logStep(`  ${step}`);
     }
   }
 
   if (billingUrl) {
     process.stderr.write("\n");
-    logStep("Opening your billing page...");
-    openBrowser(billingUrl);
+    deps.logStep("Opening your billing page...");
+    deps.openBrowser(billingUrl);
   }
 
   process.stderr.write("\n");
   return unwrapOr(
     await asyncTryCatch(async () => {
-      await prompt("Press Enter after adding a payment method to retry (or Ctrl+C to exit)");
+      await deps.prompt("Press Enter after adding a payment method to retry (or Ctrl+C to exit)");
       return true;
     }),
     false,
@@ -119,15 +136,19 @@ export async function handleBillingError(cloud: string): Promise<boolean> {
 /**
  * Show non-billing error guidance with cloud-specific causes and dashboard link.
  */
-export function showNonBillingError(cloud: string, causes: string[]): void {
+export function showNonBillingError(
+  cloud: string,
+  causes: string[],
+  deps: Pick<BillingGuidanceDeps, "logInfo" | "logWarn"> = defaultDeps,
+): void {
   if (causes.length > 0) {
-    logWarn("Possible causes:");
+    deps.logWarn("Possible causes:");
     for (const cause of causes) {
-      logWarn(`  - ${cause}`);
+      deps.logWarn(`  - ${cause}`);
     }
   }
   const billingUrl = BILLING_URLS[cloud];
   if (billingUrl) {
-    logInfo(`Dashboard: ${billingUrl}`);
+    deps.logInfo(`Dashboard: ${billingUrl}`);
   }
 }
