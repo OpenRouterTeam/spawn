@@ -14,33 +14,14 @@ const clack = mockClackPrompts({
   confirm: mock(async () => true),
 });
 
-// ── Mock cloud modules so execDeleteServer doesn't make real API calls ──
+// ── Mock only hetzner (the cloud used by test records) ──────────────────
+// Other cloud modules are left un-mocked to avoid process-global pollution
+// (mock.module is global in Bun and would break other test files).
+// They import fine but are never called since test records use cloud: "hetzner".
 const mockHetznerDestroy = mock(() => Promise.resolve());
 mock.module("../hetzner/hetzner.js", () => ({
   ensureHcloudToken: mock(() => Promise.resolve()),
   destroyServer: mockHetznerDestroy,
-}));
-
-// Stub other clouds to avoid import errors
-mock.module("../aws/aws.js", () => ({
-  ensureAwsCli: mock(() => Promise.resolve()),
-  authenticate: mock(() => Promise.resolve()),
-  destroyServer: mock(() => Promise.resolve()),
-}));
-mock.module("../digitalocean/digitalocean.js", () => ({
-  ensureDoToken: mock(() => Promise.resolve()),
-  destroyServer: mock(() => Promise.resolve()),
-}));
-mock.module("../gcp/gcp.js", () => ({
-  ensureGcloudCli: mock(() => Promise.resolve()),
-  authenticate: mock(() => Promise.resolve()),
-  resolveProject: mock(() => Promise.resolve()),
-  destroyInstance: mock(() => Promise.resolve()),
-}));
-mock.module("../sprite/sprite.js", () => ({
-  ensureSpriteCli: mock(() => Promise.resolve()),
-  ensureSpriteAuthenticated: mock(() => Promise.resolve()),
-  destroyServer: mock(() => Promise.resolve()),
 }));
 
 // History uses real module — SPAWN_HOME is pointed at a temp dir in beforeEach
