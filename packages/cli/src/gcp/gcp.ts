@@ -146,7 +146,6 @@ interface GcpState {
   zone: string;
   instanceName: string;
   serverIp: string;
-  username: string;
 }
 
 const _state: GcpState = {
@@ -154,7 +153,6 @@ const _state: GcpState = {
   zone: "",
   instanceName: "",
   serverIp: "",
-  username: "",
 };
 
 /** Return SSH connection info for tunnel support. */
@@ -645,29 +643,10 @@ async function ensureSshKey(): Promise<string> {
 
 // ─── Username ───────────────────────────────────────────────────────────────
 
+const GCP_SSH_USER = "root";
+
 function resolveUsername(): string {
-  if (_state.username) {
-    return _state.username;
-  }
-  const result = Bun.spawnSync(
-    [
-      "whoami",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "ignore",
-      ],
-    },
-  );
-  const username = new TextDecoder().decode(result.stdout).trim();
-  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-    logError("Invalid username detected");
-    throw new Error("Invalid username");
-  }
-  _state.username = username;
-  return username;
+  return GCP_SSH_USER;
 }
 
 // ─── Server Name ────────────────────────────────────────────────────────────
@@ -682,7 +661,7 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Cloud Init Startup Script ──────────────────────────────────────────────
 
-function getStartupScript(username: string, tier: CloudInitTier = "full"): string {
+function getStartupScript(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
@@ -694,15 +673,15 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
     lines.push(
       "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
       `${NODE_INSTALL_CMD} || true`,
-      "# Install Claude Code as the login user",
-      `su - "${username}" -c 'curl --proto "=https" -fsSL https://claude.ai/install.sh | bash' || true`,
+      "# Install Claude Code",
+      'curl --proto "=https" -fsSL https://claude.ai/install.sh | bash || true',
     );
   }
   if (needsBun(tier)) {
     lines.push(
-      "# Install Bun as the login user",
-      `su - "${username}" -c 'curl --proto "=https" -fsSL https://bun.sh/install | bash' || true`,
-      `ln -sf /home/${username}/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true`,
+      "# Install Bun",
+      'curl --proto "=https" -fsSL https://bun.sh/install | bash || true',
+      "ln -sf /root/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
   lines.push(
@@ -734,7 +713,7 @@ export async function createInstance(
 
   // Write startup script to a temp file (random suffix prevents collisions and predictable paths)
   const tmpFile = `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
-  writeFileSync(tmpFile, getStartupScript(username, tier), {
+  writeFileSync(tmpFile, getStartupScript(tier), {
     mode: 0o600,
   });
 
