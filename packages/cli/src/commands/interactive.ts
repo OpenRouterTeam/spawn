@@ -5,6 +5,7 @@ import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { agentKeys } from "../manifest.js";
 import { getAgentOptionalSteps } from "../shared/agents.js";
+import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
@@ -159,13 +160,15 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
   const steps = getAgentOptionalSteps(agentName);
 
   // Filter GitHub option if no local token detected
-  const filteredSteps = hasLocalGithubToken() ? steps : steps.filter((s) => s.value !== "github");
+  // Filter reuse-api-key option if no saved key exists
+  const filteredSteps = steps
+    .filter((s) => s.value !== "github" || hasLocalGithubToken())
+    .filter((s) => s.value !== "reuse-api-key" || hasSavedOpenRouterKey());
 
   if (filteredSteps.length === 0) {
     return undefined;
   }
 
-  const allValues = filteredSteps.map((s) => s.value);
   const selected = await p.multiselect({
     message: "Setup options",
     options: filteredSteps.map((s) => ({
@@ -173,12 +176,12 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
       label: s.label,
       hint: s.hint,
     })),
-    initialValues: allValues,
+    initialValues: [],
     required: false,
   });
 
   if (p.isCancel(selected)) {
-    return new Set(allValues);
+    return new Set<string>();
   }
   return new Set(selected);
 }
