@@ -100,6 +100,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-2gb)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
+    console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -759,6 +760,26 @@ async function main(): Promise<void> {
   if (reauthIdx !== -1) {
     filteredArgs.splice(reauthIdx, 1);
     process.env.SPAWN_REAUTH = "1";
+  }
+
+  // Extract --beta <feature> flag (opt-in to experimental features)
+  const [betaFlag, betaFilteredArgs] = extractFlagValue(
+    filteredArgs,
+    [
+      "--beta",
+    ],
+    "beta feature",
+    "spawn <agent> <cloud> --beta tarball",
+  );
+  filteredArgs.splice(0, filteredArgs.length, ...betaFilteredArgs);
+  if (betaFlag) {
+    if (betaFlag !== "tarball") {
+      console.error(pc.red(`Unknown beta feature: ${pc.bold(betaFlag)}`));
+      console.error("\nAvailable beta features:");
+      console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
+      process.exit(1);
+    }
+    process.env.SPAWN_BETA = betaFlag;
   }
 
   // Extract --output <format> flag
