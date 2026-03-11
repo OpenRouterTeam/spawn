@@ -14,7 +14,16 @@ import { getOrPromptApiKey } from "./oauth";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
-import { logDebug, logInfo, logStep, logWarn, openBrowser, prepareStdinForHandoff, withRetry } from "./ui";
+import {
+  logDebug,
+  logInfo,
+  logStep,
+  logWarn,
+  openBrowser,
+  prepareStdinForHandoff,
+  validateModelId,
+  withRetry,
+} from "./ui";
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -104,7 +113,11 @@ export async function runOrchestration(
   }
 
   // 4. Model ID (use agent default — no interactive prompt)
-  const modelId = agent.modelDefault || process.env.MODEL_ID;
+  const rawModelId = agent.modelDefault || process.env.MODEL_ID;
+  const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+  if (rawModelId && !modelId) {
+    logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+  }
 
   // 5. Size/bundle selection
   await cloud.promptSize();
