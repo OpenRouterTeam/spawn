@@ -29,7 +29,7 @@ _check_cli_auth_clouds() {
     if command -v jq &>/dev/null; then
         cli_clouds=$(jq -r '.clouds | to_entries[] | select(.value.auth != null) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i")) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null)
     else
-        cli_clouds=$(_MANIFEST="${manifest_path}" bun -e "
+        cli_clouds=$(_MANIFEST="${manifest_path}" bun eval "
 import fs from 'fs';
 const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
 for (const [key, cloud] of Object.entries(m.clouds || {})) {
@@ -58,7 +58,7 @@ for (const [key, cloud] of Object.entries(m.clouds || {})) {
                         if command -v jq &>/dev/null; then
                             project=$(jq -r '.GCP_PROJECT // .project // "" | select(. != null)' "${gcp_config}" 2>/dev/null)
                         else
-                            project=$(_FILE="${gcp_config}" bun -e "
+                            project=$(_FILE="${gcp_config}" bun eval "
 import fs from 'fs';
 const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
 process.stdout.write(d.GCP_PROJECT || d.project || '');
