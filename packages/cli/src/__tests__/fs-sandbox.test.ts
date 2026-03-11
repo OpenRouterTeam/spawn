@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tryCatch } from "@openrouter/spawn-shared";
 
@@ -46,21 +46,6 @@ describe("Filesystem sandbox", () => {
   it("XDG_CACHE_HOME should point to temp sandbox", () => {
     const cacheHome = process.env.XDG_CACHE_HOME ?? "";
     expect(cacheHome).toContain("spawn-test-home-");
-  });
-
-  it("real home ~/.spawn/history.json should not be modified during this test run", () => {
-    const realHistoryPath = join(REAL_HOME, ".spawn", "history.json");
-    if (!existsSync(realHistoryPath)) {
-      // No history file exists — that's fine, it definitely wasn't modified.
-      expect(true).toBe(true);
-      return;
-    }
-    // Record the mtime. If any test modifies the real file, the mtime
-    // changes. We can't detect this retroactively within a single test,
-    // but this test serves as documentation and will catch regressions
-    // when the file doesn't exist yet (first-time devs).
-    const stat = statSync(realHistoryPath);
-    expect(stat.isFile()).toBe(true);
   });
 
   it("sandbox directories should exist", () => {
