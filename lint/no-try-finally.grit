@@ -11,6 +11,8 @@
 language js(typescript)
 
 `try { $_ } finally { $_ }` as $expr where {
+  $filename <: not includes "shared/src/result.ts",
+  $filename <: not includes "shared/src/parse.ts",
   $filename <: not includes "shared/result.ts",
   $filename <: not includes "shared/parse.ts",
   register_diagnostic(

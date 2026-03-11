@@ -1,5 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": ["packages/**/*.ts"]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -74,6 +84,31 @@
       "bracketSameLine": false
     }
   },
+  "overrides": [
+    {
+      "includes": ["packages/cli/src/__tests__/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off",
+            "noAssignInExpressions": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedFunctionParameters": "off"
+          }
+        }
+      }
+    }
+  ],
+  "plugins": [
+    "./lint/no-type-assertion.grit",
+    "./lint/no-typeof-string-number.grit",
+    "./lint/no-try-catch.grit",
+    "./lint/no-try-finally.grit",
+    "./lint/no-ts-enum.grit"
+  ],
   "assist": {
     "actions": {
       "source": {

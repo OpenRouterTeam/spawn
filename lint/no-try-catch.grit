@@ -13,6 +13,8 @@ or {
   `try { $_ } catch ($err) { $_ } finally { $_ }`,
   `try { $_ } catch { $_ } finally { $_ }`
 } as $expr where {
+  $filename <: not includes "shared/src/result.ts",
+  $filename <: not includes "shared/src/parse.ts",
   $filename <: not includes "shared/result.ts",
   $filename <: not includes "shared/parse.ts",
   register_diagnostic(

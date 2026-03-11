@@ -4,5 +4,7 @@ or {
   `typeof $val === "string"`,
   `typeof $val === "number"`
 } as $expr where {
+  $filename <: not includes "type-guards.ts",
+  $filename <: not includes "result.ts",
   register_diagnostic(span=$expr, message="Use `isString()` or `isNumber()` from `shared/type-guards` instead of raw `typeof` checks.", severity="error")
 }
