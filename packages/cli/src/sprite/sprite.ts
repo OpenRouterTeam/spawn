@@ -556,15 +556,17 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 export async function installSpriteKeepAlive(): Promise<void> {
   logStep("Installing Sprite keep-alive...");
   const scriptUrl = "https://kurt-claw-f.sprites.app/sprite-keep-running.sh";
-  try {
+  const r = await asyncTryCatch(async () => {
     await runSprite(
       "mkdir -p ~/.local/bin && " +
         `curl -fsSL '${scriptUrl}' -o ~/.local/bin/sprite-keep-running && ` +
         "chmod +x ~/.local/bin/sprite-keep-running",
       60,
     );
+  });
+  if (r.ok) {
     logInfo("Sprite keep-alive installed");
-  } catch {
+  } else {
     logWarn("Could not install Sprite keep-alive — sprite may shut down during inactivity");
   }
 }

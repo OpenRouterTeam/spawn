@@ -36,10 +36,7 @@ export async function tryTarballInstall(
   logStep(`Checking for pre-built tarball (${tag})...`);
 
   // Phase 1: Fetch + parse tarball metadata
-  let x86Url: string;
-  let armUrl: string;
-  let url: string;
-  try {
+  const metaResult = await asyncTryCatch(async () => {
     // Query GitHub Releases API for the rolling release tag
     const resp = await fetchFn(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
       headers: {
@@ -50,14 +47,14 @@ export async function tryTarballInstall(
 
     if (!resp.ok) {
       logWarn("No pre-built tarball available");
-      return false;
+      return null;
     }
 
     const json: unknown = await resp.json();
     const parsed = v.safeParse(ReleaseSchema, json);
     if (!parsed.success) {
       logWarn("Tarball release has unexpected format");
-      return false;
+      return null;
     }
 
     // Find both arch-specific .tar.gz assets and let the remote VM pick the right one.
@@ -67,17 +64,24 @@ export async function tryTarballInstall(
 
     if (!x86Asset && !armAsset) {
       logWarn("No tarball asset found in release");
-      return false;
+      return null;
     }
 
-    x86Url = x86Asset?.browser_download_url || "";
-    armUrl = armAsset?.browser_download_url || "";
-    url = x86Url || armUrl;
-  } catch (err) {
+    return {
+      x86Url: x86Asset?.browser_download_url || "",
+      armUrl: armAsset?.browser_download_url || "",
+      url: x86Asset?.browser_download_url || armAsset?.browser_download_url || "",
+    };
+  });
+  if (!metaResult.ok) {
     logWarn("Failed to fetch pre-built tarball metadata");
-    logDebug(getErrorMessage(err));
+    logDebug(getErrorMessage(metaResult.error));
     return false;
   }
+  if (!metaResult.data) {
+    return false;
+  }
+  const { x86Url, armUrl, url } = metaResult.data;
 
   // Phase 2: URL validation + command building (deterministic — no try/catch needed)
   // SECURITY: Validate URLs match expected GitHub releases pattern.
