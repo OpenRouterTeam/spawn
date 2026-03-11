@@ -76,6 +76,23 @@ function extractFlagValue(
   ];
 }
 
+/** Extract all occurrences of a repeatable flag, mutating args in place. */
+function extractAllFlagValues(args: string[], flag: string, usageHint: string): string[] {
+  const values: string[] = [];
+  let idx = args.indexOf(flag);
+  while (idx !== -1) {
+    if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+      console.error(pc.red(`Error: ${pc.bold(flag)} requires a value`));
+      console.error(`\nUsage: ${pc.cyan(usageHint)}`);
+      process.exit(1);
+    }
+    values.push(args[idx + 1]);
+    args.splice(idx, 2);
+    idx = args.indexOf(flag);
+  }
+  return values;
+}
+
 const HELP_FLAGS = [
   "--help",
   "-h",
@@ -100,6 +117,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-2gb)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
+    console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -759,6 +777,23 @@ async function main(): Promise<void> {
   if (reauthIdx !== -1) {
     filteredArgs.splice(reauthIdx, 1);
     process.env.SPAWN_REAUTH = "1";
+  }
+
+  // Extract all --beta <feature> flags (repeatable, opt-in to experimental features)
+  const VALID_BETA_FEATURES = new Set([
+    "tarball",
+  ]);
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta tarball");
+  for (const flag of betaFeatures) {
+    if (!VALID_BETA_FEATURES.has(flag)) {
+      console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
+      console.error("\nAvailable beta features:");
+      console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
+      process.exit(1);
+    }
+  }
+  if (betaFeatures.length > 0) {
+    process.env.SPAWN_BETA = betaFeatures.join(",");
   }
 
   // Extract --output <format> flag

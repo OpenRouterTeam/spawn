@@ -117,8 +117,9 @@ describe("runOrchestration", () => {
     process.env.SPAWN_HOME = testDir;
     // Skip GitHub auth prompts during tests
     process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
-    // Ensure no stale SPAWN_ENABLED_STEPS leaks between tests
+    // Ensure no stale env leaks between tests
     delete process.env.SPAWN_ENABLED_STEPS;
+    delete process.env.SPAWN_BETA;
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     exitSpy = spyOn(process, "exit").mockImplementation((code) => {
       capturedExitCode = isNumber(code) ? code : 0;
@@ -522,7 +523,8 @@ describe("runOrchestration", () => {
 
   // ── Tarball install ──────────────────────────────────────────────────
 
-  it("attempts tarball install before agent.install on non-local clouds", async () => {
+  it("attempts tarball install when --beta=tarball is set on non-local clouds", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "digitalocean",
@@ -541,7 +543,25 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
+  it("skips tarball install by default (no --beta flag)", async () => {
+    const install = mock(() => Promise.resolve());
+    const cloud = createMockCloud({
+      cloudName: "digitalocean",
+    });
+    const agent = createMockAgent({
+      install,
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(mockTryTarballInstall).not.toHaveBeenCalled();
+    expect(install).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
   it("skips agent.install when tarball succeeds", async () => {
+    process.env.SPAWN_BETA = "tarball";
     mockTryTarballInstall.mockImplementation(() => Promise.resolve(true));
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
@@ -559,7 +579,8 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
-  it("skips tarball install for local cloud", async () => {
+  it("skips tarball install for local cloud even with --beta=tarball", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "local",
@@ -577,6 +598,7 @@ describe("runOrchestration", () => {
   });
 
   it("skips tarball install when agent has skipTarball set", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "digitalocean",
