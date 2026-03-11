@@ -349,6 +349,14 @@ describe("validatePreLaunchCmd", () => {
     it("should reject && chaining", () => {
       expect(() => validatePreLaunchCmd("curl evil.com && nohup agent &")).toThrow(/Invalid pre_launch/);
     });
+
+    it("should reject path traversal via .. in log paths", () => {
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../etc/cron.d/evil &")).toThrow(/Invalid pre_launch/);
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../../root/.ssh/authorized_keys &")).toThrow(
+        /Invalid pre_launch/,
+      );
+      expect(() => validatePreLaunchCmd("nohup agent >> /tmp/../etc/passwd &")).toThrow(/Invalid pre_launch/);
+    });
   });
 });
 

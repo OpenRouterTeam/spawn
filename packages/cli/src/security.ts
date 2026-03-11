@@ -343,7 +343,7 @@ const LAUNCH_BINARY_SEGMENT = /^[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*$/;
  * Path restriction: log paths must start with /tmp/ and use safe characters.
  */
 const LAUNCH_PRE_LAUNCH_SEGMENT =
-  /^(nohup\s+)?[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*(\s+>>?\s+\/tmp\/[a-zA-Z0-9._/-]+(\s+2>&1)?)?\s*&$/;
+  /^(nohup\s+)?[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*(\s+>>?\s+\/tmp\/([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+(\.[a-zA-Z0-9]+)?(\s+2>&1)?)?\s*&$/;
 
 /**
  * Validates a launch command from connection history before shell execution.
