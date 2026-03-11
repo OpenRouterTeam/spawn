@@ -176,7 +176,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
       label: s.label,
       hint: s.hint,
     })),
-    initialValues: [],
+    initialValues: filteredSteps.map((s) => s.value),
     required: false,
   });
 
