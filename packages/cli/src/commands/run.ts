@@ -9,7 +9,7 @@ import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guid
 import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.js";
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
-import { asyncTryCatch, isFileError, tryCatchIf } from "../shared/result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -563,23 +563,23 @@ function runBashScript(
   debug?: boolean,
   spawnName?: string,
 ): string | undefined {
-  try {
-    runBash(script, prompt, debug, spawnName);
-    return undefined; // success
-  } catch (err) {
-    const errMsg = getErrorMessage(err);
-    handleUserInterrupt(errMsg, dashboardUrl);
-
-    // SSH disconnect after the server was already created — don't retry
-    if (isRetryableExitCode(errMsg)) {
-      console.error();
-      p.log.warn("SSH connection lost. Your server is likely still running.");
-      p.log.warn("To reconnect, re-run the same spawn command.");
-      return undefined; // Don't report as failure — user already has clear guidance
-    }
-
-    return errMsg;
+  const r = tryCatch(() => runBash(script, prompt, debug, spawnName));
+  if (r.ok) {
+    return undefined;
   }
+
+  const errMsg = getErrorMessage(r.error);
+  handleUserInterrupt(errMsg, dashboardUrl);
+
+  // SSH disconnect after the server was already created — don't retry
+  if (isRetryableExitCode(errMsg)) {
+    console.error();
+    p.log.warn("SSH connection lost. Your server is likely still running.");
+    p.log.warn("To reconnect, re-run the same spawn command.");
+    return undefined; // Don't report as failure — user already has clear guidance
+  }
+
+  return errMsg;
 }
 
 export async function execScript(
@@ -756,23 +756,23 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
   const { prompt, debug, outputFormat, spawnName } = opts;
 
   // Phase 1: Validate inputs (exit code 3)
-  try {
+  const validationResult = tryCatch(() => {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
     if (prompt) {
       validatePrompt(prompt);
     }
-  } catch (err) {
-    headlessError(agent, cloud, "VALIDATION_ERROR", getErrorMessage(err), outputFormat, 3);
+  });
+  if (!validationResult.ok) {
+    headlessError(agent, cloud, "VALIDATION_ERROR", getErrorMessage(validationResult.error), outputFormat, 3);
   }
 
   // Load manifest (silently - no spinner in headless mode)
-  let manifest: Manifest;
-  try {
-    manifest = await loadManifest();
-  } catch (err) {
-    headlessError(agent, cloud, "MANIFEST_ERROR", getErrorMessage(err), outputFormat, 3);
+  const manifestResult = await asyncTryCatch(loadManifest);
+  if (!manifestResult.ok) {
+    headlessError(agent, cloud, "MANIFEST_ERROR", getErrorMessage(manifestResult.error), outputFormat, 3);
   }
+  const manifest = manifestResult.data;
 
   // Resolve agent/cloud names
   const resolvedAgent = resolveAgentKey(manifest, agent) ?? agent;
@@ -850,38 +850,39 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
     const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
 
-    try {
+    const fetchResult = await asyncTryCatch(async () => {
       const res = await fetch(url, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
       if (res.ok) {
-        scriptContent = await res.text();
-      } else {
-        const ghRes = await fetch(ghUrl, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT),
-        });
-        if (!ghRes.ok) {
-          headlessError(
-            resolvedAgent,
-            resolvedCloud,
-            "DOWNLOAD_ERROR",
-            `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
-            outputFormat,
-            2,
-          );
-        }
-        scriptContent = await ghRes.text();
+        return res.text();
       }
-    } catch (err) {
+      const ghRes = await fetch(ghUrl, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      });
+      if (!ghRes.ok) {
+        headlessError(
+          resolvedAgent,
+          resolvedCloud,
+          "DOWNLOAD_ERROR",
+          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+          outputFormat,
+          2,
+        );
+      }
+      return ghRes.text();
+    });
+    if (!fetchResult.ok) {
       headlessError(
         resolvedAgent,
         resolvedCloud,
         "DOWNLOAD_ERROR",
-        `Failed to download script: ${getErrorMessage(err)}`,
+        `Failed to download script: ${getErrorMessage(fetchResult.error)}`,
         outputFormat,
         2,
       );
     }
+    scriptContent = fetchResult.data;
   }
 
   // Phase 3: Execute script (exit code 1)

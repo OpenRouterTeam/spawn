@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { getSpawnCloudConfigPath } from "./paths";
-import { isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
@@ -74,17 +74,19 @@ export async function prompt(question: string): Promise<string> {
     };
   });
 
-  try {
-    const result = await Promise.race([
+  const r = await asyncTryCatch(() =>
+    Promise.race([
       p.text({
         message,
       }),
       stdinClosePromise,
-    ]);
-    return p.isCancel(result) ? "" : (result || "").trim();
-  } finally {
-    cleanupStdinListener?.();
+    ]),
+  );
+  cleanupStdinListener?.();
+  if (!r.ok) {
+    throw r.error;
   }
+  return p.isCancel(r.data) ? "" : (r.data || "").trim();
 }
 
 /**

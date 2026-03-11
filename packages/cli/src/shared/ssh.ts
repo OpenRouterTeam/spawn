@@ -324,7 +324,7 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
       // during key exchange or auth, the process hangs indefinitely. Kill it
       // after 30s so the retry loop can continue.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
-      try {
+      const inner = await asyncTryCatch(async () => {
         const [stdout, stderr] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
@@ -347,9 +347,12 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
           logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
         }
         return null;
-      } finally {
-        clearTimeout(timer);
+      });
+      clearTimeout(timer);
+      if (!inner.ok) {
+        throw inner.error;
       }
+      return inner.data;
     });
     if (r.ok && r.data !== null) {
       logInfo("SSH is ready");

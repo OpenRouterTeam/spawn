@@ -915,10 +915,9 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
     userData: userdata,
   };
 
-  try {
-    await lightsailCreateInstances(createParams);
-  } catch (err) {
-    const errMsg = getErrorMessage(err);
+  const createResult = await asyncTryCatch(() => lightsailCreateInstances(createParams));
+  if (!createResult.ok) {
+    const errMsg = getErrorMessage(createResult.error);
     logError(`Failed to create Lightsail instance: ${errMsg}`);
 
     if (isBillingError("aws", errMsg)) {
@@ -939,7 +938,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         `Instance name '${name}' already in use`,
       ]);
     }
-    throw err;
+    throw createResult.error;
   }
 
   _state.instanceName = name;
@@ -1000,7 +999,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 
   logStep("Waiting for cloud-init to complete...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -1022,24 +1021,27 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
       // can continue and the user isn't left with a hung CLI.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      let stdout: string;
-      let exitCode: number;
-      try {
-        [stdout] = await Promise.all([
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
         ]);
-        exitCode = await proc.exited;
-      } finally {
-        clearTimeout(timer);
+        const exitCode = await proc.exited;
+        return {
+          stdout,
+          exitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-      if (exitCode === 0 && stdout.includes("done")) {
-        logStepDone();
-        logInfo("Cloud-init complete");
-        return;
-      }
-    } catch {
-      // ignore
+      return pipeResult.data;
+    });
+    if (pollResult.ok && pollResult.data.exitCode === 0 && pollResult.data.stdout.includes("done")) {
+      logStepDone();
+      logInfo("Cloud-init complete");
+      return;
     }
     logStepInline(`Cloud-init still running (${attempt}/${maxAttempts})`);
     await sleep(5000);
@@ -1070,13 +1072,13 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   );
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -1106,12 +1108,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    if ((await proc.exited) !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 

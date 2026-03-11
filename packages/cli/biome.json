@@ -30,5 +30,10 @@
       }
     }
   ],
-  "plugins": ["../../lint/no-type-assertion.grit", "../../lint/no-typeof-string-number.grit"]
+  "plugins": [
+    "../../lint/no-type-assertion.grit",
+    "../../lint/no-typeof-string-number.grit",
+    "../../lint/no-try-catch.grit",
+    "../../lint/no-try-finally.grit"
+  ]
 }

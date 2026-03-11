@@ -314,9 +314,10 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
   }
 
   if (action === "enter") {
-    const r = await asyncTryCatch(() => cmdEnterAgent(selected.connection, selected.agent, manifest));
-    if (!r.ok) {
-      p.log.error(`Connection failed: ${getErrorMessage(r.error)}`);
+    const enterResult = await asyncTryCatch(() => cmdEnterAgent(selected.connection, selected.agent, manifest));
+    if (!enterResult.ok) {
+      p.log.error(`Connection failed: ${getErrorMessage(enterResult.error)}`);
+
       p.log.info(
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
@@ -325,9 +326,10 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
   }
 
   if (action === "reconnect") {
-    const r = await asyncTryCatch(() => cmdConnect(selected.connection));
-    if (!r.ok) {
-      p.log.error(`Connection failed: ${getErrorMessage(r.error)}`);
+    const reconnectResult = await asyncTryCatch(() => cmdConnect(selected.connection));
+    if (!reconnectResult.ok) {
+      p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);
+
       p.log.info(
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );

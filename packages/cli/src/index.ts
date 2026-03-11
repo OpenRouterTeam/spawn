@@ -28,7 +28,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
-import { asyncTryCatchIf, isFileError, isNetworkError, tryCatchIf } from "./shared/result.js";
+import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
 import { checkForUpdates } from "./update-check.js";
 
@@ -310,17 +310,18 @@ async function readPromptFile(promptFile: string): Promise<string> {
   const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
   const { readFileSync, statSync } = await import("node:fs");
 
-  try {
-    validatePromptFilePath(promptFile);
-  } catch (err) {
-    console.error(pc.red(getErrorMessage(err)));
+  const validateResult = tryCatch(() => validatePromptFilePath(promptFile));
+  if (!validateResult.ok) {
+    console.error(pc.red(getErrorMessage(validateResult.error)));
     process.exit(1);
   }
 
-  try {
+  const statsResult = tryCatch(() => {
     const stats = statSync(promptFile);
     validatePromptFileStats(promptFile, stats);
-  } catch (err) {
+  });
+  if (!statsResult.ok) {
+    const err = statsResult.error;
     const code = err && typeof err === "object" && "code" in err ? err.code : "";
     if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
       handlePromptFileError(promptFile, err);
@@ -711,10 +712,9 @@ async function main(): Promise<void> {
   // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
   // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
   if (rawArgs[0] === "pick") {
-    try {
-      await cmdPick(expandEqualsFlags(rawArgs.slice(1)));
-    } catch (err) {
-      handleError(err);
+    const pickResult = await asyncTryCatch(() => cmdPick(expandEqualsFlags(rawArgs.slice(1))));
+    if (!pickResult.ok) {
+      handleError(pickResult.error);
     }
     return;
   }
@@ -873,7 +873,7 @@ async function main(): Promise<void> {
 
   const cmd = filteredArgs[0];
 
-  try {
+  const cmdResult = await asyncTryCatch(async () => {
     if (!cmd) {
       if (effectiveHeadless) {
         if (outputFormat === "json") {
@@ -894,18 +894,19 @@ async function main(): Promise<void> {
     } else {
       await dispatchCommand(cmd, filteredArgs, prompt, dryRun, debug, effectiveHeadless, outputFormat);
     }
-  } catch (err) {
+  });
+  if (!cmdResult.ok) {
     if (effectiveHeadless && outputFormat === "json") {
       console.log(
         JSON.stringify({
           status: "error",
           error_code: "UNEXPECTED_ERROR",
-          error_message: getErrorMessage(err),
+          error_message: getErrorMessage(cmdResult.error),
         }),
       );
       process.exit(1);
     }
-    handleError(err);
+    handleError(cmdResult.error);
   }
 }
 

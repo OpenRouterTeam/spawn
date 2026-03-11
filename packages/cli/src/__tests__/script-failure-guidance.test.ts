@@ -190,20 +190,17 @@ describe("getScriptFailureGuidance", () => {
       const savedHC = process.env.HCLOUD_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
       delete process.env.HCLOUD_TOKEN;
-      try {
-        const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-        const joined = lines.join("\n");
-        expect(joined).toContain("HCLOUD_TOKEN");
-        expect(joined).toContain("OPENROUTER_API_KEY");
-        expect(joined).toContain("spawn hetzner");
-        expect(joined).toContain("setup");
-      } finally {
-        if (savedOR !== undefined) {
-          process.env.OPENROUTER_API_KEY = savedOR;
-        }
-        if (savedHC !== undefined) {
-          process.env.HCLOUD_TOKEN = savedHC;
-        }
+      const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
+      const joined = lines.join("\n");
+      expect(joined).toContain("HCLOUD_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
+      expect(joined).toContain("spawn hetzner");
+      expect(joined).toContain("setup");
+      if (savedOR !== undefined) {
+        process.env.OPENROUTER_API_KEY = savedOR;
+      }
+      if (savedHC !== undefined) {
+        process.env.HCLOUD_TOKEN = savedHC;
       }
     });
 
@@ -219,20 +216,17 @@ describe("getScriptFailureGuidance", () => {
       const savedDO = process.env.DO_API_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
       delete process.env.DO_API_TOKEN;
-      try {
-        const lines = getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
-        const joined = lines.join("\n");
-        expect(joined).toContain("DO_API_TOKEN");
-        expect(joined).toContain("OPENROUTER_API_KEY");
-        expect(joined).toContain("spawn digitalocean");
-        expect(joined).toContain("setup");
-      } finally {
-        if (savedOR !== undefined) {
-          process.env.OPENROUTER_API_KEY = savedOR;
-        }
-        if (savedDO !== undefined) {
-          process.env.DO_API_TOKEN = savedDO;
-        }
+      const lines = getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
+      const joined = lines.join("\n");
+      expect(joined).toContain("DO_API_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
+      expect(joined).toContain("spawn digitalocean");
+      expect(joined).toContain("setup");
+      if (savedOR !== undefined) {
+        process.env.OPENROUTER_API_KEY = savedOR;
+      }
+      if (savedDO !== undefined) {
+        process.env.DO_API_TOKEN = savedDO;
       }
     });
 

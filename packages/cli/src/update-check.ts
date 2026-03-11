@@ -180,17 +180,19 @@ function reExecWithArgs(): void {
   }
   console.error();
 
-  try {
+  const r = tryCatch(() =>
     executor.execFileSync(binPath, args, {
       stdio: "inherit",
       env: {
         ...process.env,
         SPAWN_NO_UPDATE_CHECK: "1",
       },
-    });
+    }),
+  );
+  if (r.ok) {
     process.exit(0);
-  } catch (reexecErr) {
-    const code = hasStatus(reexecErr) ? reexecErr.status : 1;
+  } else {
+    const code = hasStatus(r.error) ? r.error.status : 1;
     process.exit(code);
   }
 }

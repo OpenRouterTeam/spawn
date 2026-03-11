@@ -5,6 +5,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
+import { tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { getErrorMessage } from "./shared.js";
@@ -16,17 +17,18 @@ async function runInteractiveCommand(
   failureMsg: string,
   manualCmd: string,
 ): Promise<void> {
-  let code: number;
-  try {
-    code = spawnInteractive([
+  const r = tryCatch(() =>
+    spawnInteractive([
       cmd,
       ...args,
-    ]);
-  } catch (err) {
-    p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
+    ]),
+  );
+  if (!r.ok) {
+    p.log.error(`Failed to connect: ${getErrorMessage(r.error)}`);
     p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
-    throw err;
+    throw r.error;
   }
+  const code = r.data;
   if (code !== 0) {
     throw new Error(`${failureMsg} with exit code ${code}`);
   }
@@ -36,7 +38,7 @@ async function runInteractiveCommand(
 export async function cmdConnect(connection: VMConnection): Promise<void> {
   // SECURITY: Validate all connection parameters before use
   // This prevents command injection if the history file is corrupted or tampered with
-  try {
+  const connectValidation = tryCatch(() => {
     validateConnectionIP(connection.ip);
     validateUsername(connection.user);
     if (connection.server_name) {
@@ -45,8 +47,9 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
     if (connection.server_id) {
       validateServerIdentifier(connection.server_id);
     }
-  } catch (err) {
-    p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
+  });
+  if (!connectValidation.ok) {
+    p.log.error(`Security validation failed: ${getErrorMessage(connectValidation.error)}`);
     p.log.info("Your spawn history file may be corrupted or tampered with.");
     p.log.info(`Location: ${getHistoryPath()}`);
     p.log.info("To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'");
@@ -92,7 +95,7 @@ export async function cmdEnterAgent(
   manifest: Manifest | null,
 ): Promise<void> {
   // SECURITY: Validate all connection parameters before use
-  try {
+  const enterValidation = tryCatch(() => {
     validateConnectionIP(connection.ip);
     validateUsername(connection.user);
     if (connection.server_name) {
@@ -104,8 +107,9 @@ export async function cmdEnterAgent(
     if (connection.launch_cmd) {
       validateLaunchCmd(connection.launch_cmd);
     }
-  } catch (err) {
-    p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
+  });
+  if (!enterValidation.ok) {
+    p.log.error(`Security validation failed: ${getErrorMessage(enterValidation.error)}`);
     p.log.info("Your spawn history file may be corrupted or tampered with.");
     p.log.info(`Location: ${getHistoryPath()}`);
     p.log.info("To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { tryCatch } from "@openrouter/spawn-shared";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 
 /**
@@ -430,16 +431,12 @@ describe("validatePrompt", () => {
   });
 
   it("should provide helpful error message for command substitution", () => {
-    let caught: unknown;
-    try {
-      validatePrompt("Run $(echo test)");
-    } catch (e) {
-      caught = e;
+    const r = tryCatch(() => validatePrompt("Run $(echo test)"));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.message).toContain("shell syntax");
+      expect(r.error.message).toContain("plain English");
     }
-    expect(caught).toBeInstanceOf(Error);
-    const err = caught instanceof Error ? caught : null;
-    expect(err?.message).toContain("shell syntax");
-    expect(err?.message).toContain("plain English");
   });
 
   it("should detect multiple dangerous patterns", () => {

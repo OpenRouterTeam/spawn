@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { asyncTryCatch, tryCatch } from "@openrouter/spawn-shared";
 import { isNumber } from "../shared/type-guards.js";
 
 // ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
@@ -86,14 +87,13 @@ async function runOrchestrationSafe(
   agentName: string,
   opts: OrchestrationOptions = defaultOpts,
 ): Promise<void> {
-  try {
-    await runOrchestration(cloud, agent, agentName, opts);
-  } catch (e) {
+  const r = await asyncTryCatch(async () => runOrchestration(cloud, agent, agentName, opts));
+  if (!r.ok) {
     // process.exit mock throws to stop execution — that's expected
-    if (e instanceof Error && e.message.startsWith("__EXIT_")) {
+    if (r.error.message.startsWith("__EXIT_")) {
       return;
     }
-    throw e;
+    throw r.error;
   }
 }
 
@@ -136,14 +136,12 @@ describe("runOrchestration", () => {
     } else {
       delete process.env.SPAWN_HOME;
     }
-    try {
+    tryCatch(() =>
       rmSync(testDir, {
         recursive: true,
         force: true,
-      });
-    } catch {
-      // best-effort cleanup
-    }
+      }),
+    );
   });
 
   it("calls all cloud lifecycle methods in correct order", async () => {
