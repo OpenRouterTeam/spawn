@@ -5,9 +5,8 @@
  * handles optional hooks (preProvision, configure, preLaunch), model selection,
  * and restart loop wrapping for non-local clouds.
  *
- * IMPORTANT: We only mock ../shared/oauth (not ../shared/agent-setup or
- * ../shared/ui) because Bun's mock.module is process-global and would
- * bleed into with-retry-result.test.ts which tests the real wrapSshCall.
+ * Uses dependency injection (OrchestrationOptions.getApiKey) instead of
+ * mock.module to avoid process-global mock pollution.
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
@@ -16,20 +15,14 @@ import { join } from "node:path";
 import { asyncTryCatch, tryCatch } from "@openrouter/spawn-shared";
 import { isNumber } from "../shared/type-guards.js";
 
-// ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
-
 const mockGetOrPromptApiKey = mock(() => Promise.resolve("sk-or-v1-test-key"));
-
-mock.module("../shared/oauth", () => ({
-  getOrPromptApiKey: mockGetOrPromptApiKey,
-}));
 
 // ── Import the real module under test ─────────────────────────────────────
 
-const { runOrchestration } = await import("../shared/orchestrate");
-
 import type { AgentConfig } from "../shared/agents";
 import type { CloudOrchestrator, OrchestrationOptions } from "../shared/orchestrate";
+
+import { runOrchestration } from "../shared/orchestrate";
 
 const mockTryTarballInstall = mock(() => Promise.resolve(false));
 
@@ -75,9 +68,10 @@ function createMockAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
   };
 }
 
-/** Default options that inject the mock tarball function. */
+/** Default options that inject mock dependencies via DI. */
 const defaultOpts: OrchestrationOptions = {
   tryTarball: mockTryTarballInstall,
+  getApiKey: mockGetOrPromptApiKey,
 };
 
 /** Run orchestration and catch the process.exit throw. */

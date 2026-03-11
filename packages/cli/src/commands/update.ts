@@ -41,38 +41,40 @@ async function fetchRemoteVersion(): Promise<string> {
   return data.version;
 }
 
-async function performUpdate(_remoteVersion: string): Promise<void> {
-  const r = tryCatch(() => {
-    // Two-step: fetch with --proto '=https', then execute via bash -c
-    // Prevents protocol downgrade on hostile networks (matches update-check.ts pattern)
-    const scriptContent = execFileSync(
-      "curl",
-      [
-        "--proto",
-        "=https",
-        "-fsSL",
-        INSTALL_URL,
+function defaultRunUpdate(): void {
+  // Two-step: fetch with --proto '=https', then execute via bash -c
+  // Prevents protocol downgrade on hostile networks (matches update-check.ts pattern)
+  const scriptContent = execFileSync(
+    "curl",
+    [
+      "--proto",
+      "=https",
+      "-fsSL",
+      INSTALL_URL,
+    ],
+    {
+      encoding: "utf8",
+      stdio: [
+        "pipe",
+        "pipe",
+        "inherit",
       ],
-      {
-        encoding: "utf8",
-        stdio: [
-          "pipe",
-          "pipe",
-          "inherit",
-        ],
-      },
-    );
-    execFileSync(
-      "bash",
-      [
-        "-c",
-        scriptContent ?? "",
-      ],
-      {
-        stdio: "inherit",
-      },
-    );
-  });
+    },
+  );
+  execFileSync(
+    "bash",
+    [
+      "-c",
+      scriptContent ?? "",
+    ],
+    {
+      stdio: "inherit",
+    },
+  );
+}
+
+async function performUpdate(_remoteVersion: string, runUpdate: () => void = defaultRunUpdate): Promise<void> {
+  const r = tryCatch(() => runUpdate());
   if (r.ok) {
     console.log();
     p.log.success("Updated successfully!");
@@ -85,7 +87,11 @@ async function performUpdate(_remoteVersion: string): Promise<void> {
   }
 }
 
-export async function cmdUpdate(): Promise<void> {
+export interface UpdateOptions {
+  runUpdate?: () => void;
+}
+
+export async function cmdUpdate(options?: UpdateOptions): Promise<void> {
   const s = p.spinner();
   s.start("Checking for updates...");
 
@@ -107,5 +113,5 @@ export async function cmdUpdate(): Promise<void> {
   }
 
   s.stop(`Updating: v${VERSION} -> v${remoteVersion}`);
-  await performUpdate(remoteVersion);
+  await performUpdate(remoteVersion, options?.runUpdate);
 }

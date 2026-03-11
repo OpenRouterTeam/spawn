@@ -174,7 +174,11 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
 }
 
 /** Prompt for delete confirmation and execute. Returns true if deleted. */
-export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null): Promise<boolean> {
+export async function confirmAndDelete(
+  record: SpawnRecord,
+  manifest: Manifest | null,
+  deleteHandler?: (record: SpawnRecord) => Promise<boolean>,
+): Promise<boolean> {
   const conn = record.connection!;
   const label = conn.server_name || conn.server_id || conn.ip;
   const cloudLabel = manifest?.clouds[conn.cloud!]?.name || conn.cloud;
@@ -191,7 +195,10 @@ export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest |
 
   // Ensure credentials before starting the spinner so interactive
   // prompts (e.g. expired API key entry) don't overlap with it.
-  await ensureDeleteCredentials(record);
+  // Skip when a custom deleteHandler is provided (it manages its own deps).
+  if (!deleteHandler) {
+    await ensureDeleteCredentials(record);
+  }
 
   const s = p.spinner();
   s.start(`Deleting ${label}...`);
@@ -213,7 +220,8 @@ export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest |
     return true;
   };
 
-  const deleteResult = await asyncTryCatch(() => execDeleteServer(record));
+  const deleteFn = deleteHandler ?? execDeleteServer;
+  const deleteResult = await asyncTryCatch(() => deleteFn(record));
   process.stderr.write = origStderrWrite;
 
   const success = deleteResult.ok ? deleteResult.data : false;
