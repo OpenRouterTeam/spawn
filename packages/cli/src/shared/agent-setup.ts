@@ -710,7 +710,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
           300,
         ),
       envVars: (apiKey) => [
