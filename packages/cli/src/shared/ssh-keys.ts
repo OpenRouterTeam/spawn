@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { getSshDir } from "./paths";
+import { isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { logInfo, logStep } from "./ui";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -33,12 +34,11 @@ export function discoverSshKeys(): SshKeyPair[] {
     return [];
   }
 
-  let entries: string[];
-  try {
-    entries = readdirSync(sshDir);
-  } catch {
+  const dirResult = tryCatchIf(isFileError, () => readdirSync(sshDir));
+  if (!dirResult.ok) {
     return [];
   }
+  const entries = dirResult.data;
 
   const pubFiles = entries.filter((f) => f.endsWith(".pub"));
   const pairs: SshKeyPair[] = [];
@@ -86,28 +86,29 @@ export function discoverSshKeys(): SshKeyPair[] {
 
 /** Extract the key type from a public key file using ssh-keygen. */
 function getKeyType(pubPath: string): string {
-  try {
-    const result = Bun.spawnSync(
-      [
-        "ssh-keygen",
-        "-lf",
-        pubPath,
-      ],
-      {
-        stdio: [
-          "ignore",
-          "pipe",
-          "pipe",
+  return unwrapOr(
+    tryCatch(() => {
+      const result = Bun.spawnSync(
+        [
+          "ssh-keygen",
+          "-lf",
+          pubPath,
         ],
-      },
-    );
-    const output = new TextDecoder().decode(result.stdout).trim();
-    // Format: "256 SHA256:xxx user@host (ED25519)"
-    const match = output.match(/\(([^)]+)\)$/);
-    return match ? match[1] : "UNKNOWN";
-  } catch {
-    return "UNKNOWN";
-  }
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+      const output = new TextDecoder().decode(result.stdout).trim();
+      // Format: "256 SHA256:xxx user@host (ED25519)"
+      const match = output.match(/\(([^)]+)\)$/);
+      return match ? match[1] : "UNKNOWN";
+    }),
+    "UNKNOWN",
+  );
 }
 
 // ─── Key Generation ─────────────────────────────────────────────────────────

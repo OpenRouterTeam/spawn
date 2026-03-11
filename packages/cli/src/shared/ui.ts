@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { getSpawnCloudConfigPath } from "./paths";
-import { isFileError, tryCatchIf, unwrapOr } from "./result.js";
+import { isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
@@ -159,8 +159,8 @@ export function openBrowser(url: string): void {
 
   let opened = false;
   for (const [cmd, args] of cmds) {
-    try {
-      const result = Bun.spawnSync(
+    const r = tryCatch(() =>
+      Bun.spawnSync(
         [
           cmd,
           ...args,
@@ -172,13 +172,11 @@ export function openBrowser(url: string): void {
             "ignore",
           ],
         },
-      );
-      if (result.exitCode === 0) {
-        opened = true;
-        break;
-      }
-    } catch {
-      // command not found or failed to spawn — try next
+      ),
+    );
+    if (r.ok && r.data.exitCode === 0) {
+      opened = true;
+      break;
     }
   }
 
@@ -381,11 +379,7 @@ export function prepareStdinForHandoff(): void {
   // Reset raw mode so the terminal is in cooked mode before SSH takes over.
   // SSH will set its own terminal mode when it starts.
   if (process.stdin.isTTY) {
-    try {
-      process.stdin.setRawMode(false);
-    } catch {
-      // ignore — not a TTY or already closed
-    }
+    tryCatch(() => process.stdin.setRawMode(false));
   }
 
   // Stop the stream from reading, but do NOT destroy it (that can close fd 0).

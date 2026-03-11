@@ -9,7 +9,7 @@ import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { getUpdateFailedPath } from "./shared/paths";
-import { asyncTryCatchIf, isFileError, isNetworkError, tryCatchIf, unwrapOr } from "./shared/result";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
 import { getErrorMessage, hasStatus } from "./shared/type-guards";
 import { logDebug, logWarn } from "./shared/ui";
 
@@ -145,8 +145,8 @@ function printUpdateBanner(latestVersion: string): void {
  * currently running binary lives, causing re-exec to run the stale old binary.
  */
 function findUpdatedBinary(): string {
-  try {
-    const result = executor.execFileSync(
+  const r = tryCatch(() =>
+    executor.execFileSync(
       "which",
       [
         "spawn",
@@ -159,13 +159,11 @@ function findUpdatedBinary(): string {
           "ignore",
         ],
       },
-    );
-    const found = result ? result.toString().trim() : "";
-    if (found) {
-      return found;
-    }
-  } catch {
-    // fall through to argv fallback
+    ),
+  );
+  const found = r.ok && r.data ? r.data.toString().trim() : "";
+  if (found) {
+    return found;
   }
   return process.argv[1] || "spawn";
 }
@@ -203,7 +201,7 @@ function performAutoUpdate(latestVersion: string): void {
   // Hardcoded CDN URL — no variable interpolation, eliminates CWE-78 concern entirely
   const installUrl = `${SPAWN_CDN}/cli/install.sh`;
 
-  try {
+  const updateResult = tryCatch(() => {
     // Two-step approach: fetch script bytes with curl, then execute via bash -c
     const scriptBytes = executor.execFileSync(
       "curl",
@@ -233,12 +231,14 @@ function performAutoUpdate(latestVersion: string): void {
         stdio: "inherit",
       },
     );
+  });
 
+  if (updateResult.ok) {
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
     clearUpdateFailed();
     reExecWithArgs();
-  } catch {
+  } else {
     markUpdateFailed();
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
@@ -280,11 +280,10 @@ export async function checkForUpdates(): Promise<void> {
 
   // Auto-update if newer version is available
   if (compareVersions(VERSION, latestVersion)) {
-    try {
-      performAutoUpdate(latestVersion);
-    } catch (err) {
+    const r = tryCatch(() => performAutoUpdate(latestVersion));
+    if (!r.ok) {
       logWarn("Auto-update encountered an error");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 }

@@ -6,7 +6,7 @@ import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
-import { asyncTryCatchIf, isFileError, isNetworkError, tryCatchIf } from "./result.js";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
 import { getErrorMessage, isString } from "./type-guards";
 import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
@@ -86,10 +86,10 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
 
   // Try ports in range
   let actualPort = callbackPort;
-  for (let p = callbackPort; p < callbackPort + 10; p++) {
-    try {
-      server = Bun.serve({
-        port: p,
+  for (let port = callbackPort; port < callbackPort + 10; port++) {
+    const serveResult = tryCatch(() =>
+      Bun.serve({
+        port,
         hostname: "127.0.0.1",
         fetch(req) {
           const url = new URL(req.url);
@@ -144,10 +144,14 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
             },
           });
         },
-      });
-      actualPort = p;
-      break;
-    } catch {}
+      }),
+    );
+    if (!serveResult.ok) {
+      continue;
+    }
+    server = serveResult.data;
+    actualPort = port;
+    break;
   }
 
   if (!server) {

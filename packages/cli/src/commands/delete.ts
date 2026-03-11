@@ -16,6 +16,7 @@ import { getActiveServers, markRecordDeleted } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
+import { asyncTryCatch, asyncTryCatchIf, isNetworkError } from "../shared/result.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
 import { activeServerPicker, resolveListFilters } from "./list.js";
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";
@@ -92,21 +93,20 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
     msg.includes("404") || msg.includes("not found") || msg.includes("Not Found") || msg.includes("Could not find");
 
   const tryDelete = async (deleteFn: () => Promise<void>): Promise<boolean> => {
-    try {
-      await deleteFn();
+    const r = await asyncTryCatch(deleteFn);
+    if (r.ok) {
       markRecordDeleted(record);
       return true;
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      if (isAlreadyGone(errMsg)) {
-        p.log.warn("Server already deleted or not found. Marking as deleted.");
-        markRecordDeleted(record);
-        return true;
-      }
-      p.log.error(`Delete failed: ${errMsg}`);
-      p.log.info("The server may still be running. Check your cloud provider dashboard.");
-      return false;
     }
+    const errMsg = getErrorMessage(r.error);
+    if (isAlreadyGone(errMsg)) {
+      p.log.warn("Server already deleted or not found. Marking as deleted.");
+      markRecordDeleted(record);
+      return true;
+    }
+    p.log.error(`Delete failed: ${errMsg}`);
+    p.log.info("The server may still be running. Check your cloud provider dashboard.");
+    return false;
   };
 
   switch (conn.cloud) {
@@ -238,12 +238,8 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
     return;
   }
 
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch {
-    // Manifest unavailable
-  }
+  const manifestResult = await asyncTryCatchIf(isNetworkError, loadManifest);
+  const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
   if (!isInteractiveTTY()) {
     p.log.error("spawn delete requires an interactive terminal.");

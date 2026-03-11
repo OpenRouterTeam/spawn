@@ -9,6 +9,7 @@ import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guid
 import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.js";
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
+import { asyncTryCatch, isFileError, tryCatchIf } from "../shared/result.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -203,7 +204,7 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   const s = p.spinner();
   s.start("Downloading spawn script...");
 
-  try {
+  const r = await asyncTryCatch(async () => {
     const res = await fetch(primaryUrl, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
@@ -226,10 +227,12 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
     const text = await ghRes.text();
     s.stop("Script downloaded (fallback)");
     return text;
-  } catch (err) {
+  });
+  if (!r.ok) {
     s.stop(pc.red("Download failed"));
-    throw err;
+    throw r.error;
   }
+  return r.data;
 }
 
 // Report 404 errors (script not found)
@@ -591,17 +594,16 @@ export async function execScript(
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
 
-  let scriptContent: string;
-  try {
-    scriptContent = await downloadScriptWithFallback(url, ghUrl);
-  } catch (err) {
-    reportDownloadError(ghUrl, err);
+  const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
+  if (!dlResult.ok) {
+    reportDownloadError(ghUrl, dlResult.error);
     return; // Exit early - cannot proceed without script content
   }
+  const scriptContent = dlResult.data;
 
   // Generate a unique spawn ID and record the spawn before execution
   const spawnId = generateSpawnId();
-  try {
+  const saveResult = tryCatchIf(isFileError, () =>
     saveSpawnRecord({
       id: spawnId,
       agent,
@@ -617,13 +619,11 @@ export async function execScript(
             prompt,
           }
         : {}),
-    });
-  } catch (err) {
-    // Non-fatal: don't block the spawn if history write fails
-    // Log for debugging but continue execution
-    if (debug) {
-      console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(err)}`));
-    }
+    }),
+  );
+  // Non-fatal: don't block the spawn if history write fails
+  if (!saveResult.ok && debug) {
+    console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(saveResult.error)}`));
   }
 
   // Pass spawn ID to the bash script so connection data can be linked back
@@ -829,16 +829,15 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     if (safeCloud && safeAgent) {
       const resolvedCliDir = path.resolve(cliDir);
       const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
-      try {
-        const canonicalPath = fs.realpathSync(candidatePath);
+      const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
+      if (realResult.ok) {
         // Ensure the resolved path stays inside the CLI dir (no path traversal)
         const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
-        if (canonicalPath.startsWith(prefix)) {
-          localScriptResolved = canonicalPath;
+        if (realResult.data.startsWith(prefix)) {
+          localScriptResolved = realResult.data;
         }
-      } catch {
-        // File doesn't exist — fall through to remote fetch
       }
+      // File doesn't exist — fall through to remote fetch
     }
   }
 

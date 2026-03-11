@@ -28,6 +28,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatchIf } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
 import { checkForUpdates } from "./update-check.js";
 
@@ -237,15 +238,13 @@ async function handleDefaultCommand(
   // Check if the single argument is a cloud name before routing to agent-interactive.
   // This fixes: `spawn digitalocean` telling users to run `spawn digitalocean` for
   // setup instructions, but `spawn digitalocean` routing to "Unknown agent: digitalocean".
-  try {
-    const manifest = await loadManifest();
-    const resolvedCloud = resolveCloudKey(manifest, agent);
+  const cloudCheckResult = await asyncTryCatchIf(isNetworkError, () => loadManifest());
+  if (cloudCheckResult.ok) {
+    const resolvedCloud = resolveCloudKey(cloudCheckResult.data, agent);
     if (resolvedCloud) {
-      await cmdCloudInfo(resolvedCloud, manifest);
+      await cmdCloudInfo(resolvedCloud, cloudCheckResult.data);
       return;
     }
-  } catch {
-    // Manifest unavailable — fall through to cmdAgentInteractive which handles errors gracefully
   }
 
   // Interactive cloud selection when agent is provided without cloud
@@ -262,8 +261,9 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
   console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
   console.error(`\nUsage: ${pc.cyan(`spawn ${agent} <cloud> --prompt "your prompt here"`)}`);
 
-  try {
-    const manifest = await loadManifest();
+  const manifestResult = await asyncTryCatchIf(isNetworkError, () => loadManifest());
+  if (manifestResult.ok) {
+    const manifest = manifestResult.data;
     const resolvedAgent = resolveAgentKey(manifest, agent);
     if (!resolvedAgent) {
       return;
@@ -284,8 +284,6 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     if (clouds.length > 5) {
       console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
     }
-  } catch (_err) {
-    // Manifest unavailable — skip cloud suggestions
   }
 }
 
@@ -331,11 +329,11 @@ async function readPromptFile(promptFile: string): Promise<string> {
     process.exit(1);
   }
 
-  try {
-    return readFileSync(promptFile, "utf-8");
-  } catch (err) {
-    handlePromptFileError(promptFile, err);
+  const readResult = tryCatchIf(isFileError, () => readFileSync(promptFile, "utf-8"));
+  if (readResult.ok) {
+    return readResult.data;
   }
+  handlePromptFileError(promptFile, readResult.error);
 }
 
 /** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */

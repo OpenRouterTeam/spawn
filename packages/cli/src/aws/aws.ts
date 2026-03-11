@@ -10,7 +10,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
-import { isFileError, tryCatchIf, unwrapOr } from "../shared/result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -374,13 +374,8 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
   const text = await resp.text();
 
   if (!resp.ok) {
-    let msg = "";
-    try {
-      const e = JSON.parse(text);
-      msg = e.message || e.Message || e.__type || "";
-    } catch {
-      /* ignore */
-    }
+    const parsed = tryCatch(() => JSON.parse(text));
+    const msg = parsed.ok ? parsed.data.message || parsed.data.Message || parsed.data.__type || "" : "";
     throw new Error(`Lightsail API error (HTTP ${resp.status}) ${target}: ${msg || text}`);
   }
 
@@ -709,17 +704,15 @@ async function lightsailGetKeyPair(keyPairName: string): Promise<boolean> {
       ]).exitCode === 0
     );
   }
-  try {
-    await lightsailRest(
+  const r = await asyncTryCatch(() =>
+    lightsailRest(
       "Lightsail_20161128.GetKeyPair",
       JSON.stringify({
         keyPairName,
       }),
-    );
-    return true;
-  } catch {
-    return false;
-  }
+    ),
+  );
+  return r.ok;
 }
 
 /** Import a public key to Lightsail as a key pair. */
@@ -841,9 +834,8 @@ export async function ensureSshKey(): Promise<void> {
   }
 
   logStep("Importing SSH key to Lightsail...");
-  try {
-    await lightsailImportKeyPair(keyName, pubKey);
-  } catch {
+  const importResult = await asyncTryCatch(() => lightsailImportKeyPair(keyName, pubKey));
+  if (!importResult.ok) {
     // Race condition: another process may have imported it
     if (await lightsailGetKeyPair(keyName)) {
       logInfo("SSH key already registered with Lightsail");
@@ -964,16 +956,9 @@ async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
   const pollDelay = 5000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let state = "";
-    let ip = "";
-
-    try {
-      const info = await lightsailGetInstance(_state.instanceName);
-      state = info.state;
-      ip = info.ip;
-    } catch {
-      state = "";
-    }
+    const infoResult = await asyncTryCatch(() => lightsailGetInstance(_state.instanceName));
+    const state = infoResult.ok ? infoResult.data.state : "";
+    const ip = infoResult.ok ? infoResult.data.ip : "";
 
     if (state === "running") {
       _state.instanceIp = ip.trim();
@@ -1182,33 +1167,29 @@ export async function destroyServer(name?: string): Promise<void> {
 
   logStep(`Destroying Lightsail instance '${target}'...`);
 
-  if (_state.lightsailMode === "cli") {
-    try {
-      await awsCli([
-        "lightsail",
-        "delete-instance",
-        "--instance-name",
-        target,
-      ]);
-    } catch {
-      logError(`Failed to destroy Lightsail instance '${target}'`);
-      logWarn(`Delete it manually: ${DASHBOARD_URL}`);
-      throw new Error("Instance deletion failed");
-    }
-  } else {
-    try {
-      await lightsailRest(
-        "Lightsail_20161128.DeleteInstance",
-        JSON.stringify({
-          instanceName: target,
-          forceDeleteAddOns: false,
-        }),
-      );
-    } catch {
-      logError(`Failed to destroy Lightsail instance '${target}'`);
-      logWarn(`Delete it manually: ${DASHBOARD_URL}`);
-      throw new Error("Instance deletion failed");
-    }
+  const deleteResult =
+    _state.lightsailMode === "cli"
+      ? await asyncTryCatch(() =>
+          awsCli([
+            "lightsail",
+            "delete-instance",
+            "--instance-name",
+            target,
+          ]),
+        )
+      : await asyncTryCatch(() =>
+          lightsailRest(
+            "Lightsail_20161128.DeleteInstance",
+            JSON.stringify({
+              instanceName: target,
+              forceDeleteAddOns: false,
+            }),
+          ),
+        );
+  if (!deleteResult.ok) {
+    logError(`Failed to destroy Lightsail instance '${target}'`);
+    logWarn(`Delete it manually: ${DASHBOARD_URL}`);
+    throw new Error("Instance deletion failed");
   }
   logInfo(`Instance '${target}' destroyed`);
 }

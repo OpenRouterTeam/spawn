@@ -11,7 +11,7 @@ import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
-import { asyncTryCatchIf, isOperationalError } from "./result.js";
+import { asyncTryCatch, asyncTryCatchIf, isOperationalError } from "./result.js";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
@@ -92,11 +92,10 @@ export async function runOrchestration(
   // 1b. Pre-flight account readiness check (billing, email verification, etc.)
   //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (cloud.checkAccountReady) {
-    try {
-      await cloud.checkAccountReady();
-    } catch (err) {
+    const r = await asyncTryCatch(() => cloud.checkAccountReady!());
+    if (!r.ok) {
       logWarn("Account readiness check failed — proceeding anyway");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 
@@ -107,11 +106,10 @@ export async function runOrchestration(
   // 3. Pre-provision hooks (e.g., GitHub auth prompt — non-fatal)
   //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (agent.preProvision) {
-    try {
-      await agent.preProvision();
-    } catch (err) {
+    const r = await asyncTryCatch(() => agent.preProvision!());
+    if (!r.ok) {
       logWarn("Pre-provision hook failed — continuing");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 
@@ -167,8 +165,8 @@ export async function runOrchestration(
   // 9. Inject environment variables via .spawnrc
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
-  try {
-    await withRetry(
+  const envResult = await asyncTryCatch(() =>
+    withRetry(
       "env setup",
       () =>
         wrapSshCall(
@@ -181,8 +179,9 @@ export async function runOrchestration(
         ),
       2,
       5,
-    );
-  } catch {
+    ),
+  );
+  if (!envResult.ok) {
     logWarn("Environment setup had errors");
   }
 
@@ -195,9 +194,10 @@ export async function runOrchestration(
 
   // 10b. Agent-specific configuration
   if (agent.configure) {
-    try {
-      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5);
-    } catch {
+    const configResult = await asyncTryCatch(() =>
+      withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5),
+    );
+    if (!configResult.ok) {
       logWarn("Agent configuration failed (continuing with defaults)");
     }
   }

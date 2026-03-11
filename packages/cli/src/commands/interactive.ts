@@ -5,6 +5,7 @@ import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { agentKeys } from "../manifest.js";
 import { getAgentOptionalSteps } from "../shared/agents.js";
+import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
@@ -127,25 +128,26 @@ function hasLocalGithubToken(): boolean {
   if (process.env.GITHUB_TOKEN) {
     return true;
   }
-  try {
-    const result = Bun.spawnSync(
-      [
-        "gh",
-        "auth",
-        "token",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "pipe",
-          "ignore",
-        ],
-      },
-    );
-    return result.exitCode === 0;
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    tryCatch(
+      () =>
+        Bun.spawnSync(
+          [
+            "gh",
+            "auth",
+            "token",
+          ],
+          {
+            stdio: [
+              "ignore",
+              "pipe",
+              "ignore",
+            ],
+          },
+        ).exitCode === 0,
+    ),
+    false,
+  );
 }
 
 /**
@@ -207,12 +209,8 @@ export async function cmdInteractive(): Promise<void> {
       handleCancel();
     }
     if (topChoice === "connect") {
-      let manifest: Manifest | null = null;
-      try {
-        manifest = await loadManifestWithSpinner();
-      } catch (_err) {
-        // Manifest unavailable — show raw keys
-      }
+      const manifestResult = await asyncTryCatch(() => loadManifestWithSpinner());
+      const manifest = manifestResult.ok ? manifestResult.data : null;
       await activeServerPicker(activeServers, manifest);
       return;
     }

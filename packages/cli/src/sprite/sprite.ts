@@ -5,6 +5,7 @@ import type { VMConnection } from "../history.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getUserHome } from "../shared/paths";
+import { asyncTryCatch } from "../shared/result.js";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { getErrorMessage } from "../shared/type-guards";
 import {
@@ -67,26 +68,27 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      const msg = getErrorMessage(err);
+    const result = await asyncTryCatch(fn);
+    if (result.ok) {
+      return result.data;
+    }
 
-      if (attempt >= maxRetries) {
-        break;
-      }
+    lastError = result.error;
+    const msg = getErrorMessage(result.error);
 
-      // Only retry on transient network errors
-      if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
-        logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
-        await sleep(3000);
-        continue;
-      }
-
-      // Non-transient error — don't retry
+    if (attempt >= maxRetries) {
       break;
     }
+
+    // Only retry on transient network errors
+    if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
+      logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
+      await sleep(3000);
+      continue;
+    }
+
+    // Non-transient error — don't retry
+    break;
   }
   throw lastError;
 }
@@ -392,12 +394,12 @@ export async function setupShellEnvironment(): Promise<void> {
   // Switch interactive login shells to zsh (if available).
   // Only modify .bash_profile — NOT .bashrc — so non-interactive bash
   // (e.g., `sprite exec ... bash -c CMD`) still works and sources PATH config.
-  try {
-    await runSpriteSilent("command -v zsh");
+  const zshResult = await asyncTryCatch(async () => runSpriteSilent("command -v zsh"));
+  if (zshResult.ok) {
     const bashProfile = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
     const bpB64 = Buffer.from(bashProfile).toString("base64");
     await runSprite(`printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`);
-  } catch {
+  } else {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }
 }

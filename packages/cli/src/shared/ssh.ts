@@ -2,6 +2,7 @@
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
+import { asyncTryCatch, tryCatch } from "./result.js";
 import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
@@ -115,19 +116,16 @@ export function killWithTimeout(
   },
   gracePeriodMs = 5000,
 ): void {
-  try {
-    proc.kill();
-  } catch {
+  const r = tryCatch(() => proc.kill());
+  if (!r.ok) {
     return;
   }
   const sigkillTimer = setTimeout(() => {
-    try {
+    tryCatch(() => {
       if (!proc.killed) {
         proc.kill(9);
       }
-    } catch {
-      /* already dead */
-    }
+    });
   }, gracePeriodMs);
   // Don't let this timer keep the event loop alive — the process may already
   // be dead from SIGTERM, so there's no reason to block exit for 5 seconds.
@@ -305,7 +303,7 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const handshakeAttempts = Math.max(remaining, 5);
 
   for (let i = 1; i <= handshakeAttempts; i++) {
-    try {
+    const r = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -334,8 +332,11 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
         const exitCode = await proc.exited;
 
         if (exitCode === 0 && stdout.includes("ok")) {
-          logInfo("SSH is ready");
-          return;
+          return {
+            stdout,
+            stderr,
+            exitCode,
+          };
         }
 
         // Show the actual SSH error reason dimly so users can debug
@@ -345,10 +346,16 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
         } else {
           logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
         }
+        return null;
       } finally {
         clearTimeout(timer);
       }
-    } catch {
+    });
+    if (r.ok && r.data !== null) {
+      logInfo("SSH is ready");
+      return;
+    }
+    if (!r.ok) {
       logStep(`SSH handshake error (${i}/${handshakeAttempts})`);
     }
     await sleep(3000);

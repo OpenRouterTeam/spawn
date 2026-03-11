@@ -5,6 +5,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { clearHistory, filterHistory, getActiveServers, removeRecord } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
+import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { cmdConnect, cmdEnterAgent } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
 import { cmdRun } from "./run.js";
@@ -23,44 +24,44 @@ import {
 
 /** Format an ISO timestamp as a human-readable relative time (e.g., "5 min ago", "2 days ago") */
 export function formatRelativeTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    const diffMs = Date.now() - d.getTime();
-    if (diffMs < 0) {
-      return "just now";
-    }
-    const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) {
-      return "just now";
-    }
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) {
-      return `${diffMin} min ago`;
-    }
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) {
-      return `${diffHr}h ago`;
-    }
-    const diffDays = Math.floor(diffHr / 24);
-    if (diffDays === 1) {
-      return "yesterday";
-    }
-    if (diffDays < 30) {
-      return `${diffDays}d ago`;
-    }
-    // Fall back to absolute date for old entries
-    const date = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-    return date;
-  } catch (_err) {
-    // Invalid date format - return as-is
-    return iso;
-  }
+  return unwrapOr(
+    tryCatch(() => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) {
+        return iso;
+      }
+      const diffMs = Date.now() - d.getTime();
+      if (diffMs < 0) {
+        return "just now";
+      }
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) {
+        return "just now";
+      }
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) {
+        return `${diffMin} min ago`;
+      }
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) {
+        return `${diffHr}h ago`;
+      }
+      const diffDays = Math.floor(diffHr / 24);
+      if (diffDays === 1) {
+        return "yesterday";
+      }
+      if (diffDays < 30) {
+        return `${diffDays}d ago`;
+      }
+      // Fall back to absolute date for old entries
+      const date = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      return date;
+    }),
+    iso,
+  );
 }
 
 /** Build a display label (line 1: name) for a spawn record in the interactive picker */
@@ -121,8 +122,9 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
   }
   p.log.info(`No spawns found matching ${parts.join(", ")}.`);
 
-  try {
-    const manifest = await loadManifest();
+  const manifestResult = await asyncTryCatch(() => loadManifest());
+  if (manifestResult.ok) {
+    const manifest = manifestResult.data;
     if (agentFilter) {
       await suggestFilterCorrection(
         agentFilter,
@@ -143,8 +145,6 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
         manifest,
       );
     }
-  } catch (_err) {
-    // Manifest unavailable -- skip suggestions
   }
 
   const totalRecords = filterHistory();
@@ -210,12 +210,8 @@ export async function resolveListFilters(
   agentFilter?: string;
   cloudFilter?: string;
 }> {
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch (_err) {
-    // Manifest unavailable -- show raw keys
-  }
+  const manifestResult = await asyncTryCatch(() => loadManifest());
+  const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
   if (manifest && agentFilter) {
     const resolved = resolveAgentKey(manifest, agentFilter);
@@ -533,12 +529,8 @@ export async function cmdLast(): Promise<void> {
   }
 
   const latest = records[0];
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch (_err) {
-    // Manifest unavailable -- show raw keys
-  }
+  const lastManifestResult = await asyncTryCatch(() => loadManifest());
+  const manifest: Manifest | null = lastManifestResult.ok ? lastManifestResult.data : null;
 
   const label = buildRecordLabel(latest, manifest);
   const subtitle = buildRecordSubtitle(latest, manifest);
