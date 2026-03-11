@@ -8,6 +8,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
+import { asyncTryCatch, asyncTryCatchIf, isNetworkError, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -52,6 +53,17 @@ const _state: HetznerState = {
   serverIp: "",
 };
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: _state.serverIp,
+    user: "root",
+  };
+}
+
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function hetznerApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
@@ -59,7 +71,7 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
 
   let interval = 2;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
+    const r = await asyncTryCatch(async () => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${_state.hcloudToken}`,
@@ -81,20 +93,27 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
         logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
-        continue;
+        return undefined;
       }
       if (!resp.ok) {
         throw new Error(`Hetzner API error (HTTP ${resp.status}): ${text.slice(0, 200)}`);
       }
       return text;
-    } catch (err) {
-      if (attempt >= maxRetries) {
-        throw err;
-      }
-      logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
-      await sleep(interval * 1000);
-      interval = Math.min(interval * 2, 30);
+    });
+    if (r.ok && r.data !== undefined) {
+      return r.data;
     }
+    if (r.ok) {
+      // retry signal (status 429/5xx returned undefined)
+      continue;
+    }
+    const e = r.error instanceof Error ? r.error : new Error(String(r.error));
+    if (!isNetworkError(e) || attempt >= maxRetries) {
+      throw r.error;
+    }
+    logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
+    await sleep(interval * 1000);
+    interval = Math.min(interval * 2, 30);
   }
   throw new Error("hetznerApi: unreachable");
 }
@@ -120,19 +139,20 @@ async function testHcloudToken(): Promise<boolean> {
   if (!_state.hcloudToken) {
     return false;
   }
-  try {
-    const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
-    const data = parseJsonObj(resp);
-    // Hetzner returns { "error": { ... } } on auth failure.
-    // Success responses may contain "error": null inside action objects,
-    // so check for a real error object with a message.
-    if (toRecord(data?.error)?.message) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
+      const data = parseJsonObj(resp);
+      // Hetzner returns { "error": { ... } } on auth failure.
+      // Success responses may contain "error": null inside action objects,
+      // so check for a real error object with a message.
+      if (toRecord(data?.error)?.message) {
+        return false;
+      }
+      return true;
+    }),
+    false,
+  );
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -214,20 +234,19 @@ export async function ensureSshKey(): Promise<void> {
       name: keyName,
       public_key: pubKey,
     });
-    let regResp: string;
-    try {
-      regResp = await hetznerApi("POST", "/ssh_keys", body);
-    } catch (err) {
+    const regResult = await asyncTryCatch(() => hetznerApi("POST", "/ssh_keys", body));
+    if (!regResult.ok) {
       // HTTP 409 "uniqueness_error" means the key already exists under a different
       // name. Hetzner's error message says "SSH key not unique" which the API layer
       // throws as an Error before we can parse the response body.
-      const errMsg = getErrorMessage(err);
+      const errMsg = getErrorMessage(regResult.error);
       if (/uniqueness_error|not unique|already/.test(errMsg)) {
         logInfo(`SSH key '${key.name}' already registered (different name)`);
         continue;
       }
-      throw err;
+      throw regResult.error;
     }
+    const regResp = regResult.data;
     const regData = parseJsonObj(regResp);
     const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
@@ -502,7 +521,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 
   logStep("Waiting for cloud-init to complete...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -524,24 +543,27 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
       // can continue and the user isn't left with a hung CLI.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      let stdout: string;
-      let exitCode: number;
-      try {
-        [stdout] = await Promise.all([
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
         ]);
-        exitCode = await proc.exited;
-      } finally {
-        clearTimeout(timer);
+        const exitCode = await proc.exited;
+        return {
+          stdout,
+          exitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-      if (exitCode === 0 && stdout.includes("done")) {
-        logStepDone();
-        logInfo("Cloud-init complete");
-        return;
-      }
-    } catch {
-      // ignore
+      return pipeResult.data;
+    });
+    if (pollResult.ok && pollResult.data.exitCode === 0 && pollResult.data.stdout.includes("done")) {
+      logStepDone();
+      logInfo("Cloud-init complete");
+      return;
     }
     if (attempt >= maxAttempts) {
       logStepDone();
@@ -555,7 +577,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -577,13 +599,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -617,13 +639,13 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 
@@ -632,7 +654,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
   const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 

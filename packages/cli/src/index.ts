@@ -28,6 +28,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
+import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
 import { checkForUpdates } from "./update-check.js";
 
@@ -75,6 +76,23 @@ function extractFlagValue(
   ];
 }
 
+/** Extract all occurrences of a repeatable flag, mutating args in place. */
+function extractAllFlagValues(args: string[], flag: string, usageHint: string): string[] {
+  const values: string[] = [];
+  let idx = args.indexOf(flag);
+  while (idx !== -1) {
+    if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+      console.error(pc.red(`Error: ${pc.bold(flag)} requires a value`));
+      console.error(`\nUsage: ${pc.cyan(usageHint)}`);
+      process.exit(1);
+    }
+    values.push(args[idx + 1]);
+    args.splice(idx, 2);
+    idx = args.indexOf(flag);
+  }
+  return values;
+}
+
 const HELP_FLAGS = [
   "--help",
   "-h",
@@ -99,6 +117,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-2gb)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
+    console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -237,15 +256,13 @@ async function handleDefaultCommand(
   // Check if the single argument is a cloud name before routing to agent-interactive.
   // This fixes: `spawn digitalocean` telling users to run `spawn digitalocean` for
   // setup instructions, but `spawn digitalocean` routing to "Unknown agent: digitalocean".
-  try {
-    const manifest = await loadManifest();
-    const resolvedCloud = resolveCloudKey(manifest, agent);
+  const cloudCheckResult = await asyncTryCatchIf(isNetworkError, () => loadManifest());
+  if (cloudCheckResult.ok) {
+    const resolvedCloud = resolveCloudKey(cloudCheckResult.data, agent);
     if (resolvedCloud) {
-      await cmdCloudInfo(resolvedCloud, manifest);
+      await cmdCloudInfo(resolvedCloud, cloudCheckResult.data);
       return;
     }
-  } catch {
-    // Manifest unavailable — fall through to cmdAgentInteractive which handles errors gracefully
   }
 
   // Interactive cloud selection when agent is provided without cloud
@@ -262,8 +279,9 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
   console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
   console.error(`\nUsage: ${pc.cyan(`spawn ${agent} <cloud> --prompt "your prompt here"`)}`);
 
-  try {
-    const manifest = await loadManifest();
+  const manifestResult = await asyncTryCatchIf(isNetworkError, () => loadManifest());
+  if (manifestResult.ok) {
+    const manifest = manifestResult.data;
     const resolvedAgent = resolveAgentKey(manifest, agent);
     if (!resolvedAgent) {
       return;
@@ -284,8 +302,6 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     if (clouds.length > 5) {
       console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
     }
-  } catch (_err) {
-    // Manifest unavailable — skip cloud suggestions
   }
 }
 
@@ -312,17 +328,18 @@ async function readPromptFile(promptFile: string): Promise<string> {
   const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
   const { readFileSync, statSync } = await import("node:fs");
 
-  try {
-    validatePromptFilePath(promptFile);
-  } catch (err) {
-    console.error(pc.red(getErrorMessage(err)));
+  const validateResult = tryCatch(() => validatePromptFilePath(promptFile));
+  if (!validateResult.ok) {
+    console.error(pc.red(getErrorMessage(validateResult.error)));
     process.exit(1);
   }
 
-  try {
+  const statsResult = tryCatch(() => {
     const stats = statSync(promptFile);
     validatePromptFileStats(promptFile, stats);
-  } catch (err) {
+  });
+  if (!statsResult.ok) {
+    const err = statsResult.error;
     const code = err && typeof err === "object" && "code" in err ? err.code : "";
     if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
       handlePromptFileError(promptFile, err);
@@ -331,11 +348,11 @@ async function readPromptFile(promptFile: string): Promise<string> {
     process.exit(1);
   }
 
-  try {
-    return readFileSync(promptFile, "utf-8");
-  } catch (err) {
-    handlePromptFileError(promptFile, err);
+  const readResult = tryCatchIf(isFileError, () => readFileSync(promptFile, "utf-8"));
+  if (readResult.ok) {
+    return readResult.data;
   }
+  handlePromptFileError(promptFile, readResult.error);
 }
 
 /** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */
@@ -713,10 +730,9 @@ async function main(): Promise<void> {
   // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
   // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
   if (rawArgs[0] === "pick") {
-    try {
-      await cmdPick(expandEqualsFlags(rawArgs.slice(1)));
-    } catch (err) {
-      handleError(err);
+    const pickResult = await asyncTryCatch(() => cmdPick(expandEqualsFlags(rawArgs.slice(1))));
+    if (!pickResult.ok) {
+      handleError(pickResult.error);
     }
     return;
   }
@@ -761,6 +777,23 @@ async function main(): Promise<void> {
   if (reauthIdx !== -1) {
     filteredArgs.splice(reauthIdx, 1);
     process.env.SPAWN_REAUTH = "1";
+  }
+
+  // Extract all --beta <feature> flags (repeatable, opt-in to experimental features)
+  const VALID_BETA_FEATURES = new Set([
+    "tarball",
+  ]);
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta tarball");
+  for (const flag of betaFeatures) {
+    if (!VALID_BETA_FEATURES.has(flag)) {
+      console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
+      console.error("\nAvailable beta features:");
+      console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
+      process.exit(1);
+    }
+  }
+  if (betaFeatures.length > 0) {
+    process.env.SPAWN_BETA = betaFeatures.join(",");
   }
 
   // Extract --output <format> flag
@@ -875,7 +908,7 @@ async function main(): Promise<void> {
 
   const cmd = filteredArgs[0];
 
-  try {
+  const cmdResult = await asyncTryCatch(async () => {
     if (!cmd) {
       if (effectiveHeadless) {
         if (outputFormat === "json") {
@@ -896,18 +929,19 @@ async function main(): Promise<void> {
     } else {
       await dispatchCommand(cmd, filteredArgs, prompt, dryRun, debug, effectiveHeadless, outputFormat);
     }
-  } catch (err) {
+  });
+  if (!cmdResult.ok) {
     if (effectiveHeadless && outputFormat === "json") {
       console.log(
         JSON.stringify({
           status: "error",
           error_code: "UNEXPECTED_ERROR",
-          error_message: getErrorMessage(err),
+          error_message: getErrorMessage(cmdResult.error),
         }),
       );
       process.exit(1);
     }
-    handleError(err);
+    handleError(cmdResult.error);
   }
 }
 

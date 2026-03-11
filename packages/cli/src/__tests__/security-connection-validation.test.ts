@@ -4,7 +4,14 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
+import {
+  validateConnectionIP,
+  validateLaunchCmd,
+  validateMetadataValue,
+  validatePreLaunchCmd,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 
 describe("validateConnectionIP", () => {
   describe("valid inputs", () => {
@@ -271,6 +278,167 @@ describe("validateLaunchCmd", () => {
 
     it("should reject uppercase binary names (not in agent-setup.ts)", () => {
       expect(() => validateLaunchCmd("Claude")).toThrow(/Invalid launch command/);
+    });
+  });
+});
+
+describe("validatePreLaunchCmd", () => {
+  describe("valid inputs — background daemon patterns", () => {
+    it("should accept openclaw gateway pre_launch from manifest (#2474)", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept nohup with simple binary and backgrounding", () => {
+      expect(() => validatePreLaunchCmd("nohup myagent server &")).not.toThrow();
+    });
+
+    it("should accept binary with redirect and backgrounding (no nohup)", () => {
+      expect(() => validatePreLaunchCmd("myagent server > /tmp/myagent.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept simple backgrounded command", () => {
+      expect(() => validatePreLaunchCmd("myagent daemon &")).not.toThrow();
+    });
+
+    it("should accept nohup with append redirect", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway >> /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
+    });
+
+    it("should accept redirect without stderr merge", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw.log &")).not.toThrow();
+    });
+
+    it("should accept empty/blank commands", () => {
+      expect(() => validatePreLaunchCmd("")).not.toThrow();
+      expect(() => validatePreLaunchCmd("   ")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs — injection attempts", () => {
+    it("should reject command substitution $()", () => {
+      expect(() => validatePreLaunchCmd("$(whoami) &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject backtick command substitution", () => {
+      expect(() => validatePreLaunchCmd("`id` &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject pipe operators", () => {
+      expect(() => validatePreLaunchCmd("nohup agent | tee /tmp/log &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject redirect to non-tmp paths", () => {
+      expect(() => validatePreLaunchCmd("nohup agent > /etc/cron.d/evil 2>&1 &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject commands without backgrounding (&)", () => {
+      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw.log 2>&1")).toThrow(
+        /Invalid pre_launch/,
+      );
+    });
+
+    it("should reject commands that are too long", () => {
+      const longCmd = "nohup agent " + "a".repeat(1015) + " &";
+      expect(() => validatePreLaunchCmd(longCmd)).toThrow(/too long/);
+    });
+
+    it("should reject semicolon chaining", () => {
+      expect(() => validatePreLaunchCmd("curl evil.com; nohup agent &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject && chaining", () => {
+      expect(() => validatePreLaunchCmd("curl evil.com && nohup agent &")).toThrow(/Invalid pre_launch/);
+    });
+
+    it("should reject path traversal via .. in log paths", () => {
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../etc/cron.d/evil &")).toThrow(/Invalid pre_launch/);
+      expect(() => validatePreLaunchCmd("nohup agent > /tmp/../../root/.ssh/authorized_keys &")).toThrow(
+        /Invalid pre_launch/,
+      );
+      expect(() => validatePreLaunchCmd("nohup agent >> /tmp/../etc/passwd &")).toThrow(/Invalid pre_launch/);
+    });
+  });
+});
+
+describe("validateMetadataValue", () => {
+  describe("valid inputs", () => {
+    it("should accept valid GCP zones", () => {
+      expect(() => validateMetadataValue("us-central1-a", "zone")).not.toThrow();
+      expect(() => validateMetadataValue("europe-west1-b", "zone")).not.toThrow();
+      expect(() => validateMetadataValue("asia-east1-c", "zone")).not.toThrow();
+    });
+
+    it("should accept valid project IDs", () => {
+      expect(() => validateMetadataValue("my-project-123", "project")).not.toThrow();
+      expect(() => validateMetadataValue("gcp_project.name", "project")).not.toThrow();
+      expect(() => validateMetadataValue("prod-app-42", "project")).not.toThrow();
+    });
+
+    it("should accept alphanumeric values with allowed special characters", () => {
+      expect(() => validateMetadataValue("simple", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with.dots", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with_underscores", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with-hyphens", "field")).not.toThrow();
+      expect(() => validateMetadataValue("MixedCase123", "field")).not.toThrow();
+    });
+
+    it("should allow empty string (caller provides defaults)", () => {
+      expect(() => validateMetadataValue("", "zone")).not.toThrow();
+    });
+
+    it("should allow whitespace-only string (treated as empty)", () => {
+      expect(() => validateMetadataValue("   ", "project")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs", () => {
+    it("should reject values exceeding 128 characters", () => {
+      const longValue = "a".repeat(129);
+      expect(() => validateMetadataValue(longValue, "zone")).toThrow(/too long/);
+    });
+
+    it("should accept values at exactly 128 characters", () => {
+      const exactValue = "a".repeat(128);
+      expect(() => validateMetadataValue(exactValue, "zone")).not.toThrow();
+    });
+
+    it("should reject command substitution with $()", () => {
+      expect(() => validateMetadataValue("$(whoami)", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject backtick command substitution", () => {
+      expect(() => validateMetadataValue("`id`", "project")).toThrow(/Invalid project/);
+    });
+
+    it("should reject semicolon injection", () => {
+      expect(() => validateMetadataValue("zone;rm -rf /", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject pipe injection", () => {
+      expect(() => validateMetadataValue("zone|cat /etc/passwd", "project")).toThrow(/Invalid project/);
+    });
+
+    it("should reject ampersand chaining", () => {
+      expect(() => validateMetadataValue("zone&echo pwned", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject path traversal", () => {
+      expect(() => validateMetadataValue("../../../etc/passwd", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject spaces", () => {
+      expect(() => validateMetadataValue("us central1", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject quotes", () => {
+      expect(() => validateMetadataValue("zone'injection", "field")).toThrow(/Invalid field/);
+      expect(() => validateMetadataValue('zone"injection', "field")).toThrow(/Invalid field/);
+    });
+
+    it("should include field name in error messages", () => {
+      expect(() => validateMetadataValue("$(evil)", "gcp_zone")).toThrow(/Invalid gcp_zone/);
+      expect(() => validateMetadataValue("bad;value", "gcp_project")).toThrow(/Invalid gcp_project/);
+      expect(() => validateMetadataValue("a".repeat(129), "my_field")).toThrow(/my_field is too long/);
     });
   });
 });

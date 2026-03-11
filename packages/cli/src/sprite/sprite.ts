@@ -5,6 +5,7 @@ import type { VMConnection } from "../history.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getUserHome } from "../shared/paths";
+import { asyncTryCatch } from "../shared/result.js";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { getErrorMessage } from "../shared/type-guards";
 import {
@@ -67,26 +68,27 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      const msg = getErrorMessage(err);
+    const result = await asyncTryCatch(fn);
+    if (result.ok) {
+      return result.data;
+    }
 
-      if (attempt >= maxRetries) {
-        break;
-      }
+    lastError = result.error;
+    const msg = getErrorMessage(result.error);
 
-      // Only retry on transient network errors
-      if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
-        logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
-        await sleep(3000);
-        continue;
-      }
-
-      // Non-transient error — don't retry
+    if (attempt >= maxRetries) {
       break;
     }
+
+    // Only retry on transient network errors
+    if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
+      logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
+      await sleep(3000);
+      continue;
+    }
+
+    // Non-transient error — don't retry
+    break;
   }
   throw lastError;
 }
@@ -392,12 +394,12 @@ export async function setupShellEnvironment(): Promise<void> {
   // Switch interactive login shells to zsh (if available).
   // Only modify .bash_profile — NOT .bashrc — so non-interactive bash
   // (e.g., `sprite exec ... bash -c CMD`) still works and sources PATH config.
-  try {
-    await runSpriteSilent("command -v zsh");
+  const zshResult = await asyncTryCatch(async () => runSpriteSilent("command -v zsh"));
+  if (zshResult.ok) {
     const bashProfile = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
     const bpB64 = Buffer.from(bashProfile).toString("base64");
     await runSprite(`printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`);
-  } catch {
+  } else {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }
 }
@@ -443,13 +445,13 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
     );
     const timeout = (timeoutSecs || 300) * 1000;
     const timer = setTimeout(() => killWithTimeout(proc), timeout);
-    try {
-      const exitCode = await proc.exited;
-      if (exitCode !== 0) {
-        throw new Error(`sprite exec failed (exit ${exitCode}): ${cmd.slice(0, 80)}`);
-      }
-    } finally {
-      clearTimeout(timer);
+    const execResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(timer);
+    if (!execResult.ok) {
+      throw execResult.error;
+    }
+    if (execResult.data !== 0) {
+      throw new Error(`sprite exec failed (exit ${execResult.data}): ${cmd.slice(0, 80)}`);
     }
   });
 }
@@ -479,13 +481,13 @@ async function runSpriteSilent(cmd: string): Promise<void> {
   );
   // 60s timeout — silent commands should not hang indefinitely
   const timer = setTimeout(() => killWithTimeout(proc), 60_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`sprite exec (silent) failed (exit ${exitCode})`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const silentResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!silentResult.ok) {
+    throw silentResult.error;
+  }
+  if (silentResult.data !== 0) {
+    throw new Error(`sprite exec (silent) failed (exit ${silentResult.data})`);
   }
 }
 
@@ -554,15 +556,17 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 export async function installSpriteKeepAlive(): Promise<void> {
   logStep("Installing Sprite keep-alive...");
   const scriptUrl = "https://kurt-claw-f.sprites.app/sprite-keep-running.sh";
-  try {
-    await runSprite(
+  const keepAliveResult = await asyncTryCatch(() =>
+    runSprite(
       "mkdir -p ~/.local/bin && " +
         `curl -fsSL '${scriptUrl}' -o ~/.local/bin/sprite-keep-running && ` +
         "chmod +x ~/.local/bin/sprite-keep-running",
       60,
-    );
+    ),
+  );
+  if (keepAliveResult.ok) {
     logInfo("Sprite keep-alive installed");
-  } catch {
+  } else {
     logWarn("Could not install Sprite keep-alive — sprite may shut down during inactivity");
   }
 }
@@ -576,7 +580,7 @@ export async function installSpriteKeepAlive(): Promise<void> {
  * is installed, it wraps the command to keep the sprite alive via Sprite's
  * /v1/tasks API for the duration of the session.
  */
-export async function interactiveSession(cmd: string): Promise<number> {
+export async function interactiveSession(cmd: string, spawnFn?: (args: string[]) => number): Promise<number> {
   const spriteCmd = getSpriteCmd()!;
 
   // Encode the session command to handle multi-line restart loop scripts safely
@@ -620,7 +624,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
         sessionScript,
       ];
 
-  const exitCode = spawnInteractive(args);
+  const spawn = spawnFn ?? spawnInteractive;
+  const exitCode = spawn(args);
 
   // Post-session summary
   process.stderr.write("\n");
@@ -667,12 +672,12 @@ export async function destroyServer(name?: string): Promise<void> {
   const stderrText = new Response(proc.stderr).text();
   // 60s timeout — sprite destroy should not hang indefinitely
   const timer = setTimeout(() => killWithTimeout(proc), 60_000);
-  let exitCode: number;
-  try {
-    exitCode = await proc.exited;
-  } finally {
-    clearTimeout(timer);
+  const destroyResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!destroyResult.ok) {
+    throw destroyResult.error;
   }
+  const exitCode = destroyResult.data;
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);

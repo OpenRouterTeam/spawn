@@ -4,14 +4,27 @@
 import type { VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup";
 import type { AgentConfig } from "./agents";
+import type { SshTunnelHandle } from "./ssh";
 
 import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
+import { asyncTryCatch, asyncTryCatchIf, isOperationalError } from "./result.js";
+import { startSshTunnel } from "./ssh";
+import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
-import { logDebug, logInfo, logStep, logWarn, prepareStdinForHandoff, withRetry } from "./ui";
+import {
+  logDebug,
+  logInfo,
+  logStep,
+  logWarn,
+  openBrowser,
+  prepareStdinForHandoff,
+  validateModelId,
+  withRetry,
+} from "./ui";
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -26,6 +39,11 @@ export interface CloudOrchestrator {
   getServerName(): Promise<string>;
   waitForReady(): Promise<void>;
   interactiveSession(cmd: string): Promise<number>;
+  /** Return SSH connection info for tunnel support. Omit for non-SSH clouds. */
+  getConnectionInfo?(): {
+    host: string;
+    user: string;
+  };
 }
 
 /**
@@ -57,6 +75,7 @@ function wrapWithRestartLoop(cmd: string): string {
 /** Options for runOrchestration (used in tests to inject mock dependencies). */
 export interface OrchestrationOptions {
   tryTarball?: (runner: CloudRunner, agentName: string) => Promise<boolean>;
+  getApiKey?: (agentSlug?: string, cloudSlug?: string) => Promise<string>;
 }
 
 export async function runOrchestration(
@@ -72,31 +91,36 @@ export async function runOrchestration(
   await cloud.authenticate();
 
   // 1b. Pre-flight account readiness check (billing, email verification, etc.)
+  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (cloud.checkAccountReady) {
-    try {
-      await cloud.checkAccountReady();
-    } catch (err) {
+    const r = await asyncTryCatch(() => cloud.checkAccountReady!());
+    if (!r.ok) {
       logWarn("Account readiness check failed — proceeding anyway");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 
   // 2. Get API key (immediately after cloud auth — before any other prompts
   //    so the "opening browser" message leads directly to OpenRouter OAuth)
-  const apiKey = await getOrPromptApiKey(agentName, cloud.cloudName);
+  const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
+  const apiKey = await resolveApiKey(agentName, cloud.cloudName);
 
   // 3. Pre-provision hooks (e.g., GitHub auth prompt — non-fatal)
+  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
   if (agent.preProvision) {
-    try {
-      await agent.preProvision();
-    } catch (err) {
+    const r = await asyncTryCatch(() => agent.preProvision!());
+    if (!r.ok) {
       logWarn("Pre-provision hook failed — continuing");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 
   // 4. Model ID (use agent default — no interactive prompt)
-  const modelId = agent.modelDefault || process.env.MODEL_ID;
+  const rawModelId = agent.modelDefault || process.env.MODEL_ID;
+  const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+  if (rawModelId && !modelId) {
+    logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+  }
 
   // 5. Size/bundle selection
   await cloud.promptSize();
@@ -131,7 +155,8 @@ export async function runOrchestration(
     logInfo("Snapshot boot — skipping agent install");
   } else {
     let installedFromTarball = false;
-    if (cloud.cloudName !== "local" && !agent.skipTarball) {
+    const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+    if (cloud.cloudName !== "local" && !agent.skipTarball && betaFeatures.has("tarball")) {
       const tarball = options?.tryTarball ?? tryTarballInstall;
       installedFromTarball = await tarball(cloud.runner, agentName);
     }
@@ -143,8 +168,8 @@ export async function runOrchestration(
   // 9. Inject environment variables via .spawnrc
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
-  try {
-    await withRetry(
+  const envResult = await asyncTryCatch(() =>
+    withRetry(
       "env setup",
       () =>
         wrapSshCall(
@@ -157,29 +182,75 @@ export async function runOrchestration(
         ),
       2,
       5,
-    );
-  } catch {
+    ),
+  );
+  if (!envResult.ok) {
     logWarn("Environment setup had errors");
   }
 
-  // 10. Agent-specific configuration
+  // 10. Parse enabled setup steps from env (set by interactive/run prompts)
+  let enabledSteps: Set<string> | undefined;
+  const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
+  if (stepsEnv !== undefined) {
+    enabledSteps = new Set(stepsEnv.split(",").filter(Boolean));
+  }
+
+  // 10b. Agent-specific configuration
   if (agent.configure) {
-    try {
-      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId)), 2, 5);
-    } catch {
+    const configResult = await asyncTryCatch(() =>
+      withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5),
+    );
+    if (!configResult.ok) {
       logWarn("Agent configuration failed (continuing with defaults)");
     }
   }
 
-  // GitHub CLI setup
-  await offerGithubAuth(cloud.runner);
+  // GitHub CLI setup (skip if user unchecked in setup options)
+  if (!enabledSteps || enabledSteps.has("github")) {
+    await offerGithubAuth(cloud.runner);
+  }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
   if (agent.preLaunch) {
     await agent.preLaunch();
   }
 
-  // 11b. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
+  // 11b. SSH tunnel for web dashboard
+  let tunnelHandle: SshTunnelHandle | undefined;
+  if (agent.tunnel) {
+    if (cloud.getConnectionInfo) {
+      // SSH-based cloud: tunnel the remote port to localhost
+      const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
+        const conn = cloud.getConnectionInfo();
+        const keys = await ensureSshKeys();
+        tunnelHandle = await startSshTunnel({
+          host: conn.host,
+          user: conn.user,
+          remotePort: agent.tunnel.remotePort,
+          sshKeyOpts: getSshKeyOpts(keys),
+        });
+        if (agent.tunnel.browserUrl) {
+          const url = agent.tunnel.browserUrl(tunnelHandle.localPort);
+          if (url) {
+            openBrowser(url);
+          }
+        }
+      });
+      if (!tunnelResult.ok) {
+        logWarn("Web dashboard tunnel failed — use the TUI instead");
+      }
+    } else if (cloud.cloudName === "local") {
+      // Local: no tunnel needed, open browser directly
+      if (agent.tunnel.browserUrl) {
+        const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
+        if (url) {
+          openBrowser(url);
+        }
+      }
+    }
+  }
+
+  // 11c. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
   if (agent.preLaunchMsg) {
     process.stderr.write("\n");
     logInfo(`Tip: ${agent.preLaunchMsg}`);
@@ -202,5 +273,9 @@ export async function runOrchestration(
   // Wrap in restart loop for cloud VMs — not for local execution
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
   const exitCode = await cloud.interactiveSession(sessionCmd);
+
+  if (tunnelHandle) {
+    tunnelHandle.stop();
+  }
   process.exit(exitCode);
 }

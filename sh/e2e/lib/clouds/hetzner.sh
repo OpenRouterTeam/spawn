@@ -8,6 +8,24 @@ set -eo pipefail
 _HETZNER_API="https://api.hetzner.cloud/v1"
 
 # ---------------------------------------------------------------------------
+# _hetzner_curl_auth [curl-args...]
+#
+# Wrapper around curl that passes the HCLOUD_TOKEN via a temp config file
+# instead of a command-line -H flag. This keeps the token out of `ps` output.
+# All arguments are forwarded to curl.
+# ---------------------------------------------------------------------------
+_hetzner_curl_auth() {
+  local _cfg
+  _cfg=$(mktemp)
+  chmod 600 "${_cfg}"
+  printf 'header = "Authorization: Bearer %s"\n' "${HCLOUD_TOKEN}" > "${_cfg}"
+  curl -K "${_cfg}" "$@"
+  local _rc=$?
+  rm -f "${_cfg}"
+  return "${_rc}"
+}
+
+# ---------------------------------------------------------------------------
 # _hetzner_validate_env
 #
 # Verify HCLOUD_TOKEN is set and credentials are valid.
@@ -19,8 +37,7 @@ _hetzner_validate_env() {
     return 1
   fi
 
-  if ! curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+  if ! _hetzner_curl_auth -sf \
     "${_HETZNER_API}/servers?per_page=1" >/dev/null 2>&1; then
     log_err "Hetzner API credentials are invalid"
     return 1
@@ -54,10 +71,13 @@ _hetzner_provision_verify() {
   local app="$1"
   local log_dir="$2"
 
+  # URL-encode the app name to prevent query parameter injection
+  local encoded_app
+  encoded_app=$(jq -rn --arg v "${app}" '$v|@uri')
+
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-    "${_HETZNER_API}/servers?name=${app}" 2>/dev/null || true)
+  response=$(_hetzner_curl_auth -sf \
+    "${_HETZNER_API}/servers?name=${encoded_app}" 2>/dev/null || true)
 
   if [ -z "${response}" ]; then
     log_err "Failed to query Hetzner API for server ${app}"
@@ -120,12 +140,30 @@ _hetzner_exec() {
   local ip
   ip=$(cat "${ip_file}")
 
+  if [ -z "${ip}" ]; then
+    log_err "Empty IP in ${ip_file}"
+    return 1
+  fi
+
+  # Validate IP looks like an IPv4 address (defense-in-depth against file tampering)
+  if ! printf '%s' "${ip}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    log_err "Invalid IP address in ${ip_file}: ${ip}"
+    return 1
+  fi
+
+  # Base64-encode the command to prevent shell injection when passed as an
+  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to embed in single quotes. Stdin is preserved for callers
+  # that pipe data into cloud_exec.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   ssh -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
       -o LogLevel=ERROR \
       -o BatchMode=yes \
       -o ConnectTimeout=10 \
-      "root@${ip}" "${cmd}"
+      "root@${ip}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
@@ -153,12 +191,14 @@ _hetzner_teardown() {
     return 0
   fi
 
+  # Validate server ID is numeric (defense-in-depth against metadata tampering)
+  case "${server_id}" in ''|*[!0-9]*) log_warn "Non-numeric server ID: ${server_id}"; untrack_app "${app}"; return 0 ;; esac
+
   log_step "Deleting Hetzner server ${app} (id=${server_id})"
 
   local http_code
-  http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+  http_code=$(_hetzner_curl_auth -s -o /dev/null -w '%{http_code}' \
     -X DELETE \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
     "${_HETZNER_API}/servers/${server_id}" 2>/dev/null || printf '000')
 
   if [ "${http_code}" = "200" ] || [ "${http_code}" = "204" ]; then
@@ -184,8 +224,7 @@ _hetzner_cleanup_stale() {
   local max_age=1800  # 30 minutes
 
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+  response=$(_hetzner_curl_auth -sf \
     "${_HETZNER_API}/servers?per_page=50" 2>/dev/null || true)
 
   if [ -z "${response}" ]; then
@@ -220,6 +259,9 @@ _hetzner_cleanup_stale() {
     local server_name
     server_name=$(printf '%s' "${entry}" | cut -d: -f2-)
 
+    # Validate server ID is numeric before using it in API URL
+    case "${server_id}" in ''|*[!0-9]*) log_warn "Skipping ${entry} — non-numeric server ID"; skipped=$((skipped + 1)); continue ;; esac
+
     # Extract timestamp from name: e2e-AGENT-TIMESTAMP
     local ts
     ts=$(printf '%s' "${server_name}" | sed 's/.*-//')
@@ -238,9 +280,8 @@ _hetzner_cleanup_stale() {
       log_step "Destroying stale Hetzner server ${server_name} (id=${server_id}, age: ${age_str})"
 
       local http_code
-      http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+      http_code=$(_hetzner_curl_auth -s -o /dev/null -w '%{http_code}' \
         -X DELETE \
-        -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
         "${_HETZNER_API}/servers/${server_id}" 2>/dev/null || printf '000')
 
       if [ "${http_code}" = "200" ] || [ "${http_code}" = "204" ]; then

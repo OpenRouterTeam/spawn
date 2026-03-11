@@ -1,1 +1,14 @@
-export { Err, Ok, type Result, tryCatch } from "@openrouter/spawn-shared";
+export {
+  asyncTryCatch,
+  asyncTryCatchIf,
+  Err,
+  isFileError,
+  isNetworkError,
+  isOperationalError,
+  mapResult,
+  Ok,
+  type Result,
+  tryCatch,
+  tryCatchIf,
+  unwrapOr,
+} from "@openrouter/spawn-shared";
