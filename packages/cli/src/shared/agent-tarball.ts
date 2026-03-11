@@ -5,6 +5,7 @@
 import type { CloudRunner } from "./agent-setup";
 
 import * as v from "valibot";
+import { asyncTryCatch } from "./result";
 import { getErrorMessage } from "./type-guards";
 import { logDebug, logInfo, logStep, logWarn } from "./ui";
 
@@ -104,12 +105,11 @@ export async function tryTarballInstall(
     downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   }
 
-  // Phase 3: Remote execution
-  try {
-    await runner.runServer(downloadCmd, 150);
-  } catch (err) {
+  // Phase 3: Remote execution — catch-all because any failure means "fall back to live install"
+  const extractResult = await asyncTryCatch(() => runner.runServer(downloadCmd, 150));
+  if (!extractResult.ok) {
     logWarn("Tarball download/extract failed on remote VM");
-    logDebug(getErrorMessage(err));
+    logDebug(getErrorMessage(extractResult.error));
     return false;
   }
 
@@ -126,11 +126,18 @@ export async function tryTarballInstall(
     "  done",
     "  # Copy marker file",
     '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "  # Fix ownership — files were extracted as root",
+    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "$HOME/$_d" ]; then',
+    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    "    fi",
+    "  done",
     "fi",
   ].join("\n");
-  try {
-    await runner.runServer(mirrorCmd, 30);
-  } catch {
+  // Non-fatal — mirror failure should not block tarball install
+  const mirrorResult = await asyncTryCatch(() => runner.runServer(mirrorCmd, 30));
+  if (!mirrorResult.ok) {
     logWarn("Tarball file mirroring failed (non-fatal)");
   }
 

@@ -168,4 +168,68 @@ describe("tryTarballInstall", () => {
     expect(result).toBe(false);
     expect(runner.runServer).not.toHaveBeenCalled();
   });
+
+  describe("non-root home directory mirroring", () => {
+    it("mirrors dotfiles from /root/ to $HOME for non-root users", async () => {
+      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "openclaw", fetchFn);
+
+      const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+      expect(mirrorCmd).toContain("cp -a");
+      expect(mirrorCmd).toContain('"$HOME/$_d"');
+      for (const dir of [
+        ".claude",
+        ".local",
+        ".npm-global",
+        ".cargo",
+        ".opencode",
+        ".hermes",
+        ".bun",
+      ]) {
+        expect(mirrorCmd).toContain(dir);
+      }
+    });
+
+    it("mirrors the .spawn-tarball marker file", async () => {
+      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "openclaw", fetchFn);
+
+      const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+      expect(mirrorCmd).toContain('cp /root/.spawn-tarball "$HOME/.spawn-tarball"');
+    });
+
+    it("returns true even when mirror step fails (non-fatal)", async () => {
+      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
+      const runner = createMockRunner();
+      runner.runServer.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("cp failed"));
+
+      const result = await tryTarballInstall(runner, "openclaw", fetchFn);
+
+      expect(result).toBe(true);
+    });
+
+    it("guards mirror behind non-root check (id -u)", async () => {
+      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "openclaw", fetchFn);
+
+      const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+      expect(mirrorCmd).toContain('if [ "$(id -u)" != "0" ]; then');
+    });
+
+    it("fixes ownership of mirrored files with chown", async () => {
+      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "openclaw", fetchFn);
+
+      const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+      expect(mirrorCmd).toContain('chown -R "$(id -u):$(id -g)"');
+    });
+  });
 });
