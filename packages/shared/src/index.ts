@@ -1,3 +1,6 @@
+export type { Result } from "./result";
+export type { ValueOf } from "./type-guards";
+
 export { parseJsonObj, parseJsonWith } from "./parse";
 export {
   asyncTryCatch,
@@ -8,9 +11,8 @@ export {
   isOperationalError,
   mapResult,
   Ok,
-  type Result,
   tryCatch,
   tryCatchIf,
   unwrapOr,
 } from "./result";
-export { getErrorMessage, hasStatus, isNumber, isString, toObjectArray, toRecord, type ValueOf } from "./type-guards";
+export { getErrorMessage, hasStatus, isNumber, isString, toObjectArray, toRecord } from "./type-guards";
