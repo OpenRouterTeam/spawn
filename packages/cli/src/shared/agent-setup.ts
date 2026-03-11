@@ -240,25 +240,9 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
   }
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
-  let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
-    localTmpFile = join(getTmpDir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-    writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, {
-      mode: 0o600,
-    });
-    const remoteTmpFile = `/tmp/gh_token_${Date.now()}`;
-    try {
-      await runner.uploadFile(localTmpFile, remoteTmpFile);
-      ghCmd = `. ${remoteTmpFile} && rm -f ${remoteTmpFile} && ${ghCmd}`;
-    } catch {
-      try {
-        unlinkSync(localTmpFile);
-      } catch {
-        /* ignore */
-      }
-      localTmpFile = "";
-    }
+    ghCmd = `export GITHUB_TOKEN='${escaped}' && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
@@ -266,14 +250,6 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     await runner.runServer(ghCmd);
   } catch {
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
-  } finally {
-    if (localTmpFile) {
-      try {
-        unlinkSync(localTmpFile);
-      } catch {
-        /* ignore */
-      }
-    }
   }
 
   // Propagate host git identity to the remote VM

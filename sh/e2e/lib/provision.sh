@@ -63,7 +63,10 @@ provision_agent() {
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
     # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
-    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility
+    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility.
+    # Positive whitelist: only variables actually emitted by cloud_headless_env
+    # functions are allowed. This prevents injection of arbitrary env vars.
+    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION "
     while IFS= read -r _env_line; do
       # Skip lines that don't look like export VAR="VALUE"
       case "${_env_line}" in
@@ -76,18 +79,14 @@ provision_agent() {
       if [ -z "${_env_name}" ]; then
         continue
       fi
-      # Block dangerous system env vars that could enable privilege escalation
-      case "${_env_name}" in
-        PATH|LD_PRELOAD|LD_LIBRARY_PATH|HOME|SHELL|USER|IFS|ENV|BASH_ENV|CDPATH)
-          log_err "Blocked dangerous env var: ${_env_name}"
+      # Only allow whitelisted variable names (positive match)
+      case "${_ALLOWED_HEADLESS_VARS}" in
+        *" ${_env_name} "*) ;;
+        *)
+          log_err "Rejected unexpected env var from cloud_headless_env: ${_env_name}"
           continue
           ;;
       esac
-      # Validate env var name matches strict alphanumeric pattern
-      if ! printf '%s' "${_env_name}" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*$'; then
-        log_err "Invalid env var name: ${_env_name}"
-        continue
-      fi
       # Validate value against a safe character whitelist BEFORE export
       if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
         log_err "Invalid characters in env value for ${_env_name}"
