@@ -125,7 +125,7 @@ export async function selectFromList(items: string[], promptText: string, defaul
   });
 
   if (p.isCancel(result)) {
-    return defaultValue;
+    return "";
   }
   return isString(result) ? result : String(result);
 }
