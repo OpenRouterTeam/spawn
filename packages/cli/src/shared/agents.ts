@@ -48,13 +48,9 @@ export interface TunnelConfig {
 
 // ─── Agent Optional Steps (static metadata — no CloudRunner needed) ─────────
 
-/** Optional setup steps for each agent, keyed by agent name. */
-const AGENT_OPTIONAL_STEPS: Record<string, OptionalStep[]> = {
+/** Extra setup steps for specific agents (merged with COMMON_STEPS). */
+const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
   openclaw: [
-    {
-      value: "github",
-      label: "GitHub CLI",
-    },
     {
       value: "browser",
       label: "Chrome browser",
@@ -63,16 +59,28 @@ const AGENT_OPTIONAL_STEPS: Record<string, OptionalStep[]> = {
   ],
 };
 
-const DEFAULT_OPTIONAL_STEPS: OptionalStep[] = [
+/** Steps shown for every agent. */
+const COMMON_STEPS: OptionalStep[] = [
   {
     value: "github",
     label: "GitHub CLI",
+  },
+  {
+    value: "reuse-api-key",
+    label: "Reuse saved OpenRouter key",
+    hint: "off = create a fresh key via OAuth",
   },
 ];
 
 /** Get the optional setup steps for a given agent (no CloudRunner required). */
 export function getAgentOptionalSteps(agentName: string): OptionalStep[] {
-  return AGENT_OPTIONAL_STEPS[agentName] ?? DEFAULT_OPTIONAL_STEPS;
+  const extra = AGENT_EXTRA_STEPS[agentName];
+  return extra
+    ? [
+        ...COMMON_STEPS,
+        ...extra,
+      ]
+    : COMMON_STEPS;
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
