@@ -188,19 +188,19 @@ export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest |
     return false;
   }
 
-  // Ensure credentials before starting the spinner so interactive
-  // prompts (e.g. expired API key entry) don't overlap with it.
+  // Ensure credentials before the delete call so interactive
+  // prompts (e.g. expired API key entry) don't overlap with progress output.
   await ensureDeleteCredentials(record);
 
-  const s = p.spinner();
-  s.start(`Deleting ${label}...`);
-
+  // No spinner here — cloud-specific destroy functions print their own
+  // progress output (logStep/logInfo) which would collide with a spinner.
   const success = await execDeleteServer(record);
 
+  process.stderr.write("\n");
   if (success) {
-    s.stop(`Server "${label}" deleted.`);
+    p.log.success(`Server "${label}" deleted.`);
   } else {
-    s.stop("Delete failed.");
+    p.log.error(`Failed to delete "${label}".`);
   }
   return success;
 }
