@@ -4,7 +4,13 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { validateConnectionIP, validateLaunchCmd, validateServerIdentifier, validateUsername } from "../security.js";
+import {
+  validateConnectionIP,
+  validateLaunchCmd,
+  validateMetadataValue,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 
 describe("validateConnectionIP", () => {
   describe("valid inputs", () => {
@@ -271,6 +277,89 @@ describe("validateLaunchCmd", () => {
 
     it("should reject uppercase binary names (not in agent-setup.ts)", () => {
       expect(() => validateLaunchCmd("Claude")).toThrow(/Invalid launch command/);
+    });
+  });
+});
+
+describe("validateMetadataValue", () => {
+  describe("valid inputs", () => {
+    it("should accept valid GCP zones", () => {
+      expect(() => validateMetadataValue("us-central1-a", "zone")).not.toThrow();
+      expect(() => validateMetadataValue("europe-west1-b", "zone")).not.toThrow();
+      expect(() => validateMetadataValue("asia-east1-c", "zone")).not.toThrow();
+    });
+
+    it("should accept valid project IDs", () => {
+      expect(() => validateMetadataValue("my-project-123", "project")).not.toThrow();
+      expect(() => validateMetadataValue("gcp_project.name", "project")).not.toThrow();
+      expect(() => validateMetadataValue("prod-app-42", "project")).not.toThrow();
+    });
+
+    it("should accept alphanumeric values with allowed special characters", () => {
+      expect(() => validateMetadataValue("simple", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with.dots", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with_underscores", "field")).not.toThrow();
+      expect(() => validateMetadataValue("with-hyphens", "field")).not.toThrow();
+      expect(() => validateMetadataValue("MixedCase123", "field")).not.toThrow();
+    });
+
+    it("should allow empty string (caller provides defaults)", () => {
+      expect(() => validateMetadataValue("", "zone")).not.toThrow();
+    });
+
+    it("should allow whitespace-only string (treated as empty)", () => {
+      expect(() => validateMetadataValue("   ", "project")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs", () => {
+    it("should reject values exceeding 128 characters", () => {
+      const longValue = "a".repeat(129);
+      expect(() => validateMetadataValue(longValue, "zone")).toThrow(/too long/);
+    });
+
+    it("should accept values at exactly 128 characters", () => {
+      const exactValue = "a".repeat(128);
+      expect(() => validateMetadataValue(exactValue, "zone")).not.toThrow();
+    });
+
+    it("should reject command substitution with $()", () => {
+      expect(() => validateMetadataValue("$(whoami)", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject backtick command substitution", () => {
+      expect(() => validateMetadataValue("`id`", "project")).toThrow(/Invalid project/);
+    });
+
+    it("should reject semicolon injection", () => {
+      expect(() => validateMetadataValue("zone;rm -rf /", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject pipe injection", () => {
+      expect(() => validateMetadataValue("zone|cat /etc/passwd", "project")).toThrow(/Invalid project/);
+    });
+
+    it("should reject ampersand chaining", () => {
+      expect(() => validateMetadataValue("zone&echo pwned", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject path traversal", () => {
+      expect(() => validateMetadataValue("../../../etc/passwd", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject spaces", () => {
+      expect(() => validateMetadataValue("us central1", "zone")).toThrow(/Invalid zone/);
+    });
+
+    it("should reject quotes", () => {
+      expect(() => validateMetadataValue("zone'injection", "field")).toThrow(/Invalid field/);
+      expect(() => validateMetadataValue('zone"injection', "field")).toThrow(/Invalid field/);
+    });
+
+    it("should include field name in error messages", () => {
+      expect(() => validateMetadataValue("$(evil)", "gcp_zone")).toThrow(/Invalid gcp_zone/);
+      expect(() => validateMetadataValue("bad;value", "gcp_project")).toThrow(/Invalid gcp_project/);
+      expect(() => validateMetadataValue("a".repeat(129), "my_field")).toThrow(/my_field is too long/);
     });
   });
 });
