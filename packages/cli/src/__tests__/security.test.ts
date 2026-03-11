@@ -558,18 +558,13 @@ describe("validatePrompt", () => {
     expect(() => validatePrompt("Dump > /var/log/output")).toThrow("shell syntax");
   });
 
+  // ── False positives (issue #2249) ───────────────────────────────────────
+
   it("should accept developer phrases with >> and > that are not shell redirection", () => {
     expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
     expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
     expect(() => validatePrompt("Append >> log the errors")).not.toThrow();
-  });
-
-  // ── False positives (issue #2249) ───────────────────────────────────────
-
-  it("should accept all example prompts from issue #2249", () => {
-    expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
-    expect(() => validatePrompt("Run tests && deploy if they pass")).not.toThrow();
-    expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
+    // Heredoc in prose (not a shell heredoc operator) — issue #2249
     expect(() => validatePrompt("Add a heredoc to the Dockerfile")).not.toThrow();
   });
 
