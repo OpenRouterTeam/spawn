@@ -21,9 +21,9 @@ fi
 # Currently supports: gcp (gcloud auth login)
 _check_cli_auth_clouds() {
     local manifest_path="${1}"
-    local -n _total_ref="${2}"
-    local -n _loaded_ref="${3}"
-    local -n _missing_ref="${4}"
+    local _total_var="${2}"
+    local _loaded_var="${3}"
+    local _missing_var="${4}"
 
     local cli_clouds
     if command -v jq &>/dev/null; then
@@ -42,7 +42,7 @@ for (const [key, cloud] of Object.entries(m.clouds || {})) {
 
     while IFS='|' read -r cloud_key auth_string; do
         [[ -z "${cloud_key}" ]] && continue
-        _total_ref=$((_total_ref + 1))
+        eval "${_total_var}=\$(( ${_total_var} + 1 ))"
 
         case "${cloud_key}" in
             gcp)
@@ -50,7 +50,7 @@ for (const [key, cloud] of Object.entries(m.clouds || {})) {
                 local active_account
                 active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null | head -1)
                 if [[ -n "${active_account}" ]]; then
-                    _loaded_ref=$((_loaded_ref + 1))
+                    eval "${_loaded_var}=\$(( ${_loaded_var} + 1 ))"
                     # Load GCP_PROJECT from config file if not already set
                     local gcp_config="${HOME}/.config/spawn/gcp.json"
                     if [[ -z "${GCP_PROJECT:-}" ]] && [[ -f "${gcp_config}" ]]; then
@@ -70,13 +70,13 @@ process.stdout.write(d.GCP_PROJECT || d.project || '');
                     fi
                     log "Key preflight: gcp — authenticated as ${active_account}"
                 else
-                    _missing_ref="${_missing_ref} gcp"
+                    eval "${_missing_var}=\"\${${_missing_var}} gcp\""
                     log "Key preflight: gcp — gcloud not installed or no active account"
                 fi
                 ;;
             *)
                 # Other CLI-auth clouds (sprite, etc.) — not auto-checkable, skip silently
-                _total_ref=$((_total_ref - 1))
+                eval "${_total_var}=\$(( ${_total_var} - 1 ))"
                 ;;
         esac
     done <<< "${cli_clouds}"
