@@ -76,6 +76,23 @@ function extractFlagValue(
   ];
 }
 
+/** Extract all occurrences of a repeatable flag, mutating args in place. */
+function extractAllFlagValues(args: string[], flag: string, usageHint: string): string[] {
+  const values: string[] = [];
+  let idx = args.indexOf(flag);
+  while (idx !== -1) {
+    if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+      console.error(pc.red(`Error: ${pc.bold(flag)} requires a value`));
+      console.error(`\nUsage: ${pc.cyan(usageHint)}`);
+      process.exit(1);
+    }
+    values.push(args[idx + 1]);
+    args.splice(idx, 2);
+    idx = args.indexOf(flag);
+  }
+  return values;
+}
+
 const HELP_FLAGS = [
   "--help",
   "-h",
@@ -766,32 +783,17 @@ async function main(): Promise<void> {
   const VALID_BETA_FEATURES = new Set([
     "tarball",
   ]);
-  const betaFeatures = new Set<string>();
-  for (;;) {
-    const [flag, remaining] = extractFlagValue(
-      filteredArgs,
-      [
-        "--beta",
-      ],
-      "beta feature",
-      "spawn <agent> <cloud> --beta tarball",
-    );
-    if (!flag) {
-      break;
-    }
-    filteredArgs.splice(0, filteredArgs.length, ...remaining);
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta tarball");
+  for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
       console.error("\nAvailable beta features:");
       console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
       process.exit(1);
     }
-    betaFeatures.add(flag);
   }
-  if (betaFeatures.size > 0) {
-    process.env.SPAWN_BETA = [
-      ...betaFeatures,
-    ].join(",");
+  if (betaFeatures.length > 0) {
+    process.env.SPAWN_BETA = betaFeatures.join(",");
   }
 
   // Extract --output <format> flag
