@@ -1,0 +1,9 @@
+language js(typescript)
+
+TsEnumDeclaration() as $decl where {
+  register_diagnostic(
+    span=$decl,
+    message="TypeScript `enum` is banned. Use a `const` object with `as const` and a `ValueOf<typeof X>` type instead.",
+    severity="error"
+  )
+}

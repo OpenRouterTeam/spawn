@@ -1,3 +1,4 @@
+import type { ValueOf } from "@openrouter/spawn-shared";
 import type { SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
 
@@ -250,7 +251,7 @@ export const RecordActionOutcome = {
   Exit: 1,
 } as const;
 
-export type RecordActionOutcome = (typeof RecordActionOutcome)[keyof typeof RecordActionOutcome];
+export type RecordActionOutcome = ValueOf<typeof RecordActionOutcome>;
 
 /**
  * Handle reconnect or rerun action for a selected spawn record.
