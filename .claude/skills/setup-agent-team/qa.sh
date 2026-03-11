@@ -48,12 +48,12 @@ elif [[ "${SPAWN_REASON}" == "schedule" ]] || [[ "${SPAWN_REASON}" == "workflow_
     RUN_MODE="quality"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-quality"
     TEAM_NAME="spawn-qa-quality"
-    CYCLE_TIMEOUT=2400  # 40 min for quality sweep (includes E2E)
+    CYCLE_TIMEOUT=5400  # 90 min for quality sweep (includes E2E)
 else
     RUN_MODE="quality"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-quality"
     TEAM_NAME="spawn-qa-quality"
-    CYCLE_TIMEOUT=2400  # 40 min for quality sweep (includes E2E)
+    CYCLE_TIMEOUT=5400  # 90 min for quality sweep (includes E2E)
 fi
 
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"

@@ -16,6 +16,72 @@ if ! type log &>/dev/null 2>&1; then
     log() { printf '[%s] [keys] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*"; }
 fi
 
+# Check CLI-authenticated clouds (e.g. gcp via gcloud) and load any supplemental
+# env vars from their config file. Updates total/loaded/missing_providers in caller scope.
+# Currently supports: gcp (gcloud auth login)
+_check_cli_auth_clouds() {
+    local manifest_path="${1}"
+    local -n _total_ref="${2}"
+    local -n _loaded_ref="${3}"
+    local -n _missing_ref="${4}"
+
+    local cli_clouds
+    if command -v jq &>/dev/null; then
+        cli_clouds=$(jq -r '.clouds | to_entries[] | select(.value.auth != null) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i")) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null)
+    else
+        cli_clouds=$(_MANIFEST="${manifest_path}" bun -e "
+import fs from 'fs';
+const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
+for (const [key, cloud] of Object.entries(m.clouds || {})) {
+  const auth = cloud.auth || '';
+  if (/\b(login|configure|setup)\b/i.test(auth))
+    process.stdout.write(key + '|' + auth + '\n');
+}
+" 2>/dev/null)
+    fi
+
+    while IFS='|' read -r cloud_key auth_string; do
+        [[ -z "${cloud_key}" ]] && continue
+        _total_ref=$((_total_ref + 1))
+
+        case "${cloud_key}" in
+            gcp)
+                # Check if gcloud is installed and has an active account
+                local active_account
+                active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null | head -1)
+                if [[ -n "${active_account}" ]]; then
+                    _loaded_ref=$((_loaded_ref + 1))
+                    # Load GCP_PROJECT from config file if not already set
+                    local gcp_config="${HOME}/.config/spawn/gcp.json"
+                    if [[ -z "${GCP_PROJECT:-}" ]] && [[ -f "${gcp_config}" ]]; then
+                        local project
+                        if command -v jq &>/dev/null; then
+                            project=$(jq -r '.GCP_PROJECT // .project // "" | select(. != null)' "${gcp_config}" 2>/dev/null)
+                        else
+                            project=$(_FILE="${gcp_config}" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d.GCP_PROJECT || d.project || '');
+" 2>/dev/null)
+                        fi
+                        if [[ -n "${project}" ]]; then
+                            export GCP_PROJECT="${project}"
+                        fi
+                    fi
+                    log "Key preflight: gcp — authenticated as ${active_account}"
+                else
+                    _missing_ref="${_missing_ref} gcp"
+                    log "Key preflight: gcp — gcloud not installed or no active account"
+                fi
+                ;;
+            *)
+                # Other CLI-auth clouds (sprite, etc.) — not auto-checkable, skip silently
+                _total_ref=$((_total_ref - 1))
+                ;;
+        esac
+    done <<< "${cli_clouds}"
+}
+
 # Parse manifest.json to extract cloud_key|auth_string lines for API-token clouds.
 # Skips CLI-based auth (sprite login, aws configure, etc.) and empty auth fields.
 # Outputs one "cloud_key|auth_string" per line to stdout.
@@ -161,6 +227,9 @@ load_cloud_keys_from_config() {
             missing_providers="${missing_providers} ${cloud_key}"
         fi
     done <<< "${cloud_auths}"
+
+    # Check CLI-authenticated clouds (e.g. gcp via gcloud auth login)
+    _check_cli_auth_clouds "${manifest_path}" total loaded missing_providers
 
     MISSING_KEY_PROVIDERS=$(printf '%s' "${missing_providers}" | sed 's/^ //')
     log "Key preflight: ${loaded}/${total} cloud keys available"
