@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseJsonObj } from "./shared/parse.js";
 import { getCacheDir, getCacheFile } from "./shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatchIf, unwrapOr } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
@@ -94,7 +95,10 @@ function logError(message: string, err?: unknown): void {
 
 function readCache(): Manifest | null {
   const result = tryCatchIf(isFileError, () => {
-    const raw = JSON.parse(readFileSync(getCacheFile(), "utf-8"));
+    const raw = parseJsonObj(readFileSync(getCacheFile(), "utf-8"));
+    if (!raw) {
+      return null;
+    }
     const cleaned = stripDangerousKeys(raw);
     if (isValidManifest(cleaned)) {
       return cleaned;
@@ -214,7 +218,10 @@ function tryLoadLocalManifest(): Manifest | null {
   const result = tryCatchIf(isFileError, () => {
     const localPath = join(process.cwd(), "manifest.json");
     if (existsSync(localPath)) {
-      const raw = JSON.parse(readFileSync(localPath, "utf-8"));
+      const raw = parseJsonObj(readFileSync(localPath, "utf-8"));
+      if (!raw) {
+        return null;
+      }
       const data = stripDangerousKeys(raw);
       if (isValidManifest(data)) {
         return data;

@@ -7,7 +7,7 @@ import pc from "picocolors";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
-import { PkgVersionSchema } from "../shared/parse.js";
+import { PkgVersionSchema, parseJsonObj } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
@@ -512,7 +512,10 @@ function hasCloudConfigCredentials(cloud: string): boolean {
         return false;
       }
       const content = fs.readFileSync(configPath, "utf-8");
-      const config = JSON.parse(content);
+      const config = parseJsonObj(content);
+      if (!config) {
+        return false;
+      }
       // Check if config has any non-empty credentials
       return Object.values(config).some((v) => isString(v) && v.trim().length > 0);
     }),

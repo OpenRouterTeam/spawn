@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
-import { parseJsonWith } from "./parse";
+import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
 import { getErrorMessage, isString } from "./type-guards";
@@ -253,11 +253,19 @@ async function saveOpenRouterKey(key: string): Promise<void> {
   }
 }
 
+/** Check whether a saved OpenRouter API key exists (without loading it). */
+export function hasSavedOpenRouterKey(): boolean {
+  return loadSavedOpenRouterKey() !== null;
+}
+
 /** Load a previously saved OpenRouter API key from ~/.config/spawn/openrouter.json. */
 function loadSavedOpenRouterKey(): string | null {
   const result = tryCatchIf(isFileError, () => {
     const configPath = getSpawnCloudConfigPath("openrouter");
-    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const data = parseJsonObj(readFileSync(configPath, "utf-8"));
+    if (!data) {
+      return null;
+    }
     const key = isString(data.api_key) ? data.api_key : "";
     if (key && /^sk-or-v1-[a-f0-9]{64}$/.test(key)) {
       return key;
@@ -305,15 +313,18 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
     logWarn("Environment key failed validation, prompting for a new one...");
   }
 
-  // 2. Check saved key from previous session
-  const savedKey = loadSavedOpenRouterKey();
-  if (savedKey) {
-    logInfo("Using saved OpenRouter API key");
-    if (await verifyOpenrouterKey(savedKey)) {
-      process.env.OPENROUTER_API_KEY = savedKey;
-      return savedKey;
+  // 2. Check saved key from previous session (only if user opted in via setup options)
+  const reuseKeyEnabled = process.env.SPAWN_ENABLED_STEPS?.split(",").includes("reuse-api-key");
+  if (reuseKeyEnabled) {
+    const savedKey = loadSavedOpenRouterKey();
+    if (savedKey) {
+      logInfo("Using saved OpenRouter API key");
+      if (await verifyOpenrouterKey(savedKey)) {
+        process.env.OPENROUTER_API_KEY = savedKey;
+        return savedKey;
+      }
+      logWarn("Saved key failed validation, prompting for a new one...");
     }
-    logWarn("Saved key failed validation, prompting for a new one...");
   }
 
   // 3. Try OAuth + manual fallback (3 attempts)

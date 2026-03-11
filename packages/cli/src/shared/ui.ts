@@ -3,6 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
+import { parseJsonObj } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { isString } from "./type-guards";
@@ -235,7 +236,10 @@ export async function withRetry<T>(
 export function loadApiToken(cloud: string): string | null {
   return unwrapOr(
     tryCatchIf(isFileError, () => {
-      const data = JSON.parse(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
+      const data = parseJsonObj(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
+      if (!data) {
+        return null;
+      }
       const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
       if (!token) {
         return null;
