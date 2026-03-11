@@ -265,7 +265,7 @@ export async function checkAccountStatus(): Promise<void> {
   if (!_state.token) {
     return;
   }
-  try {
+  const r = await asyncTryCatch(async () => {
     const text = await doApi("GET", "/account", undefined, 1);
     const data = parseJsonObj(text);
     const rec = toRecord(data?.account);
@@ -297,10 +297,11 @@ export async function checkAccountStatus(): Promise<void> {
     if (emailVerified === false) {
       logWarn("Your DigitalOcean email is not verified. Verify it to avoid account restrictions.");
     }
-  } catch (err) {
+  });
+  if (!r.ok) {
     // Only re-throw if it's our explicit lock error
-    if (err instanceof Error && err.message === "DigitalOcean account is locked") {
-      throw err;
+    if (r.error instanceof Error && r.error.message === "DigitalOcean account is locked") {
+      throw r.error;
     }
     // Otherwise non-fatal — let createServer be the final check
   }
@@ -688,7 +689,7 @@ export async function ensureSshKey(): Promise<void> {
       name: `spawn-${key.name}`,
       public_key: pubKey,
     });
-    const regResult = await asyncTryCatch(async () => doApi("POST", "/account/keys", body));
+    const regResult = await asyncTryCatch(() => doApi("POST", "/account/keys", body));
     if (!regResult.ok) {
       const msg = getErrorMessage(regResult.error);
       // Key may already exist under a different name — non-fatal
@@ -1089,13 +1090,12 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
     // network drops mid-stream `await proc.exited` blocks forever. Kill
     // after 330s (5min + 30s grace) to match the remote timeout.
     const streamTimer = setTimeout(() => killWithTimeout(proc), 330_000);
-    let exitCode: number;
-    try {
-      exitCode = await proc.exited;
-    } finally {
-      clearTimeout(streamTimer);
+    const exitResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(streamTimer);
+    if (!exitResult.ok) {
+      throw exitResult.error;
     }
-    return exitCode;
+    return exitResult.data;
   });
   if (streamResult.ok) {
     if (streamResult.data === 0) {
@@ -1131,21 +1131,22 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
       // can continue and the user isn't left with a hung CLI.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      let stdout: string;
-      let pollExitCode: number;
-      try {
-        [stdout] = await Promise.all([
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
         ]);
-        pollExitCode = await proc.exited;
-      } finally {
-        clearTimeout(timer);
+        const pollExitCode = await proc.exited;
+        return {
+          stdout,
+          pollExitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-      return {
-        stdout,
-        pollExitCode,
-      };
+      return pipeResult.data;
     });
     if (pollResult.ok && pollResult.data.pollExitCode === 0 && pollResult.data.stdout.includes("done")) {
       logStepDone();
@@ -1183,13 +1184,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -1222,13 +1223,13 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 

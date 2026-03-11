@@ -535,7 +535,7 @@ export async function checkBillingEnabled(): Promise<void> {
   if (!_state.project) {
     return;
   }
-  try {
+  const billingResult = await asyncTryCatch(async () => {
     const result = gcloudSync([
       "billing",
       "projects",
@@ -562,10 +562,11 @@ export async function checkBillingEnabled(): Promise<void> {
         logWarn("Billing is still not enabled. Continuing anyway — instance creation may fail.");
       }
     }
-  } catch (err) {
+  });
+  if (!billingResult.ok) {
     // Re-throw our explicit billing error
-    if (err instanceof Error && err.message === "GCP billing not enabled") {
-      throw err;
+    if (billingResult.error instanceof Error && billingResult.error.message === "GCP billing not enabled") {
+      throw billingResult.error;
     }
     // Permission errors or missing billing API — non-fatal, continue
   }
@@ -737,9 +738,9 @@ export async function createInstance(
     "--quiet",
   ];
 
-  // Wrap all gcloud calls in try/finally so the temp file is cleaned up
+  // Wrap all gcloud calls so the temp file is cleaned up
   // even when billing retry re-uses it (the args array references tmpFile).
-  try {
+  const createResult = await asyncTryCatch(async () => {
     let result = await gcloud(args);
 
     // Auto-reauth on expired tokens
@@ -795,15 +796,17 @@ export async function createInstance(
         throw new Error("Instance creation failed");
       }
     }
-  } finally {
-    // Clean up temp file after all retry paths have completed
-    tryCatch(() =>
-      Bun.spawnSync([
-        "rm",
-        "-f",
-        tmpFile,
-      ]),
-    );
+  });
+  // Clean up temp file after all retry paths have completed
+  tryCatch(() =>
+    Bun.spawnSync([
+      "rm",
+      "-f",
+      tmpFile,
+    ]),
+  );
+  if (!createResult.ok) {
+    throw createResult.error;
   }
 
   // Get external IP
@@ -878,17 +881,18 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
       // can continue and the user isn't left with a hung CLI.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      let exitCode: number;
-      try {
+      const pipeResult = await asyncTryCatch(async () => {
         await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
         ]);
-        exitCode = await proc.exited;
-      } finally {
-        clearTimeout(timer);
+        return await proc.exited;
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-      return exitCode;
+      return pipeResult.data;
     });
     if (pollResult.ok && pollResult.data === 0) {
       logStepDone();
@@ -926,13 +930,13 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   );
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -968,13 +972,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 

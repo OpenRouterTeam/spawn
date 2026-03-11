@@ -445,13 +445,13 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
     );
     const timeout = (timeoutSecs || 300) * 1000;
     const timer = setTimeout(() => killWithTimeout(proc), timeout);
-    try {
-      const exitCode = await proc.exited;
-      if (exitCode !== 0) {
-        throw new Error(`sprite exec failed (exit ${exitCode}): ${cmd.slice(0, 80)}`);
-      }
-    } finally {
-      clearTimeout(timer);
+    const execResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(timer);
+    if (!execResult.ok) {
+      throw execResult.error;
+    }
+    if (execResult.data !== 0) {
+      throw new Error(`sprite exec failed (exit ${execResult.data}): ${cmd.slice(0, 80)}`);
     }
   });
 }
@@ -481,13 +481,13 @@ async function runSpriteSilent(cmd: string): Promise<void> {
   );
   // 60s timeout — silent commands should not hang indefinitely
   const timer = setTimeout(() => killWithTimeout(proc), 60_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`sprite exec (silent) failed (exit ${exitCode})`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const silentResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!silentResult.ok) {
+    throw silentResult.error;
+  }
+  if (silentResult.data !== 0) {
+    throw new Error(`sprite exec (silent) failed (exit ${silentResult.data})`);
   }
 }
 
@@ -556,15 +556,15 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 export async function installSpriteKeepAlive(): Promise<void> {
   logStep("Installing Sprite keep-alive...");
   const scriptUrl = "https://kurt-claw-f.sprites.app/sprite-keep-running.sh";
-  const r = await asyncTryCatch(async () => {
-    await runSprite(
+  const keepAliveResult = await asyncTryCatch(() =>
+    runSprite(
       "mkdir -p ~/.local/bin && " +
         `curl -fsSL '${scriptUrl}' -o ~/.local/bin/sprite-keep-running && ` +
         "chmod +x ~/.local/bin/sprite-keep-running",
       60,
-    );
-  });
-  if (r.ok) {
+    ),
+  );
+  if (keepAliveResult.ok) {
     logInfo("Sprite keep-alive installed");
   } else {
     logWarn("Could not install Sprite keep-alive — sprite may shut down during inactivity");
@@ -671,12 +671,12 @@ export async function destroyServer(name?: string): Promise<void> {
   const stderrText = new Response(proc.stderr).text();
   // 60s timeout — sprite destroy should not hang indefinitely
   const timer = setTimeout(() => killWithTimeout(proc), 60_000);
-  let exitCode: number;
-  try {
-    exitCode = await proc.exited;
-  } finally {
-    clearTimeout(timer);
+  const destroyResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!destroyResult.ok) {
+    throw destroyResult.error;
   }
+  const exitCode = destroyResult.data;
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);

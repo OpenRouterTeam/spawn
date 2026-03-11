@@ -3,6 +3,7 @@ import type { SpawnRecord } from "../history";
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
@@ -165,11 +166,7 @@ describe("cmdLast", () => {
 
       // We need to mock cmdRun to prevent actual execution
       // For now, just verify the message is shown
-      try {
-        await cmdLast();
-      } catch {
-        // cmdRun might throw in test environment
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       expect(step).toContain("Last spawn");
@@ -180,11 +177,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected to throw when cmdRun is called
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // The most recent is claude/hetzner from 2026-01-03
@@ -197,11 +190,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // Should use display names from manifest
@@ -215,11 +204,7 @@ describe("cmdLast", () => {
       _resetCacheForTesting();
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // Should use raw keys since manifest is unavailable
@@ -237,11 +222,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       expect(step).toContain("Claude Code");
@@ -264,11 +245,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // Should show relative time indicator
@@ -287,11 +264,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       expect(step).toContain("Claude Code");
@@ -397,11 +370,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // Should handle old dates gracefully
@@ -420,11 +389,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       expect(step).toContain("Last spawn");
@@ -452,11 +417,7 @@ describe("cmdLast", () => {
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdLast());
 
       const step = logStepOutput();
       // filterHistory().reverse() means the last item in the array becomes first (index 0)

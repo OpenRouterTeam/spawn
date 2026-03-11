@@ -16,7 +16,7 @@ import { getActiveServers, markRecordDeleted } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
-import { asyncTryCatch, asyncTryCatchIf, isNetworkError } from "../shared/result.js";
+import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
 import { activeServerPicker, resolveListFilters } from "./list.js";
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";
@@ -78,11 +78,10 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
 
   // SECURITY: Validate server ID to prevent command injection
   // This protects against corrupted or tampered history files
-  try {
-    validateServerIdentifier(id);
-  } catch (err) {
+  const idValidation = tryCatch(() => validateServerIdentifier(id));
+  if (!idValidation.ok) {
     throw new Error(
-      `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
+      `Invalid server identifier in history: ${getErrorMessage(idValidation.error)}\n\n` +
         "Your spawn history file may be corrupted or tampered with.\n" +
         `Location: ${getHistoryPath()}\n` +
         "To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'",
@@ -140,14 +139,14 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
         // Deletion runs under a spinner — suppress interactive prompts
         const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
         process.env.SPAWN_NON_INTERACTIVE = "1";
-        try {
-          await gcpResolveProject();
-        } finally {
-          if (prevNonInteractive === undefined) {
-            delete process.env.SPAWN_NON_INTERACTIVE;
-          } else {
-            process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
-          }
+        const resolveResult = await asyncTryCatch(() => gcpResolveProject());
+        if (prevNonInteractive === undefined) {
+          delete process.env.SPAWN_NON_INTERACTIVE;
+        } else {
+          process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
+        }
+        if (!resolveResult.ok) {
+          throw resolveResult.error;
         }
         await gcpDestroyInstance(id);
       });

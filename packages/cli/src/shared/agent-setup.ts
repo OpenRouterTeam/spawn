@@ -18,19 +18,18 @@ import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } f
  * - Everything else → throw (non-retryable: unknown failure)
  */
 export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
-  try {
-    await op;
+  const r = await asyncTryCatch(() => op);
+  if (r.ok) {
     return Ok(undefined);
-  } catch (err) {
-    const msg = getErrorMessage(err);
-    // Timeouts are NOT retryable — the command may have completed on the
-    // remote but we lost the connection before seeing the exit code.
-    if (msg.includes("timed out") || msg.includes("timeout")) {
-      throw err;
-    }
-    // All other SSH errors (connection refused, reset, etc.) are retryable.
-    return Err(new Error(msg));
   }
+  const msg = getErrorMessage(r.error);
+  // Timeouts are NOT retryable — the command may have completed on the
+  // remote but we lost the connection before seeing the exit code.
+  if (msg.includes("timed out") || msg.includes("timeout")) {
+    throw r.error;
+  }
+  // All other SSH errors (connection refused, reset, etc.) are retryable.
+  return Err(new Error(msg));
 }
 
 // ─── CloudRunner interface ──────────────────────────────────────────────────
@@ -68,8 +67,8 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
     mode: 0o600,
   });
 
-  try {
-    await withRetry(
+  const uploadResult = await asyncTryCatch(() =>
+    withRetry(
       "config upload",
       () =>
         wrapSshCall(
@@ -83,13 +82,11 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
         ),
       2,
       5,
-    );
-  } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      /* ignore */
-    }
+    ),
+  );
+  tryCatchIf(isOperationalError, () => unlinkSync(tmpFile));
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
   }
 }
 

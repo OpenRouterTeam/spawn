@@ -543,21 +543,22 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
       // can continue and the user isn't left with a hung CLI.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      let stdout: string;
-      let exitCode: number;
-      try {
-        [stdout] = await Promise.all([
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
         ]);
-        exitCode = await proc.exited;
-      } finally {
-        clearTimeout(timer);
+        const exitCode = await proc.exited;
+        return {
+          stdout,
+          exitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-      return {
-        stdout,
-        exitCode,
-      };
+      return pipeResult.data;
     });
     if (pollResult.ok && pollResult.data.exitCode === 0 && pollResult.data.stdout.includes("done")) {
       logStepDone();
@@ -598,13 +599,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -638,13 +639,13 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 

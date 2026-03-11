@@ -225,7 +225,7 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
   let finalResult: T | undefined;
   let cancelled = false;
 
-  try {
+  const loopResult = tryCatch(() => {
     while (true) {
       const readResult = tryCatch(() => fs.readSync(ttyFd, buf, 0, 8, null));
       if (!readResult.ok) {
@@ -250,8 +250,10 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
         break;
       }
     }
-  } finally {
-    restore();
+  });
+  restore();
+  if (!loopResult.ok) {
+    throw loopResult.error;
   }
 
   if (finalResult !== undefined) {

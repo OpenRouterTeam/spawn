@@ -9,7 +9,7 @@ import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "
 import { validateIdentifier, validatePrompt } from "../security.js";
 import { PkgVersionSchema } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
-import { isFileError, tryCatchIf, unwrapOr } from "../shared/result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
 import { getErrorMessage, isString } from "../shared/type-guards.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -32,14 +32,12 @@ export function handleCancel(): never {
 async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
   const s = p.spinner();
   s.start(msg);
-  try {
-    const result = await fn();
-    s.stop(doneMsg ?? msg.replace(/\.{3}$/, ""));
-    return result;
-  } catch (err) {
-    s.stop(pc.red("Failed"));
-    throw err;
+  const r = await asyncTryCatch(fn);
+  s.stop(r.ok ? (doneMsg ?? msg.replace(/\.{3}$/, "")) : pc.red("Failed"));
+  if (!r.ok) {
+    throw r.error;
   }
+  return r.data;
 }
 
 export async function loadManifestWithSpinner(): Promise<Manifest> {
@@ -321,10 +319,9 @@ export async function validateAndGetEntity(
 > {
   const def = ENTITY_DEFS[kind];
   const capitalLabel = def.label.charAt(0).toUpperCase() + def.label.slice(1);
-  try {
-    validateIdentifier(value, `${capitalLabel} name`);
-  } catch (err) {
-    p.log.error(getErrorMessage(err));
+  const r = tryCatch(() => validateIdentifier(value, `${capitalLabel} name`));
+  if (!r.ok) {
+    p.log.error(getErrorMessage(r.error));
     process.exit(1);
   }
 
@@ -623,14 +620,15 @@ export function isInteractiveTTY(): boolean {
 
 /** Validate inputs for injection attacks (SECURITY) and check they're non-empty */
 export function validateRunSecurity(agent: string, cloud: string, prompt?: string): void {
-  try {
+  const r = tryCatch(() => {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
     if (prompt) {
       validatePrompt(prompt);
     }
-  } catch (err) {
-    p.log.error(getErrorMessage(err));
+  });
+  if (!r.ok) {
+    p.log.error(getErrorMessage(r.error));
     process.exit(1);
   }
 
