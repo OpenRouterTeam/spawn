@@ -46,6 +46,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/kilocode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/hermes.sh)
 ```
 
+#### Junie
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/junie.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
