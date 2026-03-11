@@ -97,20 +97,21 @@ soak_inject_telegram_config() {
 
   log_step "Patching ~/.openclaw/openclaw.json with Telegram bot token..."
 
-  # Use bun -e on the remote to JSON-patch the config file
+  # Use bun eval on the remote to JSON-patch the config file
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     _TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d); \
-    bun -e ' \
-      const fs = require(\"fs\"); \
+    bun eval ' \
+      import { mkdirSync, readFileSync, writeFileSync } from \"node:fs\"; \
+      import { dirname } from \"node:path\"; \
       const configPath = process.env.HOME + \"/.openclaw/openclaw.json\"; \
       let config = {}; \
-      try { config = JSON.parse(fs.readFileSync(configPath, \"utf-8\")); } catch {} \
+      try { config = JSON.parse(readFileSync(configPath, \"utf-8\")); } catch {} \
       if (!config.channels) config.channels = {}; \
       if (!config.channels.telegram) config.channels.telegram = {}; \
       config.channels.telegram.botToken = process.env._TOKEN; \
-      fs.mkdirSync(require(\"path\").dirname(configPath), { recursive: true }); \
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); \
+      mkdirSync(dirname(configPath), { recursive: true }); \
+      writeFileSync(configPath, JSON.stringify(config, null, 2)); \
       console.log(\"Telegram config injected\"); \
     '" >/dev/null 2>&1
 
