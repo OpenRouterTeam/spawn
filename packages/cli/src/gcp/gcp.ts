@@ -491,27 +491,34 @@ export async function resolveProject(): Promise<void> {
     ]);
 
     if (listResult.exitCode !== 0 || !listResult.stdout) {
-      logError("Failed to list GCP projects");
-      logError("Set one before retrying:");
-      logError("  export GCP_PROJECT=your-project-id");
-      throw new Error("No GCP project");
+      logError("Failed to list GCP projects (you may lack resourcemanager.projects.list permission)");
+      logInfo("Enter your GCP project ID manually (or press Enter to abort):");
+      const manualProject = await prompt("GCP project ID: ");
+      if (manualProject) {
+        project = manualProject;
+      } else {
+        logError("No GCP project ID provided");
+        logError("Set one before retrying:");
+        logError("  export GCP_PROJECT=your-project-id");
+        throw new Error("No GCP project");
+      }
+    } else {
+      const items = listResult.stdout
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((line) => {
+          const parts = line.split("\t");
+          return `${parts[0]}|${parts[1] || parts[0]}`;
+        });
+
+      if (items.length === 0) {
+        logError("No active GCP projects found");
+        logError("Create one at: https://console.cloud.google.com/projectcreate");
+        throw new Error("No GCP projects");
+      }
+
+      project = await selectFromList(items, "GCP projects", items[0].split("|")[0]);
     }
-
-    const items = listResult.stdout
-      .split("\n")
-      .filter((l) => l.trim())
-      .map((line) => {
-        const parts = line.split("\t");
-        return `${parts[0]}|${parts[1] || parts[0]}`;
-      });
-
-    if (items.length === 0) {
-      logError("No active GCP projects found");
-      logError("Create one at: https://console.cloud.google.com/projectcreate");
-      throw new Error("No GCP projects");
-    }
-
-    project = await selectFromList(items, "GCP projects", items[0].split("|")[0]);
   }
 
   if (!project) {
