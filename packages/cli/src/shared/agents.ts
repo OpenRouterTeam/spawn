@@ -7,6 +7,13 @@ import { logError } from "./ui";
 /** Cloud-init dependency tier: what packages to pre-install on the VM. */
 export type CloudInitTier = "minimal" | "node" | "bun" | "full";
 
+/** An optional post-provision setup step the user can toggle on/off. */
+export interface OptionalStep {
+  value: string;
+  label: string;
+  hint?: string;
+}
+
 export interface AgentConfig {
   name: string;
   /** Default model ID passed to configure() (no interactive prompt — override via MODEL_ID env var). */
@@ -18,7 +25,7 @@ export interface AgentConfig {
   /** Return env var pairs for .spawnrc. */
   envVars: (apiKey: string) => string[];
   /** Agent-specific configuration (settings files, etc.). */
-  configure?: (apiKey: string, modelId?: string) => Promise<void>;
+  configure?: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) => Promise<void>;
   /** Pre-launch hook (e.g., start gateway daemon). */
   preLaunch?: () => Promise<void>;
   /** Optional tip or warning shown to the user just before the agent launches. */
@@ -29,6 +36,51 @@ export interface AgentConfig {
   cloudInitTier?: CloudInitTier;
   /** Skip tarball install attempt (e.g., already using snapshot). */
   skipTarball?: boolean;
+  /** SSH tunnel config for web dashboards. */
+  tunnel?: TunnelConfig;
+}
+
+/** Configuration for SSH-tunneling a remote port to localhost. */
+export interface TunnelConfig {
+  remotePort: number;
+  browserUrl?: (localPort: number) => string | undefined;
+}
+
+// ─── Agent Optional Steps (static metadata — no CloudRunner needed) ─────────
+
+/** Extra setup steps for specific agents (merged with COMMON_STEPS). */
+const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
+  openclaw: [
+    {
+      value: "browser",
+      label: "Chrome browser",
+      hint: "~400 MB — enables web tools",
+    },
+  ],
+};
+
+/** Steps shown for every agent. */
+const COMMON_STEPS: OptionalStep[] = [
+  {
+    value: "github",
+    label: "GitHub CLI",
+  },
+  {
+    value: "reuse-api-key",
+    label: "Reuse saved OpenRouter key",
+    hint: "off = create a fresh key via OAuth",
+  },
+];
+
+/** Get the optional setup steps for a given agent (no CloudRunner required). */
+export function getAgentOptionalSteps(agentName: string): OptionalStep[] {
+  const extra = AGENT_EXTRA_STEPS[agentName];
+  return extra
+    ? [
+        ...COMMON_STEPS,
+        ...extra,
+      ]
+    : COMMON_STEPS;
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────

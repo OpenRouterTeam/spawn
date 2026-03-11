@@ -10,6 +10,15 @@ import { OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
+  asyncTryCatch,
+  asyncTryCatchIf,
+  isFileError,
+  isNetworkError,
+  tryCatch,
+  tryCatchIf,
+  unwrapOr,
+} from "../shared/result.js";
+import {
   killWithTimeout,
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
@@ -105,6 +114,17 @@ const _state: DigitalOceanState = {
   serverIp: "",
 };
 
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: _state.serverIp,
+    user: "root",
+  };
+}
+
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function doApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
@@ -112,7 +132,7 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
 
   let interval = 2;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
+    const r = await asyncTryCatchIf(isNetworkError, async () => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${_state.token}`,
@@ -134,20 +154,25 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
         logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
-        continue;
+        return undefined;
       }
       if (!resp.ok) {
         throw new Error(`DigitalOcean API error ${resp.status} for ${method} ${endpoint}: ${text.slice(0, 200)}`);
       }
       return text;
-    } catch (err) {
-      if (attempt >= maxRetries) {
-        throw err;
+    });
+    if (r.ok) {
+      if (r.data !== undefined) {
+        return r.data;
       }
-      logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
-      await sleep(interval * 1000);
-      interval = Math.min(interval * 2, 30);
+      continue;
     }
+    if (attempt >= maxRetries) {
+      throw r.error;
+    }
+    logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
+    await sleep(interval * 1000);
+    interval = Math.min(interval * 2, 30);
   }
   throw new Error("doApi: unreachable");
 }
@@ -155,11 +180,10 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
 function loadConfig(): Record<string, unknown> | null {
-  try {
-    return parseJsonObj(readFileSync(getSpawnCloudConfigPath("digitalocean"), "utf-8"));
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => parseJsonObj(readFileSync(getSpawnCloudConfigPath("digitalocean"), "utf-8"))),
+    null,
+  );
 }
 
 async function saveConfig(values: Record<string, unknown>): Promise<void> {
@@ -223,12 +247,13 @@ async function testDoToken(): Promise<boolean> {
   if (!_state.token) {
     return false;
   }
-  try {
-    const text = await doApi("GET", "/account", undefined, 1);
-    return text.includes('"uuid"');
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const text = await doApi("GET", "/account", undefined, 1);
+      return text.includes('"uuid"');
+    }),
+    false,
+  );
 }
 
 /**
@@ -240,7 +265,7 @@ export async function checkAccountStatus(): Promise<void> {
   if (!_state.token) {
     return;
   }
-  try {
+  const r = await asyncTryCatch(async () => {
     const text = await doApi("GET", "/account", undefined, 1);
     const data = parseJsonObj(text);
     const rec = toRecord(data?.account);
@@ -272,10 +297,11 @@ export async function checkAccountStatus(): Promise<void> {
     if (emailVerified === false) {
       logWarn("Your DigitalOcean email is not verified. Verify it to avoid account restrictions.");
     }
-  } catch (err) {
+  });
+  if (!r.ok) {
     // Only re-throw if it's our explicit lock error
-    if (err instanceof Error && err.message === "DigitalOcean account is locked") {
-      throw err;
+    if (r.error instanceof Error && r.error.message === "DigitalOcean account is locked") {
+      throw r.error;
     }
     // Otherwise non-fatal — let createServer be the final check
   }
@@ -301,7 +327,7 @@ async function tryRefreshDoToken(): Promise<string | null> {
 
   logStep("Attempting to refresh DigitalOcean token...");
 
-  try {
+  const r = await asyncTryCatch(async () => {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
@@ -335,22 +361,25 @@ async function tryRefreshDoToken(): Promise<string | null> {
     await saveTokenToConfig(accessToken, newRefreshToken || refreshToken, expiresIn);
     logInfo("DigitalOcean token refreshed successfully");
     return accessToken;
-  } catch {
+  });
+  if (!r.ok) {
     logWarn("Token refresh request failed");
     return null;
   }
+  return r.data;
 }
 
 async function tryDoOAuth(): Promise<string | null> {
   logStep("Attempting DigitalOcean OAuth authentication...");
 
   // Check connectivity to DigitalOcean
-  try {
-    await fetch("https://cloud.digitalocean.com", {
+  const connCheck = await asyncTryCatch(() =>
+    fetch("https://cloud.digitalocean.com", {
       method: "HEAD",
       signal: AbortSignal.timeout(5_000),
-    });
-  } catch {
+    }),
+  );
+  if (!connCheck.ok) {
     logWarn("Cannot reach cloud.digitalocean.com — network may be unavailable");
     return null;
   }
@@ -363,8 +392,8 @@ async function tryDoOAuth(): Promise<string | null> {
   // Try ports in range
   let actualPort = DO_OAUTH_CALLBACK_PORT;
   for (let p = DO_OAUTH_CALLBACK_PORT; p < DO_OAUTH_CALLBACK_PORT + 10; p++) {
-    try {
-      server = Bun.serve({
+    const serveResult = tryCatch(() =>
+      Bun.serve({
         port: p,
         hostname: "127.0.0.1",
         fetch(req) {
@@ -431,10 +460,14 @@ async function tryDoOAuth(): Promise<string | null> {
             },
           });
         },
-      });
-      actualPort = p;
-      break;
-    } catch {}
+      }),
+    );
+    if (!serveResult.ok) {
+      continue;
+    }
+    server = serveResult.data;
+    actualPort = p;
+    break;
   }
 
   if (!server) {
@@ -484,7 +517,7 @@ async function tryDoOAuth(): Promise<string | null> {
 
   // Exchange code for token
   logStep("Exchanging authorization code for access token...");
-  try {
+  const exchangeResult = await asyncTryCatch(async () => {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: oauthCode,
@@ -521,10 +554,12 @@ async function tryDoOAuth(): Promise<string | null> {
     await saveTokenToConfig(accessToken, oauthRefreshToken, expiresIn);
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
     return accessToken;
-  } catch (_err) {
+  });
+  if (!exchangeResult.ok) {
     logError("Failed to exchange authorization code");
     return null;
   }
+  return exchangeResult.data;
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -654,11 +689,9 @@ export async function ensureSshKey(): Promise<void> {
       name: `spawn-${key.name}`,
       public_key: pubKey,
     });
-    let regText: string;
-    try {
-      regText = await doApi("POST", "/account/keys", body);
-    } catch (err) {
-      const msg = getErrorMessage(err);
+    const regResult = await asyncTryCatch(() => doApi("POST", "/account/keys", body));
+    if (!regResult.ok) {
+      const msg = getErrorMessage(regResult.error);
       // Key may already exist under a different name — non-fatal
       if (msg.includes("already been taken") || msg.includes("already in use")) {
         logInfo(`SSH key '${key.name}' already registered (under a different name)`);
@@ -667,6 +700,7 @@ export async function ensureSshKey(): Promise<void> {
       logWarn(`SSH key '${key.name}' registration may have failed, continuing...`);
       continue;
     }
+    const regText = regResult.data;
 
     if (regText.includes('"id"')) {
       logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
@@ -964,7 +998,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 // ─── Snapshot Lookup ─────────────────────────────────────────────────────────
 
 export async function findSpawnSnapshot(agentName: string): Promise<string | null> {
-  try {
+  const r = await asyncTryCatch(async () => {
     // DO snapshots don't support tags — filter by name prefix instead
     const prefix = `spawn-${agentName}-`;
     const text = await doApi("GET", "/images?private=true&per_page=100", undefined, 1);
@@ -989,9 +1023,8 @@ export async function findSpawnSnapshot(agentName: string): Promise<string | nul
 
     logInfo(`Found pre-built snapshot for ${agentName} (ID: ${latestId})`);
     return String(latestId);
-  } catch {
-    return null;
-  }
+  });
+  return r.ok ? r.data : null;
 }
 
 // ─── SSH-Only Wait (for snapshot boots) ──────────────────────────────────────
@@ -1036,7 +1069,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
     "kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n" +
     'echo ""; echo "--- cloud-init timed out ---"; exit 1';
 
-  try {
+  const streamResult = await asyncTryCatch(async () => {
     const proc = Bun.spawn(
       [
         "ssh",
@@ -1053,19 +1086,30 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
         ],
       },
     );
-    const exitCode = await proc.exited;
-    if (exitCode === 0) {
+    // The remote script has its own 5-min timeout (150 × 2s), but if the
+    // network drops mid-stream `await proc.exited` blocks forever. Kill
+    // after 330s (5min + 30s grace) to match the remote timeout.
+    const streamTimer = setTimeout(() => killWithTimeout(proc), 330_000);
+    const exitResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(streamTimer);
+    if (!exitResult.ok) {
+      throw exitResult.error;
+    }
+    return exitResult.data;
+  });
+  if (streamResult.ok) {
+    if (streamResult.data === 0) {
       logInfo("Cloud-init complete");
       return;
     }
     logWarn("Cloud-init did not complete within 5 minutes");
-  } catch {
+  } else {
     logWarn("Could not stream cloud-init log, falling back to polling...");
   }
 
   // Fallback poll if streaming failed (e.g. log file not yet created)
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -1082,18 +1126,32 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
           ],
         },
       );
+      // Per-process timeout: if the network drops during cloud-init polling,
+      // `await proc.exited` blocks forever. Kill after 30s so the retry loop
+      // can continue and the user isn't left with a hung CLI.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      const [stdout] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      if ((await proc.exited) === 0 && stdout.includes("done")) {
-        logStepDone();
-        logInfo("Cloud-init complete");
-        return;
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        const pollExitCode = await proc.exited;
+        return {
+          stdout,
+          pollExitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-    } catch {
-      /* ignore */
+      return pipeResult.data;
+    });
+    if (pollResult.ok && pollResult.data.pollExitCode === 0 && pollResult.data.stdout.includes("done")) {
+      logStepDone();
+      logInfo("Cloud-init complete");
+      return;
     }
     logStepInline(`Cloud-init in progress (${attempt}/${maxAttempts})`);
     await sleep(5000);
@@ -1104,7 +1162,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -1126,13 +1184,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -1165,13 +1223,13 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 
@@ -1180,7 +1238,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
   const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([

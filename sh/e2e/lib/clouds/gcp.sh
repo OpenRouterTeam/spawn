@@ -126,6 +126,12 @@ _gcp_exec() {
   local cmd="$2"
   local ssh_user="${GCP_SSH_USER:-$(whoami)}"
 
+  # Validate SSH user contains only safe characters (defense-in-depth)
+  if ! printf '%s' "${ssh_user}" | grep -qE '^[a-zA-Z0-9._-]+$'; then
+    log_err "Invalid SSH user for instance ${app}: ${ssh_user}"
+    return 1
+  fi
+
   # Resolve instance IP (cached per app)
   if [ "${_GCP_INSTANCE_APP}" != "${app}" ] || [ -z "${_GCP_INSTANCE_IP}" ]; then
     # Try reading from the IP file first (written by _gcp_provision_verify)
@@ -143,11 +149,25 @@ _gcp_exec() {
       log_err "Could not resolve IP for instance ${app}"
       return 1
     fi
+    # Validate IP looks like an IPv4 address (defense-in-depth against API/file tampering)
+    if ! printf '%s' "${_GCP_INSTANCE_IP}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+      log_err "Invalid IP address for instance ${app}: ${_GCP_INSTANCE_IP}"
+      _GCP_INSTANCE_IP=""
+      _GCP_INSTANCE_APP=""
+      return 1
+    fi
   fi
+
+  # Base64-encode the command to prevent shell injection when passed as an
+  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to embed in single quotes. Stdin is preserved for callers
+  # that pipe data into cloud_exec.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "${ssh_user}@${_GCP_INSTANCE_IP}" "${cmd}"
+      "${ssh_user}@${_GCP_INSTANCE_IP}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------

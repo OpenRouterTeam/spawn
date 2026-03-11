@@ -26,6 +26,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import os, { tmpdir } from "node:os";
 import { join } from "node:path";
+import { tryCatch } from "@openrouter/spawn-shared";
 
 // ── Stray test file cleanup ──────────────────────────────────────────────────
 //
@@ -42,7 +43,7 @@ function cleanupStrayTestFiles(): void {
   if (!REAL_HOME) {
     return;
   }
-  try {
+  tryCatch(() => {
     for (const f of readdirSync(REAL_HOME)) {
       if (f.startsWith("subprocess-test-") && f.endsWith(".txt")) {
         rmSync(join(REAL_HOME, f), {
@@ -50,9 +51,7 @@ function cleanupStrayTestFiles(): void {
         });
       }
     }
-  } catch {
-    // Best-effort
-  }
+  });
 }
 
 cleanupStrayTestFiles();
@@ -110,13 +109,11 @@ mkdirSync(join(TEST_HOME, ".local", "share"), {
 // ── Cleanup on exit ─────────────────────────────────────────────────────────
 
 process.on("exit", () => {
-  try {
+  tryCatch(() =>
     rmSync(TEST_HOME, {
       recursive: true,
       force: true,
-    });
-  } catch {
-    // Best-effort cleanup
-  }
+    }),
+  );
   cleanupStrayTestFiles();
 });

@@ -8,31 +8,17 @@ const VERSION = pkg.version;
 /**
  * Tests for cmdUpdate (commands/update.ts).
  *
- * Script download/execution tests live in:
- * - download-and-failure.test.ts (failure paths: both-404, both-500, network errors)
- * - cmdrun-happy-path.test.ts (success paths: primary/fallback download, history, env vars)
+ * Uses dependency injection (UpdateOptions.runUpdate) instead of mock.module
+ * for node:child_process to avoid process-global mock pollution.
  */
 
 const { spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
 
-// Mock node:child_process to prevent real subprocess calls in tests:
-// - execSync: used by performUpdate() to run curl|bash install — without this mock,
-//   "should handle update failure gracefully" downloads the real install script from
-//   the network, causing a 58s timeout under full-suite concurrency (CLAUDE.md violation).
-// - spawnSync: used by spawnBash() to run downloaded scripts — returns exit code 0
-//   so callers see a successful execution.
-mock.module("node:child_process", () => ({
-  execSync: mock(() => {}),
-  execFileSync: mock(() => {}),
-  spawnSync: mock(() => ({
-    status: 0,
-    signal: null,
-    error: null,
-  })),
-}));
+// ── Import commands directly (no mock.module needed) ──────────────────────
+import { cmdUpdate } from "../commands/index.js";
 
-// Import commands after mock setup
-const { cmdUpdate } = await import("../commands/index.js");
+/** No-op runUpdate to prevent real subprocess calls in tests. */
+const mockRunUpdate = mock(() => {});
 
 describe("cmdUpdate", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -43,6 +29,7 @@ describe("cmdUpdate", () => {
     consoleMocks = createConsoleMocks();
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
+    mockRunUpdate.mockClear();
 
     processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
@@ -67,7 +54,9 @@ describe("cmdUpdate", () => {
       });
     });
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     expect(mockSpinnerStop).toHaveBeenCalled();
@@ -86,7 +75,9 @@ describe("cmdUpdate", () => {
       });
     });
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     // Should show update message with version transition
@@ -102,7 +93,9 @@ describe("cmdUpdate", () => {
         }),
     );
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     // Should show failed message
@@ -118,7 +111,9 @@ describe("cmdUpdate", () => {
       throw new TypeError("Failed to fetch");
     });
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
@@ -135,9 +130,14 @@ describe("cmdUpdate", () => {
       });
     });
 
-    // cmdUpdate now runs execSync which will fail in test env
-    // The function catches errors internally, so it should not throw
-    await cmdUpdate();
+    // Mock runUpdate that throws to simulate failure
+    const failingRunUpdate = mock(() => {
+      throw new Error("curl failed");
+    });
+
+    await cmdUpdate({
+      runUpdate: failingRunUpdate,
+    });
 
     // Should show the update version in spinner stop
     const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
@@ -154,7 +154,9 @@ describe("cmdUpdate", () => {
         ),
     );
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(startCalls.some((msg: string) => msg.includes("Checking"))).toBe(true);
@@ -170,7 +172,9 @@ describe("cmdUpdate", () => {
       });
     });
 
-    await cmdUpdate();
+    await cmdUpdate({
+      runUpdate: mockRunUpdate,
+    });
 
     // cmdUpdate now uses s.stop() with version info instead of s.message()
     const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));

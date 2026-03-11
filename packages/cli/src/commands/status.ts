@@ -5,7 +5,9 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { filterHistory, markRecordDeleted } from "../history.js";
 import { loadManifest } from "../manifest.js";
+import { validateServerIdentifier } from "../security.js";
 import { parseJsonObj } from "../shared/parse.js";
+import { asyncTryCatchIf, isNetworkError, tryCatch, unwrapOr } from "../shared/result.js";
 import { isString, toRecord } from "../shared/type-guards.js";
 import { loadApiToken } from "../shared/ui.js";
 import { formatRelativeTime } from "./list.js";
@@ -34,69 +36,71 @@ interface JsonStatusEntry {
 // ── Cloud status fetchers ────────────────────────────────────────────────────
 
 async function fetchHetznerStatus(serverId: string, token: string): Promise<LiveState> {
-  try {
-    const resp = await fetch(`https://api.hetzner.cloud/v1/servers/${serverId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (resp.status === 404) {
-      return "gone";
-    }
-    if (!resp.ok) {
-      return "unknown";
-    }
-    const text = await resp.text();
-    const data = parseJsonObj(text);
-    const server = toRecord(data?.server);
-    const serverStatus = server?.status;
-    if (!isString(serverStatus)) {
-      return "unknown";
-    }
-    if (serverStatus === "running") {
-      return "running";
-    }
-    if (serverStatus === "off") {
-      return "stopped";
-    }
-    return "unknown";
-  } catch {
-    return "unknown";
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const resp = await fetch(`https://api.hetzner.cloud/v1/servers/${serverId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (resp.status === 404) {
+        return "gone" satisfies LiveState;
+      }
+      if (!resp.ok) {
+        return "unknown" satisfies LiveState;
+      }
+      const text = await resp.text();
+      const data = parseJsonObj(text);
+      const server = toRecord(data?.server);
+      const serverStatus = server?.status;
+      if (!isString(serverStatus)) {
+        return "unknown" satisfies LiveState;
+      }
+      if (serverStatus === "running") {
+        return "running" satisfies LiveState;
+      }
+      if (serverStatus === "off") {
+        return "stopped" satisfies LiveState;
+      }
+      return "unknown" satisfies LiveState;
+    }),
+    "unknown",
+  );
 }
 
 async function fetchDoStatus(dropletId: string, token: string): Promise<LiveState> {
-  try {
-    const resp = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (resp.status === 404) {
-      return "gone";
-    }
-    if (!resp.ok) {
-      return "unknown";
-    }
-    const text = await resp.text();
-    const data = parseJsonObj(text);
-    const droplet = toRecord(data?.droplet);
-    const dropletStatus = droplet?.status;
-    if (!isString(dropletStatus)) {
-      return "unknown";
-    }
-    if (dropletStatus === "active") {
-      return "running";
-    }
-    if (dropletStatus === "off" || dropletStatus === "archive") {
-      return "stopped";
-    }
-    return "unknown";
-  } catch {
-    return "unknown";
-  }
+  return unwrapOr(
+    await asyncTryCatchIf(isNetworkError, async () => {
+      const resp = await fetch(`https://api.digitalocean.com/v2/droplets/${dropletId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (resp.status === 404) {
+        return "gone" satisfies LiveState;
+      }
+      if (!resp.ok) {
+        return "unknown" satisfies LiveState;
+      }
+      const text = await resp.text();
+      const data = parseJsonObj(text);
+      const droplet = toRecord(data?.droplet);
+      const dropletStatus = droplet?.status;
+      if (!isString(dropletStatus)) {
+        return "unknown" satisfies LiveState;
+      }
+      if (dropletStatus === "active") {
+        return "running" satisfies LiveState;
+      }
+      if (dropletStatus === "off" || dropletStatus === "archive") {
+        return "stopped" satisfies LiveState;
+      }
+      return "unknown" satisfies LiveState;
+    }),
+    "unknown",
+  );
 }
 
 async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
@@ -113,6 +117,10 @@ async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
 
   const serverId = conn.server_id || conn.server_name || "";
   if (!serverId) {
+    return "unknown";
+  }
+  const validationResult = tryCatch(() => validateServerIdentifier(serverId));
+  if (!validationResult.ok) {
     return "unknown";
   }
 
@@ -269,12 +277,8 @@ export async function cmdStatus(
     return;
   }
 
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch {
-    // Manifest unavailable — show raw keys
-  }
+  const manifestResult = await asyncTryCatchIf(isNetworkError, () => loadManifest());
+  const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
   if (!opts.json) {
     p.log.step(`Checking status of ${candidates.length} server${candidates.length !== 1 ? "s" : ""}...`);

@@ -55,9 +55,30 @@ describe("paths", () => {
       expect(() => getSpawnDir()).toThrow("must be an absolute path");
     });
 
+    it("rejects dot-relative SPAWN_HOME", () => {
+      process.env.SPAWN_HOME = "./local/dir";
+      expect(() => getSpawnDir()).toThrow("must be an absolute path");
+    });
+
+    it("resolves .. segments in absolute SPAWN_HOME within home", () => {
+      const pathWithDots = join(getUserHome(), "foo", "..", "bar");
+      process.env.SPAWN_HOME = pathWithDots;
+      expect(getSpawnDir()).toBe(join(getUserHome(), "bar"));
+    });
+
+    it("rejects SPAWN_HOME outside home directory", () => {
+      process.env.SPAWN_HOME = "/tmp/spawn";
+      expect(() => getSpawnDir()).toThrow("must be within your home directory");
+    });
+
     it("rejects path traversal outside home directory", () => {
       process.env.SPAWN_HOME = "/tmp/../../root/.spawn";
       expect(() => getSpawnDir()).toThrow("must be within your home directory");
+    });
+
+    it("accepts home directory itself as SPAWN_HOME", () => {
+      process.env.SPAWN_HOME = getUserHome();
+      expect(getSpawnDir()).toBe(getUserHome());
     });
   });
 

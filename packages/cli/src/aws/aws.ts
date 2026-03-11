@@ -10,6 +10,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -68,26 +69,27 @@ export function loadCredsFromConfig(): {
   secretAccessKey: string;
   region: string;
 } | null {
-  try {
-    const raw = readFileSync(getAwsConfigPath(), "utf-8");
-    const data = parseJsonWith(raw, AwsCredsSchema);
-    if (!data?.accessKeyId || !data?.secretAccessKey) {
-      return null;
-    }
-    if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
-      return null;
-    }
-    if (data.secretAccessKey.length < 16) {
-      return null;
-    }
-    return {
-      accessKeyId: data.accessKeyId,
-      secretAccessKey: data.secretAccessKey,
-      region: data.region || "us-east-1",
-    };
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const raw = readFileSync(getAwsConfigPath(), "utf-8");
+      const data = parseJsonWith(raw, AwsCredsSchema);
+      if (!data?.accessKeyId || !data?.secretAccessKey) {
+        return null;
+      }
+      if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
+        return null;
+      }
+      if (data.secretAccessKey.length < 16) {
+        return null;
+      }
+      return {
+        accessKeyId: data.accessKeyId,
+        secretAccessKey: data.secretAccessKey,
+        region: data.region || "us-east-1",
+      };
+    }),
+    null,
+  );
 }
 
 // ─── Lightsail Bundles ────────────────────────────────────────────────────────
@@ -195,6 +197,17 @@ export function getState() {
     lightsailMode: _state.lightsailMode,
     instanceName: _state.instanceName,
     instanceIp: _state.instanceIp,
+  };
+}
+
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: _state.instanceIp,
+    user: SSH_USER,
   };
 }
 
@@ -361,13 +374,8 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
   const text = await resp.text();
 
   if (!resp.ok) {
-    let msg = "";
-    try {
-      const e = JSON.parse(text);
-      msg = e.message || e.Message || e.__type || "";
-    } catch {
-      /* ignore */
-    }
+    const parsed = tryCatch(() => JSON.parse(text));
+    const msg = parsed.ok ? parsed.data.message || parsed.data.Message || parsed.data.__type || "" : "";
     throw new Error(`Lightsail API error (HTTP ${resp.status}) ${target}: ${msg || text}`);
   }
 
@@ -680,6 +688,131 @@ export async function promptBundle(agentName?: string): Promise<void> {
   logInfo(`Using bundle: ${selected}`);
 }
 
+// ─── Lightsail Operation Helpers ─────────────────────────────────────────────
+// These helpers abstract the CLI-vs-REST branching so each consumer is a single
+// linear flow instead of duplicating the branch in every function.
+
+/** Check if a Lightsail key pair exists. Returns true if found, false otherwise. */
+async function lightsailGetKeyPair(keyPairName: string): Promise<boolean> {
+  if (_state.lightsailMode === "cli") {
+    return (
+      awsCliSync([
+        "lightsail",
+        "get-key-pair",
+        "--key-pair-name",
+        keyPairName,
+      ]).exitCode === 0
+    );
+  }
+  const r = await asyncTryCatch(() =>
+    lightsailRest(
+      "Lightsail_20161128.GetKeyPair",
+      JSON.stringify({
+        keyPairName,
+      }),
+    ),
+  );
+  return r.ok;
+}
+
+/** Import a public key to Lightsail as a key pair. */
+async function lightsailImportKeyPair(keyPairName: string, publicKeyBase64: string): Promise<void> {
+  if (_state.lightsailMode === "cli") {
+    await awsCli([
+      "lightsail",
+      "import-key-pair",
+      "--key-pair-name",
+      keyPairName,
+      "--public-key-base64",
+      publicKeyBase64,
+    ]);
+    return;
+  }
+  await lightsailRest(
+    "Lightsail_20161128.ImportKeyPair",
+    JSON.stringify({
+      keyPairName,
+      publicKeyBase64,
+    }),
+  );
+}
+
+/** Create Lightsail instances. */
+async function lightsailCreateInstances(params: {
+  name: string;
+  az: string;
+  blueprint: string;
+  bundle: string;
+  keyPairName: string;
+  userData: string;
+}): Promise<void> {
+  if (_state.lightsailMode === "cli") {
+    await awsCli([
+      "lightsail",
+      "create-instances",
+      "--instance-names",
+      params.name,
+      "--availability-zone",
+      params.az,
+      "--blueprint-id",
+      params.blueprint,
+      "--bundle-id",
+      params.bundle,
+      "--key-pair-name",
+      params.keyPairName,
+      "--user-data",
+      params.userData,
+    ]);
+    return;
+  }
+  await lightsailRest(
+    "Lightsail_20161128.CreateInstances",
+    JSON.stringify({
+      instanceNames: [
+        params.name,
+      ],
+      availabilityZone: params.az,
+      blueprintId: params.blueprint,
+      bundleId: params.bundle,
+      keyPairName: params.keyPairName,
+      userData: params.userData,
+    }),
+  );
+}
+
+/** Get Lightsail instance state and public IP. */
+async function lightsailGetInstance(instanceName: string): Promise<{
+  state: string;
+  ip: string;
+}> {
+  if (_state.lightsailMode === "cli") {
+    const resp = await awsCli([
+      "lightsail",
+      "get-instance",
+      "--instance-name",
+      instanceName,
+      "--output",
+      "json",
+    ]);
+    const data = parseJsonWith(resp, InstanceStateSchema);
+    return {
+      state: data?.instance?.state?.name || "",
+      ip: data?.instance?.publicIpAddress || "",
+    };
+  }
+  const resp = await lightsailRest(
+    "Lightsail_20161128.GetInstance",
+    JSON.stringify({
+      instanceName,
+    }),
+  );
+  const data = parseJsonWith(resp, InstanceStateSchema);
+  return {
+    state: data?.instance?.state?.name || "",
+    ip: data?.instance?.publicIpAddress || "",
+  };
+}
+
 // ─── SSH Key Management ─────────────────────────────────────────────────────
 
 export async function ensureSshKey(): Promise<void> {
@@ -695,93 +828,26 @@ export async function ensureSshKey(): Promise<void> {
   const keyName = "spawn-key";
   const pubKey = readFileSync(pubPath, "utf-8").trim();
 
-  if (_state.lightsailMode === "cli") {
-    // Check if already registered
-    const check = awsCliSync([
-      "lightsail",
-      "get-key-pair",
-      "--key-pair-name",
-      keyName,
-    ]);
-    if (check.exitCode === 0) {
-      logInfo("SSH key already registered with Lightsail");
-      return;
-    }
-
-    logStep("Importing SSH key to Lightsail...");
-    try {
-      await awsCli([
-        "lightsail",
-        "import-key-pair",
-        "--key-pair-name",
-        keyName,
-        "--public-key-base64",
-        pubKey,
-      ]);
-    } catch {
-      // Race condition: another process may have imported it
-      const recheck = awsCliSync([
-        "lightsail",
-        "get-key-pair",
-        "--key-pair-name",
-        keyName,
-      ]);
-      if (recheck.exitCode === 0) {
-        logInfo("SSH key already registered with Lightsail");
-        return;
-      }
-      throw new Error(
-        "Failed to import SSH key to Lightsail. " +
-          "On new AWS accounts, Lightsail may not be enabled. " +
-          "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
-      );
-    }
-    logInfo("SSH key imported to Lightsail");
-  } else {
-    // REST path
-    try {
-      await lightsailRest(
-        "Lightsail_20161128.GetKeyPair",
-        JSON.stringify({
-          keyPairName: keyName,
-        }),
-      );
-      logInfo("SSH key already registered with Lightsail");
-      return;
-    } catch {
-      // Key doesn't exist, import it
-    }
-
-    logStep("Importing SSH key to Lightsail via REST API...");
-    try {
-      await lightsailRest(
-        "Lightsail_20161128.ImportKeyPair",
-        JSON.stringify({
-          keyPairName: keyName,
-          publicKeyBase64: pubKey,
-        }),
-      );
-    } catch {
-      // Race condition check
-      try {
-        await lightsailRest(
-          "Lightsail_20161128.GetKeyPair",
-          JSON.stringify({
-            keyPairName: keyName,
-          }),
-        );
-        logInfo("SSH key already registered with Lightsail");
-        return;
-      } catch {
-        throw new Error(
-          "Failed to import SSH key to Lightsail. " +
-            "On new AWS accounts, Lightsail may not be enabled. " +
-            "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
-        );
-      }
-    }
-    logInfo("SSH key imported to Lightsail");
+  if (await lightsailGetKeyPair(keyName)) {
+    logInfo("SSH key already registered with Lightsail");
+    return;
   }
+
+  logStep("Importing SSH key to Lightsail...");
+  const importResult = await asyncTryCatch(() => lightsailImportKeyPair(keyName, pubKey));
+  if (!importResult.ok) {
+    // Race condition: another process may have imported it
+    if (await lightsailGetKeyPair(keyName)) {
+      logInfo("SSH key already registered with Lightsail");
+      return;
+    }
+    throw new Error(
+      "Failed to import SSH key to Lightsail. " +
+        "On new AWS accounts, Lightsail may not be enabled. " +
+        "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
+    );
+  }
+  logInfo("SSH key imported to Lightsail");
 }
 
 // ─── Cloud-init User Data ───────────────────────────────────────────────────
@@ -840,115 +906,39 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
   logStep(`Creating Lightsail instance '${name}' (bundle: ${bundle}, AZ: ${az})...`);
 
   const userdata = getCloudInitUserdata(tier);
+  const createParams = {
+    name,
+    az,
+    blueprint,
+    bundle,
+    keyPairName: "spawn-key",
+    userData: userdata,
+  };
 
-  if (_state.lightsailMode === "cli") {
-    try {
-      await awsCli([
-        "lightsail",
-        "create-instances",
-        "--instance-names",
-        name,
-        "--availability-zone",
-        az,
-        "--blueprint-id",
-        blueprint,
-        "--bundle-id",
-        bundle,
-        "--key-pair-name",
-        "spawn-key",
-        "--user-data",
-        userdata,
+  const createResult = await asyncTryCatch(() => lightsailCreateInstances(createParams));
+  if (!createResult.ok) {
+    const errMsg = getErrorMessage(createResult.error);
+    logError(`Failed to create Lightsail instance: ${errMsg}`);
+
+    if (isBillingError("aws", errMsg)) {
+      const shouldRetry = await handleBillingError("aws");
+      if (shouldRetry) {
+        logStep("Retrying instance creation...");
+        await lightsailCreateInstances(createParams);
+        _state.instanceName = name;
+        logInfo(`Instance creation initiated: ${name}`);
+        return await waitForInstance();
+      }
+    } else {
+      showNonBillingError("aws", [
+        "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
+        "Instance limit reached for your account",
+        "Bundle unavailable in region",
+        "AWS credentials lack Lightsail permissions",
+        `Instance name '${name}' already in use`,
       ]);
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      logError(`Failed to create Lightsail instance: ${errMsg}`);
-
-      if (isBillingError("aws", errMsg)) {
-        const shouldRetry = await handleBillingError("aws");
-        if (shouldRetry) {
-          logStep("Retrying instance creation...");
-          await awsCli([
-            "lightsail",
-            "create-instances",
-            "--instance-names",
-            name,
-            "--availability-zone",
-            az,
-            "--blueprint-id",
-            blueprint,
-            "--bundle-id",
-            bundle,
-            "--key-pair-name",
-            "spawn-key",
-            "--user-data",
-            userdata,
-          ]);
-          _state.instanceName = name;
-          logInfo(`Instance creation initiated: ${name}`);
-          return await waitForInstance();
-        }
-      } else {
-        showNonBillingError("aws", [
-          "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
-          "Instance limit reached for your account",
-          "Bundle unavailable in region",
-          "AWS credentials lack Lightsail permissions",
-          `Instance name '${name}' already in use`,
-        ]);
-      }
-      throw err;
     }
-  } else {
-    try {
-      await lightsailRest(
-        "Lightsail_20161128.CreateInstances",
-        JSON.stringify({
-          instanceNames: [
-            name,
-          ],
-          availabilityZone: az,
-          blueprintId: blueprint,
-          bundleId: bundle,
-          keyPairName: "spawn-key",
-          userData: userdata,
-        }),
-      );
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      logError(`Failed to create Lightsail instance: ${errMsg}`);
-
-      if (isBillingError("aws", errMsg)) {
-        const shouldRetry = await handleBillingError("aws");
-        if (shouldRetry) {
-          logStep("Retrying instance creation...");
-          await lightsailRest(
-            "Lightsail_20161128.CreateInstances",
-            JSON.stringify({
-              instanceNames: [
-                name,
-              ],
-              availabilityZone: az,
-              blueprintId: blueprint,
-              bundleId: bundle,
-              keyPairName: "spawn-key",
-              userData: userdata,
-            }),
-          );
-          _state.instanceName = name;
-          logInfo(`Instance creation initiated: ${name}`);
-          return await waitForInstance();
-        }
-      } else {
-        showNonBillingError("aws", [
-          "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
-          "Instance limit reached for your account",
-          "Bundle unavailable in region",
-          "Credentials lack lightsail:CreateInstances permission",
-          `Instance name '${name}' already in use`,
-        ]);
-      }
-      throw err;
-    }
+    throw createResult.error;
   }
 
   _state.instanceName = name;
@@ -960,68 +950,16 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
 
 // ─── Wait for Instance ──────────────────────────────────────────────────────
 
-export async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
+async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
   logStep("Waiting for instance to become running...");
   const pollDelay = 5000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let state = "";
-    let ip = "";
-
-    try {
-      if (_state.lightsailMode === "cli") {
-        const resp = await awsCli([
-          "lightsail",
-          "get-instance",
-          "--instance-name",
-          _state.instanceName,
-          "--query",
-          "instance.state.name",
-          "--output",
-          "text",
-        ]);
-        state = resp.trim();
-      } else {
-        const resp = await lightsailRest(
-          "Lightsail_20161128.GetInstance",
-          JSON.stringify({
-            instanceName: _state.instanceName,
-          }),
-        );
-        const data = parseJsonWith(resp, InstanceStateSchema);
-        state = data?.instance?.state?.name || "";
-      }
-    } catch {
-      state = "";
-    }
+    const infoResult = await asyncTryCatch(() => lightsailGetInstance(_state.instanceName));
+    const state = infoResult.ok ? infoResult.data.state : "";
+    const ip = infoResult.ok ? infoResult.data.ip : "";
 
     if (state === "running") {
-      try {
-        if (_state.lightsailMode === "cli") {
-          ip = await awsCli([
-            "lightsail",
-            "get-instance",
-            "--instance-name",
-            _state.instanceName,
-            "--query",
-            "instance.publicIpAddress",
-            "--output",
-            "text",
-          ]);
-        } else {
-          const resp = await lightsailRest(
-            "Lightsail_20161128.GetInstance",
-            JSON.stringify({
-              instanceName: _state.instanceName,
-            }),
-          );
-          const data = parseJsonWith(resp, InstanceStateSchema);
-          ip = data?.instance?.publicIpAddress || "";
-        }
-      } catch {
-        // ignore
-      }
-
       _state.instanceIp = ip.trim();
       logStepDone();
       logInfo(`Instance running: IP=${_state.instanceIp}`);
@@ -1061,7 +999,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 
   logStep("Waiting for cloud-init to complete...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -1078,19 +1016,32 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           ],
         },
       );
+      // Per-process timeout: if the network drops during cloud-init polling,
+      // `await proc.exited` blocks forever. Kill after 30s so the retry loop
+      // can continue and the user isn't left with a hung CLI.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      const [stdout] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("done")) {
-        logStepDone();
-        logInfo("Cloud-init complete");
-        return;
+      const pipeResult = await asyncTryCatch(async () => {
+        const [stdout] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        const exitCode = await proc.exited;
+        return {
+          stdout,
+          exitCode,
+        };
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-    } catch {
-      // ignore
+      return pipeResult.data;
+    });
+    if (pollResult.ok && pollResult.data.exitCode === 0 && pollResult.data.stdout.includes("done")) {
+      logStepDone();
+      logInfo("Cloud-init complete");
+      return;
     }
     logStepInline(`Cloud-init still running (${attempt}/${maxAttempts})`);
     await sleep(5000);
@@ -1121,13 +1072,13 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   );
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
@@ -1157,12 +1108,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    if ((await proc.exited) !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 
@@ -1218,33 +1170,29 @@ export async function destroyServer(name?: string): Promise<void> {
 
   logStep(`Destroying Lightsail instance '${target}'...`);
 
-  if (_state.lightsailMode === "cli") {
-    try {
-      await awsCli([
-        "lightsail",
-        "delete-instance",
-        "--instance-name",
-        target,
-      ]);
-    } catch {
-      logError(`Failed to destroy Lightsail instance '${target}'`);
-      logWarn(`Delete it manually: ${DASHBOARD_URL}`);
-      throw new Error("Instance deletion failed");
-    }
-  } else {
-    try {
-      await lightsailRest(
-        "Lightsail_20161128.DeleteInstance",
-        JSON.stringify({
-          instanceName: target,
-          forceDeleteAddOns: false,
-        }),
-      );
-    } catch {
-      logError(`Failed to destroy Lightsail instance '${target}'`);
-      logWarn(`Delete it manually: ${DASHBOARD_URL}`);
-      throw new Error("Instance deletion failed");
-    }
+  const deleteResult =
+    _state.lightsailMode === "cli"
+      ? await asyncTryCatch(() =>
+          awsCli([
+            "lightsail",
+            "delete-instance",
+            "--instance-name",
+            target,
+          ]),
+        )
+      : await asyncTryCatch(() =>
+          lightsailRest(
+            "Lightsail_20161128.DeleteInstance",
+            JSON.stringify({
+              instanceName: target,
+              forceDeleteAddOns: false,
+            }),
+          ),
+        );
+  if (!deleteResult.ok) {
+    logError(`Failed to destroy Lightsail instance '${target}'`);
+    logWarn(`Delete it manually: ${DASHBOARD_URL}`);
+    throw new Error("Instance deletion failed");
   }
   logInfo(`Instance '${target}' destroyed`);
 }

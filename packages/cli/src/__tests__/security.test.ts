@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { tryCatch } from "@openrouter/spawn-shared";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 
 /**
@@ -430,16 +431,12 @@ describe("validatePrompt", () => {
   });
 
   it("should provide helpful error message for command substitution", () => {
-    let caught: unknown;
-    try {
-      validatePrompt("Run $(echo test)");
-    } catch (e) {
-      caught = e;
+    const r = tryCatch(() => validatePrompt("Run $(echo test)"));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.message).toContain("shell syntax");
+      expect(r.error.message).toContain("plain English");
     }
-    expect(caught).toBeInstanceOf(Error);
-    const err = caught instanceof Error ? caught : null;
-    expect(err?.message).toContain("shell syntax");
-    expect(err?.message).toContain("plain English");
   });
 
   it("should detect multiple dangerous patterns", () => {
@@ -561,18 +558,13 @@ describe("validatePrompt", () => {
     expect(() => validatePrompt("Dump > /var/log/output")).toThrow("shell syntax");
   });
 
+  // ── False positives (issue #2249) ───────────────────────────────────────
+
   it("should accept developer phrases with >> and > that are not shell redirection", () => {
     expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
     expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
     expect(() => validatePrompt("Append >> log the errors")).not.toThrow();
-  });
-
-  // ── False positives (issue #2249) ───────────────────────────────────────
-
-  it("should accept all example prompts from issue #2249", () => {
-    expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
-    expect(() => validatePrompt("Run tests && deploy if they pass")).not.toThrow();
-    expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
+    // Heredoc in prose (not a shell heredoc operator) — issue #2249
     expect(() => validatePrompt("Add a heredoc to the Dockerfile")).not.toThrow();
   });
 

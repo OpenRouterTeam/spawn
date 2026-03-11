@@ -126,15 +126,30 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
    - **Before writing ANY new test**, verify: (1) the function is exported, (2) it is not already tested in an existing file, (3) the test will actually fail if the source function breaks.
    - Run `bun test` after every change. If new tests pass without importing real source, DELETE them.
 
-5. **code-health** (Sonnet) — Best match for `bug` labeled issues. Proactive: codebase health scan. ONE PR max.
-   Scan for:
-   - **Reliability**: unhandled error paths, missing exit code checks, race conditions, unchecked return values
-   - **Maintainability**: duplicated logic that should be extracted, inconsistent patterns across similar files, dead code, unclear variable names
-   - **Readability**: overly nested conditionals, magic numbers/strings, missing or misleading comments on non-obvious logic
-   - **Testability**: tightly coupled code that's hard to mock, functions with too many side effects, untestable global state
-   - **Scalability**: hardcoded limits, O(n²) patterns, blocking operations that could be async
-   - **Best practices**: shellcheck violations (bash), type-safety gaps (ts), deprecated API usage, inconsistent error handling patterns
-   Pick the **highest-impact** findings (max 3), fix them in ONE PR. Run tests after every change. Focus on fixes that prevent real bugs or meaningfully improve developer experience — skip cosmetic-only changes.
+5. **code-health** (Sonnet) — Best match for `bug` labeled issues. Proactive: post-merge consistency sweep + implementation gap detection. ONE PR max.
+
+   **Step 1: Post-merge consistency sweep.**
+   Check what landed recently: `git log --oneline -20 origin/main`
+   Then scan the codebase for stragglers that don't match the dominant pattern:
+   - Run `bunx @biomejs/biome check src/` — if there are lint/grit violations, fix them (don't just report)
+   - If 90% of files use pattern X but a few still use the old pattern, fix the stragglers
+   - Look for code that was half-migrated (e.g., one function uses Result helpers but the next function in the same file still uses `.then/.catch` or raw try/catch)
+
+   **Step 2: Implementation gap detection.**
+   Check that code changes are complete — no missing manifest updates, no orphaned scripts:
+   - `manifest.json` matrix: every script at `sh/{cloud}/{agent}.sh` should have `"implemented"` status. If a script exists but the matrix says `"missing"`, fix the matrix.
+   - Reverse check: if the matrix says `"implemented"` but the script doesn't exist, flag it.
+   - `sh/{cloud}/README.md`: if a new agent was added to a cloud but the README doesn't mention it, update it.
+   - Agent config in `packages/cli/src/shared/agents.ts`: if manifest.json lists an agent but `agents.ts` has no entry, flag it.
+   - Missing exports: if a module defines a function used by other files but doesn't export it, fix the export.
+
+   **Step 3: General health scan.**
+   Only if steps 1-2 found nothing:
+   - **Reliability**: unhandled error paths, missing exit code checks, race conditions
+   - **Dead code**: unused imports, unreachable branches, stale references to deleted files/functions
+   - **Inconsistency**: same operation done differently in similar files (e.g., one cloud module validates input but another doesn't)
+
+   Pick the **highest-impact** findings (max 3), fix them in ONE PR. Run tests after every change. Focus on fixes that prevent real bugs — skip cosmetic-only changes.
 
 6. **pr-maintainer** (Sonnet)
    Role: Keep PRs healthy and mergeable. Do NOT review/approve/merge — security team handles that.

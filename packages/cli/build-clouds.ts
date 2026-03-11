@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 // Build bundled JS files for cloud providers that use TypeScript.
 // Each cloud with a cli/src/{cloud}/main.ts gets bundled into {cloud}.js.
 // These bundles are uploaded to GitHub releases for curl|bash execution.
@@ -7,8 +8,8 @@
 //   bun run cli/build-clouds.ts          # build all clouds
 //   bun run cli/build-clouds.ts aws      # build specific cloud
 
-import { readdirSync, existsSync } from "fs";
-import path from "path";
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
 
 const cliDir = path.dirname(new URL(import.meta.url).pathname);
 const srcDir = path.join(cliDir, "src");
@@ -24,7 +25,9 @@ async function buildCloud(cloud: string): Promise<boolean> {
 
   console.log(`build: src/${cloud}/main.ts -> ${cloud}.js`);
   const result = await Bun.build({
-    entrypoints: [entry],
+    entrypoints: [
+      entry,
+    ],
     outdir: cliDir,
     naming: `${cloud}.js`,
     target: "bun",
@@ -34,7 +37,9 @@ async function buildCloud(cloud: string): Promise<boolean> {
 
   if (!result.success) {
     console.error(`FAIL: ${cloud}`);
-    for (const log of result.logs) console.error("  ", log);
+    for (const log of result.logs) {
+      console.error("  ", log);
+    }
     return false;
   }
 
@@ -51,13 +56,23 @@ if (filter) {
   (await buildCloud(filter)) ? built++ : failed++;
 } else {
   // Auto-discover: any directory under src/ with a main.ts
-  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith("__")) continue;
-    if (!existsSync(path.join(srcDir, entry.name, "main.ts"))) continue;
+  for (const entry of readdirSync(srcDir, {
+    withFileTypes: true,
+  })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    if (entry.name.startsWith("__")) {
+      continue;
+    }
+    if (!existsSync(path.join(srcDir, entry.name, "main.ts"))) {
+      continue;
+    }
     (await buildCloud(entry.name)) ? built++ : failed++;
   }
 }
 
 console.log(`\n${built} built, ${failed} failed`);
-if (failed > 0) process.exit(1);
+if (failed > 0) {
+  process.exit(1);
+}

@@ -7,6 +7,7 @@ import type { Result } from "./ui";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getTmpDir } from "./paths";
+import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
@@ -17,19 +18,18 @@ import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } f
  * - Everything else → throw (non-retryable: unknown failure)
  */
 export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
-  try {
-    await op;
+  const r = await asyncTryCatch(() => op);
+  if (r.ok) {
     return Ok(undefined);
-  } catch (err) {
-    const msg = getErrorMessage(err);
-    // Timeouts are NOT retryable — the command may have completed on the
-    // remote but we lost the connection before seeing the exit code.
-    if (msg.includes("timed out") || msg.includes("timeout")) {
-      throw err;
-    }
-    // All other SSH errors (connection refused, reset, etc.) are retryable.
-    return Err(new Error(msg));
   }
+  const msg = getErrorMessage(r.error);
+  // Timeouts are NOT retryable — the command may have completed on the
+  // remote but we lost the connection before seeing the exit code.
+  if (msg.includes("timed out") || msg.includes("timeout")) {
+    throw r.error;
+  }
+  // All other SSH errors (connection refused, reset, etc.) are retryable.
+  return Err(new Error(msg));
 }
 
 // ─── CloudRunner interface ──────────────────────────────────────────────────
@@ -48,9 +48,10 @@ async function installAgent(
   timeoutSecs?: number,
 ): Promise<void> {
   logStep(`Installing ${agentName}...`);
-  try {
-    await withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10);
-  } catch {
+  const r = await asyncTryCatch(() =>
+    withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10),
+  );
+  if (!r.ok) {
     logError(`${agentName} installation failed`);
     throw new Error(`${agentName} install failed`);
   }
@@ -66,8 +67,8 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
     mode: 0o600,
   });
 
-  try {
-    await withRetry(
+  const uploadResult = await asyncTryCatch(() =>
+    withRetry(
       "config upload",
       () =>
         wrapSshCall(
@@ -81,13 +82,11 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
         ),
       2,
       5,
-    );
-  } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      /* ignore */
-    }
+    ),
+  );
+  tryCatchIf(isOperationalError, () => unlinkSync(tmpFile));
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
   }
 }
 
@@ -116,13 +115,12 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     "exit 1",
   ].join("\n");
 
-  try {
-    await runner.runServer(script, 300);
-    logInfo("Claude Code installed");
-  } catch {
+  const r = await asyncTryCatch(() => runner.runServer(script, 300));
+  if (!r.ok) {
     logError("Claude Code installation failed");
     throw new Error("Claude Code install failed");
   }
+  logInfo("Claude Code installed");
 }
 
 async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {
@@ -170,8 +168,8 @@ let hostGitEmail = "";
 
 /** Read a git config value from the host machine, returning "" on failure. */
 function readHostGitConfig(key: string): string {
-  try {
-    const result = Bun.spawnSync(
+  const result = tryCatchIf(isOperationalError, () => {
+    const r = Bun.spawnSync(
       [
         "git",
         "config",
@@ -186,21 +184,20 @@ function readHostGitConfig(key: string): string {
         ],
       },
     );
-    if (result.exitCode === 0) {
-      return new TextDecoder().decode(result.stdout).trim();
+    if (r.exitCode === 0) {
+      return new TextDecoder().decode(r.stdout).trim();
     }
-  } catch {
-    /* ignore — git may not be installed on host */
-  }
-  return "";
+    return "";
+  });
+  return result.ok ? result.data : "";
 }
 
 async function detectGithubAuth(): Promise<void> {
   if (process.env.GITHUB_TOKEN) {
     githubToken = process.env.GITHUB_TOKEN;
   } else {
-    try {
-      const result = Bun.spawnSync(
+    const ghResult = tryCatchIf(isOperationalError, () => {
+      const r = Bun.spawnSync(
         [
           "gh",
           "auth",
@@ -214,11 +211,13 @@ async function detectGithubAuth(): Promise<void> {
           ],
         },
       );
-      if (result.exitCode === 0) {
-        githubToken = new TextDecoder().decode(result.stdout).trim();
+      if (r.exitCode === 0) {
+        return new TextDecoder().decode(r.stdout).trim();
       }
-    } catch {
-      /* ignore */
+      return "";
+    });
+    if (ghResult.ok && ghResult.data) {
+      githubToken = ghResult.data;
     }
   }
 
@@ -240,40 +239,15 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
   }
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
-  let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
-    localTmpFile = join(getTmpDir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-    writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, {
-      mode: 0o600,
-    });
-    const remoteTmpFile = `/tmp/gh_token_${Date.now()}`;
-    try {
-      await runner.uploadFile(localTmpFile, remoteTmpFile);
-      ghCmd = `. ${remoteTmpFile} && rm -f ${remoteTmpFile} && ${ghCmd}`;
-    } catch {
-      try {
-        unlinkSync(localTmpFile);
-      } catch {
-        /* ignore */
-      }
-      localTmpFile = "";
-    }
+    ghCmd = `export GITHUB_TOKEN='${escaped}' && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
-  try {
-    await runner.runServer(ghCmd);
-  } catch {
+  const ghSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(ghCmd));
+  if (!ghSetup.ok) {
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
-  } finally {
-    if (localTmpFile) {
-      try {
-        unlinkSync(localTmpFile);
-      } catch {
-        /* ignore */
-      }
-    }
   }
 
   // Propagate host git identity to the remote VM
@@ -288,10 +262,10 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
       const escaped = hostGitEmail.replace(/'/g, "'\\''");
       cmds.push(`git config --global user.email '${escaped}'`);
     }
-    try {
-      await runner.runServer(cmds.join(" && "));
+    const gitSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(cmds.join(" && ")));
+    if (gitSetup.ok) {
       logInfo("Git identity configured on remote server");
-    } catch {
+    } else {
       logWarn("Git identity setup failed (non-fatal, continuing)");
     }
   }
@@ -320,29 +294,40 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   // Snap Chromium on Ubuntu 24.04 fails — AppArmor confinement blocks CDP control.
   // Google Chrome .deb bypasses snap entirely and lands at /usr/bin/google-chrome.
   logStep("Installing Google Chrome for browser tool...");
-  try {
-    await runner.runServer(
+  const result = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
       "{ command -v google-chrome-stable >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1; } && { echo 'Chrome already installed'; exit 0; }; " +
         "curl --proto '=https' -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o /tmp/google-chrome.deb && " +
         "sudo dpkg -i /tmp/google-chrome.deb; sudo apt-get install -f -y -qq; " +
         "rm -f /tmp/google-chrome.deb",
       120,
-    );
+    ),
+  );
+  if (result.ok) {
     logInfo("Google Chrome installed");
-  } catch {
+  } else {
     logWarn("Google Chrome install failed (browser tool will be unavailable)");
   }
 }
 
-async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
+async function setupOpenclawConfig(
+  runner: CloudRunner,
+  apiKey: string,
+  modelId: string,
+  token?: string,
+  enabledSteps?: Set<string>,
+): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
   // Chrome must be installed before config is written (config references its path).
   // This runs in configure() — not install() — so it works even with tarball installs.
-  await installChromeBrowser(runner);
+  // Gate with enabledSteps — user can skip ~400 MB download via setup checkboxes.
+  if (!enabledSteps || enabledSteps.has("browser")) {
+    await installChromeBrowser(runner);
+  }
 
-  const gatewayToken = crypto.randomUUID().replace(/-/g, "");
+  const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
   const escapedKey = jsonEscape(apiKey);
   const escapedToken = jsonEscape(gatewayToken);
   const escapedModel = jsonEscape(modelId);
@@ -369,17 +354,37 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Writing JSON directly may not be picked up by all versions.
-  try {
-    await runner.runServer(
+  const browserResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
         "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
         "openclaw config set browser.noSandbox true; " +
         "openclaw config set browser.headless true; " +
         "openclaw config set browser.defaultProfile openclaw",
-    );
-  } catch {
+    ),
+  );
+  if (!browserResult.ok) {
     logWarn("Browser config setup failed (non-fatal)");
   }
+
+  // Write USER.md bootstrap file — guides users to the web dashboard for
+  // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  const userMd = [
+    "# User",
+    "",
+    "## Web Dashboard",
+    "",
+    "This machine has a web dashboard running on port 18791.",
+    "When helping the user set up channels that require QR code scanning",
+    "(WhatsApp, Telegram, etc.), always guide them to use the web dashboard",
+    "instead of the TUI — QR codes cannot be scanned from a terminal.",
+    "",
+    "The dashboard URL is: http://localhost:18791",
+    "(It may also be SSH-tunneled to the user's local machine automatically.)",
+    "",
+  ].join("\n");
+  await runner.runServer("mkdir -p ~/.openclaw/workspace");
+  await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -523,10 +528,10 @@ async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void
     "  echo '==> Swap enabled'",
     "fi",
   ].join("\n");
-  try {
-    await runner.runServer(script);
+  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(script));
+  if (result.ok) {
     logInfo("Swap space ready");
-  } catch {
+  } else {
     logWarn("Swap setup failed (non-fatal) — build may still succeed on larger instances");
   }
 }
@@ -612,30 +617,37 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
     },
 
-    openclaw: {
-      name: "OpenClaw",
-      cloudInitTier: "full",
-      preProvision: detectGithubAuth,
-      modelDefault: "moonshotai/kimi-k2.5",
-      install: async () => {
-        await installAgent(
-          runner,
-          "openclaw",
-          `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ${NPM_GLOBAL_PATH_PERSIST}`,
-        );
-      },
-      envVars: (apiKey) => [
-        `OPENROUTER_API_KEY=${apiKey}`,
-        `ANTHROPIC_API_KEY=${apiKey}`,
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
-      ],
-      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5"),
-      preLaunch: () => startGateway(runner),
-      preLaunchMsg:
-        "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
-    },
+    openclaw: (() => {
+      const dashboardToken = crypto.randomUUID().replace(/-/g, "");
+      return {
+        name: "OpenClaw",
+        cloudInitTier: "full" satisfies AgentConfig["cloudInitTier"],
+        preProvision: detectGithubAuth,
+        modelDefault: "moonshotai/kimi-k2.5",
+        install: async () => {
+          await installAgent(
+            runner,
+            "openclaw",
+            `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ${NPM_GLOBAL_PATH_PERSIST}`,
+          );
+        },
+        envVars: (apiKey: string) => [
+          `OPENROUTER_API_KEY=${apiKey}`,
+          `ANTHROPIC_API_KEY=${apiKey}`,
+          "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
+        ],
+        configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
+          setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken, enabledSteps),
+        preLaunch: () => startGateway(runner),
+        preLaunchMsg: "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
+        launchCmd: () =>
+          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        tunnel: {
+          remotePort: 18791,
+          browserUrl: (localPort: number) => `http://localhost:${localPort}/?token=${dashboardToken}`,
+        },
+      };
+    })(),
 
     opencode: {
       name: "OpenCode",
@@ -698,7 +710,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
           300,
         ),
       envVars: (apiKey) => [

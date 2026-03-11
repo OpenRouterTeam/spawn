@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -257,11 +258,7 @@ describe("Commands Error Paths", () => {
 
       // cmdRun should pass validation and attempt to download + run the script.
       // It will fail at validateScriptContent because "not a valid script" lacks shebang.
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected - either process.exit from validateScriptContent or Error thrown
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       // The log.step should have been called with the launch message
       // (meaning validation passed and it attempted to download)
@@ -279,11 +276,7 @@ describe("Commands Error Paths", () => {
 
       await loadManifest(true);
 
-      try {
-        await cmdRun("claude", "sprite", "Fix all bugs");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite", "Fix all bugs"));
 
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
@@ -317,11 +310,7 @@ describe("Commands Error Paths", () => {
     });
 
     it("should only call process.exit once even with multiple errors", async () => {
-      try {
-        await cmdRun("badagent", "badcloud");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("badagent", "badcloud"));
       // process.exit should be called exactly once (not twice, once per error)
       expect(processExitSpy).toHaveBeenCalledTimes(1);
     });

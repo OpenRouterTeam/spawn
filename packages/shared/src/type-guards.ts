@@ -1,6 +1,9 @@
 // shared/type-guards.ts — Runtime type guards (replaces unsafe `as` casts on non-API values)
 // biome-ignore-all lint/plugin: type-guard implementations must use raw typeof
 
+/** Extract union of all values from a const object or readonly tuple. */
+export type ValueOf<T> = T extends readonly (infer U)[] ? U : T[keyof T];
+
 export function isString(val: unknown): val is string {
   return typeof val === "string";
 }

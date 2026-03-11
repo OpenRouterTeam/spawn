@@ -7,13 +7,8 @@
 
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test";
 
-// ── Mock oauth (prevent interactive prompts) ──────────────────────────────
-
-mock.module("../shared/oauth", () => ({
-  getOrPromptApiKey: mock(() => Promise.resolve("sk-test")),
-}));
-
 // ── Import under test ─────────────────────────────────────────────────────
+// digitalocean.ts only imports a CSS constant from oauth, so no mock needed.
 
 const { findSpawnSnapshot } = await import("../digitalocean/digitalocean");
 

@@ -72,6 +72,19 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn status --prune` | Remove gone servers from history |
 | `spawn help` | Show help message |
 | `spawn version` | Show version |
+| `spawn <agent> <cloud> --beta <feature>` | Opt-in to an experimental feature (repeatable) |
+
+#### Beta Features
+
+Experimental features can be enabled with `--beta <feature>`. The flag is repeatable:
+
+```bash
+spawn claude gcp --beta tarball
+```
+
+| Feature | Description |
+|---------|-------------|
+| `tarball` | Use pre-built tarball for agent install (faster, skips live install) |
 
 ### Without the CLI
 

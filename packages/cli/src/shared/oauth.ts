@@ -4,8 +4,9 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
-import { parseJsonWith } from "./parse";
+import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
 import { getErrorMessage, isString } from "./type-guards";
 import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
@@ -25,7 +26,7 @@ async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
     return true;
   }
 
-  try {
+  const result = await asyncTryCatchIf(isNetworkError, async () => {
     const resp = await fetch("https://openrouter.ai/api/v1/auth/key", {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -41,9 +42,8 @@ async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
       return false;
     }
     return true; // unknown status = don't block
-  } catch {
-    return true; // network error = skip validation
-  }
+  });
+  return result.ok ? result.data : true; // network error = skip validation
 }
 
 // ─── OAuth Flow via Bun.serve ────────────────────────────────────────────────
@@ -67,12 +67,14 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
   logStep("Attempting OAuth authentication...");
 
   // Check network connectivity
-  try {
+  const reachable = await asyncTryCatchIf(isNetworkError, async () => {
     await fetch("https://openrouter.ai", {
       method: "HEAD",
       signal: AbortSignal.timeout(5_000),
     });
-  } catch {
+    return true;
+  });
+  if (!reachable.ok) {
     logWarn("Cannot reach openrouter.ai — network may be unavailable");
     return null;
   }
@@ -84,10 +86,10 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
 
   // Try ports in range
   let actualPort = callbackPort;
-  for (let p = callbackPort; p < callbackPort + 10; p++) {
-    try {
-      server = Bun.serve({
-        port: p,
+  for (let port = callbackPort; port < callbackPort + 10; port++) {
+    const serveResult = tryCatch(() =>
+      Bun.serve({
+        port,
         hostname: "127.0.0.1",
         fetch(req) {
           const url = new URL(req.url);
@@ -142,10 +144,14 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
             },
           });
         },
-      });
-      actualPort = p;
-      break;
-    } catch {}
+      }),
+    );
+    if (!serveResult.ok) {
+      continue;
+    }
+    server = serveResult.data;
+    actualPort = port;
+    break;
   }
 
   if (!server) {
@@ -191,7 +197,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
 
   // Exchange code for API key
   logStep("Exchanging OAuth code for API key...");
-  try {
+  const exchangeResult = await asyncTryCatchIf(isNetworkError, async () => {
     const resp = await fetch("https://openrouter.ai/api/v1/auth/keys", {
       method: "POST",
       headers: {
@@ -209,17 +215,19 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
     }
     logError("Failed to exchange OAuth code for API key");
     return null;
-  } catch (_err) {
+  });
+  if (!exchangeResult.ok) {
     logError("Failed to contact OpenRouter API");
     return null;
   }
+  return exchangeResult.data;
 }
 
 // ─── API Key Persistence ─────────────────────────────────────────────────────
 
 /** Save OpenRouter API key to ~/.config/spawn/openrouter.json so it persists across runs. */
 async function saveOpenRouterKey(key: string): Promise<void> {
-  try {
+  const result = await asyncTryCatchIf(isFileError, async () => {
     const configPath = getSpawnCloudConfigPath("openrouter");
     mkdirSync(dirname(configPath), {
       recursive: true,
@@ -238,25 +246,33 @@ async function saveOpenRouterKey(key: string): Promise<void> {
         mode: 0o600,
       },
     );
-  } catch (err) {
+  });
+  if (!result.ok) {
     logWarn("Could not save API key — you may need to re-authenticate next run");
-    logDebug(getErrorMessage(err));
+    logDebug(getErrorMessage(result.error));
   }
+}
+
+/** Check whether a saved OpenRouter API key exists (without loading it). */
+export function hasSavedOpenRouterKey(): boolean {
+  return loadSavedOpenRouterKey() !== null;
 }
 
 /** Load a previously saved OpenRouter API key from ~/.config/spawn/openrouter.json. */
 function loadSavedOpenRouterKey(): string | null {
-  try {
+  const result = tryCatchIf(isFileError, () => {
     const configPath = getSpawnCloudConfigPath("openrouter");
-    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const data = parseJsonObj(readFileSync(configPath, "utf-8"));
+    if (!data) {
+      return null;
+    }
     const key = isString(data.api_key) ? data.api_key : "";
     if (key && /^sk-or-v1-[a-f0-9]{64}$/.test(key)) {
       return key;
     }
     return null;
-  } catch {
-    return null;
-  }
+  });
+  return result.ok ? result.data : null;
 }
 
 // ─── Main API Key Acquisition ────────────────────────────────────────────────
@@ -297,15 +313,18 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
     logWarn("Environment key failed validation, prompting for a new one...");
   }
 
-  // 2. Check saved key from previous session
-  const savedKey = loadSavedOpenRouterKey();
-  if (savedKey) {
-    logInfo("Using saved OpenRouter API key");
-    if (await verifyOpenrouterKey(savedKey)) {
-      process.env.OPENROUTER_API_KEY = savedKey;
-      return savedKey;
+  // 2. Check saved key from previous session (only if user opted in via setup options)
+  const reuseKeyEnabled = process.env.SPAWN_ENABLED_STEPS?.split(",").includes("reuse-api-key");
+  if (reuseKeyEnabled) {
+    const savedKey = loadSavedOpenRouterKey();
+    if (savedKey) {
+      logInfo("Using saved OpenRouter API key");
+      if (await verifyOpenrouterKey(savedKey)) {
+        process.env.OPENROUTER_API_KEY = savedKey;
+        return savedKey;
+      }
+      logWarn("Saved key failed validation, prompting for a new one...");
     }
-    logWarn("Saved key failed validation, prompting for a new one...");
   }
 
   // 3. Try OAuth + manual fallback (3 attempts)

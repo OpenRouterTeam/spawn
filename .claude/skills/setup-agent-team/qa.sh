@@ -23,7 +23,12 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if [[ "${SPAWN_REASON}" == "e2e" ]]; then
+if [[ "${SPAWN_REASON}" == "soak" ]]; then
+    RUN_MODE="soak"
+    WORKTREE_BASE="/tmp/spawn-worktrees/qa-soak"
+    TEAM_NAME="spawn-qa-soak"
+    CYCLE_TIMEOUT=5400  # 90 min for soak test (60 min wait + buffer)
+elif [[ "${SPAWN_REASON}" == "e2e" ]]; then
     RUN_MODE="e2e"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-e2e"
     TEAM_NAME="spawn-qa-e2e"
@@ -184,7 +189,7 @@ done
 log "Pre-cycle cleanup done."
 
 # --- Load cloud credentials (quality + fixtures + e2e modes) ---
-if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]]; then
+if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]] || [[ "${RUN_MODE}" == "soak" ]]; then
     if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
         source "${REPO_ROOT}/sh/shared/key-request.sh"
         load_cloud_keys_from_config
@@ -371,8 +376,21 @@ ISSUE_FOOTER
     rm -f "${issue_body_file}" 2>/dev/null || true
 }
 
+# --- Soak mode: run e2e.sh --soak directly (no Claude needed) ---
+if [[ "${RUN_MODE}" == "soak" ]]; then
+    log "Running soak test directly (no Claude needed)..."
+    cd "${REPO_ROOT}"
+    bash sh/e2e/e2e.sh --soak 2>&1 | tee -a "${LOG_FILE}"
+    CLAUDE_EXIT=$?
+
+    if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+        log "Soak test completed successfully"
+    else
+        log "Soak test failed (exit_code=${CLAUDE_EXIT})"
+    fi
+
 # --- Quality mode: retry up to 3 times, then file issue ---
-if [[ "${RUN_MODE}" == "quality" ]]; then
+elif [[ "${RUN_MODE}" == "quality" ]]; then
     MAX_ATTEMPTS=3
     ATTEMPT=0
     CLAUDE_EXIT=1

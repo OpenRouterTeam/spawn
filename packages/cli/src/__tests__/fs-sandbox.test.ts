@@ -11,13 +11,14 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { tryCatch } from "@openrouter/spawn-shared";
 
 // REAL_HOME is the actual home directory captured BEFORE preload runs.
 // We read it from /etc/passwd because process.env.HOME is already sandboxed.
 const REAL_HOME = (() => {
-  try {
-    // Bun's os.homedir() is patched by preload, and process.env.HOME is
-    // sandboxed. Read the real home from the password database instead.
+  // Bun's os.homedir() is patched by preload, and process.env.HOME is
+  // sandboxed. Read the real home from the password database instead.
+  const r = tryCatch(() => {
     const proc = Bun.spawnSync([
       "sh",
       "-c",
@@ -25,9 +26,8 @@ const REAL_HOME = (() => {
     ]);
     const home = new TextDecoder().decode(proc.stdout).trim();
     return home || "/home/unknown";
-  } catch {
-    return "/home/unknown";
-  }
+  });
+  return r.ok ? r.data : "/home/unknown";
 })();
 
 describe("Filesystem sandbox", () => {

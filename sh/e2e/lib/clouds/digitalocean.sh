@@ -17,6 +17,24 @@ _DO_DEFAULT_SIZE="s-2vcpu-2gb"
 _DO_DEFAULT_REGION="nyc3"
 
 # ---------------------------------------------------------------------------
+# _do_curl_auth [curl-args...]
+#
+# Wrapper around curl that passes the DO_API_TOKEN via a temp config file
+# instead of a command-line -H flag. This keeps the token out of `ps` output.
+# All arguments are forwarded to curl.
+# ---------------------------------------------------------------------------
+_do_curl_auth() {
+  local _cfg
+  _cfg=$(mktemp)
+  chmod 600 "${_cfg}"
+  printf 'header = "Authorization: Bearer %s"\n' "${DO_API_TOKEN}" > "${_cfg}"
+  curl -K "${_cfg}" "$@"
+  local _rc=$?
+  rm -f "${_cfg}"
+  return "${_rc}"
+}
+
+# ---------------------------------------------------------------------------
 # _digitalocean_validate_env
 #
 # Validates that DO_API_TOKEN is set and the DigitalOcean API is reachable
@@ -29,8 +47,7 @@ _digitalocean_validate_env() {
     return 1
   fi
 
-  if ! curl -sf \
-    -H "Authorization: Bearer ${DO_API_TOKEN}" \
+  if ! _do_curl_auth -sf \
     "${_DO_API}/account" >/dev/null 2>&1; then
     log_err "DigitalOcean API authentication failed — check DO_API_TOKEN"
     return 1
@@ -70,8 +87,7 @@ _digitalocean_provision_verify() {
   log_step "Checking for droplet ${app}..."
 
   local droplets_json
-  droplets_json=$(curl -sf \
-    -H "Authorization: Bearer ${DO_API_TOKEN}" \
+  droplets_json=$(_do_curl_auth -sf \
     -H "Content-Type: application/json" \
     "${_DO_API}/droplets?per_page=200" 2>/dev/null || true)
 
@@ -149,9 +165,22 @@ _digitalocean_exec() {
     return 1
   fi
 
+  # Validate IP looks like an IPv4 address (defense-in-depth against file tampering)
+  if ! printf '%s' "${ip}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    log_err "Invalid IP address in ${ip_file}: ${ip}"
+    return 1
+  fi
+
+  # Base64-encode the command to prevent shell injection when passed as an
+  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to embed in single quotes. Stdin is preserved for callers
+  # that pipe data into cloud_exec.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "root@${ip}" "${cmd}"
+      "root@${ip}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
@@ -183,6 +212,9 @@ _digitalocean_teardown() {
     return 0
   fi
 
+  # Validate droplet ID is numeric (defense-in-depth against metadata tampering)
+  case "${droplet_id}" in ''|*[!0-9]*) log_warn "Non-numeric droplet ID: ${droplet_id}"; untrack_app "${app}"; return 0 ;; esac
+
   # Retry DELETE up to 3 times with --max-time to prevent hangs
   local attempt=0
   local delete_accepted=0
@@ -190,10 +222,9 @@ _digitalocean_teardown() {
     attempt=$((attempt + 1))
 
     local http_code
-    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+    http_code=$(_do_curl_auth -s -o /dev/null -w '%{http_code}' \
       --max-time 30 \
       -X DELETE \
-      -H "Authorization: Bearer ${DO_API_TOKEN}" \
       -H "Content-Type: application/json" \
       "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || printf '000')
 
@@ -216,9 +247,8 @@ _digitalocean_teardown() {
     local poll_waited=0
     while [ "${poll_waited}" -lt 60 ]; do
       local check_code
-      check_code=$(curl -s -o /dev/null -w '%{http_code}' \
+      check_code=$(_do_curl_auth -s -o /dev/null -w '%{http_code}' \
         --max-time 10 \
-        -H "Authorization: Bearer ${DO_API_TOKEN}" \
         "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || printf '000')
 
       if [ "${check_code}" = "404" ]; then
@@ -252,8 +282,7 @@ _digitalocean_cleanup_stale() {
   local max_age=1800  # 30 minutes in seconds
 
   local droplets_json
-  droplets_json=$(curl -sf \
-    -H "Authorization: Bearer ${DO_API_TOKEN}" \
+  droplets_json=$(_do_curl_auth -sf \
     -H "Content-Type: application/json" \
     "${_DO_API}/droplets?per_page=200" 2>/dev/null || true)
 
@@ -281,6 +310,9 @@ _digitalocean_cleanup_stale() {
     local droplet_name
     droplet_name=$(printf '%s' "${line}" | cut -d' ' -f2)
 
+    # Validate droplet ID is numeric before using it in API URL
+    case "${droplet_id}" in ''|*[!0-9]*) log_warn "Skipping ${line} — non-numeric droplet ID"; skipped=$((skipped + 1)); continue ;; esac
+
     # Extract timestamp from name: e2e-AGENT-TIMESTAMP
     # The timestamp is the last dash-separated segment
     local ts
@@ -299,9 +331,8 @@ _digitalocean_cleanup_stale() {
       age_str=$(format_duration "${age}")
       log_step "Destroying stale droplet ${droplet_name} (age: ${age_str})"
 
-      curl -sf -o /dev/null \
+      _do_curl_auth -sf -o /dev/null \
         -X DELETE \
-        -H "Authorization: Bearer ${DO_API_TOKEN}" \
         -H "Content-Type: application/json" \
         "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || log_warn "Failed to destroy ${droplet_name}"
 

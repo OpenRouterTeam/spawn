@@ -100,6 +100,7 @@ const VALID_REASONS = new Set([
   "hygiene",
   "fixtures",
   "e2e",
+  "soak",
 ]);
 
 /** Check if a process is still alive via kill(0) */
