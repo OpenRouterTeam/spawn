@@ -17,6 +17,7 @@ import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
+import { isString } from "../shared/type-guards.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
 import { activeServerPicker, resolveListFilters } from "./list.js";
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";
@@ -195,12 +196,35 @@ export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest |
   const s = p.spinner();
   s.start(`Deleting ${label}...`);
 
-  const success = await execDeleteServer(record);
+  // Cloud destroy functions log progress to stderr (logStep/logInfo).
+  // Redirect those writes into s.message() so the spinner text updates
+  // in place, then clear the spinner and replay the final message as a
+  // normal log line so no spinner chrome remains in the terminal.
+  const origStderrWrite = process.stderr.write;
+  const ANSI_RE = /\x1b\[[0-9;]*m/g;
+  let lastMessage = "";
+  process.stderr.write = function stderrToSpinner(chunk: string | Uint8Array) {
+    const text = isString(chunk) ? chunk : "";
+    const stripped = text.replace(ANSI_RE, "").trim();
+    if (stripped) {
+      lastMessage = stripped;
+      s.message(stripped);
+    }
+    return true;
+  };
 
+  const deleteResult = await asyncTryCatch(() => execDeleteServer(record));
+  process.stderr.write = origStderrWrite;
+
+  const success = deleteResult.ok ? deleteResult.data : false;
+
+  s.clear();
   if (success) {
-    s.stop(`Server "${label}" deleted.`);
+    const detail = lastMessage ? `: ${lastMessage}` : "";
+    p.log.success(`Server "${label}" deleted${detail}`);
   } else {
-    s.stop("Delete failed.");
+    const detail = lastMessage ? `: ${lastMessage}` : "";
+    p.log.error(`Failed to delete "${label}"${detail}`);
   }
   return success;
 }
