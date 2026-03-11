@@ -10,6 +10,7 @@ import { handleBillingError, isBillingError, showNonBillingError } from "../shar
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
+import { isFileError, tryCatchIf, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -68,26 +69,27 @@ export function loadCredsFromConfig(): {
   secretAccessKey: string;
   region: string;
 } | null {
-  try {
-    const raw = readFileSync(getAwsConfigPath(), "utf-8");
-    const data = parseJsonWith(raw, AwsCredsSchema);
-    if (!data?.accessKeyId || !data?.secretAccessKey) {
-      return null;
-    }
-    if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
-      return null;
-    }
-    if (data.secretAccessKey.length < 16) {
-      return null;
-    }
-    return {
-      accessKeyId: data.accessKeyId,
-      secretAccessKey: data.secretAccessKey,
-      region: data.region || "us-east-1",
-    };
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const raw = readFileSync(getAwsConfigPath(), "utf-8");
+      const data = parseJsonWith(raw, AwsCredsSchema);
+      if (!data?.accessKeyId || !data?.secretAccessKey) {
+        return null;
+      }
+      if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
+        return null;
+      }
+      if (data.secretAccessKey.length < 16) {
+        return null;
+      }
+      return {
+        accessKeyId: data.accessKeyId,
+        secretAccessKey: data.secretAccessKey,
+        region: data.region || "us-east-1",
+      };
+    }),
+    null,
+  );
 }
 
 // ─── Lightsail Bundles ────────────────────────────────────────────────────────

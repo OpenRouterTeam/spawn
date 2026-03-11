@@ -12,7 +12,7 @@ import {
 import { join } from "node:path";
 import * as v from "valibot";
 import { getHistoryPath, getSpawnDir } from "./shared/paths.js";
-import { tryCatch } from "./shared/result.js";
+import { isFileError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
 import { logDebug, logWarn } from "./shared/ui.js";
 
@@ -101,7 +101,7 @@ function writeHistory(records: SpawnRecord[]): void {
 /** Save launch command to a history record's connection.
  *  Matches by spawnId when provided; falls back to most recent record with a connection. */
 export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
-  const result = tryCatch(() => {
+  const result = tryCatchIf(isFileError, () => {
     const history = loadHistory();
     let found = false;
 
@@ -135,7 +135,7 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
 
 /** Back up a corrupted file before discarding it. Non-fatal (best-effort). */
 function backupCorruptedFile(filePath: string): void {
-  const result = tryCatch(() => {
+  const result = tryCatchIf(isFileError, () => {
     copyFileSync(filePath, `${filePath}.corrupt.${Date.now()}`);
     console.error(`Warning: ${filePath} was corrupted. A backup has been saved with .corrupt suffix.`);
   });
@@ -144,7 +144,8 @@ function backupCorruptedFile(filePath: string): void {
   }
 }
 
-/** Try to parse valid records from a single archive file. */
+/** Try to parse valid records from a single archive file.
+ *  Uses tryCatch (catch-all) because corrupted JSON is expected — SyntaxError is not a file error. */
 function parseArchiveFile(dir: string, file: string): SpawnRecord[] | null {
   const result = tryCatch(() => {
     const text = readFileSync(join(dir, file), "utf-8");
@@ -160,7 +161,8 @@ function parseArchiveFile(dir: string, file: string): SpawnRecord[] | null {
   return result.data.length > 0 ? result.data : null;
 }
 
-/** Attempt to recover records from archive files (history-*.json). */
+/** Attempt to recover records from archive files (history-*.json).
+ *  Uses tryCatch (catch-all) because archive recovery is best-effort — any failure returns []. */
 function recoverFromArchives(): SpawnRecord[] {
   const result = tryCatch(() => {
     const dir = getSpawnDir();
@@ -214,7 +216,7 @@ export function loadHistory(): SpawnRecord[] {
   if (!existsSync(path)) {
     return [];
   }
-  const readResult = tryCatch(() => readFileSync(path, "utf-8"));
+  const readResult = tryCatchIf(isFileError, () => readFileSync(path, "utf-8"));
   if (!readResult.ok) {
     logWarn("Could not read spawn history");
     logDebug(getErrorMessage(readResult.error));
@@ -263,7 +265,7 @@ function archiveRecords(records: SpawnRecord[]): void {
     return;
   }
   // Non-fatal — archive failure should not block saving
-  tryCatch(() => {
+  tryCatchIf(isFileError, () => {
     const dir = getSpawnDir();
     const date = new Date().toISOString().slice(0, 10);
     const archivePath = join(dir, `history-${date}.json`);

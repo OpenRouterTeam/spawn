@@ -7,6 +7,7 @@ import type { Result } from "./ui";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getTmpDir } from "./paths";
+import { asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, withRetry } from "./ui";
 
@@ -170,8 +171,8 @@ let hostGitEmail = "";
 
 /** Read a git config value from the host machine, returning "" on failure. */
 function readHostGitConfig(key: string): string {
-  try {
-    const result = Bun.spawnSync(
+  const result = tryCatchIf(isOperationalError, () => {
+    const r = Bun.spawnSync(
       [
         "git",
         "config",
@@ -186,21 +187,20 @@ function readHostGitConfig(key: string): string {
         ],
       },
     );
-    if (result.exitCode === 0) {
-      return new TextDecoder().decode(result.stdout).trim();
+    if (r.exitCode === 0) {
+      return new TextDecoder().decode(r.stdout).trim();
     }
-  } catch {
-    /* ignore — git may not be installed on host */
-  }
-  return "";
+    return "";
+  });
+  return result.ok ? result.data : "";
 }
 
 async function detectGithubAuth(): Promise<void> {
   if (process.env.GITHUB_TOKEN) {
     githubToken = process.env.GITHUB_TOKEN;
   } else {
-    try {
-      const result = Bun.spawnSync(
+    const ghResult = tryCatchIf(isOperationalError, () => {
+      const r = Bun.spawnSync(
         [
           "gh",
           "auth",
@@ -214,11 +214,13 @@ async function detectGithubAuth(): Promise<void> {
           ],
         },
       );
-      if (result.exitCode === 0) {
-        githubToken = new TextDecoder().decode(result.stdout).trim();
+      if (r.exitCode === 0) {
+        return new TextDecoder().decode(r.stdout).trim();
       }
-    } catch {
-      /* ignore */
+      return "";
+    });
+    if (ghResult.ok && ghResult.data) {
+      githubToken = ghResult.data;
     }
   }
 
@@ -246,9 +248,8 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
-  try {
-    await runner.runServer(ghCmd);
-  } catch {
+  const ghSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(ghCmd));
+  if (!ghSetup.ok) {
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
   }
 
@@ -264,10 +265,10 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
       const escaped = hostGitEmail.replace(/'/g, "'\\''");
       cmds.push(`git config --global user.email '${escaped}'`);
     }
-    try {
-      await runner.runServer(cmds.join(" && "));
+    const gitSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(cmds.join(" && ")));
+    if (gitSetup.ok) {
       logInfo("Git identity configured on remote server");
-    } catch {
+    } else {
       logWarn("Git identity setup failed (non-fatal, continuing)");
     }
   }
@@ -296,16 +297,18 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   // Snap Chromium on Ubuntu 24.04 fails — AppArmor confinement blocks CDP control.
   // Google Chrome .deb bypasses snap entirely and lands at /usr/bin/google-chrome.
   logStep("Installing Google Chrome for browser tool...");
-  try {
-    await runner.runServer(
+  const result = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
       "{ command -v google-chrome-stable >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1; } && { echo 'Chrome already installed'; exit 0; }; " +
         "curl --proto '=https' -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o /tmp/google-chrome.deb && " +
         "sudo dpkg -i /tmp/google-chrome.deb; sudo apt-get install -f -y -qq; " +
         "rm -f /tmp/google-chrome.deb",
       120,
-    );
+    ),
+  );
+  if (result.ok) {
     logInfo("Google Chrome installed");
-  } catch {
+  } else {
     logWarn("Google Chrome install failed (browser tool will be unavailable)");
   }
 }
@@ -354,15 +357,16 @@ async function setupOpenclawConfig(
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Writing JSON directly may not be picked up by all versions.
-  try {
-    await runner.runServer(
+  const browserResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
         "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
         "openclaw config set browser.noSandbox true; " +
         "openclaw config set browser.headless true; " +
         "openclaw config set browser.defaultProfile openclaw",
-    );
-  } catch {
+    ),
+  );
+  if (!browserResult.ok) {
     logWarn("Browser config setup failed (non-fatal)");
   }
 
@@ -527,10 +531,10 @@ async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void
     "  echo '==> Swap enabled'",
     "fi",
   ].join("\n");
-  try {
-    await runner.runServer(script);
+  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(script));
+  if (result.ok) {
     logInfo("Swap space ready");
-  } catch {
+  } else {
     logWarn("Swap setup failed (non-fatal) — build may still succeed on larger instances");
   }
 }

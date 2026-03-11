@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { getSpawnCloudConfigPath } from "./paths";
+import { isFileError, tryCatchIf, unwrapOr } from "./result.js";
 import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
@@ -232,19 +233,20 @@ export async function withRetry<T>(
  * Returns null if the file is missing, unreadable, or the token is invalid.
  */
 export function loadApiToken(cloud: string): string | null {
-  try {
-    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
-    const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
-    if (!token) {
-      return null;
-    }
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
-      return null;
-    }
-    return token;
-  } catch {
-    return null;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const data = JSON.parse(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
+      const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
+      if (!token) {
+        return null;
+      }
+      if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+        return null;
+      }
+      return token;
+    }),
+    null,
+  );
 }
 
 /** JSON-escape a string (returns the quoted JSON string). */
