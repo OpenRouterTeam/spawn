@@ -242,8 +242,25 @@ export async function resolveListFilters(
 
 // ── Record actions ───────────────────────────────────────────────────────────
 
-/** Handle reconnect or rerun action for a selected spawn record */
-export async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | null): Promise<void> {
+/** Outcome of handleRecordAction — determines whether the picker loops or exits. */
+export const RecordActionOutcome = {
+  /** Navigate back to the server list (delete/remove/cancel). */
+  Back: 0,
+  /** Exit the picker (enter/reconnect/rerun). */
+  Exit: 1,
+} as const;
+
+export type RecordActionOutcome = (typeof RecordActionOutcome)[keyof typeof RecordActionOutcome];
+
+/**
+ * Handle reconnect or rerun action for a selected spawn record.
+ * Returns Back if the picker should navigate back to the list (delete/remove),
+ * or Exit for terminal actions (enter/reconnect/rerun) that exit the picker.
+ */
+export async function handleRecordAction(
+  selected: SpawnRecord,
+  manifest: Manifest | null,
+): Promise<RecordActionOutcome> {
   if (!selected.connection) {
     // No connection info -- just rerun, reusing the existing spawn name
     if (selected.name) {
@@ -251,7 +268,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     }
     p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
     await cmdRun(selected.agent, selected.cloud, selected.prompt);
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   const conn = selected.connection;
@@ -310,7 +327,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
   });
 
   if (p.isCancel(action)) {
-    handleCancel();
+    return RecordActionOutcome.Back;
   }
 
   if (action === "enter") {
@@ -322,7 +339,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   if (action === "reconnect") {
@@ -334,12 +351,12 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   if (action === "delete") {
     await confirmAndDelete(selected, manifest);
-    return;
+    return RecordActionOutcome.Back;
   }
 
   if (action === "remove") {
@@ -349,7 +366,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     } else {
       p.log.warn("Could not find record in history.");
     }
-    return;
+    return RecordActionOutcome.Back;
   }
 
   // Rerun (create new spawn).  Clear any pre-set name so the user is prompted for
@@ -360,6 +377,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     `Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
   );
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
+  return RecordActionOutcome.Exit;
 }
 
 /** Interactive picker with inline delete support.
@@ -443,7 +461,18 @@ export async function activeServerPicker(records: SpawnRecord[], manifest: Manif
     }
 
     // action === "select"
-    await handleRecordAction(picked, manifest);
+    const outcome = await handleRecordAction(picked, manifest);
+    if (outcome === RecordActionOutcome.Back) {
+      // Delete/remove completed (or errored) — refresh the remaining list and loop back
+      const active = getActiveServers();
+      const activeSet = new Set(active.map((r) => r.timestamp));
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        if (!activeSet.has(remaining[i].timestamp)) {
+          remaining.splice(i, 1);
+        }
+      }
+      continue;
+    }
     return;
   }
 
