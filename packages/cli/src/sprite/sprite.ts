@@ -580,7 +580,7 @@ export async function installSpriteKeepAlive(): Promise<void> {
  * is installed, it wraps the command to keep the sprite alive via Sprite's
  * /v1/tasks API for the duration of the session.
  */
-export async function interactiveSession(cmd: string): Promise<number> {
+export async function interactiveSession(cmd: string, spawnFn?: (args: string[]) => number): Promise<number> {
   const spriteCmd = getSpriteCmd()!;
 
   // Encode the session command to handle multi-line restart loop scripts safely
@@ -624,7 +624,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
         sessionScript,
       ];
 
-  const exitCode = spawnInteractive(args);
+  const spawn = spawnFn ?? spawnInteractive;
+  const exitCode = spawn(args);
 
   // Post-session summary
   process.stderr.write("\n");

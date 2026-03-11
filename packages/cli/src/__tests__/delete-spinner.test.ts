@@ -2,11 +2,17 @@
  * delete-spinner.test.ts — Tests that confirmAndDelete feeds cloud destroy
  * stderr output into the spinner message, then clears the spinner and shows
  * the final result via p.log.success/error with the last stderr message.
+ *
+ * Uses dependency injection (deleteHandler param) instead of mock.module
+ * to avoid process-global mock pollution.
  */
+
+import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { markRecordDeleted } from "../history.js";
 import { mockClackPrompts } from "./test-helpers.js";
 
 // ── Mock @clack/prompts (must be before importing the module under test) ──
@@ -14,24 +20,12 @@ const clack = mockClackPrompts({
   confirm: mock(async () => true),
 });
 
-// ── Mock only hetzner (the cloud used by test records) ──────────────────
-// Other cloud modules are left un-mocked to avoid process-global pollution
-// (mock.module is global in Bun and would break other test files).
-// They import fine but are never called since test records use cloud: "hetzner".
-const mockHetznerDestroy = mock(() => Promise.resolve());
-mock.module("../hetzner/hetzner.js", () => ({
-  ensureHcloudToken: mock(() => Promise.resolve()),
-  destroyServer: mockHetznerDestroy,
-}));
-
-// History uses real module — SPAWN_HOME is pointed at a temp dir in beforeEach
-
-// ── Import the module under test ──────────────────────────────────────────
-const { confirmAndDelete } = await import("../commands/delete.js");
+// ── Import the module under test (no mock.module needed) ──────────────────
+import { confirmAndDelete } from "../commands/delete.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function makeRecord(cloud: string, serverName: string) {
+function makeRecord(cloud: string, serverName: string): SpawnRecord {
   return {
     id: "test-id",
     agent: "claude",
@@ -44,6 +38,19 @@ function makeRecord(cloud: string, serverName: string) {
       cloud,
     },
   };
+}
+
+/** Create a mock deleteHandler that writes to stderr (simulating cloud output). */
+function createMockDeleteHandler(stderrLines: string[], shouldSucceed = true) {
+  return mock(async (record: SpawnRecord): Promise<boolean> => {
+    for (const line of stderrLines) {
+      process.stderr.write(line);
+    }
+    if (shouldSucceed) {
+      markRecordDeleted(record);
+    }
+    return shouldSucceed;
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -67,7 +74,6 @@ describe("confirmAndDelete spinner behavior", () => {
     clack.spinnerClear.mockClear();
     clack.logSuccess.mockClear();
     clack.logError.mockClear();
-    mockHetznerDestroy.mockClear();
   });
 
   afterEach(() => {
@@ -83,14 +89,13 @@ describe("confirmAndDelete spinner behavior", () => {
   });
 
   it("feeds stderr output from destroy into spinner.message()", async () => {
-    // Simulate a cloud destroy function that writes progress to stderr
-    mockHetznerDestroy.mockImplementation(async () => {
-      process.stderr.write("\x1b[36mDestroying Hetzner server srv-123...\x1b[0m\n");
-      process.stderr.write("\x1b[32mServer srv-123 destroyed\x1b[0m\n");
-    });
+    const handler = createMockDeleteHandler([
+      "\x1b[36mDestroying Hetzner server srv-123...\x1b[0m\n",
+      "\x1b[32mServer srv-123 destroyed\x1b[0m\n",
+    ]);
 
     const record = makeRecord("hetzner", "srv-123");
-    const result = await confirmAndDelete(record, null);
+    const result = await confirmAndDelete(record, null, handler);
 
     expect(result).toBe(true);
 
@@ -101,25 +106,25 @@ describe("confirmAndDelete spinner behavior", () => {
   });
 
   it("calls spinner.clear() instead of spinner.stop()", async () => {
-    mockHetznerDestroy.mockImplementation(async () => {
-      process.stderr.write("Server srv-123 destroyed\n");
-    });
+    const handler = createMockDeleteHandler([
+      "Server srv-123 destroyed\n",
+    ]);
 
     const record = makeRecord("hetzner", "srv-123");
-    await confirmAndDelete(record, null);
+    await confirmAndDelete(record, null, handler);
 
     expect(clack.spinnerClear).toHaveBeenCalledTimes(1);
     expect(clack.spinnerStop).not.toHaveBeenCalled();
   });
 
   it("shows success with last stderr message as detail", async () => {
-    mockHetznerDestroy.mockImplementation(async () => {
-      process.stderr.write("Destroying Hetzner server srv-123...\n");
-      process.stderr.write("Server srv-123 destroyed\n");
-    });
+    const handler = createMockDeleteHandler([
+      "Destroying Hetzner server srv-123...\n",
+      "Server srv-123 destroyed\n",
+    ]);
 
     const record = makeRecord("hetzner", "srv-123");
-    await confirmAndDelete(record, null);
+    await confirmAndDelete(record, null, handler);
 
     expect(clack.logSuccess).toHaveBeenCalledTimes(1);
     const msg = clack.logSuccess.mock.calls[0][0];
@@ -128,13 +133,15 @@ describe("confirmAndDelete spinner behavior", () => {
   });
 
   it("shows error with detail on delete failure", async () => {
-    mockHetznerDestroy.mockImplementation(async () => {
-      process.stderr.write("Connection refused\n");
-      throw new Error("API timeout");
-    });
+    const handler = createMockDeleteHandler(
+      [
+        "Connection refused\n",
+      ],
+      false,
+    );
 
     const record = makeRecord("hetzner", "srv-123");
-    const result = await confirmAndDelete(record, null);
+    const result = await confirmAndDelete(record, null, handler);
 
     expect(result).toBe(false);
     expect(clack.spinnerClear).toHaveBeenCalledTimes(1);
@@ -144,12 +151,12 @@ describe("confirmAndDelete spinner behavior", () => {
   it("restores process.stderr.write after delete", async () => {
     const origWrite = process.stderr.write;
 
-    mockHetznerDestroy.mockImplementation(async () => {
-      process.stderr.write("done\n");
-    });
+    const handler = createMockDeleteHandler([
+      "done\n",
+    ]);
 
     const record = makeRecord("hetzner", "srv-123");
-    await confirmAndDelete(record, null);
+    await confirmAndDelete(record, null, handler);
 
     expect(process.stderr.write).toBe(origWrite);
   });
@@ -157,23 +164,23 @@ describe("confirmAndDelete spinner behavior", () => {
   it("restores process.stderr.write even on error", async () => {
     const origWrite = process.stderr.write;
 
-    mockHetznerDestroy.mockImplementation(async () => {
+    const handler = mock(async () => {
       process.stderr.write("boom\n");
       throw new Error("kaboom");
     });
 
     const record = makeRecord("hetzner", "srv-123");
-    await confirmAndDelete(record, null);
+    await confirmAndDelete(record, null, handler);
 
     expect(process.stderr.write).toBe(origWrite);
   });
 
   it("works with no stderr output from destroy", async () => {
     // Destroy succeeds silently
-    mockHetznerDestroy.mockImplementation(async () => {});
+    const handler = createMockDeleteHandler([]);
 
     const record = makeRecord("hetzner", "srv-123");
-    const result = await confirmAndDelete(record, null);
+    const result = await confirmAndDelete(record, null, handler);
 
     expect(result).toBe(true);
     expect(clack.spinnerClear).toHaveBeenCalledTimes(1);

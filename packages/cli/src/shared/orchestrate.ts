@@ -75,6 +75,7 @@ function wrapWithRestartLoop(cmd: string): string {
 /** Options for runOrchestration (used in tests to inject mock dependencies). */
 export interface OrchestrationOptions {
   tryTarball?: (runner: CloudRunner, agentName: string) => Promise<boolean>;
+  getApiKey?: (agentSlug?: string, cloudSlug?: string) => Promise<string>;
 }
 
 export async function runOrchestration(
@@ -101,7 +102,8 @@ export async function runOrchestration(
 
   // 2. Get API key (immediately after cloud auth — before any other prompts
   //    so the "opening browser" message leads directly to OpenRouter OAuth)
-  const apiKey = await getOrPromptApiKey(agentName, cloud.cloudName);
+  const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
+  const apiKey = await resolveApiKey(agentName, cloud.cloudName);
 
   // 3. Pre-provision hooks (e.g., GitHub auth prompt — non-fatal)
   //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.

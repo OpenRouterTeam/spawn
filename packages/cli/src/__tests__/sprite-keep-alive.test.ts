@@ -6,29 +6,15 @@
  * - installSpriteKeepAlive() is gracefully non-fatal when download fails
  * - interactiveSession() wraps the cmd in a session script with keep-alive support
  *
- * IMPORTANT: Only mock.module "../shared/ssh" here — NOT "../shared/ui" or
- * "../shared/paths", as those are shared with other test files and would
- * cause failures in history.test.ts, paths.test.ts, etc.
+ * Uses dependency injection (spawnFn param) for interactiveSession instead of
+ * mock.module to avoid process-global mock pollution.
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
-// ── Mock only ../shared/ssh (not used directly by any other test file) ────────
+// ── Import module under test directly (no mock.module needed) ────────────────
 
-const mockSpawnInteractive = mock((_args: string[]) => 0);
-const mockKillWithTimeout = mock(() => {});
-const mockSleep = mock(() => Promise.resolve());
-
-mock.module("../shared/ssh", () => ({
-  spawnInteractive: mockSpawnInteractive,
-  killWithTimeout: mockKillWithTimeout,
-  sleep: mockSleep,
-  SSH_INTERACTIVE_OPTS: [],
-}));
-
-// ── Import module under test after mocks ──────────────────────────────────────
-
-const { installSpriteKeepAlive, interactiveSession } = await import("../sprite/sprite");
+import { installSpriteKeepAlive, interactiveSession } from "../sprite/sprite";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -131,6 +117,7 @@ describe("installSpriteKeepAlive", () => {
 describe("interactiveSession (keep-alive wrapper)", () => {
   let spawnSyncSpy: ReturnType<typeof spyOn>;
   let stderrSpy: ReturnType<typeof spyOn>;
+  const mockSpawnInteractive = mock((_args: string[]) => 0);
 
   beforeEach(() => {
     mockSpawnInteractive.mockClear();
@@ -165,7 +152,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession(testCmd);
+    await interactiveSession(testCmd, mockSpawnInteractive);
 
     expect(capturedSessionScript).toContain(expectedB64);
   });
@@ -180,7 +167,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession("my-agent --start");
+    await interactiveSession("my-agent --start", mockSpawnInteractive);
 
     expect(capturedSessionScript).toContain("sprite-keep-running");
     expect(capturedSessionScript).toContain("command -v sprite-keep-running");
@@ -196,7 +183,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession("agent cmd");
+    await interactiveSession("agent cmd", mockSpawnInteractive);
 
     expect(capturedSessionScript).toContain("mktemp");
     expect(capturedSessionScript).toContain("base64 -d");
@@ -213,7 +200,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession("fallback-agent");
+    await interactiveSession("fallback-agent", mockSpawnInteractive);
 
     expect(capturedSessionScript).toContain("else");
     expect(capturedSessionScript).toMatch(/else[\s\S]*bash/);
@@ -239,7 +226,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession(multilineCmd);
+    await interactiveSession(multilineCmd, mockSpawnInteractive);
 
     expect(capturedSessionScript).toContain(expectedB64);
   });
@@ -253,7 +240,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession("agent-cmd");
+    await interactiveSession("agent-cmd", mockSpawnInteractive);
 
     expect(capturedArgs).toContain("-tty");
   });
@@ -267,7 +254,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
       return 0;
     });
 
-    await interactiveSession("agent-cmd");
+    await interactiveSession("agent-cmd", mockSpawnInteractive);
 
     expect(capturedArgs).not.toContain("-tty");
   });
@@ -275,7 +262,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
   it("returns the exit code from spawnInteractive", async () => {
     mockSpawnInteractive.mockImplementation(() => 42);
 
-    const exitCode = await interactiveSession("agent-cmd");
+    const exitCode = await interactiveSession("agent-cmd", mockSpawnInteractive);
 
     expect(exitCode).toBe(42);
   });
