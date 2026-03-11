@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
-import { parseJsonWith } from "./parse";
+import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
 import { getErrorMessage, isString } from "./type-guards";
@@ -257,7 +257,10 @@ async function saveOpenRouterKey(key: string): Promise<void> {
 function loadSavedOpenRouterKey(): string | null {
   const result = tryCatchIf(isFileError, () => {
     const configPath = getSpawnCloudConfigPath("openrouter");
-    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const data = parseJsonObj(readFileSync(configPath, "utf-8"));
+    if (!data) {
+      return null;
+    }
     const key = isString(data.api_key) ? data.api_key : "";
     if (key && /^sk-or-v1-[a-f0-9]{64}$/.test(key)) {
       return key;
