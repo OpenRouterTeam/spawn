@@ -8,6 +8,24 @@ set -eo pipefail
 _HETZNER_API="https://api.hetzner.cloud/v1"
 
 # ---------------------------------------------------------------------------
+# _hetzner_curl_auth [curl-args...]
+#
+# Wrapper around curl that passes the HCLOUD_TOKEN via a temp config file
+# instead of a command-line -H flag. This keeps the token out of `ps` output.
+# All arguments are forwarded to curl.
+# ---------------------------------------------------------------------------
+_hetzner_curl_auth() {
+  local _cfg
+  _cfg=$(mktemp)
+  chmod 600 "${_cfg}"
+  printf 'header = "Authorization: Bearer %s"\n' "${HCLOUD_TOKEN}" > "${_cfg}"
+  curl -K "${_cfg}" "$@"
+  local _rc=$?
+  rm -f "${_cfg}"
+  return "${_rc}"
+}
+
+# ---------------------------------------------------------------------------
 # _hetzner_validate_env
 #
 # Verify HCLOUD_TOKEN is set and credentials are valid.
@@ -19,8 +37,7 @@ _hetzner_validate_env() {
     return 1
   fi
 
-  if ! curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+  if ! _hetzner_curl_auth -sf \
     "${_HETZNER_API}/servers?per_page=1" >/dev/null 2>&1; then
     log_err "Hetzner API credentials are invalid"
     return 1
@@ -59,8 +76,7 @@ _hetzner_provision_verify() {
   encoded_app=$(jq -rn --arg v "${app}" '$v|@uri')
 
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+  response=$(_hetzner_curl_auth -sf \
     "${_HETZNER_API}/servers?name=${encoded_app}" 2>/dev/null || true)
 
   if [ -z "${response}" ]; then
@@ -181,9 +197,8 @@ _hetzner_teardown() {
   log_step "Deleting Hetzner server ${app} (id=${server_id})"
 
   local http_code
-  http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+  http_code=$(_hetzner_curl_auth -s -o /dev/null -w '%{http_code}' \
     -X DELETE \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
     "${_HETZNER_API}/servers/${server_id}" 2>/dev/null || printf '000')
 
   if [ "${http_code}" = "200" ] || [ "${http_code}" = "204" ]; then
@@ -209,8 +224,7 @@ _hetzner_cleanup_stale() {
   local max_age=1800  # 30 minutes
 
   local response
-  response=$(curl -sf \
-    -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+  response=$(_hetzner_curl_auth -sf \
     "${_HETZNER_API}/servers?per_page=50" 2>/dev/null || true)
 
   if [ -z "${response}" ]; then
@@ -266,9 +280,8 @@ _hetzner_cleanup_stale() {
       log_step "Destroying stale Hetzner server ${server_name} (id=${server_id}, age: ${age_str})"
 
       local http_code
-      http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+      http_code=$(_hetzner_curl_auth -s -o /dev/null -w '%{http_code}' \
         -X DELETE \
-        -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
         "${_HETZNER_API}/servers/${server_id}" 2>/dev/null || printf '000')
 
       if [ "${http_code}" = "200" ] || [ "${http_code}" = "204" ]; then
