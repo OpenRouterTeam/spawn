@@ -153,7 +153,8 @@ export async function runOrchestration(
     logInfo("Snapshot boot — skipping agent install");
   } else {
     let installedFromTarball = false;
-    if (cloud.cloudName !== "local" && !agent.skipTarball && process.env.SPAWN_BETA === "tarball") {
+    const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+    if (cloud.cloudName !== "local" && !agent.skipTarball && betaFeatures.has("tarball")) {
       const tarball = options?.tryTarball ?? tryTarballInstall;
       installedFromTarball = await tarball(cloud.runner, agentName);
     }
