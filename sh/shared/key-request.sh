@@ -65,6 +65,11 @@ process.stdout.write(d.GCP_PROJECT || d.project || '');
 " 2>/dev/null)
                         fi
                         if [[ -n "${project}" ]]; then
+                            # Validate GCP project ID format before export
+                            if [[ ! "${project}" =~ ^[a-z][a-z0-9-]*$ ]]; then
+                                log "SECURITY: Invalid GCP project ID format: ${project}"
+                                return 1
+                            fi
                             export GCP_PROJECT="${project}"
                         fi
                     fi
