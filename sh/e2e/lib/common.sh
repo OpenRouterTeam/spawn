@@ -15,6 +15,21 @@ case "${PROVISION_TIMEOUT}" in ''|*[!0-9]*) PROVISION_TIMEOUT=720 ;; esac
 case "${INSTALL_WAIT}" in ''|*[!0-9]*) INSTALL_WAIT=600 ;; esac
 case "${INPUT_TEST_TIMEOUT}" in ''|*[!0-9]*) INPUT_TEST_TIMEOUT=120 ;; esac
 
+# ---------------------------------------------------------------------------
+# OpenRouter API key fallback
+#
+# On QA VMs that run Claude Code via OpenRouter, the API key is stored as
+# ANTHROPIC_AUTH_TOKEN (because Claude Code uses ANTHROPIC_BASE_URL + token).
+# Export OPENROUTER_API_KEY from ANTHROPIC_AUTH_TOKEN when using OpenRouter.
+# ---------------------------------------------------------------------------
+if [ -z "${OPENROUTER_API_KEY:-}" ] && [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+  case "${ANTHROPIC_BASE_URL:-}" in
+    *openrouter*)
+      export OPENROUTER_API_KEY="${ANTHROPIC_AUTH_TOKEN}"
+      ;;
+  esac
+fi
+
 # Active cloud (set by load_cloud_driver)
 ACTIVE_CLOUD=""
 

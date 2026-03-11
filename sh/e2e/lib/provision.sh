@@ -66,7 +66,7 @@ provision_agent() {
     # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility.
     # Positive whitelist: only variables actually emitted by cloud_headless_env
     # functions are allowed. This prevents injection of arbitrary env vars.
-    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION "
+    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION SPRITE_NAME SPRITE_ORG "
     while IFS= read -r _env_line; do
       # Skip lines that don't look like export VAR="VALUE"
       case "${_env_line}" in
