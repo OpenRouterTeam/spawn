@@ -333,6 +333,19 @@ const LAUNCH_EXPORT_PATH_SEGMENT = /^export\s+PATH=[$a-zA-Z0-9_/:.~-]+$/;
 const LAUNCH_BINARY_SEGMENT = /^[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*$/;
 
 /**
+ * Matches a background daemon pre_launch command:
+ *   [nohup] <binary> <args> [> <logpath> [2>&1]] [&]
+ *
+ * Examples:
+ *   nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &
+ *   openclaw gateway &
+ *
+ * Path restriction: log paths must start with /tmp/ and use safe characters.
+ */
+const LAUNCH_PRE_LAUNCH_SEGMENT =
+  /^(nohup\s+)?[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*(\s+>>?\s+\/tmp\/[a-zA-Z0-9._/-]+(\s+2>&1)?)?\s*&$/;
+
+/**
  * Validates a launch command from connection history before shell execution.
  * SECURITY-CRITICAL: launch_cmd is passed directly to `bash -lc` via SSH.
  * A tampered history file could inject arbitrary commands without this check.
@@ -395,6 +408,39 @@ export function validateLaunchCmd(cmd: string): void {
         "The final segment must be a simple binary name (e.g., 'claude', 'zeroclaw agent').\n\n" +
         "Your spawn history file may be corrupted or tampered with.\n" +
         `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+}
+
+/**
+ * Validates a pre_launch command from the manifest before shell execution.
+ * SECURITY-CRITICAL: pre_launch is passed directly to `bash -lc` via SSH.
+ *
+ * Pre-launch commands run background daemons before the main agent TUI, e.g.:
+ *   nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &
+ *
+ * Uses an allowlist: the command must match a background daemon pattern:
+ *   [nohup] <binary> [args] [> /tmp/<logpath> [2>&1]] &
+ *
+ * @param cmd - The pre_launch command to validate
+ * @throws Error if the command does not match the allowlist
+ */
+export function validatePreLaunchCmd(cmd: string): void {
+  if (!cmd || cmd.trim() === "") {
+    return;
+  }
+
+  if (cmd.length > 1024) {
+    throw new Error(`Pre-launch command is too long (${cmd.length} characters, maximum is 1024)`);
+  }
+
+  const trimmed = cmd.trim();
+  if (!LAUNCH_PRE_LAUNCH_SEGMENT.test(trimmed)) {
+    throw new Error(
+      "Invalid pre_launch command in manifest\n\n" +
+        `Command: "${cmd}"\n\n` +
+        "Pre-launch commands must match: [nohup] <binary> [args] [> /tmp/<log> [2>&1]] &\n\n" +
+        "If this is a valid agent pre_launch, update the allowlist in security.ts",
     );
   }
 }
