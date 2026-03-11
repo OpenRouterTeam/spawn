@@ -105,11 +105,15 @@ export async function tryTarballInstall(
   }
 
   // Phase 3: Remote execution
-  try {
-    await runner.runServer(downloadCmd, 150);
-  } catch (err) {
-    logWarn("Tarball download/extract failed on remote VM");
-    logDebug(getErrorMessage(err));
+  const extracted = await runner.runServer(downloadCmd, 150).then(
+    () => true,
+    (err) => {
+      logWarn("Tarball download/extract failed on remote VM");
+      logDebug(getErrorMessage(err));
+      return false;
+    },
+  );
+  if (!extracted) {
     return false;
   }
 
@@ -135,11 +139,9 @@ export async function tryTarballInstall(
     "  done",
     "fi",
   ].join("\n");
-  try {
-    await runner.runServer(mirrorCmd, 30);
-  } catch {
+  await runner.runServer(mirrorCmd, 30).catch(() => {
     logWarn("Tarball file mirroring failed (non-fatal)");
-  }
+  });
 
   logInfo("Agent installed from pre-built tarball");
   return true;
