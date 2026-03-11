@@ -26,6 +26,7 @@ import {
   logStepDone,
   logStepInline,
   logWarn,
+  openBrowser,
   prompt,
   promptSpawnNameShared,
   sanitizeTermValue,
@@ -787,9 +788,39 @@ export async function createInstance(
         } else {
           throw new Error("Instance creation failed");
         }
+      } else if (/SERVICE_DISABLED/i.test(errMsg)) {
+        const urlMatch = errMsg.match(/https:\/\/console\.developers\.google\.com\/apis\/api\/[^\s"']+/);
+        const activationUrl =
+          urlMatch?.[0] ??
+          `https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=${_state.project}`;
+
+        process.stderr.write("\n");
+        logWarn("The Compute Engine API is not enabled on this project.");
+        logStep("  1. Open the API activation page (opening now...)");
+        logStep("  2. Click 'Enable' to activate the Compute Engine API");
+        logStep("  3. Wait ~30 seconds for it to propagate");
+        logStep("  4. Return here and press Enter to retry");
+        process.stderr.write("\n");
+        openBrowser(activationUrl);
+
+        const shouldRetry = await prompt("Press Enter after enabling the API to retry (or Ctrl+C to exit)")
+          .then(() => true)
+          .catch(() => false);
+        if (shouldRetry) {
+          logStep("Retrying instance creation...");
+          const retryResult = await gcloud(args);
+          if (retryResult.exitCode === 0) {
+            result = retryResult;
+          } else {
+            const retryErr = retryResult.stderr || "Unknown error";
+            logError(`Retry failed: ${retryErr}`);
+            throw new Error("Instance creation failed");
+          }
+        } else {
+          throw new Error("Instance creation failed");
+        }
       } else {
         showNonBillingError("gcp", [
-          "Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)",
           "Instance quota exceeded (try different GCP_ZONE)",
           "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
         ]);
