@@ -134,31 +134,21 @@ describe("validateIdentifier", () => {
 
   // ── Encoding attacks ────────────────────────────────────────────────────
 
-  it("should reject null byte in identifier", () => {
-    expect(() => validateIdentifier("agent\x00name", "Test")).toThrow();
+  it("should reject unicode and control character attacks", () => {
+    const attacks = [
+      "agent\x00name", // null byte
+      "cl\u0430ude", // cyrillic homoglyph
+      "agent\u200Bname", // zero-width space
+      "agent\u202Ename", // right-to-left override
+    ];
+    for (const input of attacks) {
+      expect(() => validateIdentifier(input, "Test"), JSON.stringify(input)).toThrow();
+    }
   });
 
-  it("should reject unicode homoglyphs", () => {
-    expect(() => validateIdentifier("cl\u0430ude", "Test")).toThrow();
-  });
-
-  it("should reject zero-width characters", () => {
-    expect(() => validateIdentifier("agent\u200Bname", "Test")).toThrow();
-  });
-
-  it("should reject right-to-left override character", () => {
-    expect(() => validateIdentifier("agent\u202Ename", "Test")).toThrow();
-  });
-
-  it("should accept identifier with only hyphens", () => {
+  it("should accept identifiers with only hyphens, underscores, or digits", () => {
     expect(() => validateIdentifier("---", "Test")).not.toThrow();
-  });
-
-  it("should accept identifier with only underscores", () => {
     expect(() => validateIdentifier("___", "Test")).not.toThrow();
-  });
-
-  it("should accept numeric-only identifiers", () => {
     expect(() => validateIdentifier("123", "Test")).not.toThrow();
   });
 
