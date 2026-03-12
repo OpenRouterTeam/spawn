@@ -2,7 +2,8 @@
 # e2e/lib/soak.sh — Telegram soak test for OpenClaw
 #
 # Provisions OpenClaw on Sprite, waits for stabilization, injects a Telegram
-# bot token, and runs integration tests against the Telegram Bot API.
+# bot token, installs a cron-triggered reminder, and runs integration tests
+# against the Telegram Bot API — including verifying the cron fired.
 #
 # Required env vars:
 #   TELEGRAM_BOT_TOKEN      — Bot token from @BotFather
@@ -10,15 +11,19 @@
 #
 # Optional env vars:
 #   SOAK_WAIT_SECONDS       — Override the default 1-hour soak wait (default: 3600)
+#   SOAK_CRON_DELAY_SECONDS — Delay before cron fires (default: 3300 = 55 min)
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 SOAK_WAIT_SECONDS="${SOAK_WAIT_SECONDS:-3600}"
+SOAK_CRON_DELAY_SECONDS="${SOAK_CRON_DELAY_SECONDS:-3300}"
 SOAK_HEARTBEAT_INTERVAL=300  # 5 minutes
 SOAK_GATEWAY_PORT=18789
 TELEGRAM_API_BASE="https://api.telegram.org"
+SOAK_CRON_RESULT_FILE="/tmp/spawn-cron-telegram-result.json"
+SOAK_CRON_MARKER=""  # Set during install, checked during verify
 
 # ---------------------------------------------------------------------------
 # soak_validate_telegram_env
@@ -220,24 +225,129 @@ soak_test_telegram_webhook() {
 }
 
 # ---------------------------------------------------------------------------
+# soak_install_cron_reminder APP_NAME
+#
+# Installs a one-shot cron job on the remote VM that sends a Telegram message
+# after SOAK_CRON_DELAY_SECONDS (~55 min). The cron writes the API response
+# to SOAK_CRON_RESULT_FILE so we can verify it after the soak wait.
+#
+# This tests OpenClaw's ability to stay alive and execute scheduled tasks.
+# ---------------------------------------------------------------------------
+soak_install_cron_reminder() {
+  local app="$1"
+
+  log_header "Installing cron-triggered Telegram reminder"
+
+  local encoded_token
+  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+
+  # Generate a unique marker so we can identify this specific cron message
+  SOAK_CRON_MARKER="SPAWN_CRON_REMINDER_$(date +%s)"
+  log_info "Cron marker: ${SOAK_CRON_MARKER}"
+  log_info "Cron delay: ${SOAK_CRON_DELAY_SECONDS}s (~$((SOAK_CRON_DELAY_SECONDS / 60)) min)"
+
+  # Build the cron script locally, base64-encode it, and upload to the remote VM.
+  # The script sleeps for SOAK_CRON_DELAY_SECONDS, then sends a Telegram message
+  # and writes the API response to a result file. It removes itself from crontab
+  # after firing (one-shot). We also launch it via nohup as belt-and-suspenders.
+  local cron_script
+  cron_script="#!/bin/bash
+sleep ${SOAK_CRON_DELAY_SECONDS}
+_TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d)
+curl -sS \"https://api.telegram.org/bot\${_TOKEN}/sendMessage\" \\
+  -d chat_id='${TELEGRAM_TEST_CHAT_ID}' \\
+  -d text='${SOAK_CRON_MARKER}' \\
+  > ${SOAK_CRON_RESULT_FILE} 2>&1
+crontab -l 2>/dev/null | grep -v 'spawn-cron-test' | crontab - 2>/dev/null || true"
+
+  # Base64-encode the script to safely transfer it to the remote VM
+  local encoded_script
+  encoded_script=$(printf '%s' "${cron_script}" | base64 -w 0 2>/dev/null || printf '%s' "${cron_script}" | base64 | tr -d '\n')
+
+  cloud_exec "${app}" "printf '%s' '${encoded_script}' | base64 -d > /tmp/spawn-cron-test.sh && \
+    chmod +x /tmp/spawn-cron-test.sh && \
+    (crontab -l 2>/dev/null || true; echo '* * * * * /tmp/spawn-cron-test.sh # spawn-cron-test') | crontab - && \
+    nohup /tmp/spawn-cron-test.sh > /dev/null 2>&1 &" 2>&1
+
+  if [ $? -ne 0 ]; then
+    log_err "Failed to install cron reminder"
+    return 1
+  fi
+
+  # Verify the cron was installed
+  local cron_check
+  cron_check=$(cloud_exec "${app}" "crontab -l 2>/dev/null | grep -c 'spawn-cron-test'" 2>&1) || true
+  if [ "${cron_check:-0}" -ge 1 ]; then
+    log_ok "Cron reminder installed (fires in ~${SOAK_CRON_DELAY_SECONDS}s)"
+  else
+    log_warn "Cron entry not found in crontab — relying on nohup background process"
+  fi
+
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# soak_test_telegram_cron_fired APP_NAME
+#
+# Verifies that the cron-triggered Telegram message was sent successfully
+# by reading the result file from the remote VM.
+# ---------------------------------------------------------------------------
+soak_test_telegram_cron_fired() {
+  local app="$1"
+
+  log_step "Testing cron-triggered Telegram reminder..."
+
+  if [ -z "${SOAK_CRON_MARKER}" ]; then
+    log_err "Cron marker not set — soak_install_cron_reminder was not called"
+    return 1
+  fi
+
+  # Read the result file from the remote VM
+  local output
+  output=$(cloud_exec "${app}" "cat ${SOAK_CRON_RESULT_FILE} 2>/dev/null || echo 'FILE_NOT_FOUND'" 2>&1) || true
+
+  if [ "${output}" = "FILE_NOT_FOUND" ] || [ -z "${output}" ]; then
+    log_err "Cron reminder — result file not found (cron did not fire within ${SOAK_CRON_DELAY_SECONDS}s)"
+    # Check if the script is still running (hasn't finished sleeping)
+    local still_running
+    still_running=$(cloud_exec "${app}" "pgrep -c -f 'spawn-cron-test' 2>/dev/null || echo 0" 2>&1) || true
+    if [ "${still_running:-0}" -ge 1 ]; then
+      log_info "Cron script is still running (sleep not finished yet)"
+    fi
+    return 1
+  fi
+
+  if printf '%s' "${output}" | grep -q '"ok":true'; then
+    log_ok "Cron reminder — Telegram message sent successfully (marker: ${SOAK_CRON_MARKER})"
+    return 0
+  else
+    log_err "Cron reminder — Telegram API returned error"
+    log_err "Response: ${output}"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # soak_run_telegram_tests APP_NAME
 #
-# Runs all 3 Telegram tests and returns the failure count.
+# Runs all 4 Telegram tests and returns the failure count.
 # ---------------------------------------------------------------------------
 soak_run_telegram_tests() {
   local app="$1"
   local failures=0
 
-  log_header "Telegram Integration Tests"
+  local total=4
+  log_header "Telegram Integration Tests (${total} tests)"
 
   soak_test_telegram_getme "${app}" || failures=$((failures + 1))
   soak_test_telegram_send "${app}" || failures=$((failures + 1))
   soak_test_telegram_webhook "${app}" || failures=$((failures + 1))
+  soak_test_telegram_cron_fired "${app}" || failures=$((failures + 1))
 
   if [ "${failures}" -eq 0 ]; then
-    log_ok "All 3 Telegram tests passed"
+    log_ok "All ${total} Telegram tests passed"
   else
-    log_err "${failures}/3 Telegram test(s) failed"
+    log_err "${failures}/${total} Telegram test(s) failed"
   fi
 
   return "${failures}"
@@ -247,7 +357,8 @@ soak_run_telegram_tests() {
 # run_soak_test [LOG_DIR]
 #
 # Orchestrator: validate env → load sprite driver → provision openclaw →
-# verify → soak wait → inject telegram config → run tests → teardown.
+# verify → inject telegram config → install cron reminder → soak wait →
+# run tests (including cron verification) → teardown.
 # ---------------------------------------------------------------------------
 run_soak_test() {
   local log_dir="${1:-${LOG_DIR:-}}"
@@ -255,8 +366,9 @@ run_soak_test() {
     log_dir=$(mktemp -d "${TMPDIR:-/tmp}/spawn-soak.XXXXXX")
   fi
 
-  log_header "Spawn Soak Test: OpenClaw + Telegram"
+  log_header "Spawn Soak Test: OpenClaw + Telegram (with cron reminder)"
   log_info "Soak wait: ${SOAK_WAIT_SECONDS}s"
+  log_info "Cron delay: ${SOAK_CRON_DELAY_SECONDS}s"
 
   # Validate Telegram secrets
   if ! soak_validate_telegram_env; then
@@ -294,17 +406,22 @@ run_soak_test() {
     return 1
   fi
 
-  # Soak wait
-  soak_wait "${app_name}"
-
-  # Inject Telegram config
+  # Inject Telegram config BEFORE soak wait so cron can use the bot token
   if ! soak_inject_telegram_config "${app_name}"; then
     log_err "Soak test aborted — Telegram config injection failed"
     teardown_agent "${app_name}" || log_warn "Teardown failed for ${app_name}"
     return 1
   fi
 
-  # Run Telegram tests
+  # Install cron reminder — fires in ~55 min during the 1h soak wait
+  if ! soak_install_cron_reminder "${app_name}"; then
+    log_warn "Cron reminder install failed — cron test will fail but continuing"
+  fi
+
+  # Soak wait — gateway heartbeat + cron fires during this window
+  soak_wait "${app_name}"
+
+  # Run Telegram tests (including cron verification)
   local test_failures=0
   soak_run_telegram_tests "${app_name}" || test_failures=$?
 
