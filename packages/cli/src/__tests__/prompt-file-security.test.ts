@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { tryCatch } from "@openrouter/spawn-shared";
 import { validatePromptFilePath, validatePromptFileStats } from "../security.js";
 
 describe("validatePromptFilePath", () => {
@@ -82,12 +81,8 @@ describe("validatePromptFilePath", () => {
   });
 
   it("should include helpful error message about exfiltration risk", () => {
-    const r = tryCatch(() => validatePromptFilePath("/home/user/.ssh/id_rsa"));
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.error.message).toContain("sent to the agent");
-      expect(r.error.message).toContain("plain text file");
-    }
+    expect(() => validatePromptFilePath("/home/user/.ssh/id_rsa")).toThrow("sent to the agent");
+    expect(() => validatePromptFilePath("/home/user/.ssh/id_rsa")).toThrow("plain text file");
   });
 
   it("should reject SSH key files by filename pattern anywhere in path", () => {
@@ -144,11 +139,7 @@ describe("validatePromptFileStats", () => {
       isFile: () => true,
       size: 5 * 1024 * 1024,
     };
-    const r = tryCatch(() => validatePromptFileStats("large.bin", stats));
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.error.message).toContain("5.0MB");
-      expect(r.error.message).toContain("maximum is 1MB");
-    }
+    expect(() => validatePromptFileStats("large.bin", stats)).toThrow("5.0MB");
+    expect(() => validatePromptFileStats("large.bin", stats)).toThrow("maximum is 1MB");
   });
 });
