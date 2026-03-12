@@ -57,7 +57,6 @@ describe("Icon Integrity", () => {
       });
 
       it(`${id}.png is actual PNG data`, () => {
-        expect(existsSync(pngPath)).toBe(true);
         expect(isPng(pngPath)).toBe(true);
       });
 
@@ -94,7 +93,6 @@ describe("Icon Integrity", () => {
       });
 
       it(`${id}.png is actual PNG data`, () => {
-        expect(existsSync(pngPath)).toBe(true);
         expect(isPng(pngPath)).toBe(true);
       });
 
