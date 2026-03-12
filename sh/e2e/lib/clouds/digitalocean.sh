@@ -355,8 +355,20 @@ EOF
 # ---------------------------------------------------------------------------
 # _digitalocean_max_parallel
 #
-# DigitalOcean accounts often have a 3-droplet limit.
+# Queries the DigitalOcean account to determine available droplet capacity.
+# Subtracts non-e2e droplets from the account limit so parallel test runs
+# don't fail due to pre-existing droplets consuming quota slots.
+# Falls back to 3 if the API is unavailable.
 # ---------------------------------------------------------------------------
 _digitalocean_max_parallel() {
-  printf '3'
+  local _account_json _limit _existing _available
+  _account_json=$(_do_curl_auth -sf "${_DO_API}/account" 2>/dev/null) || { printf '3'; return 0; }
+  _limit=$(printf '%s' "${_account_json}" | grep -o '"droplet_limit":[0-9]*' | grep -o '[0-9]*$') || { printf '3'; return 0; }
+  _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | grep -o '"id":[0-9]*' | wc -l | tr -d ' ') || { printf '3'; return 0; }
+  _available=$(( _limit - _existing ))
+  if [ "${_available}" -lt 1 ]; then
+    printf '1'
+  else
+    printf '%d' "${_available}"
+  fi
 }
