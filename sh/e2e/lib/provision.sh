@@ -45,7 +45,18 @@ provision_agent() {
     return 1
   fi
 
-  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)"
+  # ---------------------------------------------------------------------------
+  # Retry loop for transient cloud capacity errors (e.g. DigitalOcean 422
+  # "droplet limit exceeded"). Waits 30s between retries, up to 3 attempts.
+  # Only retries when stderr contains a droplet-limit / quota error pattern.
+  # ---------------------------------------------------------------------------
+  local _provision_max_retries=3
+  local _provision_attempt=1
+  local _provision_verified=0
+
+  while [ "${_provision_attempt}" -le "${_provision_max_retries}" ]; do
+
+  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)${_provision_attempt:+ [attempt ${_provision_attempt}/${_provision_max_retries}]}"
 
   # Remove stale exit file
   rm -f "${exit_file}"
@@ -137,8 +148,35 @@ CLOUD_ENV
 
   # Even if provision "failed" (timeout), the instance may exist and install may have completed.
   # Verify instance existence via cloud driver.
-  if ! cloud_provision_verify "${app_name}" "${log_dir}"; then
-    log_err "Instance ${app_name} does not exist after provisioning"
+  if cloud_provision_verify "${app_name}" "${log_dir}"; then
+    _provision_verified=1
+    break
+  fi
+
+  # Provision failed — check if this is a retryable droplet limit / quota error.
+  # Pattern matches DigitalOcean 422 "droplet limit" and generic quota messages
+  # that appear in the CLI stderr output.
+  if [ -f "${stderr_file}" ] && grep -qiE 'droplet.limit|limit.exceeded|error 422|quota' "${stderr_file}" 2>/dev/null; then
+    if [ "${_provision_attempt}" -lt "${_provision_max_retries}" ]; then
+      log_warn "Droplet limit error detected (attempt ${_provision_attempt}/${_provision_max_retries}) — retrying in 30s..."
+      sleep 30
+      _provision_attempt=$((_provision_attempt + 1))
+      continue
+    fi
+  fi
+
+  # Non-retryable failure or retries exhausted
+  log_err "Instance ${app_name} does not exist after provisioning"
+  if [ -f "${stderr_file}" ]; then
+    log_err "Stderr tail:"
+    tail -20 "${stderr_file}" >&2 || true
+  fi
+  return 1
+
+  done  # end retry loop
+
+  if [ "${_provision_verified}" -ne 1 ]; then
+    log_err "Instance ${app_name} does not exist after ${_provision_max_retries} provision attempts"
     if [ -f "${stderr_file}" ]; then
       log_err "Stderr tail:"
       tail -20 "${stderr_file}" >&2 || true
