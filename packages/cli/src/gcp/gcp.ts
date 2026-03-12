@@ -1022,9 +1022,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
   }
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  // Use shellQuote for consistent single-quote escaping (prevents shell expansion of $variables in cmd)
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([
@@ -1084,6 +1083,14 @@ export async function destroyInstance(name?: string): Promise<void> {
 
 // ─── Shell Quoting ──────────────────────────────────────────────────────────
 
-function shellQuote(s: string): string {
+/** POSIX single-quote escaping: wraps `s` in single quotes and escapes any
+ *  embedded single quotes with the standard `'\''` technique.
+ *
+ *  Defense-in-depth: rejects null bytes which could truncate the string at
+ *  the C/OS level even though callers already validate for them. */
+export function shellQuote(s: string): string {
+  if (/\0/.test(s)) {
+    throw new Error("shellQuote: input must not contain null bytes");
+  }
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
