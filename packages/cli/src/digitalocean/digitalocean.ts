@@ -42,6 +42,7 @@ import {
   prompt,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
   toKebabCase,
   validateRegionName,
   validateServerName,
@@ -1155,6 +1156,9 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -1228,11 +1232,12 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 }
 
 export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([

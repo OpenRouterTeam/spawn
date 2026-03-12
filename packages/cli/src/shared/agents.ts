@@ -1,6 +1,6 @@
 // shared/agents.ts — AgentConfig interface + shared helpers (cloud-agnostic)
 
-import { logError } from "./ui";
+import { logError, shellQuote } from "./ui";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -109,9 +109,12 @@ export function generateEnvConfig(pairs: string[]): string {
       logError(`SECURITY: Invalid environment variable name rejected: ${key}`);
       continue;
     }
-    // Escape single quotes in value
-    const escaped = value.replace(/'/g, "'\\''");
-    lines.push(`export ${key}='${escaped}'`);
+    // Reject null bytes in value (defense-in-depth)
+    if (/\0/.test(value)) {
+      logError(`SECURITY: Null byte in environment variable value rejected: ${key}`);
+      continue;
+    }
+    lines.push(`export ${key}=${shellQuote(value)}`);
   }
   return lines.join("\n") + "\n";
 }

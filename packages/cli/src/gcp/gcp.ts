@@ -31,6 +31,7 @@ import {
   promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
 } from "../shared/ui";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
@@ -1083,14 +1084,5 @@ export async function destroyInstance(name?: string): Promise<void> {
 
 // ─── Shell Quoting ──────────────────────────────────────────────────────────
 
-/** POSIX single-quote escaping: wraps `s` in single quotes and escapes any
- *  embedded single quotes with the standard `'\''` technique.
- *
- *  Defense-in-depth: rejects null bytes which could truncate the string at
- *  the C/OS level even though callers already validate for them. */
-export function shellQuote(s: string): string {
-  if (/\0/.test(s)) {
-    throw new Error("shellQuote: input must not contain null bytes");
-  }
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
+// shellQuote is now imported from shared/ui.ts and re-exported for backwards compat
+export { shellQuote } from "../shared/ui";

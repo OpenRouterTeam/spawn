@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { shellQuote } from "../gcp/gcp.js";
+import { shellQuote } from "../shared/ui.js";
 
 describe("shellQuote", () => {
   it("should wrap simple strings in single quotes", () => {
