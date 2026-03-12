@@ -800,11 +800,12 @@ async function main(): Promise<void> {
     process.env.SPAWN_BETA = betaFeatures.join(",");
   }
 
-  // Extract --model <value> flag → MODEL_ID env var (must be before --config so it takes priority)
+  // Extract --model / -m <value> flag → MODEL_ID env var (must be before --config so it takes priority)
   const [modelFlag, modelFilteredArgs] = extractFlagValue(
     filteredArgs,
     [
       "--model",
+      "-m",
     ],
     "model ID",
     'spawn <agent> <cloud> --model "openai/gpt-5.3-codex"',
@@ -935,21 +936,6 @@ async function main(): Promise<void> {
     process.env.DO_DROPLET_SIZE = sizeFlag;
     process.env.HETZNER_SERVER_TYPE = sizeFlag;
     process.env.LIGHTSAIL_BUNDLE = sizeFlag;
-  }
-
-  // Extract --model / -m <model_id> flag (overrides the agent's default model)
-  const [modelFlag, modelFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--model",
-      "-m",
-    ],
-    "model ID",
-    "spawn codex gcp --model openai/gpt-5.3-codex",
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...modelFilteredArgs);
-  if (modelFlag) {
-    process.env.MODEL_ID = modelFlag;
   }
 
   // --output implies --headless
