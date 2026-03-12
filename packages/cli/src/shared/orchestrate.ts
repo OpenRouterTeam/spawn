@@ -250,7 +250,20 @@ export async function runOrchestration(
     }
   }
 
-  // 11c. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
+  // 11c. Interactive channel login (WhatsApp QR scan, Telegram bot link)
+  // Runs before the TUI so users can link messaging channels during setup.
+  if (enabledSteps?.has("whatsapp")) {
+    logStep("Linking WhatsApp — scan the QR code with your phone...");
+    logInfo("Open WhatsApp > Settings > Linked Devices > Link a Device");
+    process.stderr.write("\n");
+    const whatsappCmd =
+      "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+      "openclaw channels login --channel whatsapp";
+    prepareStdinForHandoff();
+    await cloud.interactiveSession(whatsappCmd);
+  }
+
+  // 11d. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
   if (agent.preLaunchMsg) {
     process.stderr.write("\n");
     logInfo(`Tip: ${agent.preLaunchMsg}`);

@@ -391,10 +391,8 @@ async function setupOpenclawConfig(
     }
   }
 
-  // WhatsApp — requires QR code scanning, remind user to use dashboard
-  if (enabledSteps?.has("whatsapp")) {
-    logInfo("WhatsApp requires QR code scanning — use the web dashboard after launch");
-  }
+  // WhatsApp — QR code scanning happens interactively in orchestrate.ts
+  // after the gateway starts and tunnel is set up. No config needed here.
 
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
