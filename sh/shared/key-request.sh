@@ -29,7 +29,7 @@ _check_cli_auth_clouds() {
     if command -v jq &>/dev/null; then
         cli_clouds=$(jq -r '.clouds | to_entries[] | select(.value.auth != null) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i")) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null)
     else
-        cli_clouds=$(_MANIFEST="${manifest_path}" bun eval "
+        cli_clouds=$(_MANIFEST="${manifest_path}" bun -e "
 import fs from 'fs';
 const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
 for (const [key, cloud] of Object.entries(m.clouds || {})) {
@@ -58,7 +58,7 @@ for (const [key, cloud] of Object.entries(m.clouds || {})) {
                         if command -v jq &>/dev/null; then
                             project=$(jq -r '.GCP_PROJECT // .project // "" | select(. != null)' "${gcp_config}" 2>/dev/null)
                         else
-                            project=$(_FILE="${gcp_config}" bun eval "
+                            project=$(_FILE="${gcp_config}" bun -e "
 import fs from 'fs';
 const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
 process.stdout.write(d.GCP_PROJECT || d.project || '');
@@ -95,7 +95,7 @@ _parse_cloud_auths() {
     if command -v jq &>/dev/null; then
         jq -r '.clouds | to_entries[] | select(.value.auth != null and .value.auth != "") | select(.value.key_request != false) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i") | not) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null
     else
-        _MANIFEST="${manifest_path}" bun eval "
+        _MANIFEST="${manifest_path}" bun -e "
 import fs from 'fs';
 const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
 for (const [key, cloud] of Object.entries(m.clouds || {})) {
@@ -134,7 +134,7 @@ _try_load_env_var() {
         if command -v jq &>/dev/null; then
             val=$(jq -r --arg v "${var_name}" '(.[$v] // .api_key // .token) // "" | select(. != null)' "${config_file}" 2>/dev/null)
         else
-            val=$(_FILE="${config_file}" _VAR="${var_name}" bun eval "
+            val=$(_FILE="${config_file}" _VAR="${var_name}" bun -e "
 import fs from 'fs';
 const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
 process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
@@ -268,7 +268,7 @@ request_missing_cloud_keys() {
     if command -v jq &>/dev/null; then
         providers_json=$(printf '%s\n' ${MISSING_KEY_PROVIDERS} | jq -Rn '[inputs | select(. != "")]' 2>/dev/null) || return 0
     elif command -v bun &>/dev/null; then
-        providers_json=$(_PROVIDERS="${MISSING_KEY_PROVIDERS}" bun eval "
+        providers_json=$(_PROVIDERS="${MISSING_KEY_PROVIDERS}" bun -e "
 const providers = process.env._PROVIDERS.trim().split(/\s+/).filter(Boolean);
 process.stdout.write(JSON.stringify(providers));
 " 2>/dev/null) || return 0
