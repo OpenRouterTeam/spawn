@@ -42,5 +42,11 @@
     "install": [
       "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash || [ -f ~/.local/bin/hermes ]"
     ]
+  },
+  "junie": {
+    "tier": "node",
+    "install": [
+      "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @jetbrains/junie-cli"
+    ]
   }
 }

@@ -13,9 +13,9 @@ fi
 
 # Validate agent name against allowed list to prevent injection
 case "${AGENT_NAME}" in
-  openclaw|codex|kilocode|claude|opencode|zeroclaw|hermes) ;;
+  openclaw|codex|kilocode|claude|opencode|zeroclaw|hermes|junie) ;;
   *)
-    printf 'Error: Invalid agent name: %s\nAllowed: openclaw, codex, kilocode, claude, opencode, zeroclaw, hermes\n' "${AGENT_NAME}" >&2
+    printf 'Error: Invalid agent name: %s\nAllowed: openclaw, codex, kilocode, claude, opencode, zeroclaw, hermes, junie\n' "${AGENT_NAME}" >&2
     exit 1
     ;;
 esac
@@ -32,7 +32,7 @@ case "${AGENT_NAME}" in
     echo "/usr/bin/google-chrome" >> "${PATHS_FILE}"
     echo "/opt/google/chrome/" >> "${PATHS_FILE}"
     ;;
-  codex|kilocode)
+  codex|kilocode|junie)
     echo "/root/.npm-global/" >> "${PATHS_FILE}"
     ;;
   claude)
