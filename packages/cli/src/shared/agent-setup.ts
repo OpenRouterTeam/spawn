@@ -275,7 +275,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
 async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
-  const config = `model = "openai/gpt-5.1-codex"
+  const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
 
 [model_providers.openrouter]
