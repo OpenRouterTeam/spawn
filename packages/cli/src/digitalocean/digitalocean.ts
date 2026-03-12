@@ -6,7 +6,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { mkdirSync, readFileSync } from "node:fs";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { OAUTH_CSS } from "../shared/oauth";
+import { generateCsrfState, OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
@@ -42,6 +42,7 @@ import {
   prompt,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
   toKebabCase,
   validateRegionName,
   validateServerName,
@@ -70,6 +71,9 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
 //      gcloud (Google), and az (Azure).
 //
+// Override: Set DO_CLIENT_SECRET env var to use your own OAuth app secret instead
+// of the bundled default (useful for organizations with custom DO OAuth apps).
+//
 // TODO: PKCE migration — monitor and migrate when DigitalOcean adds support.
 //   Last checked: 2026-03 — PKCE without client_secret returns 401 invalid_request.
 //   Check status: POST to /v1/oauth/token with code_verifier but WITHOUT client_secret.
@@ -82,7 +86,8 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //     6. Update this comment to reflect the new PKCE-only flow
 //   Re-check every 6 months or when DigitalOcean announces OAuth/API updates.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
-const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
+const DO_CLIENT_SECRET =
+  process.env["DO_CLIENT_SECRET"] ?? "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
 // Fine-grained scopes for spawn (minimum required)
 const DO_SCOPES = [
@@ -312,12 +317,6 @@ export async function checkAccountStatus(): Promise<void> {
 const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
 const OAUTH_ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
-
-function generateCsrfState(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 async function tryRefreshDoToken(): Promise<string | null> {
   const refreshToken = loadRefreshToken();
@@ -1161,6 +1160,9 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const serverIp = ip || _state.serverIp;
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -1234,11 +1236,12 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 }
 
 export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([

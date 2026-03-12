@@ -31,6 +31,7 @@ import {
   promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
 } from "../shared/ui";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
@@ -933,6 +934,9 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -967,6 +971,11 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
+  // Validate localPath: reject path traversal, argument injection, and empty paths
+  if (!localPath || localPath.includes("..") || localPath.startsWith("-")) {
+    logError(`Invalid local path: ${localPath}`);
+    throw new Error("Invalid local path");
+  }
   if (
     !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
     remotePath.includes("..") ||
@@ -1009,11 +1018,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  // Use shellQuote for consistent single-quote escaping (prevents shell expansion of $variables in cmd)
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([
@@ -1073,6 +1084,5 @@ export async function destroyInstance(name?: string): Promise<void> {
 
 // ─── Shell Quoting ──────────────────────────────────────────────────────────
 
-function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
+// shellQuote is now imported from shared/ui.ts and re-exported for backwards compat
+export { shellQuote } from "../shared/ui";

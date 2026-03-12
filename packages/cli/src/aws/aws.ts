@@ -34,6 +34,7 @@ import {
   promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
   validateRegionName,
 } from "../shared/ui";
 
@@ -1052,6 +1053,9 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
@@ -1060,7 +1064,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `${SSH_USER}@${_state.instanceIp}`,
-      `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
+      `bash -c ${shellQuote(fullCmd)}`,
     ],
     {
       stdio: [
@@ -1119,12 +1123,11 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  // Pass command directly to SSH (no outer bash -c wrapper) — matches Hetzner/DO behavior.
-  // The extra bash -c layer added latency and an unnecessary shell process.
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = spawnInteractive([
     "ssh",

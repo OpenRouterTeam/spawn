@@ -253,6 +253,18 @@ export function loadApiToken(cloud: string): string | null {
   );
 }
 
+/** POSIX single-quote escaping: wraps `s` in single quotes and escapes any
+ *  embedded single quotes with the standard `'\''` technique.
+ *
+ *  Defense-in-depth: rejects null bytes which could truncate the string at
+ *  the C/OS level even though callers already validate for them. */
+export function shellQuote(s: string): string {
+  if (/\0/.test(s)) {
+    throw new Error("shellQuote: input must not contain null bytes");
+  }
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 /** JSON-escape a string (returns the quoted JSON string). */
 export function jsonEscape(s: string): string {
   return JSON.stringify(s);

@@ -178,6 +178,14 @@ _digitalocean_exec() {
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
+  # Validate base64 output contains only safe characters (defense-in-depth).
+  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption
+  # and ensures the value cannot break out of single quotes in the SSH command.
+  if ! printf '%s' "${encoded_cmd}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+    log_err "Invalid base64 encoding of command for SSH exec"
+    return 1
+  fi
+
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       "root@${ip}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"

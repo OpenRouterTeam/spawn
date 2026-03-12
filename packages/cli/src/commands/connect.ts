@@ -14,6 +14,7 @@ import { getHistoryPath } from "../shared/paths.js";
 import { tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
+import { shellQuote } from "../shared/ui.js";
 import { getErrorMessage } from "./shared.js";
 
 /** Execute a shell command and resolve/reject on process close/error */
@@ -180,7 +181,7 @@ export async function cmdEnterAgent(
 
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
-  const escapedRemoteCmd = remoteCmd.replace(/'/g, "'\\''");
+  const quotedRemoteCmd = shellQuote(remoteCmd);
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   return runInteractiveCommand(
     "ssh",
@@ -189,9 +190,9 @@ export async function cmdEnterAgent(
       ...keyOpts,
       `${connection.user}@${connection.ip}`,
       "--",
-      `bash -lc '${escapedRemoteCmd}'`,
+      `bash -lc ${quotedRemoteCmd}`,
     ],
     `Failed to enter ${agentName}`,
-    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${escapedRemoteCmd}'`,
+    `ssh -t ${connection.user}@${connection.ip} -- bash -lc ${quotedRemoteCmd}`,
   );
 }
