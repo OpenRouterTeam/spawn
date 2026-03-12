@@ -264,7 +264,7 @@ rm  -rf  /
     expect(() => validateScriptContent(script)).toThrow("destructive filesystem operation");
   });
 
-  it("should accept scripts with comments containing dangerous patterns", () => {
+  it("should reject scripts with dangerous patterns in comments (regex matches inside comments)", () => {
     const script = `#!/bin/bash
 # Don't do this: rm -rf /
 echo "safe"
@@ -434,20 +434,6 @@ describe("validatePrompt", () => {
   it("should provide helpful error message for command substitution", () => {
     expect(() => validatePrompt("Run $(echo test)")).toThrow("shell syntax");
     expect(() => validatePrompt("Run $(echo test)")).toThrow("plain English");
-  });
-
-  it("should detect multiple dangerous patterns", () => {
-    const dangerousPatterns = [
-      "$(whoami)",
-      "`id`",
-      "; rm -rf /tmp",
-      "| bash",
-      "| sh",
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      expect(() => validatePrompt(`Test ${pattern} here`)).toThrow();
-    }
   });
 
   // ── Command injection patterns (issue #1400) ───────────────────────────
