@@ -328,68 +328,63 @@ async function setupOpenclawConfig(
   }
 
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
-  const escapedKey = jsonEscape(apiKey);
-  const escapedToken = jsonEscape(gatewayToken);
-  const escapedModel = jsonEscape(modelId);
 
-  const config = `{
-  "env": {
-    "OPENROUTER_API_KEY": ${escapedKey}
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": ${escapedToken}
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": ${escapedModel}
-      }
-    }
-  }
-}`;
-  await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
-
-  // Configure browser via CLI (openclaw config set) — the supported way to set
-  // browser options. Writing JSON directly may not be picked up by all versions.
-  const browserResult = await asyncTryCatchIf(isOperationalError, () =>
-    runner.runServer(
-      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
-        "openclaw config set browser.noSandbox true; " +
-        "openclaw config set browser.headless true; " +
-        "openclaw config set browser.defaultProfile openclaw",
-    ),
-  );
-  if (!browserResult.ok) {
-    logWarn("Browser config setup failed (non-fatal)");
-  }
-
-  // Telegram channel setup — prompt for bot token and inject into config
+  // Prompt for Telegram bot token before building the config JSON so we can
+  // include it in a single atomic write — avoids `openclaw config set` calls
+  // that can clobber the gateway auth token.
+  let telegramBotToken = "";
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
     const botToken = await prompt("Telegram bot token (from @BotFather): ");
-    const trimmedToken = botToken.trim();
-
-    if (trimmedToken) {
-      const escapedBotToken = jsonEscape(trimmedToken);
-      const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
-        runner.runServer(
-          "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-            `openclaw config set channels.telegram.botToken ${escapedBotToken}`,
-        ),
-      );
-      if (telegramResult.ok) {
-        logInfo("Telegram bot token configured");
-      } else {
-        logWarn("Telegram config failed — set it up via the web dashboard after launch");
-      }
-    } else {
+    telegramBotToken = botToken.trim();
+    if (!telegramBotToken) {
       logInfo("No token entered — set up Telegram via the web dashboard after launch");
     }
   }
+
+  // Build the full config as a single JSON object. All settings — gateway auth,
+  // browser, channels — are written atomically to avoid `openclaw config set`
+  // calls that re-serialize the file and can drop the gateway auth token.
+  const hasBrowser = !enabledSteps || enabledSteps.has("browser");
+  const configObj: Record<string, unknown> = {
+    env: {
+      OPENROUTER_API_KEY: apiKey,
+    },
+    gateway: {
+      mode: "local",
+      auth: {
+        token: gatewayToken,
+      },
+    },
+    agents: {
+      defaults: {
+        model: {
+          primary: modelId,
+        },
+      },
+    },
+  };
+
+  if (hasBrowser) {
+    configObj.browser = {
+      executablePath: "/usr/bin/google-chrome-stable",
+      noSandbox: true,
+      headless: true,
+      defaultProfile: "openclaw",
+    };
+  }
+
+  if (telegramBotToken) {
+    configObj.channels = {
+      telegram: {
+        botToken: telegramBotToken,
+      },
+    };
+    logInfo("Telegram bot token configured");
+  }
+
+  const config = JSON.stringify(configObj, null, 2);
+  await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // WhatsApp — QR code scanning happens interactively in orchestrate.ts
   // after the gateway starts and tunnel is set up. No config needed here.
