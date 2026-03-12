@@ -197,10 +197,22 @@ CLOUD_ENV
 
   # Add agent-specific env vars
   case "${agent}" in
+    claude)
+      {
+        printf 'export ANTHROPIC_BASE_URL=%q\n' "https://openrouter.ai/api"
+        printf 'export ANTHROPIC_AUTH_TOKEN=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
     openclaw)
       {
         printf 'export ANTHROPIC_API_KEY=%q\n' "${api_key}"
         printf 'export ANTHROPIC_BASE_URL=%q\n' "https://openrouter.ai/api"
+      } >> "${env_tmp}"
+      ;;
+    codex)
+      {
+        printf 'export OPENAI_API_KEY=%q\n' "${api_key}"
+        printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
       } >> "${env_tmp}"
       ;;
     zeroclaw)
