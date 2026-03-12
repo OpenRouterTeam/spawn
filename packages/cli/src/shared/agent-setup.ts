@@ -623,7 +623,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         name: "OpenClaw",
         cloudInitTier: "full" satisfies AgentConfig["cloudInitTier"],
         preProvision: detectGithubAuth,
-        modelDefault: "moonshotai/kimi-k2.5",
+        modelDefault: "openrouter/openrouter/auto",
         install: async () => {
           await installAgent(
             runner,
@@ -637,7 +637,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
         ],
         configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
-          setupOpenclawConfig(runner, apiKey, modelId || "moonshotai/kimi-k2.5", dashboardToken, enabledSteps),
+          setupOpenclawConfig(runner, apiKey, modelId || "openrouter/openrouter/auto", dashboardToken, enabledSteps),
         preLaunch: () => startGateway(runner),
         preLaunchMsg: "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
         launchCmd: () =>

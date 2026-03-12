@@ -57,7 +57,7 @@
       "interactive_prompts": {
         "model_id": {
           "prompt": "Enter model ID",
-          "default": "moonshotai/kimi-k2.5"
+          "default": "openrouter/openrouter/auto"
         }
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/openclaw.png",
