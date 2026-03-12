@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -240,8 +240,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
   if (githubToken) {
-    const escaped = githubToken.replace(/'/g, "'\\''");
-    ghCmd = `export GITHUB_TOKEN='${escaped}' && ${ghCmd}`;
+    ghCmd = `export GITHUB_TOKEN=${shellQuote(githubToken)} && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
@@ -255,12 +254,10 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     logStep("Configuring git identity on the remote server...");
     const cmds: string[] = [];
     if (hostGitName) {
-      const escaped = hostGitName.replace(/'/g, "'\\''");
-      cmds.push(`git config --global user.name '${escaped}'`);
+      cmds.push(`git config --global user.name ${shellQuote(hostGitName)}`);
     }
     if (hostGitEmail) {
-      const escaped = hostGitEmail.replace(/'/g, "'\\''");
-      cmds.push(`git config --global user.email '${escaped}'`);
+      cmds.push(`git config --global user.email ${shellQuote(hostGitEmail)}`);
     }
     const gitSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(cmds.join(" && ")));
     if (gitSetup.ok) {
@@ -275,7 +272,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
 async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
-  const config = `model = "openai/gpt-5.1-codex"
+  const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
 
 [model_providers.openrouter]

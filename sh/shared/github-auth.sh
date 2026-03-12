@@ -136,11 +136,11 @@ _fetch_gh_latest_version() {
     }
 
     local latest_version=""
-    # Prefer jq for safe JSON parsing; fall back to bun eval (never python)
+    # Prefer jq for safe JSON parsing; fall back to bun -e (never python)
     if command -v jq &>/dev/null; then
         latest_version=$(printf '%s' "${api_response}" | jq -r '.tag_name // empty' 2>/dev/null) || true
     elif command -v bun &>/dev/null; then
-        latest_version=$(_GH_API_RESPONSE="${api_response}" bun eval "
+        latest_version=$(_GH_API_RESPONSE="${api_response}" bun -e "
             const data = JSON.parse(process.env._GH_API_RESPONSE || '{}');
             const tag = typeof data.tag_name === 'string' ? data.tag_name : '';
             process.stdout.write(tag);
