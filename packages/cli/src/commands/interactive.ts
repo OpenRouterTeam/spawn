@@ -176,7 +176,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
       label: s.label,
       hint: s.hint,
     })),
-    initialValues: filteredSteps.map((s) => s.value),
+    initialValues: filteredSteps.filter((s) => s.value === "browser").map((s) => s.value),
     required: false,
   });
 
