@@ -1,7 +1,8 @@
 name: QA
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */4 * * *'   # Every 4 hours — quality sweep
+    - cron: '0 3 * * 1'     # Every Monday 3am UTC — Telegram soak test
   workflow_dispatch:
     inputs:
       reason:
@@ -24,7 +25,11 @@ jobs:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
-          REASON="${{ github.event.inputs.reason || 'schedule' }}"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 3 * * 1" ]; then
+            REASON="soak"
+          else
+            REASON="${{ github.event.inputs.reason || 'schedule' }}"
+          fi
           curl -sS --fail-with-body -X POST \
             "${SPRITE_URL}/trigger?reason=${REASON}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"

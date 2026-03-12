@@ -226,6 +226,29 @@ if [[ "${RUN_MODE}" == "e2e" ]]; then
     fi
 fi
 
+# --- Load Telegram credentials for soak mode ---
+if [[ "${RUN_MODE}" == "soak" ]]; then
+    if [[ -f /etc/spawn-qa-auth.env ]]; then
+        while IFS='=' read -r _tkey _tval || [[ -n "${_tkey}" ]]; do
+            _tkey="${_tkey#"${_tkey%%[! ]*}"}"
+            _tkey="${_tkey%"${_tkey##*[! ]}"}"
+            [[ -z "${_tkey}" || "${_tkey}" == \#* ]] && continue
+            case "${_tkey}" in
+                TELEGRAM_BOT_TOKEN|TELEGRAM_TEST_CHAT_ID)
+                    export "${_tkey}=${_tval}"
+                    ;;
+            esac
+        done < /etc/spawn-qa-auth.env
+        if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ -n "${TELEGRAM_TEST_CHAT_ID:-}" ]]; then
+            log "Telegram credentials loaded for soak test"
+        else
+            log "WARNING: TELEGRAM_BOT_TOKEN or TELEGRAM_TEST_CHAT_ID missing from /etc/spawn-qa-auth.env — soak test will fail"
+        fi
+    else
+        log "WARNING: /etc/spawn-qa-auth.env not found — soak test requires TELEGRAM_BOT_TOKEN and TELEGRAM_TEST_CHAT_ID"
+    fi
+fi
+
 # Launch Claude Code with mode-specific prompt
 # Enable agent teams (required for team-based workflows)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
