@@ -6,7 +6,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { mkdirSync, readFileSync } from "node:fs";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { OAUTH_CSS } from "../shared/oauth";
+import { generateCsrfState, OAUTH_CSS } from "../shared/oauth";
 import { parseJsonObj } from "../shared/parse";
 import { getSpawnCloudConfigPath } from "../shared/paths";
 import {
@@ -312,12 +312,6 @@ export async function checkAccountStatus(): Promise<void> {
 const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
 const OAUTH_ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
-
-function generateCsrfState(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 async function tryRefreshDoToken(): Promise<string | null> {
   const refreshToken = loadRefreshToken();
