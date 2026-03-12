@@ -335,7 +335,9 @@ async function setupOpenclawConfig(
   let telegramBotToken = "";
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
-    const botToken = await prompt("Telegram bot token (from @BotFather): ");
+    // Allow env var override for non-interactive / CI / testing scenarios
+    const envToken = process.env.SPAWN_TELEGRAM_BOT_TOKEN ?? "";
+    const botToken = envToken || (await prompt("Telegram bot token (from @BotFather): "));
     telegramBotToken = botToken.trim();
     if (!telegramBotToken) {
       logInfo("No token entered — set up Telegram via the web dashboard after launch");
