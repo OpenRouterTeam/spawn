@@ -48,6 +48,25 @@ if ! validate_positive_int "SOAK_WAIT_SECONDS" "${SOAK_WAIT_SECONDS}"; then exit
 if ! validate_positive_int "SOAK_CRON_DELAY_SECONDS" "${SOAK_CRON_DELAY_SECONDS}"; then exit 1; fi
 
 # ---------------------------------------------------------------------------
+# _encode_b64 VALUE
+#
+# Base64-encodes VALUE (via stdin), strips newlines, and validates the output
+# contains only [A-Za-z0-9+/=]. Prints the encoded string on success, returns
+# 1 on failure. Defense-in-depth: prevents corrupted base64 from breaking out
+# of single-quoted SSH command strings.
+# ---------------------------------------------------------------------------
+_encode_b64() {
+  local raw="$1"
+  local encoded
+  encoded=$(printf '%s' "${raw}" | base64 -w 0 2>/dev/null || printf '%s' "${raw}" | base64 | tr -d '\n')
+  if ! printf '%s' "${encoded}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+    log_err "Invalid base64 encoding"
+    return 1
+  fi
+  printf '%s' "${encoded}"
+}
+
+# ---------------------------------------------------------------------------
 # soak_validate_telegram_env
 #
 # Checks that TELEGRAM_BOT_TOKEN and TELEGRAM_TEST_CHAT_ID are set.
@@ -123,7 +142,7 @@ soak_inject_telegram_config() {
 
   # Base64-encode the token to avoid shell metacharacter issues
   local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  encoded_token=$(_encode_b64 "${TELEGRAM_BOT_TOKEN}") || return 1
 
   log_step "Patching ~/.openclaw/openclaw.json with Telegram bot token..."
 
@@ -166,7 +185,7 @@ soak_test_telegram_getme() {
   log_step "Testing Telegram getMe API..."
 
   local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  encoded_token=$(_encode_b64 "${TELEGRAM_BOT_TOKEN}") || return 1
 
   local output
   output=$(cloud_exec "${app}" "_TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d); \
@@ -193,7 +212,7 @@ soak_test_telegram_send() {
   log_step "Testing Telegram sendMessage API..."
 
   local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  encoded_token=$(_encode_b64 "${TELEGRAM_BOT_TOKEN}") || return 1
 
   local marker
   marker="SPAWN_SOAK_TEST_$(date +%s)"
@@ -225,7 +244,7 @@ soak_test_telegram_webhook() {
   log_step "Testing Telegram getWebhookInfo API..."
 
   local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  encoded_token=$(_encode_b64 "${TELEGRAM_BOT_TOKEN}") || return 1
 
   local output
   output=$(cloud_exec "${app}" "_TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d); \
@@ -344,7 +363,7 @@ soak_test_openclaw_cron_fired() {
   log_step "Testing OpenClaw cron-triggered Telegram reminder..."
 
   local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  encoded_token=$(_encode_b64 "${TELEGRAM_BOT_TOKEN}") || return 1
 
   # Step 1: Get the message_id from OpenClaw's cron execution data.
   # OpenClaw stores cron job data in ~/.openclaw/cron/. We look for:
