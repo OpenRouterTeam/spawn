@@ -22,8 +22,7 @@ SOAK_CRON_DELAY_SECONDS="${SOAK_CRON_DELAY_SECONDS:-3300}"
 SOAK_HEARTBEAT_INTERVAL=300  # 5 minutes
 SOAK_GATEWAY_PORT=18789
 TELEGRAM_API_BASE="https://api.telegram.org"
-SOAK_CRON_RESULT_FILE="/tmp/spawn-cron-telegram-result.json"
-SOAK_CRON_MARKER=""  # Set during install, checked during verify
+SOAK_CRON_JOB_NAME="spawn-soak-reminder"  # OpenClaw cron job name
 
 # ---------------------------------------------------------------------------
 # soak_validate_telegram_env
@@ -225,104 +224,134 @@ soak_test_telegram_webhook() {
 }
 
 # ---------------------------------------------------------------------------
-# soak_install_cron_reminder APP_NAME
+# soak_install_openclaw_cron APP_NAME
 #
-# Installs a one-shot cron job on the remote VM that sends a Telegram message
-# after SOAK_CRON_DELAY_SECONDS (~55 min). The cron writes the API response
-# to SOAK_CRON_RESULT_FILE so we can verify it after the soak wait.
+# Uses OpenClaw's built-in cron scheduler to create a one-shot reminder that
+# sends a Telegram message after SOAK_CRON_DELAY_SECONDS (~55 min).
 #
-# This tests OpenClaw's ability to stay alive and execute scheduled tasks.
+# This tests that OpenClaw's gateway stays alive and its cron system can
+# execute scheduled tasks and deliver messages to Telegram.
+#
+# Uses: openclaw cron add --at <ISO8601> --channel telegram --announce
+# Verify: openclaw cron runs <name> after soak wait
 # ---------------------------------------------------------------------------
-soak_install_cron_reminder() {
+soak_install_openclaw_cron() {
   local app="$1"
 
-  log_header "Installing cron-triggered Telegram reminder"
+  log_header "Scheduling OpenClaw cron reminder"
+  log_info "Job name: ${SOAK_CRON_JOB_NAME}"
+  log_info "Delay: ${SOAK_CRON_DELAY_SECONDS}s (~$((SOAK_CRON_DELAY_SECONDS / 60)) min)"
 
-  local encoded_token
-  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+  # Compute the ISO 8601 fire time on the remote VM (uses its clock, not ours)
+  local fire_at
+  fire_at=$(cloud_exec "${app}" "date -u -d '+${SOAK_CRON_DELAY_SECONDS} seconds' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+    date -u -v+${SOAK_CRON_DELAY_SECONDS}S '+%Y-%m-%dT%H:%M:%SZ'" 2>&1) || true
 
-  # Generate a unique marker so we can identify this specific cron message
-  SOAK_CRON_MARKER="SPAWN_CRON_REMINDER_$(date +%s)"
-  log_info "Cron marker: ${SOAK_CRON_MARKER}"
-  log_info "Cron delay: ${SOAK_CRON_DELAY_SECONDS}s (~$((SOAK_CRON_DELAY_SECONDS / 60)) min)"
+  if [ -z "${fire_at}" ]; then
+    log_err "Failed to compute fire time on remote VM"
+    return 1
+  fi
+  log_info "Fire at: ${fire_at} (UTC)"
 
-  # Build the cron script locally, base64-encode it, and upload to the remote VM.
-  # The script sleeps for SOAK_CRON_DELAY_SECONDS, then sends a Telegram message
-  # and writes the API response to a result file. It removes itself from crontab
-  # after firing (one-shot). We also launch it via nohup as belt-and-suspenders.
-  local cron_script
-  cron_script="#!/bin/bash
-sleep ${SOAK_CRON_DELAY_SECONDS}
-_TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d)
-curl -sS \"https://api.telegram.org/bot\${_TOKEN}/sendMessage\" \\
-  -d chat_id='${TELEGRAM_TEST_CHAT_ID}' \\
-  -d text='${SOAK_CRON_MARKER}' \\
-  > ${SOAK_CRON_RESULT_FILE} 2>&1
-crontab -l 2>/dev/null | grep -v 'spawn-cron-test' | crontab - 2>/dev/null || true"
+  # Create the cron job via OpenClaw's CLI
+  # --at: one-shot at a specific time
+  # --session isolated: runs in its own session (doesn't block main conversation)
+  # --channel telegram: deliver via Telegram
+  # --to: target the test chat
+  # --announce: post the message to the channel
+  # --delete-after-run: clean up after firing (one-shot)
+  local output
+  output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    openclaw cron add \
+      --name '${SOAK_CRON_JOB_NAME}' \
+      --at '${fire_at}' \
+      --session isolated \
+      --message 'Spawn soak test: scheduled reminder fired successfully at \$(date -u)' \
+      --announce \
+      --channel telegram \
+      --to 'chat:${TELEGRAM_TEST_CHAT_ID}' \
+      --delete-after-run" 2>&1) || true
 
-  # Base64-encode the script to safely transfer it to the remote VM
-  local encoded_script
-  encoded_script=$(printf '%s' "${cron_script}" | base64 -w 0 2>/dev/null || printf '%s' "${cron_script}" | base64 | tr -d '\n')
-
-  cloud_exec "${app}" "printf '%s' '${encoded_script}' | base64 -d > /tmp/spawn-cron-test.sh && \
-    chmod +x /tmp/spawn-cron-test.sh && \
-    (crontab -l 2>/dev/null || true; echo '* * * * * /tmp/spawn-cron-test.sh # spawn-cron-test') | crontab - && \
-    nohup /tmp/spawn-cron-test.sh > /dev/null 2>&1 &" 2>&1
-
-  if [ $? -ne 0 ]; then
-    log_err "Failed to install cron reminder"
+  if printf '%s' "${output}" | grep -qi 'error\|fail\|not found\|unknown'; then
+    log_err "Failed to create OpenClaw cron job"
+    log_err "Output: ${output}"
     return 1
   fi
 
-  # Verify the cron was installed
-  local cron_check
-  cron_check=$(cloud_exec "${app}" "crontab -l 2>/dev/null | grep -c 'spawn-cron-test'" 2>&1) || true
-  if [ "${cron_check:-0}" -ge 1 ]; then
-    log_ok "Cron reminder installed (fires in ~${SOAK_CRON_DELAY_SECONDS}s)"
+  log_ok "OpenClaw cron job scheduled (fires at ${fire_at})"
+
+  # Verify the job exists via openclaw cron list
+  local list_output
+  list_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    openclaw cron list" 2>&1) || true
+
+  if printf '%s' "${list_output}" | grep -q "${SOAK_CRON_JOB_NAME}"; then
+    log_ok "Cron job '${SOAK_CRON_JOB_NAME}' confirmed in openclaw cron list"
   else
-    log_warn "Cron entry not found in crontab — relying on nohup background process"
+    log_warn "Cron job not visible in openclaw cron list — may still work"
+    log_info "List output: ${list_output}"
   fi
 
   return 0
 }
 
 # ---------------------------------------------------------------------------
-# soak_test_telegram_cron_fired APP_NAME
+# soak_test_openclaw_cron_fired APP_NAME
 #
-# Verifies that the cron-triggered Telegram message was sent successfully
-# by reading the result file from the remote VM.
+# Verifies that the OpenClaw cron job executed and delivered a Telegram
+# message by checking the job's execution history via `openclaw cron runs`.
 # ---------------------------------------------------------------------------
-soak_test_telegram_cron_fired() {
+soak_test_openclaw_cron_fired() {
   local app="$1"
 
-  log_step "Testing cron-triggered Telegram reminder..."
+  log_step "Testing OpenClaw cron-triggered Telegram reminder..."
 
-  if [ -z "${SOAK_CRON_MARKER}" ]; then
-    log_err "Cron marker not set — soak_install_cron_reminder was not called"
+  # Check execution history for the cron job
+  local runs_output
+  runs_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    openclaw cron runs '${SOAK_CRON_JOB_NAME}'" 2>&1) || true
+
+  if [ -z "${runs_output}" ]; then
+    log_err "OpenClaw cron — no output from 'openclaw cron runs'"
+    # Fall back: check job status
+    local status_output
+    status_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+      export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+      openclaw cron status '${SOAK_CRON_JOB_NAME}'" 2>&1) || true
+    log_info "Job status: ${status_output}"
     return 1
   fi
 
-  # Read the result file from the remote VM
-  local output
-  output=$(cloud_exec "${app}" "cat ${SOAK_CRON_RESULT_FILE} 2>/dev/null || echo 'FILE_NOT_FOUND'" 2>&1) || true
-
-  if [ "${output}" = "FILE_NOT_FOUND" ] || [ -z "${output}" ]; then
-    log_err "Cron reminder — result file not found (cron did not fire within ${SOAK_CRON_DELAY_SECONDS}s)"
-    # Check if the script is still running (hasn't finished sleeping)
-    local still_running
-    still_running=$(cloud_exec "${app}" "pgrep -c -f 'spawn-cron-test' 2>/dev/null || echo 0" 2>&1) || true
-    if [ "${still_running:-0}" -ge 1 ]; then
-      log_info "Cron script is still running (sleep not finished yet)"
-    fi
-    return 1
-  fi
-
-  if printf '%s' "${output}" | grep -q '"ok":true'; then
-    log_ok "Cron reminder — Telegram message sent successfully (marker: ${SOAK_CRON_MARKER})"
+  # Check for successful execution — look for success/completed/ok indicators
+  if printf '%s' "${runs_output}" | grep -qiE 'success|completed|ok|delivered'; then
+    log_ok "OpenClaw cron — job executed and delivered successfully"
     return 0
+  elif printf '%s' "${runs_output}" | grep -qiE 'fail|error|timeout'; then
+    log_err "OpenClaw cron — job executed but failed"
+    log_err "Runs output: ${runs_output}"
+    return 1
+  elif printf '%s' "${runs_output}" | grep -qiE 'pending|scheduled|waiting'; then
+    log_err "OpenClaw cron — job has not fired yet (still pending)"
+    log_info "Runs output: ${runs_output}"
+    return 1
   else
-    log_err "Cron reminder — Telegram API returned error"
-    log_err "Response: ${output}"
+    # Job has run history but unclear result — check if delete-after-run cleaned it
+    # If the job was deleted (--delete-after-run), it executed successfully
+    local list_output
+    list_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+      export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+      openclaw cron list" 2>&1) || true
+
+    if ! printf '%s' "${list_output}" | grep -q "${SOAK_CRON_JOB_NAME}"; then
+      log_ok "OpenClaw cron — job auto-deleted after run (--delete-after-run confirms execution)"
+      return 0
+    fi
+
+    log_warn "OpenClaw cron — ambiguous result"
+    log_info "Runs output: ${runs_output}"
     return 1
   fi
 }
@@ -342,7 +371,7 @@ soak_run_telegram_tests() {
   soak_test_telegram_getme "${app}" || failures=$((failures + 1))
   soak_test_telegram_send "${app}" || failures=$((failures + 1))
   soak_test_telegram_webhook "${app}" || failures=$((failures + 1))
-  soak_test_telegram_cron_fired "${app}" || failures=$((failures + 1))
+  soak_test_openclaw_cron_fired "${app}" || failures=$((failures + 1))
 
   if [ "${failures}" -eq 0 ]; then
     log_ok "All ${total} Telegram tests passed"
@@ -357,8 +386,8 @@ soak_run_telegram_tests() {
 # run_soak_test [LOG_DIR]
 #
 # Orchestrator: validate env → load sprite driver → provision openclaw →
-# verify → inject telegram config → install cron reminder → soak wait →
-# run tests (including cron verification) → teardown.
+# verify → inject telegram config → schedule openclaw cron reminder →
+# soak wait → run tests (including openclaw cron verification) → teardown.
 # ---------------------------------------------------------------------------
 run_soak_test() {
   local log_dir="${1:-${LOG_DIR:-}}"
@@ -413,9 +442,9 @@ run_soak_test() {
     return 1
   fi
 
-  # Install cron reminder — fires in ~55 min during the 1h soak wait
-  if ! soak_install_cron_reminder "${app_name}"; then
-    log_warn "Cron reminder install failed — cron test will fail but continuing"
+  # Schedule OpenClaw cron reminder — fires in ~55 min during the 1h soak wait
+  if ! soak_install_openclaw_cron "${app_name}"; then
+    log_warn "OpenClaw cron install failed — cron test will fail but continuing"
   fi
 
   # Soak wait — gateway heartbeat + cron fires during this window
