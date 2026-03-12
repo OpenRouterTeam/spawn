@@ -281,6 +281,9 @@ soak_install_openclaw_cron() {
 
   log_ok "OpenClaw cron job scheduled (fires at ${fire_at})"
 
+  # Drop a timestamp marker so the verify step can find cron artifacts created after this point
+  cloud_exec "${app}" "touch /tmp/.spawn-cron-scheduled" 2>/dev/null || true
+
   # Verify the job exists via openclaw cron list
   local list_output
   list_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
@@ -300,58 +303,102 @@ soak_install_openclaw_cron() {
 # ---------------------------------------------------------------------------
 # soak_test_openclaw_cron_fired APP_NAME
 #
-# Verifies that the OpenClaw cron job executed and delivered a Telegram
-# message by checking the job's execution history via `openclaw cron runs`.
+# Verifies that the OpenClaw cron job actually delivered a message to
+# Telegram by:
+#   1. Reading OpenClaw's cron execution logs for the Telegram API response
+#   2. Extracting the message_id from the response
+#   3. Calling Telegram's forwardMessage API with that message_id
+#
+# If Telegram can forward the message, it EXISTS in the chat — this is
+# proof from Telegram itself, not from OpenClaw's self-reporting.
 # ---------------------------------------------------------------------------
 soak_test_openclaw_cron_fired() {
   local app="$1"
 
   log_step "Testing OpenClaw cron-triggered Telegram reminder..."
 
-  # Check execution history for the cron job
+  local encoded_token
+  encoded_token=$(printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 -w 0 2>/dev/null || printf '%s' "${TELEGRAM_BOT_TOKEN}" | base64 | tr -d '\n')
+
+  # Step 1: Get the message_id from OpenClaw's cron execution data.
+  # OpenClaw stores cron job data in ~/.openclaw/cron/. We look for:
+  #   - openclaw cron runs output (structured execution history)
+  #   - ~/.openclaw/cron/ files (raw execution artifacts)
+  # The Telegram sendMessage response contains "message_id":<number>.
+  log_info "Step 1: Extracting message_id from OpenClaw cron logs..."
+
+  local message_id=""
+
+  # Try openclaw cron runs first — it may include the delivery response
   local runs_output
   runs_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    openclaw cron runs '${SOAK_CRON_JOB_NAME}'" 2>&1) || true
+    openclaw cron runs '${SOAK_CRON_JOB_NAME}' 2>/dev/null || true" 2>&1) || true
 
-  if [ -z "${runs_output}" ]; then
-    log_err "OpenClaw cron — no output from 'openclaw cron runs'"
-    # Fall back: check job status
-    local status_output
-    status_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+  if [ -n "${runs_output}" ]; then
+    log_info "Cron runs output: ${runs_output}"
+    # Try to extract message_id from JSON in the output
+    message_id=$(printf '%s' "${runs_output}" | grep -o '"message_id":[0-9]*' | head -1 | grep -o '[0-9]*') || true
+  fi
+
+  # Fallback: search OpenClaw's cron data directory for the Telegram response
+  if [ -z "${message_id}" ]; then
+    log_info "Searching ~/.openclaw/cron/ for Telegram API response..."
+    local cron_data
+    cron_data=$(cloud_exec "${app}" "find ~/.openclaw/cron/ -type f -name '*.json' -newer /tmp/.spawn-cron-scheduled 2>/dev/null | \
+      xargs grep -l 'message_id' 2>/dev/null | head -1 | xargs cat 2>/dev/null || true" 2>&1) || true
+
+    if [ -n "${cron_data}" ]; then
+      message_id=$(printf '%s' "${cron_data}" | grep -o '"message_id":[0-9]*' | head -1 | grep -o '[0-9]*') || true
+    fi
+  fi
+
+  # Fallback: scan the entire cron directory for any message_id
+  if [ -z "${message_id}" ]; then
+    local all_cron_data
+    all_cron_data=$(cloud_exec "${app}" "grep -rh 'message_id' ~/.openclaw/cron/ 2>/dev/null || true" 2>&1) || true
+    if [ -n "${all_cron_data}" ]; then
+      # Take the last (most recent) message_id found
+      message_id=$(printf '%s' "${all_cron_data}" | grep -o '"message_id":[0-9]*' | tail -1 | grep -o '[0-9]*') || true
+    fi
+  fi
+
+  if [ -z "${message_id}" ]; then
+    log_err "OpenClaw cron — could not find message_id in cron execution data"
+    log_err "The cron job may not have fired, or delivery failed before reaching Telegram"
+
+    # Log diagnostic info
+    local job_status
+    job_status=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-      openclaw cron status '${SOAK_CRON_JOB_NAME}'" 2>&1) || true
-    log_info "Job status: ${status_output}"
+      openclaw cron status '${SOAK_CRON_JOB_NAME}' 2>/dev/null; \
+      echo '---'; \
+      openclaw cron list 2>/dev/null; \
+      echo '---'; \
+      ls -la ~/.openclaw/cron/ 2>/dev/null || echo 'no cron dir'" 2>&1) || true
+    log_info "Diagnostic: ${job_status}"
     return 1
   fi
 
-  # Check for successful execution — look for success/completed/ok indicators
-  if printf '%s' "${runs_output}" | grep -qiE 'success|completed|ok|delivered'; then
-    log_ok "OpenClaw cron — job executed and delivered successfully"
+  log_info "Step 2: Found message_id=${message_id} — verifying on Telegram..."
+
+  # Step 2: Verify the message exists in the Telegram chat by forwarding it.
+  # If Telegram can forward message_id from chat to itself, the message is real.
+  # This is proof from Telegram's API, not OpenClaw's self-reporting.
+  local verify_output
+  verify_output=$(cloud_exec "${app}" "_TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d); \
+    curl -sS \"https://api.telegram.org/bot\${_TOKEN}/forwardMessage\" \
+      -d chat_id='${TELEGRAM_TEST_CHAT_ID}' \
+      -d from_chat_id='${TELEGRAM_TEST_CHAT_ID}' \
+      -d message_id='${message_id}'" 2>&1) || true
+
+  if printf '%s' "${verify_output}" | grep -q '"ok":true'; then
+    log_ok "OpenClaw cron — message ${message_id} verified in Telegram chat (forwarded successfully)"
     return 0
-  elif printf '%s' "${runs_output}" | grep -qiE 'fail|error|timeout'; then
-    log_err "OpenClaw cron — job executed but failed"
-    log_err "Runs output: ${runs_output}"
-    return 1
-  elif printf '%s' "${runs_output}" | grep -qiE 'pending|scheduled|waiting'; then
-    log_err "OpenClaw cron — job has not fired yet (still pending)"
-    log_info "Runs output: ${runs_output}"
-    return 1
   else
-    # Job has run history but unclear result — check if delete-after-run cleaned it
-    # If the job was deleted (--delete-after-run), it executed successfully
-    local list_output
-    list_output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-      export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-      openclaw cron list" 2>&1) || true
-
-    if ! printf '%s' "${list_output}" | grep -q "${SOAK_CRON_JOB_NAME}"; then
-      log_ok "OpenClaw cron — job auto-deleted after run (--delete-after-run confirms execution)"
-      return 0
-    fi
-
-    log_warn "OpenClaw cron — ambiguous result"
-    log_info "Runs output: ${runs_output}"
+    log_err "OpenClaw cron — Telegram could not forward message_id=${message_id}"
+    log_err "This means the message does NOT exist in the chat"
+    log_err "Response: ${verify_output}"
     return 1
   fi
 }
