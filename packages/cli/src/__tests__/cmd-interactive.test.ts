@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -129,11 +130,7 @@ describe("cmdInteractive", () => {
         CANCEL_SYMBOL,
       ]);
 
-      try {
-        await cmdInteractive();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdInteractive());
 
       const outroOutput = mockOutro.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(outroOutput.toLowerCase()).toContain("cancelled");
@@ -161,11 +158,7 @@ describe("cmdInteractive", () => {
         CANCEL_SYMBOL,
       ]);
 
-      try {
-        await cmdInteractive();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdInteractive());
 
       const outroOutput = mockOutro.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(outroOutput.toLowerCase()).toContain("cancelled");
@@ -180,11 +173,7 @@ describe("cmdInteractive", () => {
         CANCEL_SYMBOL,
       ]);
 
-      try {
-        await cmdInteractive();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdInteractive());
 
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
@@ -239,11 +228,7 @@ describe("cmdInteractive", () => {
         "sprite",
       ];
 
-      try {
-        await cmdInteractive();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdInteractive());
 
       const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Codex"))).toBe(true);
@@ -268,11 +253,7 @@ describe("cmdInteractive", () => {
         "sprite",
       ];
 
-      try {
-        await cmdInteractive();
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdInteractive());
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);

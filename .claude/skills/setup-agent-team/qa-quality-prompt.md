@@ -6,7 +6,7 @@ Run tests, run E2E validation, find and remove duplicate/theatrical tests, enfor
 
 ## Time Budget
 
-Complete within 35 minutes. At 30 min stop spawning new work, at 34 min shutdown all teammates, at 35 min force shutdown.
+Complete within 85 minutes. At 75 min stop spawning new work, at 83 min shutdown all teammates, at 85 min force shutdown.
 
 ## Worktree Requirement
 

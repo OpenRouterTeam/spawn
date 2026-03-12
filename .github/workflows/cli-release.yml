@@ -49,12 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Delete existing release if present
-          gh release delete cli-latest --yes 2>/dev/null || true
-          git tag -d cli-latest 2>/dev/null || true
-          git push origin :refs/tags/cli-latest 2>/dev/null || true
-
-          # Create new release with built cli.js and version file
+          # Create release if it doesn't exist, then upload assets with --clobber
+          # to atomically replace files without a delete→create race window
           gh release create cli-latest \
             --title "CLI v${{ steps.version.outputs.version }}" \
             --notes "Pre-built CLI binary (auto-updated on every push to main).
@@ -64,22 +60,22 @@ jobs:
 
           **Version:** ${{ steps.version.outputs.version }}
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --prerelease \
+            --prerelease 2>/dev/null || true
+
+          gh release upload cli-latest \
             packages/cli/cli.js \
-            packages/cli/version
+            packages/cli/version \
+            --clobber
 
       - name: Upload cloud bundles
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Upload each cloud bundle as a separate release (aws-latest/aws.js, etc.)
+          # Upload each cloud bundle, creating the release if needed.
+          # Uses --clobber to atomically replace assets (no delete→create race).
           for bundle in packages/cli/*.js; do
             name=$(basename "$bundle" .js)
             [[ "$name" == "cli" ]] && continue  # skip cli.js, already uploaded above
-
-            gh release delete "${name}-latest" --yes 2>/dev/null || true
-            git tag -d "${name}-latest" 2>/dev/null || true
-            git push origin ":refs/tags/${name}-latest" 2>/dev/null || true
 
             gh release create "${name}-latest" \
               --title "${name} bundle v${{ steps.version.outputs.version }}" \
@@ -88,6 +84,7 @@ jobs:
           Downloaded by \`sh/${name}/*.sh\` shims for \`bash <(curl ...)\` execution.
 
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-              --prerelease \
-              "$bundle"
+              --prerelease 2>/dev/null || true
+
+            gh release upload "${name}-latest" "$bundle" --clobber
           done

@@ -9,6 +9,7 @@ import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { getUpdateFailedPath } from "./shared/paths";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
 import { getErrorMessage, hasStatus } from "./shared/type-guards";
 import { logDebug, logWarn } from "./shared/ui";
 
@@ -33,7 +34,7 @@ const CROSS_MARK = isAscii ? "x" : "\u2717";
 
 async function fetchLatestVersion(): Promise<string | null> {
   // Primary: plain-text version file from GitHub release artifact (static URL)
-  try {
+  const primary = await asyncTryCatchIf(isNetworkError, async () => {
     const res = await fetch(VERSION_URL, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
@@ -43,12 +44,14 @@ async function fetchLatestVersion(): Promise<string | null> {
         return text;
       }
     }
-  } catch {
-    // Fall through to GitHub raw fallback
+    return null;
+  });
+  if (primary.ok && primary.data) {
+    return primary.data;
   }
 
   // Fallback: package.json from GitHub raw
-  try {
+  const fallback = await asyncTryCatchIf(isNetworkError, async () => {
     const res = await fetch(`${RAW_BASE}/packages/cli/package.json`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
@@ -57,9 +60,8 @@ async function fetchLatestVersion(): Promise<string | null> {
     }
     const data = parseJsonWith(await res.text(), PkgVersionSchema);
     return data?.version ?? null;
-  } catch {
-    return null;
-  }
+  });
+  return fallback.ok ? fallback.data : null;
 }
 
 function compareVersions(current: string, latest: string): boolean {
@@ -84,37 +86,34 @@ function compareVersions(current: string, latest: string): boolean {
 // ── Failure Backoff ──────────────────────────────────────────────────────────
 
 function isUpdateBackedOff(): boolean {
-  try {
-    const failedPath = getUpdateFailedPath();
-    const content = fs.readFileSync(failedPath, "utf8").trim();
-    const failedAt = Number.parseInt(content, 10);
-    if (Number.isNaN(failedAt)) {
-      return false;
-    }
-    return Date.now() - failedAt < UPDATE_BACKOFF_MS;
-  } catch {
-    return false;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const failedPath = getUpdateFailedPath();
+      const content = fs.readFileSync(failedPath, "utf8").trim();
+      const failedAt = Number.parseInt(content, 10);
+      if (Number.isNaN(failedAt)) {
+        return false;
+      }
+      return Date.now() - failedAt < UPDATE_BACKOFF_MS;
+    }),
+    false,
+  );
 }
 
 function markUpdateFailed(): void {
-  try {
+  tryCatchIf(isFileError, () => {
     const failedPath = getUpdateFailedPath();
     fs.mkdirSync(path.dirname(failedPath), {
       recursive: true,
     });
     fs.writeFileSync(failedPath, String(Date.now()));
-  } catch {
-    // Best-effort — don't break the CLI if we can't write the file
-  }
+  });
 }
 
 function clearUpdateFailed(): void {
-  try {
+  tryCatchIf(isFileError, () => {
     fs.unlinkSync(getUpdateFailedPath());
-  } catch {
-    // File may not exist — that's fine
-  }
+  });
 }
 
 /** Print boxed update banner to stderr */
@@ -146,8 +145,8 @@ function printUpdateBanner(latestVersion: string): void {
  * currently running binary lives, causing re-exec to run the stale old binary.
  */
 function findUpdatedBinary(): string {
-  try {
-    const result = executor.execFileSync(
+  const r = tryCatch(() =>
+    executor.execFileSync(
       "which",
       [
         "spawn",
@@ -160,13 +159,11 @@ function findUpdatedBinary(): string {
           "ignore",
         ],
       },
-    );
-    const found = result ? result.toString().trim() : "";
-    if (found) {
-      return found;
-    }
-  } catch {
-    // fall through to argv fallback
+    ),
+  );
+  const found = r.ok && r.data ? r.data.toString().trim() : "";
+  if (found) {
+    return found;
   }
   return process.argv[1] || "spawn";
 }
@@ -183,17 +180,19 @@ function reExecWithArgs(): void {
   }
   console.error();
 
-  try {
+  const r = tryCatch(() =>
     executor.execFileSync(binPath, args, {
       stdio: "inherit",
       env: {
         ...process.env,
         SPAWN_NO_UPDATE_CHECK: "1",
       },
-    });
+    }),
+  );
+  if (r.ok) {
     process.exit(0);
-  } catch (reexecErr) {
-    const code = hasStatus(reexecErr) ? reexecErr.status : 1;
+  } else {
+    const code = hasStatus(r.error) ? r.error.status : 1;
     process.exit(code);
   }
 }
@@ -204,7 +203,7 @@ function performAutoUpdate(latestVersion: string): void {
   // Hardcoded CDN URL — no variable interpolation, eliminates CWE-78 concern entirely
   const installUrl = `${SPAWN_CDN}/cli/install.sh`;
 
-  try {
+  const updateResult = tryCatch(() => {
     // Two-step approach: fetch script bytes with curl, then execute via bash -c
     const scriptBytes = executor.execFileSync(
       "curl",
@@ -234,12 +233,14 @@ function performAutoUpdate(latestVersion: string): void {
         stdio: "inherit",
       },
     );
+  });
 
+  if (updateResult.ok) {
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
     clearUpdateFailed();
     reExecWithArgs();
-  } catch {
+  } else {
     markUpdateFailed();
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
@@ -281,11 +282,10 @@ export async function checkForUpdates(): Promise<void> {
 
   // Auto-update if newer version is available
   if (compareVersions(VERSION, latestVersion)) {
-    try {
-      performAutoUpdate(latestVersion);
-    } catch (err) {
+    const r = tryCatch(() => performAutoUpdate(latestVersion));
+    if (!r.ok) {
       logWarn("Auto-update encountered an error");
-      logDebug(getErrorMessage(err));
+      logDebug(getErrorMessage(r.error));
     }
   }
 }

@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tryCatch } from "@openrouter/spawn-shared";
 import { mockClackPrompts } from "./test-helpers";
 
 mockClackPrompts({
@@ -37,14 +38,12 @@ function setupTmpHome() {
 
 function cleanupTmpHome() {
   process.env.HOME = origHome;
-  try {
+  tryCatch(() =>
     rmSync(tmpDir, {
       recursive: true,
       force: true,
-    });
-  } catch {
-    // ignore
-  }
+    }),
+  );
 }
 
 /**

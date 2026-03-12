@@ -13,6 +13,7 @@ import {
   ensureSpriteCli,
   getServerName,
   getVmConnection,
+  installSpriteKeepAlive,
   interactiveSession,
   promptSpawnName,
   runSprite,
@@ -48,6 +49,7 @@ async function main() {
       await createSprite(name);
       await verifySpriteConnectivity();
       await setupShellEnvironment();
+      await installSpriteKeepAlive();
       return getVmConnection();
     },
     getServerName,

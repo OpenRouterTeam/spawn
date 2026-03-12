@@ -18,13 +18,8 @@ beforeEach(() => {
   stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
 });
 
-// ── Mock oauth to avoid interactive prompts ──────────────────────────────────
-
-mock.module("../shared/oauth", () => ({
-  getOrPromptApiKey: mock(() => Promise.resolve("sk-or-v1-test-key")),
-}));
-
 // ── Import module under test ──────────────────────────────────────────────────
+// agent-setup.ts doesn't import oauth, so no mock needed.
 
 const { createCloudAgents } = await import("../shared/agent-setup");
 

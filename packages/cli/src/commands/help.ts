@@ -8,6 +8,7 @@ function getHelpUsageSection(): string {
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
   spawn <agent> <cloud> --zone <zone>  Set zone/region (works for all clouds)
   spawn <agent> <cloud> --size <type>  Set instance size/type (works for all clouds)
+  spawn <agent> <cloud> --model <id>  Set the LLM model (e.g. openai/gpt-5.3-codex)
   spawn <agent> <cloud> --custom      Show interactive size/region pickers
   spawn <agent> <cloud> --headless   Provision and exit (no interactive session)
   spawn <agent> <cloud> --output json
@@ -53,6 +54,8 @@ function getHelpExamplesSection(): string {
   spawn claude gcp --zone us-east1-b  ${pc.dim("# Use a specific GCP zone")}
   spawn claude gcp --size e2-standard-4
                                      ${pc.dim("# Use a specific machine type")}
+  spawn codex gcp --model openai/gpt-5.3-codex
+                                     ${pc.dim("# Override the default LLM model")}
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
@@ -94,6 +97,7 @@ function getHelpTroubleshootingSection(): string {
 function getHelpEnvVarsSection(): string {
   return `${pc.bold("ENVIRONMENT VARIABLES")}
   ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
+  ${pc.cyan("MODEL_ID")}                  Override agent's default LLM model (or use --model flag)
   ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
   ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
   ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)

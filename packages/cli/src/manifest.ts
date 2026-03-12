@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseJsonObj } from "./shared/parse.js";
 import { getCacheDir, getCacheFile } from "./shared/paths.js";
+import { asyncTryCatch, isFileError, tryCatchIf, unwrapOr } from "./shared/result.js";
 import { getErrorMessage } from "./shared/type-guards.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -78,13 +80,13 @@ const FETCH_TIMEOUT = 10_000; // 10 seconds
 // ── Cache helpers ──────────────────────────────────────────────────────────────
 
 function cacheAge(): number {
-  try {
-    const st: ReturnType<typeof statSync> = statSync(getCacheFile());
-    return (Date.now() - st.mtimeMs) / 1000;
-  } catch (_err) {
-    // Cache file doesn't exist or is inaccessible - treat as infinitely old
-    return Number.POSITIVE_INFINITY;
-  }
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const st: ReturnType<typeof statSync> = statSync(getCacheFile());
+      return (Date.now() - st.mtimeMs) / 1000;
+    }),
+    Number.POSITIVE_INFINITY,
+  );
 }
 
 function logError(message: string, err?: unknown): void {
@@ -92,18 +94,22 @@ function logError(message: string, err?: unknown): void {
 }
 
 function readCache(): Manifest | null {
-  try {
-    const raw = JSON.parse(readFileSync(getCacheFile(), "utf-8"));
+  const result = tryCatchIf(isFileError, () => {
+    const raw = parseJsonObj(readFileSync(getCacheFile(), "utf-8"));
+    if (!raw) {
+      return null;
+    }
     const cleaned = stripDangerousKeys(raw);
     if (isValidManifest(cleaned)) {
       return cleaned;
     }
     return null;
-  } catch (err) {
-    // Cache file missing, corrupted, or unreadable
-    logError(`Failed to read cache from ${getCacheFile()}`, err);
+  });
+  if (!result.ok) {
+    logError(`Failed to read cache from ${getCacheFile()}`, result.error);
     return null;
   }
+  return result.data;
 }
 
 function isTestEnv(): boolean {
@@ -144,7 +150,7 @@ function stripDangerousKeys(obj: unknown): unknown {
   return clean;
 }
 
-export function isValidManifest(data: unknown): data is Manifest {
+function isValidManifest(data: unknown): data is Manifest {
   return (
     data !== null &&
     typeof data === "object" &&
@@ -159,7 +165,9 @@ export function isValidManifest(data: unknown): data is Manifest {
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {
-  try {
+  // Uses asyncTryCatch (catch-all) because fetch + JSON parse + validation is a single
+  // remote operation — any failure (network, JSON parse, TypeError) means "fetch failed".
+  const result = await asyncTryCatch(async () => {
     const res = await fetch(`${RAW_BASE}/manifest.json`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
@@ -174,10 +182,12 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
       return null;
     }
     return data;
-  } catch (err) {
-    logError("Network error fetching manifest", err);
+  });
+  if (!result.ok) {
+    logError("Network error fetching manifest", result.error);
     return null;
   }
+  return result.data;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -205,20 +215,21 @@ function tryLoadLocalManifest(): Manifest | null {
     return null;
   }
 
-  try {
-    // Try loading manifest.json from current directory (development mode)
+  const result = tryCatchIf(isFileError, () => {
     const localPath = join(process.cwd(), "manifest.json");
     if (existsSync(localPath)) {
-      const raw = JSON.parse(readFileSync(localPath, "utf-8"));
+      const raw = parseJsonObj(readFileSync(localPath, "utf-8"));
+      if (!raw) {
+        return null;
+      }
       const data = stripDangerousKeys(raw);
       if (isValidManifest(data)) {
         return data;
       }
     }
-  } catch (_err) {
-    // Local manifest not found or invalid - not an error, just continue
-  }
-  return null;
+    return null;
+  });
+  return result.ok ? result.data : null;
 }
 
 export async function loadManifest(forceRefresh = false): Promise<Manifest> {

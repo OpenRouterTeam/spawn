@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -68,10 +69,9 @@ describe("Download and Failure Pipeline", () => {
         });
       });
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected: process.exit(1) from reportDownloadFailure
+      const r = await asyncTryCatch(() => cmdRun("claude", "sprite"));
+      if (!r.ok && !r.error.message.includes("process.exit")) {
+        throw r.error;
       }
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -90,10 +90,9 @@ describe("Download and Failure Pipeline", () => {
           }),
       );
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
+      const r = await asyncTryCatch(() => cmdRun("claude", "sprite"));
+      if (!r.ok && !r.error.message.includes("process.exit")) {
+        throw r.error;
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
@@ -113,10 +112,9 @@ describe("Download and Failure Pipeline", () => {
         });
       });
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
+      const r = await asyncTryCatch(() => cmdRun("claude", "sprite"));
+      if (!r.ok && !r.error.message.includes("process.exit")) {
+        throw r.error;
       }
 
       // Should show HTTP error codes in console output (not the "script not found" path)
@@ -135,10 +133,9 @@ describe("Download and Failure Pipeline", () => {
         throw new Error("DNS resolution failed");
       });
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
+      const r = await asyncTryCatch(() => cmdRun("claude", "sprite"));
+      if (!r.ok && !r.error.message.includes("process.exit")) {
+        throw r.error;
       }
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -152,10 +149,9 @@ describe("Download and Failure Pipeline", () => {
         throw new Error("Network timeout");
       });
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
+      const r = await asyncTryCatch(() => cmdRun("claude", "sprite"));
+      if (!r.ok && !r.error.message.includes("process.exit")) {
+        throw r.error;
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");

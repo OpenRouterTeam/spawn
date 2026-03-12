@@ -15,6 +15,9 @@ SPAWN_REPO="OpenRouterTeam/spawn"
 SPAWN_CDN="https://openrouter.ai/labs/spawn"
 SPAWN_RAW_BASE="https://raw.githubusercontent.com/${SPAWN_REPO}/main"
 MIN_BUN_VERSION="1.2.0"
+BUN_INSTALL_VERSION="1.3.9"
+# SHA-256 of https://bun.sh/install?version=1.3.9 — update when bumping BUN_INSTALL_VERSION
+BUN_INSTALLER_SHA256="bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,10 +27,21 @@ NC='\033[0m'
 
 CYAN='\033[0;36m'
 
-log_info()  { printf "${GREEN}[spawn]${NC} %s\n" "$1"; }
-log_step()  { printf "${CYAN}[spawn]${NC} %s\n" "$1"; }
-log_warn()  { printf "${YELLOW}[spawn]${NC} %s\n" "$1"; }
-log_error() { printf "${RED}[spawn]${NC} %s\n" "$1"; }
+log_info()  { printf '%b[spawn]%b %s\n' "$GREEN" "$NC" "$1"; }
+log_step()  { printf '%b[spawn]%b %s\n' "$CYAN" "$NC" "$1"; }
+log_warn()  { printf '%b[spawn]%b %s\n' "$YELLOW" "$NC" "$1"; }
+log_error() { printf '%b[spawn]%b %s\n' "$RED" "$NC" "$1"; }
+
+# --- Helper: portable SHA-256 (macOS uses shasum, Linux uses sha256sum) ---
+sha256_file() {
+    if command -v sha256sum &>/dev/null; then
+        sha256sum "$1" | cut -d' ' -f1
+    elif command -v shasum &>/dev/null; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        return 1
+    fi
+}
 
 # --- Helper: compare semver strings ---
 # Returns 0 (true) if $1 >= $2
@@ -239,9 +253,9 @@ ensure_in_path() {
         all_ready=false
     fi
     if [ "$all_ready" = true ]; then
-        printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
+        printf '%b[spawn]%b Run %bspawn%b to get started\n' "$GREEN" "$NC" "$BOLD" "$NC"
     else
-        printf "${GREEN}[spawn]${NC} To start using spawn, run:\n"
+        printf '%b[spawn]%b To start using spawn, run:\n' "$GREEN" "$NC"
         echo ""
         echo "    exec \$SHELL"
         echo ""
@@ -289,7 +303,30 @@ export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
 if ! command -v bun &>/dev/null; then
     log_step "bun not found. Installing bun..."
-    curl -fsSL --proto '=https' https://bun.sh/install?version=1.3.9 | bash
+
+    # Download the bun installer to a temp file and verify its SHA-256 hash
+    # before executing. This defends against a compromised bun.sh CDN or
+    # DNS hijack serving a tampered install script.
+    _bun_installer=$(mktemp)
+    curl -fsSL --proto '=https' "https://bun.sh/install?version=${BUN_INSTALL_VERSION}" -o "$_bun_installer"
+    _bun_hash="$(sha256_file "$_bun_installer" 2>/dev/null || true)"
+    if [ -z "$_bun_hash" ]; then
+        log_warn "Cannot verify bun installer (no sha256sum/shasum available), executing unverified"
+    elif [ "$_bun_hash" != "$BUN_INSTALLER_SHA256" ]; then
+        rm -f "$_bun_installer"
+        log_error "bun installer hash mismatch — possible supply chain attack"
+        log_error "Expected: ${BUN_INSTALLER_SHA256}"
+        log_error "Got:      ${_bun_hash}"
+        echo ""
+        echo "The bun installer from bun.sh does not match the expected hash."
+        echo "This could indicate a compromised CDN or DNS hijack."
+        echo ""
+        echo "If bun has released a new installer, please report this at:"
+        echo "  https://github.com/${SPAWN_REPO}/issues"
+        exit 1
+    fi
+    bash "$_bun_installer"
+    rm -f "$_bun_installer"
 
     # Re-export so bun is available in this session immediately.
     # Use hard-coded paths alongside BUN_INSTALL — the bun installer may
@@ -300,7 +337,7 @@ if ! command -v bun &>/dev/null; then
         log_error "Failed to install bun automatically"
         echo ""
         echo "Please install bun manually:"
-        echo "  curl -fsSL --proto '=https' https://bun.sh/install?version=1.3.9 | bash"
+        echo "  curl -fsSL --proto '=https' https://bun.sh/install?version=${BUN_INSTALL_VERSION} | bash"
         echo ""
         echo "Then reopen your terminal and re-run:"
         echo "  curl -fsSL --proto '=https' ${SPAWN_CDN}/cli/install.sh | bash"

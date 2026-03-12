@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { isFileError, tryCatchIf } from "../shared/result.js";
 
 /**
  * `spawn pick` — interactive option picker invokable from bash scripts.
@@ -42,10 +43,9 @@ export async function cmdPick(pickArgs: string[]): Promise<void> {
   if (!process.stdin.isTTY) {
     // Stdin is piped — read options from it synchronously
     const { readFileSync } = await import("node:fs");
-    try {
-      inputText = readFileSync(0, "utf8"); // fd 0 = stdin
-    } catch {
-      // ignore read errors (e.g. already closed)
+    const readResult = tryCatchIf(isFileError, () => readFileSync(0, "utf8"));
+    if (readResult.ok) {
+      inputText = readResult.data;
     }
   }
 

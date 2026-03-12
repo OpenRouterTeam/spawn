@@ -1,4 +1,5 @@
 // shared/parse.ts — Schema-validated JSON parsing (replaces unsafe `as` casts)
+// biome-ignore-all lint/plugin: parse implementations require raw try/catch around JSON.parse
 
 import * as v from "valibot";
 

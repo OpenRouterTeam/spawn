@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { HISTORY_SCHEMA_VERSION } from "../history.js";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
@@ -324,11 +325,7 @@ describe("cmdRun happy-path pipeline", () => {
       });
       await loadManifest(true);
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected - process.exit from reportScriptFailure
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       const historyPath = join(historyDir, "history.json");
       expect(existsSync(historyPath)).toBe(true);
@@ -566,11 +563,7 @@ describe("cmdRun happy-path pipeline", () => {
       });
       await loadManifest(true);
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected - validateScriptContent rejects scripts without shebang
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       const clackErrors = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const errOutput = [
@@ -587,11 +580,7 @@ describe("cmdRun happy-path pipeline", () => {
       });
       await loadManifest(true);
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       const clackErrors = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const errOutput = [

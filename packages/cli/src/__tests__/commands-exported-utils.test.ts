@@ -6,7 +6,6 @@ import {
   getImplementedAgents,
   getImplementedClouds,
   getMissingClouds,
-  getTerminalWidth,
   parseAuthEnvVars,
 } from "../commands/index.js";
 import { createEmptyManifest, createMockManifest } from "./test-helpers";
@@ -27,7 +26,6 @@ import { createEmptyManifest, createMockManifest } from "./test-helpers";
  * - getMissingClouds: returns clouds where an agent is NOT implemented
  * - getErrorMessage: duck-typed error message extraction
  * - calculateColumnWidth: matrix display column sizing
- * - getTerminalWidth: terminal width with fallback
  */
 
 const mockManifest = createMockManifest();
@@ -389,22 +387,6 @@ describe("calculateColumnWidth (actual export)", () => {
       5,
     );
     expect(result).toBe(18 + 2); // "a-much-longer-name" (18) + COL_PADDING (2)
-  });
-});
-
-// ── getTerminalWidth ──────────────────────────────────────────────────────────
-
-describe("getTerminalWidth", () => {
-  it("should return a number", () => {
-    const width = getTerminalWidth();
-    expect(typeof width).toBe("number");
-  });
-
-  it("should return at least 80 (default fallback)", () => {
-    // In test env without a TTY, process.stdout.columns is usually undefined
-    // so the fallback to 80 should kick in
-    const width = getTerminalWidth();
-    expect(width).toBeGreaterThanOrEqual(80);
   });
 });
 

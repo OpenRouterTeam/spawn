@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { getUserHome } from "../shared/paths";
+import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import {
   killWithTimeout,
   SSH_BASE_OPTS,
@@ -25,10 +26,12 @@ import {
   logStepDone,
   logStepInline,
   logWarn,
+  openBrowser,
   prompt,
   promptSpawnNameShared,
   sanitizeTermValue,
   selectFromList,
+  shellQuote,
 } from "../shared/ui";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
@@ -144,7 +147,6 @@ interface GcpState {
   zone: string;
   instanceName: string;
   serverIp: string;
-  username: string;
 }
 
 const _state: GcpState = {
@@ -152,8 +154,18 @@ const _state: GcpState = {
   zone: "",
   instanceName: "",
   serverIp: "",
-  username: "",
 };
+
+/** Return SSH connection info for tunnel support. */
+export function getConnectionInfo(): {
+  host: string;
+  user: string;
+} {
+  return {
+    host: _state.serverIp,
+    user: resolveUsername(),
+  };
+}
 
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
 
@@ -478,27 +490,43 @@ export async function resolveProject(): Promise<void> {
     ]);
 
     if (listResult.exitCode !== 0 || !listResult.stdout) {
-      logError("Failed to list GCP projects");
-      logError("Set one before retrying:");
-      logError("  export GCP_PROJECT=your-project-id");
-      throw new Error("No GCP project");
+      logError("Failed to list GCP projects (you may lack resourcemanager.projects.list permission)");
+      logInfo("Enter your GCP project ID manually (or press Enter to abort):");
+      const gcpProjectIdPattern = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+      let manualProject = "";
+      for (;;) {
+        manualProject = await prompt("GCP project ID: ");
+        if (!manualProject) {
+          logError("No GCP project ID provided");
+          logError("Set one before retrying:");
+          logError("  export GCP_PROJECT=your-project-id");
+          throw new Error("No GCP project");
+        }
+        if (gcpProjectIdPattern.test(manualProject)) {
+          break;
+        }
+        logError(`Invalid project ID: '${manualProject}'`);
+        logInfo("GCP project IDs must be 6-30 characters, lowercase letters/numbers/hyphens,");
+        logInfo("start with a letter, and end with a letter or digit.");
+      }
+      project = manualProject;
+    } else {
+      const items = listResult.stdout
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((line) => {
+          const parts = line.split("\t");
+          return `${parts[0]}|${parts[1] || parts[0]}`;
+        });
+
+      if (items.length === 0) {
+        logError("No active GCP projects found");
+        logError("Create one at: https://console.cloud.google.com/projectcreate");
+        throw new Error("No GCP projects");
+      }
+
+      project = await selectFromList(items, "GCP projects", items[0].split("|")[0]);
     }
-
-    const items = listResult.stdout
-      .split("\n")
-      .filter((l) => l.trim())
-      .map((line) => {
-        const parts = line.split("\t");
-        return `${parts[0]}|${parts[1] || parts[0]}`;
-      });
-
-    if (items.length === 0) {
-      logError("No active GCP projects found");
-      logError("Create one at: https://console.cloud.google.com/projectcreate");
-      throw new Error("No GCP projects");
-    }
-
-    project = await selectFromList(items, "GCP projects", items[0].split("|")[0]);
   }
 
   if (!project) {
@@ -523,7 +551,7 @@ export async function checkBillingEnabled(): Promise<void> {
   if (!_state.project) {
     return;
   }
-  try {
+  const billingResult = await asyncTryCatch(async () => {
     const result = gcloudSync([
       "billing",
       "projects",
@@ -550,10 +578,11 @@ export async function checkBillingEnabled(): Promise<void> {
         logWarn("Billing is still not enabled. Continuing anyway — instance creation may fail.");
       }
     }
-  } catch (err) {
+  });
+  if (!billingResult.ok) {
     // Re-throw our explicit billing error
-    if (err instanceof Error && err.message === "GCP billing not enabled") {
-      throw err;
+    if (billingResult.error instanceof Error && billingResult.error.message === "GCP billing not enabled") {
+      throw billingResult.error;
     }
     // Permission errors or missing billing API — non-fatal, continue
   }
@@ -615,29 +644,10 @@ async function ensureSshKey(): Promise<string> {
 
 // ─── Username ───────────────────────────────────────────────────────────────
 
+const GCP_SSH_USER = "root";
+
 function resolveUsername(): string {
-  if (_state.username) {
-    return _state.username;
-  }
-  const result = Bun.spawnSync(
-    [
-      "whoami",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "ignore",
-      ],
-    },
-  );
-  const username = new TextDecoder().decode(result.stdout).trim();
-  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-    logError("Invalid username detected");
-    throw new Error("Invalid username");
-  }
-  _state.username = username;
-  return username;
+  return GCP_SSH_USER;
 }
 
 // ─── Server Name ────────────────────────────────────────────────────────────
@@ -652,7 +662,7 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Cloud Init Startup Script ──────────────────────────────────────────────
 
-function getStartupScript(username: string, tier: CloudInitTier = "full"): string {
+function getStartupScript(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
@@ -664,15 +674,15 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
     lines.push(
       "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
       `${NODE_INSTALL_CMD} || true`,
-      "# Install Claude Code as the login user",
-      `su - "${username}" -c 'curl --proto "=https" -fsSL https://claude.ai/install.sh | bash' || true`,
+      "# Install Claude Code",
+      'curl --proto "=https" -fsSL https://claude.ai/install.sh | bash || true',
     );
   }
   if (needsBun(tier)) {
     lines.push(
-      "# Install Bun as the login user",
-      `su - "${username}" -c 'curl --proto "=https" -fsSL https://bun.sh/install | bash' || true`,
-      `ln -sf /home/${username}/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true`,
+      "# Install Bun",
+      'curl --proto "=https" -fsSL https://bun.sh/install | bash || true',
+      "ln -sf /root/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
   lines.push(
@@ -704,7 +714,7 @@ export async function createInstance(
 
   // Write startup script to a temp file (random suffix prevents collisions and predictable paths)
   const tmpFile = `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
-  writeFileSync(tmpFile, getStartupScript(username, tier), {
+  writeFileSync(tmpFile, getStartupScript(tier), {
     mode: 0o600,
   });
 
@@ -725,9 +735,9 @@ export async function createInstance(
     "--quiet",
   ];
 
-  // Wrap all gcloud calls in try/finally so the temp file is cleaned up
+  // Wrap all gcloud calls so the temp file is cleaned up
   // even when billing retry re-uses it (the args array references tmpFile).
-  try {
+  const createResult = await asyncTryCatch(async () => {
     let result = await gcloud(args);
 
     // Auto-reauth on expired tokens
@@ -774,26 +784,56 @@ export async function createInstance(
         } else {
           throw new Error("Instance creation failed");
         }
+      } else if (/SERVICE_DISABLED/i.test(errMsg)) {
+        const urlMatch = errMsg.match(/https:\/\/console\.developers\.google\.com\/apis\/api\/[^\s"']+/);
+        const activationUrl =
+          urlMatch?.[0] ??
+          `https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=${_state.project}`;
+
+        process.stderr.write("\n");
+        logWarn("The Compute Engine API is not enabled on this project.");
+        logStep("  1. Open the API activation page (opening now...)");
+        logStep("  2. Click 'Enable' to activate the Compute Engine API");
+        logStep("  3. Wait ~30 seconds for it to propagate");
+        logStep("  4. Return here and press Enter to retry");
+        process.stderr.write("\n");
+        openBrowser(activationUrl);
+
+        const shouldRetry = await prompt("Press Enter after enabling the API to retry (or Ctrl+C to exit)")
+          .then(() => true)
+          .catch(() => false);
+        if (shouldRetry) {
+          logStep("Retrying instance creation...");
+          const retryResult = await gcloud(args);
+          if (retryResult.exitCode === 0) {
+            result = retryResult;
+          } else {
+            const retryErr = retryResult.stderr || "Unknown error";
+            logError(`Retry failed: ${retryErr}`);
+            throw new Error("Instance creation failed");
+          }
+        } else {
+          throw new Error("Instance creation failed");
+        }
       } else {
         showNonBillingError("gcp", [
-          "Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)",
           "Instance quota exceeded (try different GCP_ZONE)",
           "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
         ]);
         throw new Error("Instance creation failed");
       }
     }
-  } finally {
-    // Clean up temp file after all retry paths have completed
-    try {
-      Bun.spawnSync([
-        "rm",
-        "-f",
-        tmpFile,
-      ]);
-    } catch {
-      /* ignore */
-    }
+  });
+  // Clean up temp file after all retry paths have completed
+  tryCatch(() =>
+    Bun.spawnSync([
+      "rm",
+      "-f",
+      tmpFile,
+    ]),
+  );
+  if (!createResult.ok) {
+    throw createResult.error;
   }
 
   // Get external IP
@@ -846,7 +886,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
+    const pollResult = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -863,18 +903,28 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           ],
         },
       );
+      // Per-process timeout: if the network drops during cloud-init polling,
+      // `await proc.exited` blocks forever. Kill after 30s so the retry loop
+      // can continue and the user isn't left with a hung CLI.
+      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
       // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      if ((await proc.exited) === 0) {
-        logStepDone();
-        logInfo("Startup script completed");
-        return;
+      const pipeResult = await asyncTryCatch(async () => {
+        await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+        ]);
+        return await proc.exited;
+      });
+      clearTimeout(timer);
+      if (!pipeResult.ok) {
+        throw pipeResult.error;
       }
-    } catch {
-      // ignore
+      return pipeResult.data;
+    });
+    if (pollResult.ok && pollResult.data === 0) {
+      logStepDone();
+      logInfo("Startup script completed");
+      return;
     }
     logStepInline(`Startup script running (${attempt}/${maxAttempts})`);
     await sleep(5000);
@@ -884,6 +934,9 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -907,17 +960,22 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   );
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const runResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!runResult.ok) {
+    throw runResult.error;
+  }
+  if (runResult.data !== 0) {
+    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
   }
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
+  // Validate localPath: reject path traversal, argument injection, and empty paths
+  if (!localPath || localPath.includes("..") || localPath.startsWith("-")) {
+    logError(`Invalid local path: ${localPath}`);
+    throw new Error("Invalid local path");
+  }
   if (
     !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
     remotePath.includes("..") ||
@@ -949,22 +1007,24 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     },
   );
   const timer = setTimeout(() => killWithTimeout(proc), 120_000);
-  try {
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload_file failed for ${remotePath}`);
-    }
-  } finally {
-    clearTimeout(timer);
+  const uploadResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!uploadResult.ok) {
+    throw uploadResult.error;
+  }
+  if (uploadResult.data !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  // Single-quote escaping prevents premature shell expansion of $variables in cmd
-  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
+  // Use shellQuote for consistent single-quote escaping (prevents shell expansion of $variables in cmd)
+  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([
@@ -1024,6 +1084,5 @@ export async function destroyInstance(name?: string): Promise<void> {
 
 // ─── Shell Quoting ──────────────────────────────────────────────────────────
 
-function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
+// shellQuote is now imported from shared/ui.ts and re-exported for backwards compat
+export { shellQuote } from "../shared/ui";

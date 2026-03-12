@@ -2,7 +2,7 @@
 
 ## No `as` Type Assertions
 
-**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`packages/cli/no-type-assertion.grit`).
+**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`lint/no-type-assertion.grit`).
 
 ### Exemptions
 - `as const` — allowed (compile-time only, no runtime risk)

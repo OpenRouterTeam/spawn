@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { asyncTryCatch } from "@openrouter/spawn-shared";
 import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
@@ -200,11 +201,7 @@ describe("cmdRun - display name resolution", () => {
 
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("Claude Code", "sprite");
-      } catch {
-        // May throw from script execution or process.exit
-      }
+      await asyncTryCatch(() => cmdRun("Claude Code", "sprite"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"))).toBe(true);
@@ -213,11 +210,7 @@ describe("cmdRun - display name resolution", () => {
     it("should resolve cloud display name and log resolution message", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude", "Hetzner Cloud");
-      } catch {
-        // May throw from script execution or process.exit
-      }
+      await asyncTryCatch(() => cmdRun("claude", "Hetzner Cloud"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("hetzner"))).toBe(true);
@@ -226,11 +219,7 @@ describe("cmdRun - display name resolution", () => {
     it("should resolve both agent and cloud display names simultaneously", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("Claude Code", "Hetzner Cloud");
-      } catch {
-        // May throw from script execution or process.exit
-      }
+      await asyncTryCatch(() => cmdRun("Claude Code", "Hetzner Cloud"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       const resolvedAgent = infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"));
@@ -242,11 +231,7 @@ describe("cmdRun - display name resolution", () => {
     it("should not log resolution when exact keys are used", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // May throw from script execution
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved"))).toBe(false);
@@ -255,11 +240,7 @@ describe("cmdRun - display name resolution", () => {
     it("should resolve case-insensitive display name", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude code", "sprite");
-      } catch {
-        // May throw
-      }
+      await asyncTryCatch(() => cmdRun("claude code", "sprite"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"))).toBe(true);
@@ -272,11 +253,7 @@ describe("cmdRun - display name resolution", () => {
     it("should show correct display names in launch message after resolution", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("Claude Code", "Hetzner Cloud");
-      } catch {
-        // May throw from script execution
-      }
+      await asyncTryCatch(() => cmdRun("Claude Code", "Hetzner Cloud"));
 
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("Claude Code") && msg.includes("Hetzner Cloud"))).toBe(true);
@@ -285,11 +262,7 @@ describe("cmdRun - display name resolution", () => {
     it("should show 'with prompt' in launch message when prompt is provided", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude", "sprite", "Fix all bugs");
-      } catch {
-        // May throw from script execution
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite", "Fix all bugs"));
 
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
@@ -298,11 +271,7 @@ describe("cmdRun - display name resolution", () => {
     it("should not show 'with prompt' when no prompt given", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // May throw from script execution
-      }
+      await asyncTryCatch(() => cmdRun("claude", "sprite"));
 
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(false);
@@ -323,11 +292,7 @@ describe("cmdRun - display name resolution", () => {
       };
       await setManifestAndScript(partialManifest);
 
-      try {
-        await cmdRun("claude", "digitalocean");
-      } catch {
-        // Expected: process.exit from validateImplementation
-      }
+      await asyncTryCatch(() => cmdRun("claude", "digitalocean"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should show the "see all N options" message since claude has 4 implemented clouds
@@ -345,11 +310,7 @@ describe("cmdRun - display name resolution", () => {
       // We need a missing combo: hetzner/codex is missing
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("codex", "hetzner");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("codex", "hetzner"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // codex has 1 implemented cloud (sprite), so no "see all" hint
@@ -363,11 +324,7 @@ describe("cmdRun - display name resolution", () => {
     it("should show 'no implemented cloud providers' and suggest 'spawn matrix'", async () => {
       await setManifestAndScript(noCloudManifest);
 
-      try {
-        await cmdRun("codex", "sprite");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("codex", "sprite"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
@@ -381,11 +338,7 @@ describe("cmdRun - display name resolution", () => {
     it("should not log resolution for completely unknown agent display name", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("Unknown Agent Name", "sprite");
-      } catch {
-        // Expected: will fail at validateIdentifier (spaces)
-      }
+      await asyncTryCatch(() => cmdRun("Unknown Agent Name", "sprite"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved"))).toBe(false);
@@ -394,11 +347,7 @@ describe("cmdRun - display name resolution", () => {
     it("should not log resolution for completely unknown cloud display name", async () => {
       await setManifestAndScript(mockManifest);
 
-      try {
-        await cmdRun("claude", "Unknown Cloud");
-      } catch {
-        // Expected
-      }
+      await asyncTryCatch(() => cmdRun("claude", "Unknown Cloud"));
 
       const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // No cloud resolution message should appear

@@ -13,6 +13,7 @@ import {
   ensureDoToken,
   ensureSshKey,
   findSpawnSnapshot,
+  getConnectionInfo,
   getServerName,
   interactiveSession,
   promptDoRegion,
@@ -75,6 +76,7 @@ async function main() {
       }
     },
     interactiveSession,
+    getConnectionInfo,
   };
 
   await runOrchestration(cloud, agent, agentName);

@@ -12,6 +12,7 @@ import {
   createInstance,
   ensureAwsCli,
   ensureSshKey,
+  getConnectionInfo,
   getServerName,
   interactiveSession,
   promptBundle,
@@ -58,6 +59,7 @@ async function main() {
       await waitForCloudInit();
     },
     interactiveSession,
+    getConnectionInfo,
   };
 
   await runOrchestration(cloud, agent, agentName);

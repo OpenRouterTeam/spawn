@@ -51,17 +51,20 @@ bun test src/__tests__/manifest.test.ts
 - `prompt-file-security.test.ts` — `validatePromptFilePath`, `validatePromptFileStats`
 
 ### Infrastructure
-- `manifest-cache-lifecycle.test.ts` — Cache lifecycle: write, read, expiry, forced refresh
 - `history.test.ts` — History read/write
 - `history-trimming.test.ts` — History trimming at size limits
+- `history-corruption.test.ts` — History corruption recovery: malformed JSON, concurrent writes
 - `clear-history.test.ts` — `clearHistory`, `cmdListClear`
+- `paths.test.ts` — `getSpawnDir`, `getCacheDir`, `getHistoryPath`, `getSshDir`, path resolution
 - `ssh-keys.test.ts` — SSH key discovery, generation, fingerprinting
 - `update-check.test.ts` — Auto-update check logic
 - `with-retry-result.test.ts` — `withRetry`, `wrapSshCall`, Result constructors
 - `orchestrate.test.ts` — `runOrchestration`
+- `fs-sandbox.test.ts` — Guardrail: verifies test preload sandbox isolates filesystem writes
 
 ### Parsing and type utilities
 - `parse.test.ts` — `parseJsonWith`
+- `picker.test.ts` — `parsePickerInput`: tab-separated picker input parsing
 - `fuzzy-key-matching.test.ts` — `findClosestKeyByNameOrKey`, `levenshtein`, `findClosestMatch`, `resolveAgentKey`, `resolveCloudKey`
 - `unknown-flags.test.ts` — Unknown flag detection, `KNOWN_FLAGS`, `expandEqualsFlags`
 - `custom-flag.test.ts` — `--custom` flag for AWS, GCP, Hetzner, DigitalOcean
@@ -76,7 +79,9 @@ bun test src/__tests__/manifest.test.ts
 - `check-entity.test.ts` / `check-entity-messages.test.ts` — Entity validation
 - `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
 - `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
+- `do-payment-warning.test.ts` — `ensureDoToken` proactive payment method reminder for first-time DigitalOcean users
 - `do-snapshot.test.ts` — `findSpawnSnapshot`: DigitalOcean snapshot lookup, filtering, error handling
+- `sprite-keep-alive.test.ts` — `installSpriteKeepAlive` download/install, graceful failure, session script wrapping
 - `ui-utils.test.ts` — `validateServerName`, `validateRegionName`, `toKebabCase`, `sanitizeTermValue`, `jsonEscape`
 
 ### Agent-specific

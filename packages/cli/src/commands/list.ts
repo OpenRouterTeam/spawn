@@ -1,3 +1,4 @@
+import type { ValueOf } from "@openrouter/spawn-shared";
 import type { SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
 
@@ -5,6 +6,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { clearHistory, filterHistory, getActiveServers, removeRecord } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
+import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { cmdConnect, cmdEnterAgent } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
 import { cmdRun } from "./run.js";
@@ -23,44 +25,44 @@ import {
 
 /** Format an ISO timestamp as a human-readable relative time (e.g., "5 min ago", "2 days ago") */
 export function formatRelativeTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    const diffMs = Date.now() - d.getTime();
-    if (diffMs < 0) {
-      return "just now";
-    }
-    const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) {
-      return "just now";
-    }
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) {
-      return `${diffMin} min ago`;
-    }
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) {
-      return `${diffHr}h ago`;
-    }
-    const diffDays = Math.floor(diffHr / 24);
-    if (diffDays === 1) {
-      return "yesterday";
-    }
-    if (diffDays < 30) {
-      return `${diffDays}d ago`;
-    }
-    // Fall back to absolute date for old entries
-    const date = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-    return date;
-  } catch (_err) {
-    // Invalid date format - return as-is
-    return iso;
-  }
+  return unwrapOr(
+    tryCatch(() => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) {
+        return iso;
+      }
+      const diffMs = Date.now() - d.getTime();
+      if (diffMs < 0) {
+        return "just now";
+      }
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) {
+        return "just now";
+      }
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) {
+        return `${diffMin} min ago`;
+      }
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) {
+        return `${diffHr}h ago`;
+      }
+      const diffDays = Math.floor(diffHr / 24);
+      if (diffDays === 1) {
+        return "yesterday";
+      }
+      if (diffDays < 30) {
+        return `${diffDays}d ago`;
+      }
+      // Fall back to absolute date for old entries
+      const date = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      return date;
+    }),
+    iso,
+  );
 }
 
 /** Build a display label (line 1: name) for a spawn record in the interactive picker */
@@ -121,8 +123,9 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
   }
   p.log.info(`No spawns found matching ${parts.join(", ")}.`);
 
-  try {
-    const manifest = await loadManifest();
+  const manifestResult = await asyncTryCatch(() => loadManifest());
+  if (manifestResult.ok) {
+    const manifest = manifestResult.data;
     if (agentFilter) {
       await suggestFilterCorrection(
         agentFilter,
@@ -143,8 +146,6 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
         manifest,
       );
     }
-  } catch (_err) {
-    // Manifest unavailable -- skip suggestions
   }
 
   const totalRecords = filterHistory();
@@ -210,12 +211,8 @@ export async function resolveListFilters(
   agentFilter?: string;
   cloudFilter?: string;
 }> {
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch (_err) {
-    // Manifest unavailable -- show raw keys
-  }
+  const manifestResult = await asyncTryCatch(() => loadManifest());
+  const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
   if (manifest && agentFilter) {
     const resolved = resolveAgentKey(manifest, agentFilter);
@@ -246,8 +243,25 @@ export async function resolveListFilters(
 
 // ── Record actions ───────────────────────────────────────────────────────────
 
-/** Handle reconnect or rerun action for a selected spawn record */
-export async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | null): Promise<void> {
+/** Outcome of handleRecordAction — determines whether the picker loops or exits. */
+export const RecordActionOutcome = {
+  /** Navigate back to the server list (delete/remove/cancel). */
+  Back: 0,
+  /** Exit the picker (enter/reconnect/rerun). */
+  Exit: 1,
+} as const;
+
+export type RecordActionOutcome = ValueOf<typeof RecordActionOutcome>;
+
+/**
+ * Handle reconnect or rerun action for a selected spawn record.
+ * Returns Back if the picker should navigate back to the list (delete/remove),
+ * or Exit for terminal actions (enter/reconnect/rerun) that exit the picker.
+ */
+export async function handleRecordAction(
+  selected: SpawnRecord,
+  manifest: Manifest | null,
+): Promise<RecordActionOutcome> {
   if (!selected.connection) {
     // No connection info -- just rerun, reusing the existing spawn name
     if (selected.name) {
@@ -255,7 +269,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     }
     p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
     await cmdRun(selected.agent, selected.cloud, selected.prompt);
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   const conn = selected.connection;
@@ -314,36 +328,36 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
   });
 
   if (p.isCancel(action)) {
-    handleCancel();
+    return RecordActionOutcome.Back;
   }
 
   if (action === "enter") {
-    try {
-      await cmdEnterAgent(selected.connection, selected.agent, manifest);
-    } catch (err) {
-      p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+    const enterResult = await asyncTryCatch(() => cmdEnterAgent(selected.connection, selected.agent, manifest));
+    if (!enterResult.ok) {
+      p.log.error(`Connection failed: ${getErrorMessage(enterResult.error)}`);
+
       p.log.info(
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   if (action === "reconnect") {
-    try {
-      await cmdConnect(selected.connection);
-    } catch (err) {
-      p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+    const reconnectResult = await asyncTryCatch(() => cmdConnect(selected.connection));
+    if (!reconnectResult.ok) {
+      p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);
+
       p.log.info(
         `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
-    return;
+    return RecordActionOutcome.Exit;
   }
 
   if (action === "delete") {
     await confirmAndDelete(selected, manifest);
-    return;
+    return RecordActionOutcome.Back;
   }
 
   if (action === "remove") {
@@ -353,7 +367,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     } else {
       p.log.warn("Could not find record in history.");
     }
-    return;
+    return RecordActionOutcome.Back;
   }
 
   // Rerun (create new spawn).  Clear any pre-set name so the user is prompted for
@@ -364,6 +378,7 @@ export async function handleRecordAction(selected: SpawnRecord, manifest: Manife
     `Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
   );
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
+  return RecordActionOutcome.Exit;
 }
 
 /** Interactive picker with inline delete support.
@@ -447,7 +462,18 @@ export async function activeServerPicker(records: SpawnRecord[], manifest: Manif
     }
 
     // action === "select"
-    await handleRecordAction(picked, manifest);
+    const outcome = await handleRecordAction(picked, manifest);
+    if (outcome === RecordActionOutcome.Back) {
+      // Delete/remove completed (or errored) — refresh the remaining list and loop back
+      const active = getActiveServers();
+      const activeSet = new Set(active.map((r) => r.timestamp));
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        if (!activeSet.has(remaining[i].timestamp)) {
+          remaining.splice(i, 1);
+        }
+      }
+      continue;
+    }
     return;
   }
 
@@ -499,15 +525,9 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     if (filtered.length === 0) {
       const historyRecords = filterHistory(agentFilter, cloudFilter);
       if (historyRecords.length > 0) {
-        p.log.info("No active servers found.");
-        p.log.info(
-          pc.dim(
-            `${historyRecords.length} spawn${historyRecords.length !== 1 ? "s" : ""} in history but without active connections.`,
-          ),
-        );
-        p.log.info(
-          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view full history with ${pc.cyan("spawn list | cat")}`,
-        );
+        p.log.info("No active servers found. Showing spawn history:");
+        renderListTable(historyRecords, manifest);
+        showListFooter(historyRecords, agentFilter, cloudFilter);
       } else {
         await showEmptyListMessage(agentFilter, cloudFilter);
       }
@@ -539,12 +559,8 @@ export async function cmdLast(): Promise<void> {
   }
 
   const latest = records[0];
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch (_err) {
-    // Manifest unavailable -- show raw keys
-  }
+  const lastManifestResult = await asyncTryCatch(() => loadManifest());
+  const manifest: Manifest | null = lastManifestResult.ok ? lastManifestResult.data : null;
 
   const label = buildRecordLabel(latest, manifest);
   const subtitle = buildRecordSubtitle(latest, manifest);

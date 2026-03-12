@@ -1,19 +1,22 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import type { BillingGuidanceDeps } from "../shared/billing-guidance";
 
-// Mock the ui module before importing billing-guidance
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
+
+// ── Mock deps (injected via DI, not mock.module) ──────────────────────────
+
 const mockOpenBrowser = mock(() => {});
 const mockPrompt = mock(() => Promise.resolve(""));
 
-mock.module("../shared/ui", () => ({
-  logError: mock(() => {}),
-  logInfo: mock(() => {}),
-  logStep: mock(() => {}),
-  logWarn: mock(() => {}),
-  openBrowser: mockOpenBrowser,
-  prompt: mockPrompt,
-}));
-
-const { handleBillingError, isBillingError, showNonBillingError } = await import("../shared/billing-guidance");
+function createMockDeps(): BillingGuidanceDeps {
+  return {
+    logInfo: mock(() => {}),
+    logStep: mock(() => {}),
+    logWarn: mock(() => {}),
+    openBrowser: mockOpenBrowser,
+    prompt: mockPrompt,
+  };
+}
 
 describe("isBillingError", () => {
   describe("hetzner", () => {
@@ -100,24 +103,26 @@ describe("handleBillingError", () => {
 
   it("opens billing URL and returns true when user presses Enter", async () => {
     mockPrompt.mockImplementation(() => Promise.resolve(""));
-    const result = await handleBillingError("hetzner");
+    const deps = createMockDeps();
+    const result = await handleBillingError("hetzner", deps);
     expect(result).toBe(true);
-    expect(mockOpenBrowser).toHaveBeenCalledWith("https://console.hetzner.cloud/");
+    expect(deps.openBrowser).toHaveBeenCalledWith("https://console.hetzner.cloud/");
     stderrSpy.mockRestore();
   });
 
   it("returns false when prompt throws (Ctrl+C)", async () => {
     mockPrompt.mockImplementation(() => Promise.reject(new Error("cancelled")));
-    const result = await handleBillingError("digitalocean");
+    const result = await handleBillingError("digitalocean", createMockDeps());
     expect(result).toBe(false);
     stderrSpy.mockRestore();
   });
 
   it("works for clouds without billing URL", async () => {
     mockPrompt.mockImplementation(() => Promise.resolve(""));
-    const result = await handleBillingError("unknown");
+    const deps = createMockDeps();
+    const result = await handleBillingError("unknown", deps);
     expect(result).toBe(true);
-    expect(mockOpenBrowser).not.toHaveBeenCalled();
+    expect(deps.openBrowser).not.toHaveBeenCalled();
     stderrSpy.mockRestore();
   });
 });
@@ -130,10 +135,15 @@ describe("showNonBillingError", () => {
   });
 
   it("does not throw", () => {
+    const deps = createMockDeps();
     expect(() => {
-      showNonBillingError("hetzner", [
-        "Server limit reached for your account",
-      ]);
+      showNonBillingError(
+        "hetzner",
+        [
+          "Server limit reached for your account",
+        ],
+        deps,
+      );
     }).not.toThrow();
     stderrSpy.mockRestore();
   });

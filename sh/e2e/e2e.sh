@@ -30,6 +30,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/provision.sh"
 source "${SCRIPT_DIR}/lib/verify.sh"
 source "${SCRIPT_DIR}/lib/teardown.sh"
+source "${SCRIPT_DIR}/lib/soak.sh"
 
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
@@ -45,6 +46,7 @@ PARALLEL_COUNT=99
 SKIP_CLEANUP=0
 SKIP_INPUT_TEST="${SKIP_INPUT_TEST:-0}"
 SEQUENTIAL_MODE=0
+SOAK_MODE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -98,6 +100,10 @@ while [ $# -gt 0 ]; do
       SKIP_INPUT_TEST=1
       shift
       ;;
+    --soak)
+      SOAK_MODE=1
+      shift
+      ;;
     --help|-h)
       printf "Usage: %s --cloud CLOUD [--cloud CLOUD2 ...] [agents...] [options]\n\n" "$0"
       printf "Clouds: %s\n" "${ALL_CLOUDS}"
@@ -109,6 +115,7 @@ while [ $# -gt 0 ]; do
       printf "  --sequential        Force sequential agent execution\n"
       printf "  --skip-cleanup      Skip stale e2e-* instance cleanup\n"
       printf "  --skip-input-test   Skip live input tests\n"
+      printf "  --soak              Run Telegram soak test (OpenClaw on Sprite)\n"
       printf "  --help              Show this help\n"
       exit 0
       ;;
@@ -138,6 +145,14 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+# Soak mode: run Telegram soak test and exit (no --cloud required)
+if [ "${SOAK_MODE}" -eq 1 ]; then
+  LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/spawn-e2e.XXXXXX")
+  export LOG_DIR
+  run_soak_test "${LOG_DIR}"
+  exit $?
+fi
 
 # Require at least one cloud
 if [ -z "${CLOUDS}" ]; then

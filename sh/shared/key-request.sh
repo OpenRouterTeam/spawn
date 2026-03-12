@@ -16,6 +16,77 @@ if ! type log &>/dev/null 2>&1; then
     log() { printf '[%s] [keys] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*"; }
 fi
 
+# Check CLI-authenticated clouds (e.g. gcp via gcloud) and load any supplemental
+# env vars from their config file. Updates total/loaded/missing_providers in caller scope.
+# Currently supports: gcp (gcloud auth login)
+_check_cli_auth_clouds() {
+    local manifest_path="${1}"
+    local _total_var="${2}"
+    local _loaded_var="${3}"
+    local _missing_var="${4}"
+
+    local cli_clouds
+    if command -v jq &>/dev/null; then
+        cli_clouds=$(jq -r '.clouds | to_entries[] | select(.value.auth != null) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i")) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null)
+    else
+        cli_clouds=$(_MANIFEST="${manifest_path}" bun eval "
+import fs from 'fs';
+const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
+for (const [key, cloud] of Object.entries(m.clouds || {})) {
+  const auth = cloud.auth || '';
+  if (/\b(login|configure|setup)\b/i.test(auth))
+    process.stdout.write(key + '|' + auth + '\n');
+}
+" 2>/dev/null)
+    fi
+
+    while IFS='|' read -r cloud_key auth_string; do
+        [[ -z "${cloud_key}" ]] && continue
+        eval "${_total_var}=\$(( ${_total_var} + 1 ))"
+
+        case "${cloud_key}" in
+            gcp)
+                # Check if gcloud is installed and has an active account
+                local active_account
+                active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null | head -1)
+                if [[ -n "${active_account}" ]]; then
+                    eval "${_loaded_var}=\$(( ${_loaded_var} + 1 ))"
+                    # Load GCP_PROJECT from config file if not already set
+                    local gcp_config="${HOME}/.config/spawn/gcp.json"
+                    if [[ -z "${GCP_PROJECT:-}" ]] && [[ -f "${gcp_config}" ]]; then
+                        local project
+                        if command -v jq &>/dev/null; then
+                            project=$(jq -r '.GCP_PROJECT // .project // "" | select(. != null)' "${gcp_config}" 2>/dev/null)
+                        else
+                            project=$(_FILE="${gcp_config}" bun eval "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d.GCP_PROJECT || d.project || '');
+" 2>/dev/null)
+                        fi
+                        if [[ -n "${project}" ]]; then
+                            # Validate GCP project ID format before export
+                            if [[ ! "${project}" =~ ^[a-z][a-z0-9-]*$ ]]; then
+                                log "SECURITY: Invalid GCP project ID format: ${project}"
+                                return 1
+                            fi
+                            export GCP_PROJECT="${project}"
+                        fi
+                    fi
+                    log "Key preflight: gcp — authenticated as ${active_account}"
+                else
+                    eval "${_missing_var}=\"\${${_missing_var}} gcp\""
+                    log "Key preflight: gcp — gcloud not installed or no active account"
+                fi
+                ;;
+            *)
+                # Other CLI-auth clouds (sprite, etc.) — not auto-checkable, skip silently
+                eval "${_total_var}=\$(( ${_total_var} - 1 ))"
+                ;;
+        esac
+    done <<< "${cli_clouds}"
+}
+
 # Parse manifest.json to extract cloud_key|auth_string lines for API-token clouds.
 # Skips CLI-based auth (sprite login, aws configure, etc.) and empty auth fields.
 # Outputs one "cloud_key|auth_string" per line to stdout.
@@ -24,7 +95,7 @@ _parse_cloud_auths() {
     if command -v jq &>/dev/null; then
         jq -r '.clouds | to_entries[] | select(.value.auth != null and .value.auth != "") | select(.value.key_request != false) | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i") | not) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null
     else
-        _MANIFEST="${manifest_path}" bun -e "
+        _MANIFEST="${manifest_path}" bun eval "
 import fs from 'fs';
 const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
 for (const [key, cloud] of Object.entries(m.clouds || {})) {
@@ -63,7 +134,7 @@ _try_load_env_var() {
         if command -v jq &>/dev/null; then
             val=$(jq -r --arg v "${var_name}" '(.[$v] // .api_key // .token) // "" | select(. != null)' "${config_file}" 2>/dev/null)
         else
-            val=$(_FILE="${config_file}" _VAR="${var_name}" bun -e "
+            val=$(_FILE="${config_file}" _VAR="${var_name}" bun eval "
 import fs from 'fs';
 const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
 process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
@@ -162,6 +233,9 @@ load_cloud_keys_from_config() {
         fi
     done <<< "${cloud_auths}"
 
+    # Check CLI-authenticated clouds (e.g. gcp via gcloud auth login)
+    _check_cli_auth_clouds "${manifest_path}" total loaded missing_providers
+
     MISSING_KEY_PROVIDERS=$(printf '%s' "${missing_providers}" | sed 's/^ //')
     log "Key preflight: ${loaded}/${total} cloud keys available"
     if [[ -n "${MISSING_KEY_PROVIDERS}" ]]; then
@@ -194,7 +268,7 @@ request_missing_cloud_keys() {
     if command -v jq &>/dev/null; then
         providers_json=$(printf '%s\n' ${MISSING_KEY_PROVIDERS} | jq -Rn '[inputs | select(. != "")]' 2>/dev/null) || return 0
     elif command -v bun &>/dev/null; then
-        providers_json=$(_PROVIDERS="${MISSING_KEY_PROVIDERS}" bun -e "
+        providers_json=$(_PROVIDERS="${MISSING_KEY_PROVIDERS}" bun eval "
 const providers = process.env._PROVIDERS.trim().split(/\s+/).filter(Boolean);
 process.stdout.write(JSON.stringify(providers));
 " 2>/dev/null) || return 0

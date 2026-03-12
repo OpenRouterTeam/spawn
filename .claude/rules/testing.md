@@ -19,5 +19,5 @@ Tests MUST NEVER touch real user files. The test preload (`__tests__/preload.ts`
 - **NEVER import `homedir` from `node:os`** — Bun's `homedir()` ignores `process.env.HOME` and returns the real home. Use `process.env.HOME ?? ""` instead.
 - **NEVER hardcode home directory paths** like `/home/user/...` or `~/...`
 - **If you override `SPAWN_HOME`** in `beforeEach`, save and restore the original in `afterEach` (the preload sets a safe default)
-- **Use `getUserHome()`** in production code (from `shared/ui.ts`) — it reads `process.env.HOME` first
+- **Use `getUserHome()`** in production code (from `shared/paths.ts`) — it reads `process.env.HOME` first
 - The `fs-sandbox.test.ts` guardrail test verifies the sandbox is active

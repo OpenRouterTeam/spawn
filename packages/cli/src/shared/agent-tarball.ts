@@ -5,6 +5,7 @@
 import type { CloudRunner } from "./agent-setup";
 
 import * as v from "valibot";
+import { asyncTryCatch } from "./result";
 import { getErrorMessage } from "./type-guards";
 import { logDebug, logInfo, logStep, logWarn } from "./ui";
 
@@ -35,10 +36,7 @@ export async function tryTarballInstall(
   logStep(`Checking for pre-built tarball (${tag})...`);
 
   // Phase 1: Fetch + parse tarball metadata
-  let x86Url: string;
-  let armUrl: string;
-  let url: string;
-  try {
+  const metaResult = await asyncTryCatch(async () => {
     // Query GitHub Releases API for the rolling release tag
     const resp = await fetchFn(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
       headers: {
@@ -49,14 +47,14 @@ export async function tryTarballInstall(
 
     if (!resp.ok) {
       logWarn("No pre-built tarball available");
-      return false;
+      return null;
     }
 
     const json: unknown = await resp.json();
     const parsed = v.safeParse(ReleaseSchema, json);
     if (!parsed.success) {
       logWarn("Tarball release has unexpected format");
-      return false;
+      return null;
     }
 
     // Find both arch-specific .tar.gz assets and let the remote VM pick the right one.
@@ -66,17 +64,24 @@ export async function tryTarballInstall(
 
     if (!x86Asset && !armAsset) {
       logWarn("No tarball asset found in release");
-      return false;
+      return null;
     }
 
-    x86Url = x86Asset?.browser_download_url || "";
-    armUrl = armAsset?.browser_download_url || "";
-    url = x86Url || armUrl;
-  } catch (err) {
+    return {
+      x86Url: x86Asset?.browser_download_url || "",
+      armUrl: armAsset?.browser_download_url || "",
+      url: x86Asset?.browser_download_url || armAsset?.browser_download_url || "",
+    };
+  });
+  if (!metaResult.ok) {
     logWarn("Failed to fetch pre-built tarball metadata");
-    logDebug(getErrorMessage(err));
+    logDebug(getErrorMessage(metaResult.error));
     return false;
   }
+  if (!metaResult.data) {
+    return false;
+  }
+  const { x86Url, armUrl, url } = metaResult.data;
 
   // Phase 2: URL validation + command building (deterministic — no try/catch needed)
   // SECURITY: Validate URLs match expected GitHub releases pattern.
@@ -104,13 +109,40 @@ export async function tryTarballInstall(
     downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   }
 
-  // Phase 3: Remote execution
-  try {
-    await runner.runServer(downloadCmd, 150);
-  } catch (err) {
+  // Phase 3: Remote execution — catch-all because any failure means "fall back to live install"
+  const extractResult = await asyncTryCatch(() => runner.runServer(downloadCmd, 150));
+  if (!extractResult.ok) {
     logWarn("Tarball download/extract failed on remote VM");
-    logDebug(getErrorMessage(err));
+    logDebug(getErrorMessage(extractResult.error));
     return false;
+  }
+
+  // Phase 4: Mirror /root/ files to $HOME/ for non-root SSH users (e.g. GCP, AWS Lightsail).
+  // Tarballs are built with absolute /root/ paths, but some clouds SSH as a regular user
+  // whose $HOME is /home/<user>/, not /root/. Without this, binaries are unreachable.
+  const mirrorCmd = [
+    'if [ "$(id -u)" != "0" ]; then',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "/root/$_d" ]; then',
+    '      mkdir -p "$HOME/$_d"',
+    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    "    fi",
+    "  done",
+    "  # Copy marker file",
+    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "  # Fix ownership — files were extracted as root",
+    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "$HOME/$_d" ]; then',
+    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    "    fi",
+    "  done",
+    "fi",
+  ].join("\n");
+  // Non-fatal — mirror failure should not block tarball install
+  const mirrorResult = await asyncTryCatch(() => runner.runServer(mirrorCmd, 30));
+  if (!mirrorResult.ok) {
+    logWarn("Tarball file mirroring failed (non-fatal)");
   }
 
   logInfo("Agent installed from pre-built tarball");

@@ -20,6 +20,13 @@ provision_agent() {
   local app_name="$2"
   local log_dir="$3"
 
+  # Validate app_name early — it's used in file paths and passed to cloud_exec.
+  # Only allow alphanumeric, dots, hyphens, and underscores.
+  if [ -z "${app_name}" ] || ! printf '%s' "${app_name}" | grep -qE '^[A-Za-z0-9._-]+$'; then
+    log_err "Invalid app_name: must be non-empty and contain only [A-Za-z0-9._-]"
+    return 1
+  fi
+
   local exit_file="${log_dir}/${app_name}.exit"
   local stdout_file="${log_dir}/${app_name}.stdout"
   local stderr_file="${log_dir}/${app_name}.stderr"
@@ -38,7 +45,18 @@ provision_agent() {
     return 1
   fi
 
-  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)"
+  # ---------------------------------------------------------------------------
+  # Retry loop for transient cloud capacity errors (e.g. DigitalOcean 422
+  # "droplet limit exceeded"). Waits 30s between retries, up to 3 attempts.
+  # Only retries when stderr contains a droplet-limit / quota error pattern.
+  # ---------------------------------------------------------------------------
+  local _provision_max_retries=3
+  local _provision_attempt=1
+  local _provision_verified=0
+
+  while [ "${_provision_attempt}" -le "${_provision_max_retries}" ]; do
+
+  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)${_provision_attempt:+ [attempt ${_provision_attempt}/${_provision_max_retries}]}"
 
   # Remove stale exit file
   rm -f "${exit_file}"
@@ -56,7 +74,10 @@ provision_agent() {
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
     # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
-    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility
+    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility.
+    # Positive whitelist: only variables actually emitted by cloud_headless_env
+    # functions are allowed. This prevents injection of arbitrary env vars.
+    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION SPRITE_NAME SPRITE_ORG "
     while IFS= read -r _env_line; do
       # Skip lines that don't look like export VAR="VALUE"
       case "${_env_line}" in
@@ -69,18 +90,14 @@ provision_agent() {
       if [ -z "${_env_name}" ]; then
         continue
       fi
-      # Block dangerous system env vars that could enable privilege escalation
-      case "${_env_name}" in
-        PATH|LD_PRELOAD|LD_LIBRARY_PATH|HOME|SHELL|USER|IFS|ENV|BASH_ENV|CDPATH)
-          log_err "Blocked dangerous env var: ${_env_name}"
+      # Only allow whitelisted variable names (positive match)
+      case "${_ALLOWED_HEADLESS_VARS}" in
+        *" ${_env_name} "*) ;;
+        *)
+          log_err "Rejected unexpected env var from cloud_headless_env: ${_env_name}"
           continue
           ;;
       esac
-      # Validate env var name matches strict alphanumeric pattern
-      if ! printf '%s' "${_env_name}" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*$'; then
-        log_err "Invalid env var name: ${_env_name}"
-        continue
-      fi
       # Validate value against a safe character whitelist BEFORE export
       if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
         log_err "Invalid characters in env value for ${_env_name}"
@@ -131,8 +148,35 @@ CLOUD_ENV
 
   # Even if provision "failed" (timeout), the instance may exist and install may have completed.
   # Verify instance existence via cloud driver.
-  if ! cloud_provision_verify "${app_name}" "${log_dir}"; then
-    log_err "Instance ${app_name} does not exist after provisioning"
+  if cloud_provision_verify "${app_name}" "${log_dir}"; then
+    _provision_verified=1
+    break
+  fi
+
+  # Provision failed — check if this is a retryable droplet limit / quota error.
+  # Pattern matches DigitalOcean 422 "droplet limit" and generic quota messages
+  # that appear in the CLI stderr output.
+  if [ -f "${stderr_file}" ] && grep -qiE 'droplet.limit|limit.exceeded|error 422|quota' "${stderr_file}" 2>/dev/null; then
+    if [ "${_provision_attempt}" -lt "${_provision_max_retries}" ]; then
+      log_warn "Droplet limit error detected (attempt ${_provision_attempt}/${_provision_max_retries}) — retrying in 30s..."
+      sleep 30
+      _provision_attempt=$((_provision_attempt + 1))
+      continue
+    fi
+  fi
+
+  # Non-retryable failure or retries exhausted
+  log_err "Instance ${app_name} does not exist after provisioning"
+  if [ -f "${stderr_file}" ]; then
+    log_err "Stderr tail:"
+    tail -20 "${stderr_file}" >&2 || true
+  fi
+  return 1
+
+  done  # end retry loop
+
+  if [ "${_provision_verified}" -ne 1 ]; then
+    log_err "Instance ${app_name} does not exist after ${_provision_max_retries} provision attempts"
     if [ -f "${stderr_file}" ]; then
       log_err "Stderr tail:"
       tail -20 "${stderr_file}" >&2 || true
@@ -176,8 +220,13 @@ CLOUD_ENV
   # Build env lines in a temp file to avoid interpolating api_key into shell
   # strings directly (prevents command injection if the key contains shell
   # metacharacters like single quotes, backticks, or dollar signs).
+  # printf %q shell-quotes each value; base64 encodes the result; the encoded
+  # payload is piped via stdin to cloud_exec (never interpolated into the
+  # remote command string). This three-layer approach (quoting + encoding +
+  # stdin piping) ensures no user-controlled data enters shell evaluation.
   local env_tmp
   env_tmp=$(mktemp)
+  trap 'rm -f "${env_tmp}"' RETURN
   {
     printf '%s\n' "# [spawn:env]"
     printf 'export IS_SANDBOX=%q\n' "1"
@@ -186,10 +235,22 @@ CLOUD_ENV
 
   # Add agent-specific env vars
   case "${agent}" in
+    claude)
+      {
+        printf 'export ANTHROPIC_BASE_URL=%q\n' "https://openrouter.ai/api"
+        printf 'export ANTHROPIC_AUTH_TOKEN=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
     openclaw)
       {
         printf 'export ANTHROPIC_API_KEY=%q\n' "${api_key}"
         printf 'export ANTHROPIC_BASE_URL=%q\n' "https://openrouter.ai/api"
+      } >> "${env_tmp}"
+      ;;
+    codex)
+      {
+        printf 'export OPENAI_API_KEY=%q\n' "${api_key}"
+        printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
       } >> "${env_tmp}"
       ;;
     zeroclaw)
@@ -220,13 +281,17 @@ CLOUD_ENV
   local env_b64
   env_b64=$(base64 < "${env_tmp}" | tr -d '\n')
 
-  # Validate base64 output contains only safe characters (defense-in-depth)
+  # Validate base64 output contains only safe characters (defense-in-depth).
+  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption.
   if ! printf '%s' "${env_b64}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
     log_err "Invalid base64 encoding"
-    rm -f "${env_tmp}"
     return 1
   fi
 
+  # SECURITY: env_b64 is piped via stdin — it is NOT interpolated into the
+  # remote command string. The command argument to cloud_exec is a fixed
+  # string with no variable substitution from user-controlled data.
+  # The \$ escapes below are for remote shell variables, not local ones.
   if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
     for _rc in ~/.bashrc ~/.profile ~/.bash_profile; do \
     grep -q 'source ~/.spawnrc' \"\$_rc\" 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> \"\$_rc\"; done" >/dev/null 2>&1; then
@@ -234,6 +299,5 @@ CLOUD_ENV
   else
     log_err "Failed to create manual .spawnrc"
   fi
-  rm -f "${env_tmp}"
   return 0
 }

@@ -2,6 +2,7 @@
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
+import { asyncTryCatch, tryCatch } from "./result.js";
 import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
@@ -115,19 +116,16 @@ export function killWithTimeout(
   },
   gracePeriodMs = 5000,
 ): void {
-  try {
-    proc.kill();
-  } catch {
+  const r = tryCatch(() => proc.kill());
+  if (!r.ok) {
     return;
   }
   const sigkillTimer = setTimeout(() => {
-    try {
+    tryCatch(() => {
       if (!proc.killed) {
         proc.kill(9);
       }
-    } catch {
-      /* already dead */
-    }
+    });
   }, gracePeriodMs);
   // Don't let this timer keep the event loop alive — the process may already
   // be dead from SIGTERM, so there's no reason to block exit for 5 seconds.
@@ -162,6 +160,76 @@ function tcpCheck(host: string, port: number, timeoutMs = 2000): Promise<boolean
       resolve(false);
     });
   });
+}
+
+// ─── SSH Tunnel ──────────────────────────────────────────────────────────
+
+export interface SshTunnelHandle {
+  localPort: number;
+  stop: () => void;
+  exited: Promise<number>;
+}
+
+/**
+ * Start an SSH tunnel forwarding a remote port to localhost.
+ * Tries local ports starting from `remotePort` up to `remotePort + 10`.
+ * Throws if no port is available or the SSH connection fails immediately.
+ */
+export async function startSshTunnel(opts: {
+  host: string;
+  user: string;
+  remotePort: number;
+  localPort?: number;
+  sshKeyOpts?: string[];
+}): Promise<SshTunnelHandle> {
+  const { host, user, remotePort, sshKeyOpts } = opts;
+
+  // Find available local port
+  let localPort = opts.localPort ?? remotePort;
+  let found = false;
+  for (let p = localPort; p <= localPort + 10; p++) {
+    const inUse = await tcpCheck("127.0.0.1", p, 500);
+    if (!inUse) {
+      localPort = p;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    throw new Error(`No available local port in range ${remotePort}-${remotePort + 10}`);
+  }
+
+  const args = [
+    "ssh",
+    ...SSH_BASE_OPTS,
+    ...(sshKeyOpts ?? []),
+    "-N",
+    "-L",
+    `${localPort}:127.0.0.1:${remotePort}`,
+    `${user}@${host}`,
+  ];
+
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "ignore",
+      "ignore",
+      "pipe",
+    ],
+  });
+
+  // Wait briefly to detect immediate failures (bad auth, connection refused)
+  await sleep(1500);
+
+  if (proc.exitCode !== null) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`SSH tunnel failed: ${stderr.trim() || `exit code ${proc.exitCode}`}`);
+  }
+
+  return {
+    localPort,
+    stop: () => killWithTimeout(proc),
+    exited: proc.exited,
+  };
 }
 
 // ─── SSH Wait ────────────────────────────────────────────────────────────────
@@ -235,7 +303,7 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const handshakeAttempts = Math.max(remaining, 5);
 
   for (let i = 1; i <= handshakeAttempts; i++) {
-    try {
+    const r = await asyncTryCatch(async () => {
       const proc = Bun.spawn(
         [
           "ssh",
@@ -256,7 +324,7 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
       // during key exchange or auth, the process hangs indefinitely. Kill it
       // after 30s so the retry loop can continue.
       const timer = setTimeout(() => killWithTimeout(proc), 30_000);
-      try {
+      const inner = await asyncTryCatch(async () => {
         const [stdout, stderr] = await Promise.all([
           new Response(proc.stdout).text(),
           new Response(proc.stderr).text(),
@@ -264,8 +332,11 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
         const exitCode = await proc.exited;
 
         if (exitCode === 0 && stdout.includes("ok")) {
-          logInfo("SSH is ready");
-          return;
+          return {
+            stdout,
+            stderr,
+            exitCode,
+          };
         }
 
         // Show the actual SSH error reason dimly so users can debug
@@ -275,10 +346,19 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
         } else {
           logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
         }
-      } finally {
-        clearTimeout(timer);
+        return null;
+      });
+      clearTimeout(timer);
+      if (!inner.ok) {
+        throw inner.error;
       }
-    } catch {
+      return inner.data;
+    });
+    if (r.ok && r.data !== null) {
+      logInfo("SSH is ready");
+      return;
+    }
+    if (!r.ok) {
       logStep(`SSH handshake error (${i}/${handshakeAttempts})`);
     }
     await sleep(3000);

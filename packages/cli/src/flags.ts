@@ -30,6 +30,9 @@ export const KNOWN_FLAGS = new Set([
   "--size",
   "--prune",
   "--json",
+  "--beta",
+  "--model",
+  "-m",
 ]);
 
 /** Return the first unknown flag in args, or null if all are known/positional */

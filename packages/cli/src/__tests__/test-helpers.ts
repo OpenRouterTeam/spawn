@@ -102,6 +102,7 @@ export interface ClackPromptsMock {
   spinnerStart: ReturnType<typeof mock>;
   spinnerStop: ReturnType<typeof mock>;
   spinnerMessage: ReturnType<typeof mock>;
+  spinnerClear: ReturnType<typeof mock>;
   intro: ReturnType<typeof mock>;
   outro: ReturnType<typeof mock>;
   cancel: ReturnType<typeof mock>;
@@ -132,6 +133,7 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
     spinnerStart: mock(() => {}),
     spinnerStop: mock(() => {}),
     spinnerMessage: mock(() => {}),
+    spinnerClear: mock(() => {}),
     intro: mock(() => {}),
     outro: mock(() => {}),
     cancel: mock(() => {}),
@@ -149,6 +151,7 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
       start: mocks.spinnerStart,
       stop: mocks.spinnerStop,
       message: mocks.spinnerMessage,
+      clear: mocks.spinnerClear,
     }),
     log: {
       step: mocks.logStep,

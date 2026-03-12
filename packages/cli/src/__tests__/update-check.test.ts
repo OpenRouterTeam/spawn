@@ -1,16 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
+import { tryCatch } from "@openrouter/spawn-shared";
 
 // ── Test Helpers ───────────────────────────────────────────────────────────────
 
 /** Remove the .update-failed backoff file so it doesn't interfere with tests */
 function clearUpdateBackoff() {
-  try {
-    fs.unlinkSync(path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed"));
-  } catch {
-    // File may not exist
-  }
+  tryCatch(() => fs.unlinkSync(path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed")));
 }
 
 function mockEnv() {

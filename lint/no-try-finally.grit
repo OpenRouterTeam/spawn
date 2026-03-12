@@ -1,0 +1,18 @@
+// Bans bare try/finally (no catch clause) across the codebase.
+//
+// $_ is an AST wildcard — it matches any subtree regardless of how many lines
+// it spans, so single-line and multiline try blocks are both caught.
+//
+// Guidance: asyncTryCatch() never throws (it returns a Result), so cleanup
+// code can simply run sequentially on the next line — no nesting needed.
+//
+// Files that legitimately need try/finally use biome-ignore comments.
+language js(typescript)
+
+`try { $_ } finally { $_ }` as $expr where {
+  register_diagnostic(
+    span = $expr,
+    message = "Avoid try/finally — asyncTryCatch() from @openrouter/spawn-shared never throws, so cleanup just runs sequentially. Before: try { await fn(); } finally { cleanup(); }. After: await asyncTryCatch(() => fn()); cleanup();.",
+    severity = "error"
+  )
+}
