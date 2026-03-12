@@ -25,10 +25,10 @@ macOS ships bash 3.2. All scripts MUST work on it:
 
 ## Use Bun + TypeScript for Inline Scripting — NEVER python/python3
 When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial logic:
-- **ALWAYS** use `bun eval '...'` or write a temp `.ts` file and `bun run` it
+- **ALWAYS** use `bun -e '...'` or write a temp `.ts` file and `bun run` it
 - **NEVER** use `python3 -c` or `python -c` for inline scripting — python is not a project dependency
-- Prefer `jq` for simple JSON extraction; fall back to `bun eval` when jq is unavailable
-- Pass data to bun via environment variables (e.g., `_DATA="${var}" bun eval "..."`) or temp files — never interpolate untrusted values into JS strings
+- Prefer `jq` for simple JSON extraction; fall back to `bun -e` when jq is unavailable
+- Pass data to bun via environment variables (e.g., `_DATA="${var}" bun -e "..."`) or temp files — never interpolate untrusted values into JS strings
 - For complex operations (SigV4 signing, API calls with retries), write a heredoc `.ts` file and `bun run` it
 
 ## ESM Only — NEVER use require() or CommonJS
