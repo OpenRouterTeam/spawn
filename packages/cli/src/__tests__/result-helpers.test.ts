@@ -28,30 +28,34 @@ function errnoError(message: string, code: string): Error {
 describe("tryCatch", () => {
   it("returns Ok on success", () => {
     const result = tryCatch(() => 42);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toBe(42);
-    }
+    expect(result).toMatchObject({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("returns Err on thrown Error", () => {
     const result = tryCatch(() => {
       throw new Error("boom");
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("boom");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "boom",
+      },
+    });
   });
 
   it("wraps non-Error throws in Error", () => {
     const result = tryCatch(() => {
       throw "string error";
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("string error");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "string error",
+      },
+    });
   });
 });
 
@@ -60,28 +64,32 @@ describe("tryCatch", () => {
 describe("asyncTryCatch", () => {
   it("returns Ok on resolved promise", async () => {
     const result = await asyncTryCatch(async () => "hello");
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toBe("hello");
-    }
+    expect(result).toMatchObject({
+      ok: true,
+      data: "hello",
+    });
   });
 
   it("returns Err on rejected promise", async () => {
     const result = await asyncTryCatch(async () => {
       throw new Error("async boom");
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("async boom");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "async boom",
+      },
+    });
   });
 
   it("returns Err on sync throw inside async fn", async () => {
     const result = await asyncTryCatch(() => Promise.reject(new Error("rejected")));
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("rejected");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "rejected",
+      },
+    });
   });
 });
 
@@ -90,20 +98,22 @@ describe("asyncTryCatch", () => {
 describe("tryCatchIf", () => {
   it("returns Ok on success", () => {
     const result = tryCatchIf(isFileError, () => 42);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toBe(42);
-    }
+    expect(result).toMatchObject({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("returns Err when guard matches", () => {
     const result = tryCatchIf(isFileError, () => {
       throw errnoError("file not found", "ENOENT");
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("file not found");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "file not found",
+      },
+    });
   });
 
   it("re-throws when guard does NOT match", () => {
@@ -128,20 +138,22 @@ describe("tryCatchIf", () => {
 describe("asyncTryCatchIf", () => {
   it("returns Ok on success", async () => {
     const result = await asyncTryCatchIf(isNetworkError, async () => "ok");
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toBe("ok");
-    }
+    expect(result).toMatchObject({
+      ok: true,
+      data: "ok",
+    });
   });
 
   it("returns Err when guard matches", async () => {
     const result = await asyncTryCatchIf(isNetworkError, async () => {
       throw errnoError("connection refused", "ECONNREFUSED");
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("connection refused");
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "connection refused",
+      },
+    });
   });
 
   it("re-throws when guard does NOT match", async () => {
@@ -175,19 +187,19 @@ describe("unwrapOr", () => {
 describe("mapResult", () => {
   it("transforms Ok value", () => {
     const result = mapResult(Ok(5), (n) => n * 2);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toBe(10);
-    }
+    expect(result).toMatchObject({
+      ok: true,
+      data: 10,
+    });
   });
 
   it("passes Err through unchanged", () => {
     const err = new Error("fail");
     const result = mapResult(Err<number>(err), (n) => n * 2);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe(err);
-    }
+    expect(result).toMatchObject({
+      ok: false,
+      error: err,
+    });
   });
 });
 
