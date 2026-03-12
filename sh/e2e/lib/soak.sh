@@ -19,6 +19,7 @@ set -eo pipefail
 # ---------------------------------------------------------------------------
 SOAK_WAIT_SECONDS="${SOAK_WAIT_SECONDS:-3600}"
 SOAK_CRON_DELAY_SECONDS="${SOAK_CRON_DELAY_SECONDS:-3300}"
+SOAK_CLOUD="${SOAK_CLOUD:-sprite}"
 SOAK_HEARTBEAT_INTERVAL=300  # 5 minutes
 SOAK_GATEWAY_PORT=18789
 TELEGRAM_API_BASE="https://api.telegram.org"
@@ -146,14 +147,15 @@ soak_inject_telegram_config() {
 
   log_step "Patching ~/.openclaw/openclaw.json with Telegram bot token..."
 
-  # Use bun eval on the remote to JSON-patch the config file
+  # Use bun -e on the remote to JSON-patch the config file.
+  # _TOKEN is passed via env var prefix so process.env._TOKEN is available in bun.
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     _TOKEN=\$(printf '%s' '${encoded_token}' | base64 -d); \
-    bun eval ' \
+    _TOKEN=\${_TOKEN} bun -e ' \
       import { mkdirSync, readFileSync, writeFileSync } from \"node:fs\"; \
       import { dirname } from \"node:path\"; \
-      const configPath = process.env.HOME + \"/.openclaw/openclaw.json\"; \
+      const configPath = (process.env.HOME ?? \"\") + \"/.openclaw/openclaw.json\"; \
       let config = {}; \
       try { config = JSON.parse(readFileSync(configPath, \"utf-8\")); } catch {} \
       if (!config.channels) config.channels = {}; \
@@ -162,7 +164,7 @@ soak_inject_telegram_config() {
       mkdirSync(dirname(configPath), { recursive: true }); \
       writeFileSync(configPath, JSON.stringify(config, null, 2)); \
       console.log(\"Telegram config injected\"); \
-    '" >/dev/null 2>&1
+    '" 2>&1
 
   if [ $? -ne 0 ]; then
     log_err "Failed to inject Telegram config"
@@ -477,7 +479,7 @@ soak_run_telegram_tests() {
 # ---------------------------------------------------------------------------
 # run_soak_test [LOG_DIR]
 #
-# Orchestrator: validate env → load sprite driver → provision openclaw →
+# Orchestrator: validate env → load cloud driver (SOAK_CLOUD) → provision openclaw →
 # verify → inject telegram config → schedule openclaw cron reminder →
 # soak wait → run tests (including openclaw cron verification) → teardown.
 # ---------------------------------------------------------------------------
@@ -488,6 +490,7 @@ run_soak_test() {
   fi
 
   log_header "Spawn Soak Test: OpenClaw + Telegram (with cron reminder)"
+  log_info "Cloud: ${SOAK_CLOUD}"
   log_info "Soak wait: ${SOAK_WAIT_SECONDS}s"
   log_info "Cron delay: ${SOAK_CRON_DELAY_SECONDS}s"
 
@@ -497,8 +500,8 @@ run_soak_test() {
     return 1
   fi
 
-  # Load sprite cloud driver
-  load_cloud_driver "sprite"
+  # Load cloud driver (configurable via SOAK_CLOUD, default: sprite)
+  load_cloud_driver "${SOAK_CLOUD}"
 
   # Validate cloud environment
   if ! require_env; then
