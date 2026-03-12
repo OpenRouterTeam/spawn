@@ -6,12 +6,15 @@ import type { CloudRunner } from "./agent-setup";
 import type { AgentConfig } from "./agents";
 import type { SshTunnelHandle } from "./ssh";
 
+import { readFileSync } from "node:fs";
+import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
-import { asyncTryCatch, asyncTryCatchIf, isOperationalError } from "./result.js";
+import { getSpawnPreferencesPath } from "./paths";
+import { asyncTryCatch, asyncTryCatchIf, isFileError, isOperationalError, tryCatchIf } from "./result.js";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
@@ -78,6 +81,27 @@ export interface OrchestrationOptions {
   getApiKey?: (agentSlug?: string, cloudSlug?: string) => Promise<string>;
 }
 
+/**
+ * Load a preferred model from ~/.config/spawn/preferences.json.
+ * Format: { "models": { "codex": "openai/gpt-5.3-codex", "openclaw": "anthropic/claude-sonnet-4.6" } }
+ * Returns null if no preference is set or the file doesn't exist.
+ */
+const PreferencesSchema = v.object({
+  models: v.optional(v.record(v.string(), v.string())),
+});
+
+function loadPreferredModel(agentName: string): string | null {
+  const result = tryCatchIf(isFileError, () => {
+    const raw = JSON.parse(readFileSync(getSpawnPreferencesPath(), "utf-8"));
+    const parsed = v.safeParse(PreferencesSchema, raw);
+    if (!parsed.success) {
+      return null;
+    }
+    return parsed.output.models?.[agentName] ?? null;
+  });
+  return result.ok ? result.data : null;
+}
+
 export async function runOrchestration(
   cloud: CloudOrchestrator,
   agent: AgentConfig,
@@ -115,8 +139,8 @@ export async function runOrchestration(
     }
   }
 
-  // 4. Model ID (use agent default — no interactive prompt)
-  const rawModelId = agent.modelDefault || process.env.MODEL_ID;
+  // 4. Model ID — priority: --model flag (MODEL_ID env) > preferences file > agent default
+  const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
   const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
   if (rawModelId && !modelId) {
     logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);

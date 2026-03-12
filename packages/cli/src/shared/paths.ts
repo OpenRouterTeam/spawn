@@ -53,6 +53,11 @@ export function getSpawnCloudConfigPath(cloud: string): string {
   return join(getUserHome(), ".config", "spawn", `${cloud}.json`);
 }
 
+/** Return the path to the spawn preferences file: ~/.config/spawn/preferences.json */
+export function getSpawnPreferencesPath(): string {
+  return join(getUserHome(), ".config", "spawn", "preferences.json");
+}
+
 /** Return the cache directory for spawn, respecting XDG_CACHE_HOME. */
 export function getCacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(getUserHome(), ".cache"), "spawn");
