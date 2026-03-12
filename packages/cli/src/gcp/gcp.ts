@@ -933,6 +933,9 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -967,6 +970,11 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
+  // Validate localPath: reject path traversal, argument injection, and empty paths
+  if (!localPath || localPath.includes("..") || localPath.startsWith("-")) {
+    logError(`Invalid local path: ${localPath}`);
+    throw new Error("Invalid local path");
+  }
   if (
     !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
     remotePath.includes("..") ||
@@ -1009,6 +1017,9 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
