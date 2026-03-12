@@ -59,7 +59,7 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/junie.sh)
 | `DO_API_TOKEN` | DigitalOcean API token | — (OAuth if unset) |
 | `DO_DROPLET_NAME` | Name for the created droplet | auto-generated |
 | `DO_REGION` | Datacenter region (see regions below) | `nyc3` |
-| `DO_DROPLET_SIZE` | Droplet size slug (see sizes below) | `s-2vcpu-4gb` |
+| `DO_DROPLET_SIZE` | Droplet size slug (see sizes below) | `s-2vcpu-2gb` |
 
 ### Available Regions
 
@@ -82,8 +82,8 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/junie.sh)
 |---|---|---|
 | `s-1vcpu-1gb` | 1 vCPU · 1 GB RAM | $6/mo |
 | `s-1vcpu-2gb` | 1 vCPU · 2 GB RAM | $12/mo |
-| `s-2vcpu-2gb` | 2 vCPU · 2 GB RAM | $18/mo |
-| `s-2vcpu-4gb` | 2 vCPU · 4 GB RAM | $24/mo (default) |
+| `s-2vcpu-2gb` | 2 vCPU · 2 GB RAM | $18/mo (default) |
+| `s-2vcpu-4gb` | 2 vCPU · 4 GB RAM | $24/mo |
 | `s-4vcpu-8gb` | 4 vCPU · 8 GB RAM | $48/mo |
 | `s-8vcpu-16gb` | 8 vCPU · 16 GB RAM | $96/mo |
 
