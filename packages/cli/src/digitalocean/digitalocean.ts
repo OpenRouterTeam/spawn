@@ -71,6 +71,9 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
 //      gcloud (Google), and az (Azure).
 //
+// Override: Set DO_CLIENT_SECRET env var to use your own OAuth app secret instead
+// of the bundled default (useful for organizations with custom DO OAuth apps).
+//
 // TODO: PKCE migration — monitor and migrate when DigitalOcean adds support.
 //   Last checked: 2026-03 — PKCE without client_secret returns 401 invalid_request.
 //   Check status: POST to /v1/oauth/token with code_verifier but WITHOUT client_secret.
@@ -83,7 +86,8 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //     6. Update this comment to reflect the new PKCE-only flow
 //   Re-check every 6 months or when DigitalOcean announces OAuth/API updates.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
-const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
+const DO_CLIENT_SECRET =
+  process.env["DO_CLIENT_SECRET"] ?? "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
 // Fine-grained scopes for spawn (minimum required)
 const DO_SCOPES = [
