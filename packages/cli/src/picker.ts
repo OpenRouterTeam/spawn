@@ -21,21 +21,21 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import { tryCatch, unwrapOr } from "./shared/result.js";
 
-export interface PickOption {
+interface PickOption {
   value: string;
   label: string;
   hint?: string;
   subtitle?: string;
 }
 
-export interface PickConfig {
+interface PickConfig {
   message: string;
   options: PickOption[];
   defaultValue?: string;
   deleteKey?: boolean;
 }
 
-export interface PickResult {
+interface PickResult {
   action: "select" | "delete" | "cancel";
   value: string | null;
   index: number;

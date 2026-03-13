@@ -18,7 +18,7 @@ const SpawnConfigSchema = v.object({
   setup: v.optional(SpawnConfigSetupSchema),
 });
 
-export type SpawnConfig = v.InferOutput<typeof SpawnConfigSchema>;
+type SpawnConfig = v.InferOutput<typeof SpawnConfigSchema>;
 
 /** Maximum config file size (1 MB) */
 const MAX_CONFIG_SIZE = 1024 * 1024;
