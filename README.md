@@ -65,6 +65,7 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn last` | Instantly rerun the most recent spawn |
 | `spawn agents` | List all agents with descriptions |
 | `spawn clouds` | List all cloud providers |
+| `spawn feedback "message"` | Send feedback to the Spawn team |
 | `spawn update` | Check for CLI updates |
 | `spawn delete` | Interactively select and destroy a cloud server |
 | `spawn delete -a <agent>` | Filter servers to delete by agent |
