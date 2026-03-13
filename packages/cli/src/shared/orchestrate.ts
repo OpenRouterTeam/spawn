@@ -291,18 +291,14 @@ export async function runOrchestration(
     }
   }
 
-  // 11c. Interactive channel login (WhatsApp QR scan)
-  // Telegram is configured via the config file in agent-setup.ts (atomic JSON write).
-  // WhatsApp requires interactive QR code scanning after the gateway starts.
-  const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
-
-  if (enabledSteps?.has("whatsapp")) {
-    logStep("Linking WhatsApp — scan the QR code with your phone...");
-    logInfo("Open WhatsApp > Settings > Linked Devices > Link a Device");
-    process.stderr.write("\n");
-    const whatsappCmd = `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw channels login --channel whatsapp`;
+  // 11c. Channel setup — delegate to OpenClaw's built-in onboard wizard.
+  // `openclaw onboard` interactively guides the user through Telegram, WhatsApp,
+  // and other channel configuration. Runs after the gateway starts.
+  if (enabledSteps?.has("telegram") || enabledSteps?.has("whatsapp")) {
+    const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
+    logStep("Running OpenClaw channel setup...");
     prepareStdinForHandoff();
-    await cloud.interactiveSession(whatsappCmd);
+    await cloud.interactiveSession(`source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw onboard`);
   }
 
   // 11d. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
