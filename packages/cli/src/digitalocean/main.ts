@@ -60,10 +60,13 @@ async function main() {
       region = await promptDoRegion();
     },
     async createServer(name: string) {
-      // Check for a pre-built snapshot before provisioning
-      snapshotId = await findSpawnSnapshot(agentName);
-      if (snapshotId) {
-        cloud.skipAgentInstall = true;
+      // Check for a pre-built snapshot before provisioning (opt-in via --beta images)
+      const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+      if (betaFeatures.includes("images")) {
+        snapshotId = await findSpawnSnapshot(agentName);
+        if (snapshotId) {
+          cloud.skipAgentInstall = true;
+        }
       }
       return await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId ?? undefined);
     },
