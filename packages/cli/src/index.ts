@@ -115,10 +115,9 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--custom")}            Show interactive size/region pickers`);
     console.error(`    ${pc.cyan("--zone, --region")}    Set zone/region (e.g. us-east1-b, nyc3)`);
     console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-2gb)`);
-    console.error(`    ${pc.cyan("--model, -m")}         Set the LLM model (e.g. openai/gpt-5.3-codex)`);
+    console.error(`    ${pc.cyan("--model, -m <id>")}    Set the LLM model (e.g. openai/gpt-5.3-codex)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
-    console.error(`    ${pc.cyan("--model <id>")}        Set the model ID (e.g. openai/gpt-5.3-codex)`);
     console.error(`    ${pc.cyan("--config <path>")}     Load config from JSON file`);
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
