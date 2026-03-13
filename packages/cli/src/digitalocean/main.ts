@@ -6,13 +6,13 @@ import type { CloudOrchestrator } from "../shared/orchestrate";
 
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
+import { logInfo } from "../shared/ui";
 import { agents, resolveAgent } from "./agents";
 import {
   checkAccountStatus,
   createServer as createDroplet,
   ensureDoToken,
   ensureSshKey,
-  findSpawnSnapshot,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -24,6 +24,18 @@ import {
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean";
+
+/** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
+const MARKETPLACE_IMAGES: Record<string, string> = {
+  claude: "openrouter-spawnclaude",
+  codex: "openrouter-spawncodex",
+  openclaw: "openrouter-spawnopenclaw",
+  opencode: "openrouter-spawnopencode",
+  kilocode: "openrouter-spawnkilocode",
+  zeroclaw: "openrouter-spawnzeroclaw",
+  hermes: "openrouter-spawnhermes",
+  junie: "openrouter-spawnjunie",
+};
 
 async function main() {
   const agentName = process.argv[2];
@@ -37,7 +49,7 @@ async function main() {
 
   let dropletSize = "";
   let region = "";
-  let snapshotId: string | null = null;
+  let marketplaceImage: string | undefined;
 
   const cloud: CloudOrchestrator = {
     cloudName: "digitalocean",
@@ -60,16 +72,23 @@ async function main() {
       region = await promptDoRegion();
     },
     async createServer(name: string) {
-      // Check for a pre-built snapshot before provisioning
-      snapshotId = await findSpawnSnapshot(agentName);
-      if (snapshotId) {
-        cloud.skipAgentInstall = true;
+      // Use pre-built marketplace image when --beta images is active
+      const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+      if (betaFeatures.includes("images")) {
+        const slug = MARKETPLACE_IMAGES[agentName];
+        if (slug) {
+          marketplaceImage = slug;
+          cloud.skipAgentInstall = true;
+          logInfo(`Using marketplace image: ${slug}`);
+        } else {
+          logInfo(`No marketplace image for ${agentName}, using fresh install`);
+        }
       }
-      return await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId ?? undefined);
+      return await createDroplet(name, agent.cloudInitTier, dropletSize, region, marketplaceImage);
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId) {
+      if (marketplaceImage) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();

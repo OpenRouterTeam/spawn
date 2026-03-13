@@ -126,6 +126,7 @@ spawn claude gcp --beta tarball
 | Feature | Description |
 |---------|-------------|
 | `tarball` | Use pre-built tarball for agent install (faster, skips live install) |
+| `images` | Use pre-built DigitalOcean marketplace images (faster boot, skips cloud-init) |
 
 ### Without the CLI
 

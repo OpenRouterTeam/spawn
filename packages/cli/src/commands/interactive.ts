@@ -210,7 +210,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
   return new Set(realSteps);
 }
 
-export { promptSpawnName, promptSetupOptions, getAndValidateCloudChoices, selectCloud };
+export { getAndValidateCloudChoices, promptSetupOptions, promptSpawnName, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
