@@ -35,6 +35,8 @@ function getHelpUsageSection(): string {
   spawn status -a <agent>            Filter status by agent (or --agent)
   spawn status -c <cloud>            Filter status by cloud (or --cloud)
   spawn status --prune               Remove gone servers from history
+  spawn fix                          Re-run agent setup on an existing VM (re-inject credentials, reinstall)
+  spawn fix <spawn-id>               Fix a specific spawn by name or ID
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
