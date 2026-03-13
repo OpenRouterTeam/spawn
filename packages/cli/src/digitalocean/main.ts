@@ -25,6 +25,11 @@ import {
   waitForSshOnly,
 } from "./digitalocean";
 
+/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
+const AGENT_MIN_SIZE: Record<string, string> = {
+  openclaw: "s-2vcpu-4gb",
+};
+
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
   claude: "openrouter-spawnclaude",
@@ -69,6 +74,12 @@ async function main() {
     },
     async promptSize() {
       dropletSize = await promptDropletSize();
+      // Enforce minimum size for agents that need more RAM (e.g. openclaw-plugins OOMs on 2GB)
+      const minSize = AGENT_MIN_SIZE[agentName];
+      if (minSize && (!dropletSize || dropletSize === "s-2vcpu-2gb")) {
+        dropletSize = minSize;
+        logInfo(`Using ${minSize} (minimum for ${agentName})`);
+      }
       region = await promptDoRegion();
     },
     async createServer(name: string) {
