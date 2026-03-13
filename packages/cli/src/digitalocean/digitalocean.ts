@@ -871,7 +871,7 @@ export async function createServer(
   tier?: CloudInitTier,
   dropletSize?: string,
   region?: string,
-  snapshotId?: string,
+  imageOverride?: string,
 ): Promise<VMConnection> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-2gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
@@ -881,8 +881,13 @@ export async function createServer(
     throw new Error("Invalid region");
   }
 
-  const image = snapshotId ? Number(snapshotId) : "ubuntu-24-04-x64";
-  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : "ubuntu-24-04-x64";
+  // imageOverride can be a numeric snapshot ID or a marketplace slug (e.g. "openrouter-spawnclaude")
+  const image: string | number = imageOverride
+    ? /^\d+$/.test(imageOverride)
+      ? Number(imageOverride)
+      : imageOverride
+    : "ubuntu-24-04-x64";
+  const imageLabel = imageOverride ?? "ubuntu-24-04-x64";
 
   logStep(
     `Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ${imageLabel})...`,
@@ -905,8 +910,8 @@ export async function createServer(
     monitoring: false,
   };
 
-  // Only include cloud-init userdata when NOT booting from a snapshot
-  if (!snapshotId) {
+  // Only include cloud-init userdata when NOT booting from a pre-built image
+  if (!imageOverride) {
     dropletConfig.user_data = getCloudInitUserdata(tier);
   }
 

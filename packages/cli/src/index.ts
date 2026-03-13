@@ -121,6 +121,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--config <path>")}     Load config from JSON file`);
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
+    console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -789,13 +790,15 @@ async function main(): Promise<void> {
   // Extract all --beta <feature> flags (repeatable, opt-in to experimental features)
   const VALID_BETA_FEATURES = new Set([
     "tarball",
+    "images",
   ]);
-  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta tarball");
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta images");
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
       console.error("\nAvailable beta features:");
       console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
+      console.error(`  ${pc.cyan("images")}   Use pre-built DO marketplace images (faster boot)`);
       process.exit(1);
     }
   }
