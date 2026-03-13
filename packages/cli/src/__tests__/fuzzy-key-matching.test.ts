@@ -430,8 +430,8 @@ describe("findClosestMatch - threshold boundary tests", () => {
   ];
 
   it("should match at exactly distance 3", () => {
-    // "clau" -> "claude" distance 2, within threshold
-    const result = findClosestMatch("clau", candidates);
+    // "cla" -> "claude" requires 3 insertions (u, d, e) = distance 3, at threshold boundary
+    const result = findClosestMatch("cla", candidates);
     expect(result).toBe("claude");
   });
 
