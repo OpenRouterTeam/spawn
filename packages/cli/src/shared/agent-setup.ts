@@ -368,7 +368,14 @@ async function setupOpenclawConfig(
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
     const envToken = process.env.TELEGRAM_BOT_TOKEN;
-    const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token (from @BotFather): ")).trim();
+    if (!envToken) {
+      logInfo("To get a bot token:");
+      logInfo("  1. Open Telegram and search for @BotFather");
+      logInfo("  2. Send /newbot and follow the prompts");
+      logInfo("  3. Copy the token (looks like 123456:ABC-DEF...)");
+      logInfo("  Press Enter to skip if you don't have one yet.");
+    }
+    const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token: ")).trim();
 
     if (trimmedToken) {
       const escapedBotToken = jsonEscape(trimmedToken);
