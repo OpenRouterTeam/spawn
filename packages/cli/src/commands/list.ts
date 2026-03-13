@@ -9,6 +9,7 @@ import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { cmdConnect, cmdEnterAgent } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
+import { fixSpawn } from "./fix.js";
 import { cmdRun } from "./run.js";
 import {
   buildRetryCommand,
@@ -308,6 +309,15 @@ export async function handleRecordAction(
     hint: "Create a fresh instance",
   });
 
+  const canFix = !conn.deleted && conn.ip && conn.ip !== "sprite-console" && conn.user;
+  if (canFix) {
+    options.push({
+      value: "fix",
+      label: "Fix this server",
+      hint: "Re-inject credentials and reinstall agent",
+    });
+  }
+
   if (canDelete) {
     options.push({
       value: "delete",
@@ -353,6 +363,11 @@ export async function handleRecordAction(
       );
     }
     return RecordActionOutcome.Exit;
+  }
+
+  if (action === "fix") {
+    await fixSpawn(selected, manifest);
+    return RecordActionOutcome.Back;
   }
 
   if (action === "delete") {

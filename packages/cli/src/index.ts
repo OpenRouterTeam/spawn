@@ -10,6 +10,7 @@ import {
   cmdClouds,
   cmdDelete,
   cmdFeedback,
+  cmdFix,
   cmdHelp,
   cmdInteractive,
   cmdLast,
@@ -499,6 +500,13 @@ const DELETE_COMMANDS = new Set([
   "kill",
 ]);
 
+// fix handled separately for optional positional spawn-id argument
+const FIX_COMMANDS = new Set([
+  "fix",
+  "repair",
+  "refresh",
+]);
+
 // status handled separately for --prune/--json flag parsing
 const STATUS_COMMANDS = new Set([
   "status",
@@ -700,6 +708,16 @@ async function dispatchCommand(
   }
   if (DELETE_COMMANDS.has(cmd)) {
     await dispatchDeleteCommand(filteredArgs);
+    return;
+  }
+  if (FIX_COMMANDS.has(cmd)) {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    // Optional positional argument: spawn fix [spawn-id]
+    const spawnId = filteredArgs[1] && !filteredArgs[1].startsWith("-") ? filteredArgs[1] : undefined;
+    await cmdFix(spawnId);
     return;
   }
   if (STATUS_COMMANDS.has(cmd)) {
