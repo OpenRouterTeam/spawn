@@ -364,6 +364,22 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
+  // Enable channel plugins before configuring them — plugins are disabled by
+  // default in OpenClaw and the gateway hangs if a token is set for a disabled plugin.
+  const pluginsToEnable: string[] = [];
+  if (enabledSteps?.has("telegram")) {
+    pluginsToEnable.push("telegram");
+  }
+  if (enabledSteps?.has("whatsapp")) {
+    pluginsToEnable.push("whatsapp");
+  }
+  if (pluginsToEnable.length > 0) {
+    const enableCmds = pluginsToEnable.map((p) => `openclaw plugins enable ${shellQuote(p)}`).join("; ");
+    await asyncTryCatchIf(isOperationalError, () =>
+      runner.runServer(`export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ${enableCmds}`),
+    );
+  }
+
   // Telegram channel setup — check env var first, then prompt interactively
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
@@ -643,7 +659,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         name: "OpenClaw",
         cloudInitTier: "full" satisfies AgentConfig["cloudInitTier"],
         preProvision: detectGithubAuth,
-        modelDefault: "openrouter/openrouter/auto",
+        modelDefault: "openrouter/auto",
         install: async () => {
           await installAgent(
             runner,
@@ -657,7 +673,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
         ],
         configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
-          setupOpenclawConfig(runner, apiKey, modelId || "openrouter/openrouter/auto", dashboardToken, enabledSteps),
+          setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto", dashboardToken, enabledSteps),
         preLaunch: () => startGateway(runner),
         preLaunchMsg: "Your web dashboard will open automatically — use it for WhatsApp QR scanning and channel setup.",
         launchCmd: () =>
