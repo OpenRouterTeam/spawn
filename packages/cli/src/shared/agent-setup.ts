@@ -325,28 +325,29 @@ async function setupOpenclawConfig(
   }
 
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
-  const escapedKey = jsonEscape(apiKey);
-  const escapedToken = jsonEscape(gatewayToken);
-  const escapedModel = jsonEscape(modelId);
 
-  const config = `{
-  "env": {
-    "OPENROUTER_API_KEY": ${escapedKey}
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": ${escapedToken}
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": ${escapedModel}
-      }
-    }
-  }
-}`;
+  // Build config object for atomic JSON write — base config only (API key, gateway, model).
+  // Channel setup (Telegram, WhatsApp) is handled by `openclaw onboard` in orchestrate.ts.
+  const configObj: Record<string, unknown> = {
+    env: {
+      OPENROUTER_API_KEY: apiKey,
+    },
+    gateway: {
+      mode: "local",
+      auth: {
+        token: gatewayToken,
+      },
+    },
+    agents: {
+      defaults: {
+        model: {
+          primary: modelId,
+        },
+      },
+    },
+  };
+
+  const config = JSON.stringify(configObj, null, 2);
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
@@ -364,22 +365,6 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Enable channel plugins before configuring them — plugins are disabled by
-  // default in OpenClaw and the gateway hangs if a token is set for a disabled plugin.
-  const pluginsToEnable: string[] = [];
-  if (enabledSteps?.has("telegram")) {
-    pluginsToEnable.push("telegram");
-  }
-  if (enabledSteps?.has("whatsapp")) {
-    pluginsToEnable.push("whatsapp");
-  }
-  if (pluginsToEnable.length > 0) {
-    const enableCmds = pluginsToEnable.map((p) => `openclaw plugins enable ${shellQuote(p)}`).join("; ");
-    await asyncTryCatchIf(isOperationalError, () =>
-      runner.runServer(`export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ${enableCmds}`),
-    );
-  }
-
   // Re-assert gateway auth token after browser config set calls — each `openclaw config set`
   // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
   // Re-setting the token here ensures it survives those cycles and the gateway starts authenticated.
@@ -393,8 +378,7 @@ async function setupOpenclawConfig(
     logWarn("Gateway token re-assertion failed (non-fatal) — dashboard may show Unauthorized");
   }
 
-  // Channel configuration (Telegram token, WhatsApp QR) happens in orchestrate.ts
-  // AFTER the gateway starts — openclaw channels commands need a running gateway.
+  // Channel setup (Telegram, WhatsApp) is handled by `openclaw onboard` in orchestrate.ts.
 
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
