@@ -2,6 +2,8 @@
 
 // delete.ts — cmdDelete
 export { cmdDelete } from "./delete.js";
+// feedback.ts — cmdFeedback
+export { cmdFeedback } from "./feedback.js";
 // help.ts — cmdHelp
 export { cmdHelp } from "./help.js";
 // info.ts — cmdMatrix, cmdAgents, cmdClouds, cmdAgentInfo, cmdCloudInfo

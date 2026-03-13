@@ -9,6 +9,7 @@ import {
   cmdCloudInfo,
   cmdClouds,
   cmdDelete,
+  cmdFeedback,
   cmdHelp,
   cmdInteractive,
   cmdLast,
@@ -733,6 +734,16 @@ async function main(): Promise<void> {
     const pickResult = await asyncTryCatch(() => cmdPick(expandEqualsFlags(rawArgs.slice(1))));
     if (!pickResult.ok) {
       handleError(pickResult.error);
+    }
+    return;
+  }
+
+  // ── `spawn feedback` — bypass flag parsing; rest of args are the message ───
+  if (rawArgs[0] === "feedback") {
+    try {
+      await cmdFeedback(rawArgs.slice(1));
+    } catch (err) {
+      handleError(err);
     }
     return;
   }
