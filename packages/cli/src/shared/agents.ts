@@ -80,6 +80,7 @@ const COMMON_STEPS: OptionalStep[] = [
   {
     value: "github",
     label: "GitHub CLI",
+    hint: "install gh + authenticate on the remote server",
   },
   {
     value: "reuse-api-key",
