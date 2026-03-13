@@ -380,6 +380,19 @@ async function setupOpenclawConfig(
     );
   }
 
+  // Re-assert gateway auth token after browser config set calls — each `openclaw config set`
+  // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
+  // Re-setting the token here ensures it survives those cycles and the gateway starts authenticated.
+  const gatewayTokenResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        `openclaw config set gateway.auth.token ${shellQuote(gatewayToken)}`,
+    ),
+  );
+  if (!gatewayTokenResult.ok) {
+    logWarn("Gateway token re-assertion failed (non-fatal) — dashboard may show Unauthorized");
+  }
+
   // Telegram channel setup — check env var first, then prompt interactively
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
