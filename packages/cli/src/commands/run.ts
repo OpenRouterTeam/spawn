@@ -221,7 +221,7 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
     });
     if (!ghRes.ok) {
       s.stop(pc.red("Download failed"));
-      reportDownloadFailure(primaryUrl, fallbackUrl, res.status, ghRes.status);
+      reportDownloadFailure(res.status, ghRes.status);
       process.exit(1);
     }
     const text = await ghRes.text();
@@ -268,12 +268,7 @@ function reportHTTPFailure(primaryStatus: number, fallbackStatus: number): void 
   }
 }
 
-function reportDownloadFailure(
-  _primaryUrl: string,
-  _fallbackUrl: string,
-  primaryStatus: number,
-  fallbackStatus: number,
-): void {
+function reportDownloadFailure(primaryStatus: number, fallbackStatus: number): void {
   if (primaryStatus === 404 && fallbackStatus === 404) {
     report404Failure();
   } else {

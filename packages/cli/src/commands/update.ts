@@ -73,7 +73,7 @@ function defaultRunUpdate(): void {
   );
 }
 
-async function performUpdate(_remoteVersion: string, runUpdate: () => void = defaultRunUpdate): Promise<void> {
+async function performUpdate(runUpdate: () => void = defaultRunUpdate): Promise<void> {
   const r = tryCatch(() => runUpdate());
   if (r.ok) {
     console.log();
@@ -113,5 +113,5 @@ export async function cmdUpdate(options?: UpdateOptions): Promise<void> {
   }
 
   s.stop(`Updating: v${VERSION} -> v${remoteVersion}`);
-  await performUpdate(remoteVersion, options?.runUpdate);
+  await performUpdate(options?.runUpdate);
 }

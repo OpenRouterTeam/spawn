@@ -45,7 +45,6 @@ function handleError(err: unknown): never {
 function extractFlagValue(
   args: string[],
   flags: string[],
-  _flagLabel: string,
   usageHint: string,
 ): [
   string | undefined,
@@ -371,7 +370,6 @@ async function resolvePrompt(args: string[]): Promise<
       "--prompt",
       "-p",
     ],
-    "prompt",
     'spawn <agent> <cloud> --prompt "your prompt here"',
   );
 
@@ -381,7 +379,6 @@ async function resolvePrompt(args: string[]): Promise<
       "--prompt-file",
       "-f",
     ],
-    "prompt file",
     "spawn <agent> <cloud> --prompt-file instructions.txt",
   );
   filteredArgs = finalArgs;
@@ -806,7 +803,6 @@ async function main(): Promise<void> {
       "--model",
       "-m",
     ],
-    "model ID",
     'spawn <agent> <cloud> --model "openai/gpt-5.3-codex"',
   );
   filteredArgs.splice(0, filteredArgs.length, ...modelFilteredArgs);
@@ -820,7 +816,6 @@ async function main(): Promise<void> {
     [
       "--config",
     ],
-    "config file",
     "spawn <agent> <cloud> --config setup.json",
   );
   filteredArgs.splice(0, filteredArgs.length, ...configFilteredArgs);
@@ -859,7 +854,6 @@ async function main(): Promise<void> {
     [
       "--steps",
     ],
-    "setup steps",
     "spawn <agent> <cloud> --steps github,browser,telegram",
   );
   filteredArgs.splice(0, filteredArgs.length, ...stepsFilteredArgs);
@@ -874,7 +868,6 @@ async function main(): Promise<void> {
     [
       "--output",
     ],
-    "output format",
     "spawn <agent> <cloud> --headless --output json",
   );
   // Replace filteredArgs contents in-place (splice + push to maintain reference)
@@ -893,7 +886,6 @@ async function main(): Promise<void> {
     [
       "--name",
     ],
-    "spawn name",
     'spawn <agent> <cloud> --name "my-dev-box"',
   );
   filteredArgs.splice(0, filteredArgs.length, ...nameFilteredArgs);
@@ -908,7 +900,6 @@ async function main(): Promise<void> {
       "--zone",
       "--region",
     ],
-    "zone/region",
     "spawn <agent> gcp --zone us-east1-b",
   );
   filteredArgs.splice(0, filteredArgs.length, ...zoneFilteredArgs);
@@ -926,7 +917,6 @@ async function main(): Promise<void> {
       "--machine-type",
       "--size",
     ],
-    "machine type/size",
     "spawn <agent> gcp --machine-type e2-standard-4",
   );
   filteredArgs.splice(0, filteredArgs.length, ...sizeFilteredArgs);

@@ -270,7 +270,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
 // ─── Codex CLI Config ────────────────────────────────────────────────────────
 
-async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+async function setupCodexConfig(runner: CloudRunner): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
@@ -662,7 +662,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
-      configure: (apiKey) => setupCodexConfig(runner, apiKey),
+      configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
     },
 
