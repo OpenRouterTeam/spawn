@@ -1,6 +1,6 @@
 # Autonomous Loops
 
-When running autonomous discovery/refactoring loops (`./discovery.sh --loop`):
+When running autonomous discovery/refactoring loops (`.claude/skills/setup-agent-team/discovery.sh --loop`):
 
 - **Run `bash -n` on every changed .sh file** before committing — syntax errors break everything
 - **NEVER revert a prior fix** — don't undo previously applied compatibility fixes

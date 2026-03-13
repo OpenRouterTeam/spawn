@@ -75,7 +75,6 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn status --prune` | Remove gone servers from history |
 | `spawn help` | Show help message |
 | `spawn version` | Show version |
-| `spawn <agent> <cloud> --beta <feature>` | Opt-in to an experimental feature (repeatable) |
 
 #### Config File
 
