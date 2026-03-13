@@ -151,6 +151,9 @@ function hasLocalGithubToken(): boolean {
   );
 }
 
+/** Sentinel value for the "None" option in the setup options multiselect. */
+const NONE_STEP = "__none__";
+
 /**
  * Show a multiselect prompt for optional post-provision setup steps.
  * Returns a Set of enabled step values, or undefined if there are no steps.
@@ -169,21 +172,42 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
     return undefined;
   }
 
+  // "None" is shown first and pre-selected by default so that:
+  // 1. Arrow keys work immediately (multiple items to navigate)
+  // 2. Users can explicitly skip all steps without pressing Enter on an empty list
+  // 3. Users who accidentally select another option can deselect it and choose None
+  const hasBrowserDefault = filteredSteps.some((s) => s.value === "browser");
+  const defaultValues = hasBrowserDefault
+    ? filteredSteps.filter((s) => s.value === "browser").map((s) => s.value)
+    : [
+        NONE_STEP,
+      ];
+
   const selected = await p.multiselect({
     message: "Setup options (↑/↓ navigate, space to select, enter to confirm)",
-    options: filteredSteps.map((s) => ({
-      value: s.value,
-      label: s.label,
-      hint: s.hint,
-    })),
-    initialValues: filteredSteps.filter((s) => s.value === "browser").map((s) => s.value),
+    options: [
+      {
+        value: NONE_STEP,
+        label: "None",
+        hint: "skip all setup steps",
+      },
+      ...filteredSteps.map((s) => ({
+        value: s.value,
+        label: s.label,
+        hint: s.hint,
+      })),
+    ],
+    initialValues: defaultValues,
     required: false,
   });
 
   if (p.isCancel(selected)) {
     return new Set<string>();
   }
-  return new Set(selected);
+
+  // Strip the "None" sentinel — it carries no real step value
+  const realSteps = selected.filter((v) => v !== NONE_STEP);
+  return new Set(realSteps);
 }
 
 export { promptSpawnName, promptSetupOptions, getAndValidateCloudChoices, selectCloud };

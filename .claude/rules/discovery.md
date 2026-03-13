@@ -19,7 +19,7 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 We are currently shipping with **6 curated clouds** (sorted by price):
 1. **local** — free (no provisioning)
-2. **hetzner** — ~€3.29/mo (CX22)
+2. **hetzner** — ~€3.49/mo (cx23)
 3. **aws** — $3.50/mo (nano)
 4. **digitalocean** — $4/mo (Basic droplet)
 5. **gcp** — $7.11/mo (e2-micro)
