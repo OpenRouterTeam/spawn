@@ -179,6 +179,7 @@ interface AwsState {
   instanceName: string;
   instanceIp: string;
   selectedBundle: string;
+  keyPairName: string;
 }
 
 const _state: AwsState = {
@@ -190,6 +191,7 @@ const _state: AwsState = {
   instanceName: "",
   instanceIp: "",
   selectedBundle: DEFAULT_BUNDLE.id,
+  keyPairName: "spawn-key",
 };
 
 export function getState() {
@@ -826,8 +828,12 @@ export async function ensureSshKey(): Promise<void> {
     throw new Error(`SSH public key not found: ${pubPath}`);
   }
 
-  const keyName = "spawn-key";
   const pubKey = readFileSync(pubPath, "utf-8").trim();
+  // Derive a machine-specific key name from the public key content so that
+  // different machines never collide on "spawn-key" with mismatched key material.
+  const keyHash = createHash("sha256").update(pubKey).digest("hex").slice(0, 8);
+  const keyName = `spawn-key-${keyHash}`;
+  _state.keyPairName = keyName;
 
   if (await lightsailGetKeyPair(keyName)) {
     logInfo("SSH key already registered with Lightsail");
@@ -912,7 +918,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
     az,
     blueprint,
     bundle,
-    keyPairName: "spawn-key",
+    keyPairName: _state.keyPairName,
     userData: userdata,
   };
 
