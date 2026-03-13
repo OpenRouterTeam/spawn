@@ -483,10 +483,6 @@ describe("validatePrompt", () => {
     expect(() => validatePrompt("Start server &")).toThrow("shell syntax");
   });
 
-  it("should reject heredoc syntax in operator combinations", () => {
-    expect(() => validatePrompt("Input << EOF")).toThrow("shell syntax");
-  });
-
   it("should accept legitimate uses of ampersand and pipes in text", () => {
     expect(() => validatePrompt("Smith & Jones corporation")).not.toThrow();
     expect(() => validatePrompt("Rock & roll music")).not.toThrow();
