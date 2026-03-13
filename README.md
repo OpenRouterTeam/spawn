@@ -50,6 +50,9 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
 | `spawn <agent> <cloud> --output json` | Headless mode with structured JSON on stdout |
+| `spawn <agent> <cloud> --model <id>` | Set the model ID (overrides agent default) |
+| `spawn <agent> <cloud> --config <file>` | Load options from a JSON config file |
+| `spawn <agent> <cloud> --steps <list>` | Comma-separated setup steps to enable |
 | `spawn <agent> <cloud> --custom` | Show interactive size/region pickers |
 | `spawn <agent>` | Show available clouds for an agent |
 | `spawn <cloud>` | Show available agents for a cloud |
@@ -73,6 +76,45 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn help` | Show help message |
 | `spawn version` | Show version |
 | `spawn <agent> <cloud> --beta <feature>` | Opt-in to an experimental feature (repeatable) |
+
+#### Config File
+
+The `--config` flag loads options from a JSON file. CLI flags override config values.
+
+```json
+{
+  "model": "openai/gpt-5.3-codex",
+  "steps": ["github", "browser", "telegram"],
+  "name": "my-dev-box",
+  "setup": {
+    "telegram_bot_token": "123456:ABC-DEF...",
+    "github_token": "ghp_xxxx"
+  }
+}
+```
+
+```bash
+spawn codex gcp --config setup.json --headless --output json
+```
+
+#### Setup Steps
+
+Control which optional setup steps run with `--steps`:
+
+```bash
+spawn openclaw gcp --steps github,browser     # Only GitHub + Chrome
+spawn claude gcp --steps ""                    # Skip all optional steps
+```
+
+Available steps vary by agent:
+
+| Step | Agents | Description |
+|------|--------|-------------|
+| `github` | All | GitHub CLI + git identity |
+| `reuse-api-key` | All | Reuse saved OpenRouter key |
+| `browser` | openclaw | Chrome browser (~400 MB) |
+| `telegram` | openclaw | Telegram bot (set `TELEGRAM_BOT_TOKEN` for non-interactive) |
+| `whatsapp` | openclaw | WhatsApp linking (interactive QR scan, skipped in headless) |
 
 #### Beta Features
 

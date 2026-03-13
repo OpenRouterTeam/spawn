@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, shellQuote, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -364,8 +364,53 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
+  // Telegram channel setup — check env var first, then prompt interactively
+  if (enabledSteps?.has("telegram")) {
+    logStep("Setting up Telegram...");
+    const envToken = process.env.TELEGRAM_BOT_TOKEN;
+    const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token (from @BotFather): ")).trim();
+
+    if (trimmedToken) {
+      const escapedBotToken = jsonEscape(trimmedToken);
+      const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
+        runner.runServer(
+          "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+            `openclaw config set channels.telegram.botToken ${escapedBotToken}`,
+        ),
+      );
+      if (telegramResult.ok) {
+        logInfo("Telegram bot token configured");
+      } else {
+        logWarn("Telegram config failed — set it up via the web dashboard after launch");
+      }
+    } else {
+      logInfo("No token entered — set up Telegram via the web dashboard after launch");
+    }
+  }
+
+  // WhatsApp — QR code scanning happens interactively in orchestrate.ts
+  // after the gateway starts and tunnel is set up. No config needed here.
+
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  const messagingLines: string[] = [];
+  if (enabledSteps?.has("telegram") || enabledSteps?.has("whatsapp")) {
+    messagingLines.push("", "## Messaging Channels", "", "The user selected messaging channels during setup.");
+    if (enabledSteps.has("telegram")) {
+      messagingLines.push(
+        "- **Telegram**: If a bot token was provided, it is already configured.",
+        "  To verify: `openclaw config get channels.telegram.botToken`",
+      );
+    }
+    if (enabledSteps.has("whatsapp")) {
+      messagingLines.push(
+        "- **WhatsApp**: Requires QR code scanning. Guide the user to the web",
+        "  dashboard to complete setup: http://localhost:18791",
+      );
+    }
+    messagingLines.push("");
+  }
+
   const userMd = [
     "# User",
     "",
@@ -378,6 +423,7 @@ async function setupOpenclawConfig(
     "",
     "The dashboard URL is: http://localhost:18791",
     "(It may also be SSH-tunneled to the user's local machine automatically.)",
+    ...messagingLines,
     "",
   ].join("\n");
   await runner.runServer("mkdir -p ~/.openclaw/workspace");
@@ -636,7 +682,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
           setupOpenclawConfig(runner, apiKey, modelId || "openrouter/openrouter/auto", dashboardToken, enabledSteps),
         preLaunch: () => startGateway(runner),
-        preLaunchMsg: "Your web dashboard will open automatically. If it doesn't, check the terminal for the URL.",
+        preLaunchMsg: "Your web dashboard will open automatically — use it for WhatsApp QR scanning and channel setup.",
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
         tunnel: {

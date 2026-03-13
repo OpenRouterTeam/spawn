@@ -17,6 +17,11 @@ function getHelpUsageSection(): string {
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
                                      Execute agent with prompt from file
+  spawn <agent> <cloud> --model <id>   Set the model ID (overrides config/default)
+  spawn <agent> <cloud> --config <file>
+                                     Load all options from a JSON config file
+  spawn <agent> <cloud> --steps <list>
+                                     Comma-separated setup steps to enable
   spawn <agent>                      Interactive cloud picker for agent
   spawn <cloud>                      Show available agents for cloud
   spawn list                         Browse and rerun previous spawns (aliases: ls, history)
@@ -59,6 +64,10 @@ function getHelpExamplesSection(): string {
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
+  spawn codex gcp --config setup.json --headless --output json
+                                     ${pc.dim("# Config file with headless JSON output")}
+  spawn openclaw gcp --steps github,browser --headless
+                                     ${pc.dim("# Only run specific setup steps")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
@@ -103,6 +112,8 @@ function getHelpEnvVarsSection(): string {
   ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
   ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
+  ${pc.cyan("SPAWN_ENABLED_STEPS")}       Comma-separated setup steps (set by --steps/--config)
+  ${pc.cyan("TELEGRAM_BOT_TOKEN")}       Telegram bot token for non-interactive setup
   ${pc.cyan("SPAWN_HEADLESS=1")}          Set automatically in --headless mode (for scripts)
   ${pc.cyan("SPAWN_CUSTOM=1")}           Set automatically in --custom mode (show size/region pickers)`;
 }

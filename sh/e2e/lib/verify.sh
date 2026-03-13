@@ -626,6 +626,46 @@ verify_junie() {
 }
 
 # ---------------------------------------------------------------------------
+# Setup step verification helpers
+# ---------------------------------------------------------------------------
+
+verify_setup_github() {
+  local app="$1"
+  log_step "Checking GitHub CLI setup..."
+  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v gh && gh auth status" >/dev/null 2>&1; then
+    log_ok "GitHub CLI installed and authenticated"
+    return 0
+  else
+    log_warn "GitHub CLI not authenticated (non-fatal)"
+    return 0
+  fi
+}
+
+verify_setup_browser() {
+  local app="$1"
+  log_step "Checking Chrome browser..."
+  if cloud_exec "${app}" "command -v google-chrome-stable >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1" >/dev/null 2>&1; then
+    log_ok "Chrome browser installed"
+    return 0
+  else
+    log_err "Chrome browser not found"
+    return 1
+  fi
+}
+
+verify_setup_telegram() {
+  local app="$1"
+  log_step "Checking openclaw Telegram config..."
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH openclaw config get channels.telegram.botToken 2>/dev/null | grep -v '^$'" >/dev/null 2>&1; then
+    log_ok "Telegram bot token configured"
+    return 0
+  else
+    log_warn "Telegram bot token not configured (non-fatal)"
+    return 0
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # verify_agent AGENT APP_NAME
 #
 # Dispatch: common checks + agent-specific checks.

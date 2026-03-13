@@ -12,6 +12,10 @@ export interface OptionalStep {
   value: string;
   label: string;
   hint?: string;
+  /** Env var that supplies data for this step (e.g. TELEGRAM_BOT_TOKEN). */
+  dataEnvVar?: string;
+  /** When true, step requires interactive input (e.g. QR scan) — skipped in headless. */
+  interactive?: boolean;
 }
 
 export interface AgentConfig {
@@ -56,6 +60,18 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
       label: "Chrome browser",
       hint: "~400 MB — enables web tools",
     },
+    {
+      value: "telegram",
+      label: "Telegram",
+      hint: "connect via bot token from @BotFather",
+      dataEnvVar: "TELEGRAM_BOT_TOKEN",
+    },
+    {
+      value: "whatsapp",
+      label: "WhatsApp",
+      hint: "scan QR code during setup",
+      interactive: true,
+    },
   ],
 };
 
@@ -81,6 +97,31 @@ export function getAgentOptionalSteps(agentName: string): OptionalStep[] {
         ...extra,
       ]
     : COMMON_STEPS;
+}
+
+/** Validate step names against the known steps for an agent.
+ *  Returns valid and invalid step names separately. */
+export function validateStepNames(
+  agentName: string,
+  steps: string[],
+): {
+  valid: string[];
+  invalid: string[];
+} {
+  const known = new Set(getAgentOptionalSteps(agentName).map((s) => s.value));
+  const valid: string[] = [];
+  const invalid: string[] = [];
+  for (const step of steps) {
+    if (known.has(step)) {
+      valid.push(step);
+    } else {
+      invalid.push(step);
+    }
+  }
+  return {
+    valid,
+    invalid,
+  };
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
