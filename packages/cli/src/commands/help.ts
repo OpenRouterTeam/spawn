@@ -17,7 +17,6 @@ function getHelpUsageSection(): string {
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
                                      Execute agent with prompt from file
-  spawn <agent> <cloud> --model <id>   Set the model ID (overrides config/default)
   spawn <agent> <cloud> --config <file>
                                      Load all options from a JSON config file
   spawn <agent> <cloud> --steps <list>
