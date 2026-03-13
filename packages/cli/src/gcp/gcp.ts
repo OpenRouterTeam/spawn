@@ -1081,8 +1081,3 @@ export async function destroyInstance(name?: string): Promise<void> {
   }
   logInfo(`Instance '${instanceName}' destroyed`);
 }
-
-// ─── Shell Quoting ──────────────────────────────────────────────────────────
-
-// shellQuote is now imported from shared/ui.ts and re-exported for backwards compat
-export { shellQuote } from "../shared/ui";
