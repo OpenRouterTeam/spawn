@@ -30,40 +30,20 @@ const mockManifest = createMockManifest();
 
 describe("findClosestKeyByNameOrKey", () => {
   describe("key-based matching", () => {
-    it("should match a key with distance 1 (missing letter)", () => {
+    it("should match a key within the edit-distance threshold (deletion, insertion, substitution)", () => {
       const keys = [
         "claude",
         "codex",
       ];
-      const result = findClosestKeyByNameOrKey("claud", keys, () => "irrelevant-name");
-      expect(result).toBe("claude");
-    });
-
-    it("should match a key with distance 1 (extra letter)", () => {
-      const keys = [
-        "claude",
-        "codex",
-      ];
-      const result = findClosestKeyByNameOrKey("claudee", keys, () => "irrelevant-name");
-      expect(result).toBe("claude");
-    });
-
-    it("should match a key with distance 1 (substitution)", () => {
-      const keys = [
-        "claude",
-        "codex",
-      ];
-      const result = findClosestKeyByNameOrKey("claudi", keys, () => "irrelevant-name");
-      expect(result).toBe("claude");
-    });
-
-    it("should match a key with distance 2", () => {
-      const keys = [
-        "claude",
-        "codex",
-      ];
-      const result = findClosestKeyByNameOrKey("clad", keys, () => "irrelevant-name");
-      expect(result).toBe("claude");
+      const getName = () => "irrelevant-name";
+      // deletion: "claud" → "claude" (distance 1)
+      expect(findClosestKeyByNameOrKey("claud", keys, getName)).toBe("claude");
+      // insertion: "claudee" → "claude" (distance 1)
+      expect(findClosestKeyByNameOrKey("claudee", keys, getName)).toBe("claude");
+      // substitution: "claudi" → "claude" (distance 1)
+      expect(findClosestKeyByNameOrKey("claudi", keys, getName)).toBe("claude");
+      // distance 2
+      expect(findClosestKeyByNameOrKey("clad", keys, getName)).toBe("claude");
     });
 
     it("should match a key with distance 3 (max threshold)", () => {
@@ -429,32 +409,17 @@ describe("findClosestMatch - threshold boundary tests", () => {
     "hetzner",
   ];
 
-  it("should match at exactly distance 3", () => {
-    // "cla" -> "claude" requires 3 insertions (u, d, e) = distance 3, at threshold boundary
-    const result = findClosestMatch("cla", candidates);
-    expect(result).toBe("claude");
-  });
-
-  it("should not match at distance 4", () => {
-    // Need a string that is distance 4+ from all candidates
-    // "zzzzz" vs "claude" -> 6, "codex" -> 5, "sprite" -> 6, "hetzner" -> 7
-    const result = findClosestMatch("zzzzz", candidates);
-    expect(result).toBeNull();
-  });
-
-  it("should match at distance 0 (exact match)", () => {
-    const result = findClosestMatch("claude", candidates);
-    expect(result).toBe("claude");
-  });
-
-  it("should match at distance 1", () => {
-    const result = findClosestMatch("claud", candidates);
-    expect(result).toBe("claude");
-  });
-
-  it("should match at distance 2", () => {
-    const result = findClosestMatch("clau", candidates);
-    expect(result).toBe("claude");
+  it("should match inputs within threshold (distances 0–3) and reject beyond it", () => {
+    // distance 0: exact match
+    expect(findClosestMatch("claude", candidates)).toBe("claude");
+    // distance 1: one deletion
+    expect(findClosestMatch("claud", candidates)).toBe("claude");
+    // distance 2: two deletions
+    expect(findClosestMatch("clau", candidates)).toBe("claude");
+    // distance 3: three insertions needed — at threshold boundary
+    expect(findClosestMatch("cla", candidates)).toBe("claude");
+    // distance 4+: all candidates too far — "zzzzz" vs shortest candidate ("codex") is distance 5
+    expect(findClosestMatch("zzzzz", candidates)).toBeNull();
   });
 
   it("should return the closest when multiple are within threshold", () => {
@@ -492,43 +457,25 @@ describe("findClosestMatch - threshold boundary tests", () => {
 
 // ── resolveAgentKey / resolveCloudKey: display name edge cases ──────────────
 
-describe("resolveAgentKey - display name edge cases", () => {
-  it("should resolve case-insensitive display name match", () => {
+describe("resolveAgentKey / resolveCloudKey - display name edge cases", () => {
+  it("should resolve case-insensitive display name match for agents and clouds", () => {
     // "claude code" matches display name "Claude Code" case-insensitively
     expect(resolveAgentKey(mockManifest, "claude code")).toBe("claude");
-  });
-
-  it("should prefer exact key match over display name match", () => {
-    // If key is "claude" and display name is "Claude Code",
-    // input "claude" should match as key (exact), not try display names
-    expect(resolveAgentKey(mockManifest, "claude")).toBe("claude");
-  });
-
-  it("should try case-insensitive key before display name", () => {
-    // "CLAUDE" should match key "claude" case-insensitively
-    // before trying display name matching
-    expect(resolveAgentKey(mockManifest, "CLAUDE")).toBe("claude");
-  });
-
-  it("should return null for non-matching input", () => {
-    expect(resolveAgentKey(mockManifest, "nonexistent")).toBeNull();
-  });
-});
-
-describe("resolveCloudKey - display name edge cases", () => {
-  it("should resolve case-insensitive display name match", () => {
     expect(resolveCloudKey(mockManifest, "hetzner cloud")).toBe("hetzner");
   });
 
   it("should prefer exact key match over display name match", () => {
+    expect(resolveAgentKey(mockManifest, "claude")).toBe("claude");
     expect(resolveCloudKey(mockManifest, "sprite")).toBe("sprite");
   });
 
-  it("should try case-insensitive key before display name", () => {
+  it("should match keys case-insensitively before trying display names", () => {
+    expect(resolveAgentKey(mockManifest, "CLAUDE")).toBe("claude");
     expect(resolveCloudKey(mockManifest, "SPRITE")).toBe("sprite");
   });
 
   it("should return null for non-matching input", () => {
+    expect(resolveAgentKey(mockManifest, "nonexistent")).toBeNull();
     expect(resolveCloudKey(mockManifest, "nonexistent")).toBeNull();
   });
 });
