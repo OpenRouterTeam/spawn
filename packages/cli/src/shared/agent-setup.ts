@@ -519,7 +519,7 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
 
   // Run onboard first to set up provider/key
   await runner.runServer(
-    `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
+    `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
   );
 
   // Patch autonomy settings in-place. `zeroclaw onboard` already generates
@@ -547,37 +547,6 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
 }
 
 // ─── Swap Space Setup ─────────────────────────────────────────────────────────
-
-/**
- * Ensure swap space exists on the remote machine.
- * Used before memory-intensive builds (e.g., Rust compilation) on
- * resource-constrained instances (512 MB RAM). Idempotent — skips if
- * swap is already configured. Non-fatal if sudo is unavailable.
- */
-async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
-  if (typeof sizeMb !== "number" || sizeMb <= 0 || !Number.isInteger(sizeMb)) {
-    throw new Error(`Invalid swap size: ${sizeMb}`);
-  }
-  logStep(`Ensuring ${sizeMb} MB swap space for compilation...`);
-  const script = [
-    "if swapon --show 2>/dev/null | grep -q /swapfile; then",
-    "  echo '==> Swap already configured, skipping'",
-    "else",
-    `  echo '==> Creating ${sizeMb} MB swap file...'`,
-    `  sudo fallocate -l ${sizeMb}M /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=${sizeMb} status=none`,
-    "  sudo chmod 600 /swapfile",
-    "  sudo mkswap /swapfile >/dev/null",
-    "  sudo swapon /swapfile",
-    "  echo '==> Swap enabled'",
-    "fi",
-  ].join("\n");
-  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(script));
-  if (result.ok) {
-    logInfo("Swap space ready");
-  } else {
-    logWarn("Swap setup failed (non-fatal) — build may still succeed on larger instances");
-  }
-}
 
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
@@ -620,8 +589,9 @@ const NPM_GLOBAL_PATH_PERSIST =
 
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
-const ZEROCLAW_INSTALL_URL =
-  "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh";
+// Last zeroclaw release that shipped Linux prebuilt binaries (v0.1.9a has none).
+// Used for direct binary install to avoid a Rust source build timeout.
+const ZEROCLAW_PREBUILT_TAG = "v0.1.7-beta.30";
 
 function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
@@ -726,15 +696,21 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "minimal",
       preProvision: detectGithubAuth,
       install: async () => {
-        // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
-        // OOM during Rust compilation if --prefer-prebuilt falls back to source.
-        await ensureSwapSpace(runner);
-        await installAgent(
-          runner,
-          "ZeroClaw",
-          `curl --proto '=https' -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
-          600, // 10 min: swap-backed compilation is slower than the 5-min default
-        );
+        // Direct binary install from pinned release (v0.1.9a "latest" has no assets,
+        // causing the bootstrap --prefer-prebuilt path to 404-fail and fall back to
+        // a Rust source build that exceeds the 600s install timeout).
+        const directInstallCmd =
+          `_ZC_ARCH="$(uname -m)"; ` +
+          `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
+          `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
+          `else echo "Unsupported arch: $_ZC_ARCH" >&2; exit 1; fi; ` +
+          `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/download/${ZEROCLAW_PREBUILT_TAG}/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
+          `_ZC_TMP="$(mktemp -d)"; ` +
+          `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
+          `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
+          `{ mkdir -p "$HOME/.local/bin" && install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw"; } && ` +
+          `rm -rf "$_ZC_TMP"`;
+        await installAgent(runner, "ZeroClaw", directInstallCmd, 120);
       },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -742,7 +718,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
-        "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+        "export PATH=$HOME/.local/bin:$HOME/.cargo/bin:$PATH; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
     },
 
     hermes: {
