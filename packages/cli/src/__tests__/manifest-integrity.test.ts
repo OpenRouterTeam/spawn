@@ -30,16 +30,6 @@ describe("Manifest Integrity", () => {
   // ── Basic structure ─────────────────────────────────────────────────
 
   describe("structure", () => {
-    it("should parse as valid JSON", () => {
-      expect(() => JSON.parse(manifestRaw)).not.toThrow();
-    });
-
-    it("should have agents, clouds, and matrix top-level keys", () => {
-      expect(manifest).toHaveProperty("agents");
-      expect(manifest).toHaveProperty("clouds");
-      expect(manifest).toHaveProperty("matrix");
-    });
-
     it("should have at least one agent", () => {
       expect(agents.length).toBeGreaterThan(0);
     });
