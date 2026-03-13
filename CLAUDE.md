@@ -46,7 +46,6 @@ spawn/
     discovery.yml                # Scheduled + issue-triggered discovery workflow
     refactor.yml                 # Scheduled + issue-triggered refactor workflow
   manifest.json                  # The matrix (source of truth)
-  discovery.sh                   # Run this to trigger one discovery cycle
   fixtures/                      # API response fixtures for testing
   README.md                      # User-facing docs
   CLAUDE.md                      # This file — project overview
