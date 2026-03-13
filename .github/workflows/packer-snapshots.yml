@@ -90,8 +90,8 @@ jobs:
         if: success()
         run: |
           IMG_ID=$(jq -r '.builds[-1].artifact_id | split(":")[1]' packer/manifest.json)
-          if [ -z "$IMG_ID" ] || [ "$IMG_ID" = "null" ]; then
-            echo "Failed to extract snapshot ID from manifest"
+          if ! [[ "$IMG_ID" =~ ^[0-9]+$ ]]; then
+            echo "Invalid or missing snapshot ID: ${IMG_ID}"
             exit 1
           fi
           echo "Snapshot ID: ${IMG_ID}"
@@ -111,7 +111,7 @@ jobs:
               echo "  Transfer to ${REGION} initiated"
             else
               echo "  WARNING: Transfer to ${REGION} returned ${HTTP_CODE} (non-fatal)"
-              cat /tmp/transfer-resp.json
+              jq -r '.' /tmp/transfer-resp.json 2>/dev/null || echo "Response unavailable"
               FAILED=$((FAILED + 1))
             fi
           done
