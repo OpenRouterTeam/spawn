@@ -6,13 +6,13 @@ import type { CloudOrchestrator } from "../shared/orchestrate";
 
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
+import { logInfo } from "../shared/ui";
 import { agents, resolveAgent } from "./agents";
 import {
   checkAccountStatus,
   createServer as createDroplet,
   ensureDoToken,
   ensureSshKey,
-  findSpawnSnapshot,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -24,6 +24,11 @@ import {
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean";
+
+/** Map agent names to DO marketplace image slugs */
+function getMarketplaceSlug(agent: string): string {
+  return `openrouter-spawn${agent}`;
+}
 
 async function main() {
   const agentName = process.argv[2];
@@ -37,7 +42,7 @@ async function main() {
 
   let dropletSize = "";
   let region = "";
-  let snapshotId: string | null = null;
+  let marketplaceImage: string | undefined;
 
   const cloud: CloudOrchestrator = {
     cloudName: "digitalocean",
@@ -60,19 +65,18 @@ async function main() {
       region = await promptDoRegion();
     },
     async createServer(name: string) {
-      // Check for a pre-built snapshot before provisioning (opt-in via --beta images)
+      // Use pre-built marketplace image when --beta images is active
       const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
       if (betaFeatures.includes("images")) {
-        snapshotId = await findSpawnSnapshot(agentName);
-        if (snapshotId) {
-          cloud.skipAgentInstall = true;
-        }
+        marketplaceImage = getMarketplaceSlug(agentName);
+        cloud.skipAgentInstall = true;
+        logInfo(`Using marketplace image: ${marketplaceImage}`);
       }
-      return await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId ?? undefined);
+      return await createDroplet(name, agent.cloudInitTier, dropletSize, region, marketplaceImage);
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId) {
+      if (marketplaceImage) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();
