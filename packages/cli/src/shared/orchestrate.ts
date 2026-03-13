@@ -19,7 +19,6 @@ import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import { getErrorMessage } from "./type-guards";
 import {
-  jsonEscape,
   logDebug,
   logInfo,
   logStep,
@@ -27,6 +26,7 @@ import {
   openBrowser,
   prepareStdinForHandoff,
   prompt,
+  shellQuote,
   validateModelId,
   withRetry,
 } from "./ui";
@@ -308,7 +308,7 @@ export async function runOrchestration(
     }
     const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token: ")).trim();
     if (trimmedToken) {
-      const escaped = jsonEscape(trimmedToken);
+      const escaped = shellQuote(trimmedToken);
       const result = await asyncTryCatchIf(isOperationalError, () =>
         cloud.runner.runServer(
           `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw channels add --channel telegram --token ${escaped}`,
