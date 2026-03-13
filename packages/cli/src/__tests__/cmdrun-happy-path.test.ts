@@ -389,22 +389,14 @@ describe("cmdRun happy-path pipeline", () => {
   // ── Env var passing via runBash ───────────────────────────────────────────
 
   describe("SPAWN_PROMPT and SPAWN_MODE env var passing", () => {
-    it("should pass prompt to bash script via SPAWN_PROMPT env var", async () => {
-      // Use a script that echoes the env var so we can verify it was set
-      const echoScript = '#!/bin/bash\nset -eo pipefail\ntest "$SPAWN_PROMPT" = "Fix all bugs"';
-      global.fetch = mockFetchForDownload({
-        primaryOk: true,
-        scriptContent: echoScript,
-      });
-      await loadManifest(true);
-
-      // If SPAWN_PROMPT is set correctly, the test command succeeds (exit 0)
-      await cmdRun("claude", "sprite", "Fix all bugs");
-      expect(processExitSpy).not.toHaveBeenCalled();
-    });
-
-    it("should set SPAWN_MODE to non-interactive when prompt is provided", async () => {
-      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest "$SPAWN_MODE" = "non-interactive"';
+    it("should set both SPAWN_PROMPT and SPAWN_MODE when prompt is provided", async () => {
+      // Single script checks both vars — avoids two separate bash invocations
+      const checkScript = [
+        "#!/bin/bash",
+        "set -eo pipefail",
+        'test "$SPAWN_PROMPT" = "Fix all bugs"',
+        'test "$SPAWN_MODE" = "non-interactive"',
+      ].join("\n");
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
@@ -415,21 +407,14 @@ describe("cmdRun happy-path pipeline", () => {
       expect(processExitSpy).not.toHaveBeenCalled();
     });
 
-    it("should NOT set SPAWN_PROMPT when no prompt is provided", async () => {
-      // This script fails if SPAWN_PROMPT is set (non-empty)
-      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_PROMPT:-}"';
-      global.fetch = mockFetchForDownload({
-        primaryOk: true,
-        scriptContent: checkScript,
-      });
-      await loadManifest(true);
-
-      await cmdRun("claude", "sprite");
-      expect(processExitSpy).not.toHaveBeenCalled();
-    });
-
-    it("should NOT set SPAWN_MODE when no prompt is provided", async () => {
-      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_MODE:-}"';
+    it("should NOT set SPAWN_PROMPT or SPAWN_MODE when no prompt is provided", async () => {
+      // Single script verifies both vars are unset
+      const checkScript = [
+        "#!/bin/bash",
+        "set -eo pipefail",
+        'test -z "${SPAWN_PROMPT:-}"',
+        'test -z "${SPAWN_MODE:-}"',
+      ].join("\n");
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
