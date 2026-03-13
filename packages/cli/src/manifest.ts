@@ -319,4 +319,4 @@ export function _resetCacheForTesting(): void {
   _staleCache = false;
 }
 
-export { RAW_BASE, REPO, SPAWN_CDN, VERSION_URL, stripDangerousKeys };
+export { RAW_BASE, REPO, SPAWN_CDN, stripDangerousKeys, VERSION_URL };
