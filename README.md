@@ -114,7 +114,6 @@ Available steps vary by agent:
 | `reuse-api-key` | All | Reuse saved OpenRouter key |
 | `browser` | openclaw | Chrome browser (~400 MB) |
 | `telegram` | openclaw | Telegram bot (set `TELEGRAM_BOT_TOKEN` for non-interactive) |
-| `whatsapp` | openclaw | WhatsApp linking (interactive QR scan, skipped in headless) |
 
 #### Beta Features
 

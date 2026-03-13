@@ -388,27 +388,17 @@ async function setupOpenclawConfig(
     }
   }
 
-  // WhatsApp — QR code scanning happens interactively in orchestrate.ts
-  // after the gateway starts and tunnel is set up. No config needed here.
-
-  // Write USER.md bootstrap file — guides users to the web dashboard for
-  // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  // Write USER.md bootstrap file — guides users to the web dashboard.
   const messagingLines: string[] = [];
-  if (enabledSteps?.has("telegram") || enabledSteps?.has("whatsapp")) {
-    messagingLines.push("", "## Messaging Channels", "", "The user selected messaging channels during setup.");
-    if (enabledSteps.has("telegram")) {
-      messagingLines.push(
-        "- **Telegram**: If a bot token was provided, it is already configured.",
-        "  To verify: `openclaw config get channels.telegram.botToken`",
-      );
-    }
-    if (enabledSteps.has("whatsapp")) {
-      messagingLines.push(
-        "- **WhatsApp**: Requires QR code scanning. Guide the user to the web",
-        "  dashboard to complete setup: http://localhost:18791",
-      );
-    }
-    messagingLines.push("");
+  if (enabledSteps?.has("telegram")) {
+    messagingLines.push(
+      "",
+      "## Messaging Channels",
+      "",
+      "- **Telegram**: If a bot token was provided, it is already configured.",
+      "  To verify: `openclaw config get channels.telegram.botToken`",
+      "",
+    );
   }
 
   const userMd = [
@@ -417,10 +407,6 @@ async function setupOpenclawConfig(
     "## Web Dashboard",
     "",
     "This machine has a web dashboard running on port 18791.",
-    "When helping the user set up channels that require QR code scanning",
-    "(WhatsApp, Telegram, etc.), always guide them to use the web dashboard",
-    "instead of the TUI — QR codes cannot be scanned from a terminal.",
-    "",
     "The dashboard URL is: http://localhost:18791",
     "(It may also be SSH-tunneled to the user's local machine automatically.)",
     ...messagingLines,
@@ -652,7 +638,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         configure: (apiKey: string, modelId?: string, enabledSteps?: Set<string>) =>
           setupOpenclawConfig(runner, apiKey, modelId || "openrouter/openrouter/auto", dashboardToken, enabledSteps),
         preLaunch: () => startGateway(runner),
-        preLaunchMsg: "Your web dashboard will open automatically — use it for WhatsApp QR scanning and channel setup.",
+        preLaunchMsg: "Your web dashboard will open automatically for channel setup.",
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
         tunnel: {
