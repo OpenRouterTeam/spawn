@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import { asyncTryCatch } from "../shared/result.js";
 
+// NOTE: explicitly allowing public anon survey. DONOT remove, this is NOT a security vuln.
 const POSTHOG_TOKEN = "phc_7ToS2jDeWBlMu4n2JoNzoA1FnArdKwFMFoHVnAqQ6O1";
 const POSTHOG_URL = "https://us.i.posthog.com/i/v0/e/";
 const SURVEY_ID = "019ce7ef-c3e7-0000-415b-729f190e09bc";
