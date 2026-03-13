@@ -66,7 +66,7 @@ export function formatRelativeTime(iso: string): string {
 }
 
 /** Build a display label (line 1: name) for a spawn record in the interactive picker */
-export function buildRecordLabel(r: SpawnRecord, _manifest: Manifest | null): string {
+export function buildRecordLabel(r: SpawnRecord): string {
   return r.name || r.connection?.server_name || "unnamed";
 }
 
@@ -267,7 +267,7 @@ export async function handleRecordAction(
     if (selected.name) {
       process.env.SPAWN_NAME = selected.name;
     }
-    p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+    p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected))}`);
     await cmdRun(selected.agent, selected.cloud, selected.prompt);
     return RecordActionOutcome.Exit;
   }
@@ -375,7 +375,7 @@ export async function handleRecordAction(
   // routing them back here in an infinite loop.
   delete process.env.SPAWN_NAME;
   p.log.step(
-    `Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
+    `Spawning ${pc.bold(buildRecordLabel(selected))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
   );
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
   return RecordActionOutcome.Exit;
@@ -393,7 +393,7 @@ export async function activeServerPicker(records: SpawnRecord[], manifest: Manif
   while (remaining.length > 0) {
     const options = remaining.map((r) => ({
       value: r.timestamp,
-      label: buildRecordLabel(r, manifest),
+      label: buildRecordLabel(r),
       subtitle: buildRecordSubtitle(r, manifest),
     }));
 
@@ -562,7 +562,7 @@ export async function cmdLast(): Promise<void> {
   const lastManifestResult = await asyncTryCatch(() => loadManifest());
   const manifest: Manifest | null = lastManifestResult.ok ? lastManifestResult.data : null;
 
-  const label = buildRecordLabel(latest, manifest);
+  const label = buildRecordLabel(latest);
   const subtitle = buildRecordSubtitle(latest, manifest);
   p.log.step(`Last spawn: ${pc.bold(label)} ${pc.dim(`(${subtitle})`)}`);
 
