@@ -25,8 +25,6 @@ import {
   logWarn,
   openBrowser,
   prepareStdinForHandoff,
-  prompt,
-  shellQuote,
   validateModelId,
   withRetry,
 } from "./ui";
@@ -293,43 +291,10 @@ export async function runOrchestration(
     }
   }
 
-  // 11c. Channel setup (runs after gateway is up so openclaw commands work)
+  // 11c. Interactive channel login (WhatsApp QR scan)
+  // Telegram is configured via the config file in agent-setup.ts (atomic JSON write).
+  // WhatsApp requires interactive QR code scanning after the gateway starts.
   const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
-
-  if (enabledSteps?.has("telegram")) {
-    logStep("Setting up Telegram...");
-    const envToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!envToken) {
-      logInfo("To get a bot token:");
-      logInfo("  1. Open Telegram and search for @BotFather");
-      logInfo("  2. Send /newbot and follow the prompts");
-      logInfo("  3. Copy the token (looks like 123456:ABC-DEF...)");
-      logInfo("  Press Enter to skip if you don't have one yet.");
-    }
-    const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token: ")).trim();
-    if (trimmedToken) {
-      const escaped = shellQuote(trimmedToken);
-      const result = await asyncTryCatchIf(isOperationalError, () =>
-        cloud.runner.runServer(
-          `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw channels add --channel telegram --token ${escaped}`,
-        ),
-      );
-      if (result.ok) {
-        logInfo("Telegram channel added");
-        // Set groupPolicy to "open" so group messages aren't silently dropped
-        // (default "allowlist" with empty groupAllowFrom drops all group messages)
-        await asyncTryCatchIf(isOperationalError, () =>
-          cloud.runner.runServer(
-            `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw config set channels.telegram.groupPolicy open`,
-          ),
-        );
-      } else {
-        logWarn("Telegram setup failed — configure it via the web dashboard after launch");
-      }
-    } else {
-      logInfo("No token entered — set up Telegram via the web dashboard after launch");
-    }
-  }
 
   if (enabledSteps?.has("whatsapp")) {
     logStep("Linking WhatsApp — scan the QR code with your phone...");

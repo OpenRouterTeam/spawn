@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, shellQuote, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -324,29 +324,63 @@ async function setupOpenclawConfig(
     await installChromeBrowser(runner);
   }
 
-  const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
-  const escapedKey = jsonEscape(apiKey);
-  const escapedToken = jsonEscape(gatewayToken);
-  const escapedModel = jsonEscape(modelId);
-
-  const config = `{
-  "env": {
-    "OPENROUTER_API_KEY": ${escapedKey}
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": ${escapedToken}
+  // Prompt for Telegram bot token before building the config JSON so we can
+  // include it in a single atomic write. Telegram is a channel (not a plugin) —
+  // configured via the config file, not `openclaw channels add`.
+  let telegramBotToken = "";
+  if (enabledSteps?.has("telegram")) {
+    logStep("Setting up Telegram...");
+    const envToken = process.env.TELEGRAM_BOT_TOKEN ?? process.env.SPAWN_TELEGRAM_BOT_TOKEN ?? "";
+    if (!envToken) {
+      logInfo("To get a bot token:");
+      logInfo("  1. Open Telegram and search for @BotFather");
+      logInfo("  2. Send /newbot and follow the prompts");
+      logInfo("  3. Copy the token (looks like 123456:ABC-DEF...)");
+      logInfo("  Press Enter to skip if you don't have one yet.");
     }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": ${escapedModel}
-      }
+    telegramBotToken = (envToken || (await prompt("Telegram bot token: "))).trim();
+    if (!telegramBotToken) {
+      logInfo("No token entered — set up Telegram via the web dashboard after launch");
     }
   }
-}`;
+
+  const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
+
+  // Build config object for atomic JSON write
+  const configObj: Record<string, unknown> = {
+    env: {
+      OPENROUTER_API_KEY: apiKey,
+    },
+    gateway: {
+      mode: "local",
+      auth: {
+        token: gatewayToken,
+      },
+    },
+    agents: {
+      defaults: {
+        model: {
+          primary: modelId,
+        },
+      },
+    },
+  };
+
+  // Telegram is a built-in channel — configure it in the config file directly.
+  // Setting enabled + groupPolicy "open" avoids the Doctor warning about
+  // "allowlist" with empty groupAllowFrom silently dropping group messages.
+  if (telegramBotToken) {
+    configObj.channels = {
+      telegram: {
+        enabled: true,
+        botToken: telegramBotToken,
+        groupPolicy: "open",
+      },
+    };
+    logInfo("Telegram bot token configured");
+  }
+
+  const config = JSON.stringify(configObj, null, 2);
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
@@ -364,21 +398,9 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Enable channel plugins before configuring them — plugins are disabled by
-  // default in OpenClaw and the gateway hangs if a token is set for a disabled plugin.
-  const pluginsToEnable: string[] = [];
-  if (enabledSteps?.has("telegram")) {
-    pluginsToEnable.push("telegram");
-  }
-  if (enabledSteps?.has("whatsapp")) {
-    pluginsToEnable.push("whatsapp");
-  }
-  if (pluginsToEnable.length > 0) {
-    const enableCmds = pluginsToEnable.map((p) => `openclaw plugins enable ${shellQuote(p)}`).join("; ");
-    await asyncTryCatchIf(isOperationalError, () =>
-      runner.runServer(`export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ${enableCmds}`),
-    );
-  }
+  // Note: Telegram is a built-in channel, NOT a plugin — do not call
+  // `openclaw plugins enable telegram` (it causes OOM on low-RAM instances).
+  // Telegram config is written directly to the config file above.
 
   // Re-assert gateway auth token after browser config set calls — each `openclaw config set`
   // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
@@ -393,8 +415,7 @@ async function setupOpenclawConfig(
     logWarn("Gateway token re-assertion failed (non-fatal) — dashboard may show Unauthorized");
   }
 
-  // Channel configuration (Telegram token, WhatsApp QR) happens in orchestrate.ts
-  // AFTER the gateway starts — openclaw channels commands need a running gateway.
+  // WhatsApp QR scanning happens in orchestrate.ts AFTER the gateway starts.
 
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
