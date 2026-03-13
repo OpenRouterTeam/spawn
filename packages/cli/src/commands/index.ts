@@ -1,8 +1,5 @@
 // Barrel re-export — all command modules re-exported from this index.
 
-// run.ts — cmdRun, cmdRunHeadless, script failure guidance
-export type { HeadlessOptions } from "./run.js";
-
 // delete.ts — cmdDelete
 export { cmdDelete } from "./delete.js";
 // help.ts — cmdHelp
@@ -31,6 +28,7 @@ export {
 } from "./list.js";
 // pick.ts — cmdPick
 export { cmdPick } from "./pick.js";
+// run.ts — cmdRun, cmdRunHeadless, script failure guidance
 export {
   cmdRun,
   cmdRunHeadless,
