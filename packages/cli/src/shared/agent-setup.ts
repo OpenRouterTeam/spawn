@@ -378,7 +378,7 @@ async function setupOpenclawConfig(
     const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token: ")).trim();
 
     if (trimmedToken) {
-      const escapedBotToken = jsonEscape(trimmedToken);
+      const escapedBotToken = shellQuote(trimmedToken);
       const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
         runner.runServer(
           "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +

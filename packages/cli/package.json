@@ -1,6 +1,6 @@
 {
   "name": "@openrouter/spawn",
-  "version": "0.17.3",
+  "version": "0.17.4",
   "type": "module",
   "bin": {
     "spawn": "cli.js"
