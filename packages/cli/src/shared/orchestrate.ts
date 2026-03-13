@@ -212,11 +212,28 @@ export async function runOrchestration(
     logWarn("Environment setup had errors");
   }
 
-  // 10. Parse enabled setup steps from env (set by interactive/run prompts)
+  // 10. Parse enabled setup steps from env (set by --steps, --config, or interactive prompts)
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
   if (stepsEnv !== undefined) {
-    enabledSteps = new Set(stepsEnv.split(",").filter(Boolean));
+    const stepNames = stepsEnv.split(",").filter(Boolean);
+    // Validate step names and warn about unknowns
+    if (stepNames.length > 0) {
+      const { validateStepNames } = await import("./agents.js");
+      const { valid, invalid } = validateStepNames(agentName, stepNames);
+      if (invalid.length > 0) {
+        logWarn(`Unknown setup steps ignored: ${invalid.join(", ")}`);
+      }
+      enabledSteps = new Set(valid);
+    } else {
+      // --steps "" → disable all optional steps
+      enabledSteps = new Set();
+    }
+    // Skip interactive WhatsApp in headless mode
+    if (process.env.SPAWN_HEADLESS === "1" && enabledSteps.has("whatsapp")) {
+      logWarn("WhatsApp requires interactive QR scanning — skipping in headless mode");
+      enabledSteps.delete("whatsapp");
+    }
   }
 
   // 10b. Agent-specific configuration

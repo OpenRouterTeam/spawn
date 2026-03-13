@@ -935,11 +935,14 @@ export async function cmdRun(
 
   await preflightCredentialCheck(manifest, cloud);
 
-  const enabledSteps = await promptSetupOptions(agent);
-  if (enabledSteps) {
-    process.env.SPAWN_ENABLED_STEPS = [
-      ...enabledSteps,
-    ].join(",");
+  // Skip setup prompt if steps already set via --steps or --config
+  if (!process.env.SPAWN_ENABLED_STEPS) {
+    const enabledSteps = await promptSetupOptions(agent);
+    if (enabledSteps) {
+      process.env.SPAWN_ENABLED_STEPS = [
+        ...enabledSteps,
+      ].join(",");
+    }
   }
 
   const spawnName = await promptSpawnName();

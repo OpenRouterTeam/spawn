@@ -227,11 +227,14 @@ export async function cmdInteractive(): Promise<void> {
 
   await preflightCredentialCheck(manifest, cloudChoice);
 
-  const enabledSteps = await promptSetupOptions(agentChoice);
-  if (enabledSteps) {
-    process.env.SPAWN_ENABLED_STEPS = [
-      ...enabledSteps,
-    ].join(",");
+  // Skip setup prompt if steps already set via --steps or --config
+  if (!process.env.SPAWN_ENABLED_STEPS) {
+    const enabledSteps = await promptSetupOptions(agentChoice);
+    if (enabledSteps) {
+      process.env.SPAWN_ENABLED_STEPS = [
+        ...enabledSteps,
+      ].join(",");
+    }
   }
 
   const spawnName = await promptSpawnName();
@@ -280,11 +283,14 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
 
   await preflightCredentialCheck(manifest, cloudChoice);
 
-  const enabledSteps = await promptSetupOptions(resolvedAgent);
-  if (enabledSteps) {
-    process.env.SPAWN_ENABLED_STEPS = [
-      ...enabledSteps,
-    ].join(",");
+  // Skip setup prompt if steps already set via --steps or --config
+  if (!process.env.SPAWN_ENABLED_STEPS) {
+    const enabledSteps = await promptSetupOptions(resolvedAgent);
+    if (enabledSteps) {
+      process.env.SPAWN_ENABLED_STEPS = [
+        ...enabledSteps,
+      ].join(",");
+    }
   }
 
   const spawnName = await promptSpawnName();

@@ -388,6 +388,33 @@ async function setupOpenclawConfig(
   // WhatsApp — QR code scanning happens interactively in orchestrate.ts
   // after the gateway starts and tunnel is set up. No config needed here.
 
+  // Telegram channel setup — check env var first, then prompt interactively
+  if (enabledSteps?.has("telegram")) {
+    logStep("Setting up Telegram...");
+    const envToken = process.env.TELEGRAM_BOT_TOKEN;
+    const trimmedToken = envToken?.trim() || (await prompt("Telegram bot token (from @BotFather): ")).trim();
+
+    if (trimmedToken) {
+      const escapedBotToken = jsonEscape(trimmedToken);
+      const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
+        runner.runServer(
+          "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+            `openclaw config set channels.telegram.botToken ${escapedBotToken}`,
+        ),
+      );
+      if (telegramResult.ok) {
+        logInfo("Telegram bot token configured");
+      } else {
+        logWarn("Telegram config failed — set it up via the web dashboard after launch");
+      }
+    } else {
+      logInfo("No token entered — set up Telegram via the web dashboard after launch");
+    }
+  }
+
+  // WhatsApp — QR code scanning happens interactively in orchestrate.ts
+  // after the gateway starts and tunnel is set up. No config needed here.
+
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
   const messagingLines: string[] = [];
