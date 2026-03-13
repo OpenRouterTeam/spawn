@@ -364,6 +364,22 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
+  // Enable channel plugins before configuring them — plugins are disabled by
+  // default in OpenClaw and the gateway hangs if a token is set for a disabled plugin.
+  const pluginsToEnable: string[] = [];
+  if (enabledSteps?.has("telegram")) {
+    pluginsToEnable.push("telegram");
+  }
+  if (enabledSteps?.has("whatsapp")) {
+    pluginsToEnable.push("whatsapp");
+  }
+  if (pluginsToEnable.length > 0) {
+    const enableCmds = pluginsToEnable.map((p) => `openclaw plugins enable ${shellQuote(p)}`).join("; ");
+    await asyncTryCatchIf(isOperationalError, () =>
+      runner.runServer(`export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ${enableCmds}`),
+    );
+  }
+
   // Telegram channel setup — check env var first, then prompt interactively
   if (enabledSteps?.has("telegram")) {
     logStep("Setting up Telegram...");
