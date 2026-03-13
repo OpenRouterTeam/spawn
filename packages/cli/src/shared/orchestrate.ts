@@ -316,6 +316,13 @@ export async function runOrchestration(
       );
       if (result.ok) {
         logInfo("Telegram channel added");
+        // Set groupPolicy to "open" so group messages aren't silently dropped
+        // (default "allowlist" with empty groupAllowFrom drops all group messages)
+        await asyncTryCatchIf(isOperationalError, () =>
+          cloud.runner.runServer(
+            `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw config set channels.telegram.groupPolicy open`,
+          ),
+        );
       } else {
         logWarn("Telegram setup failed — configure it via the web dashboard after launch");
       }
