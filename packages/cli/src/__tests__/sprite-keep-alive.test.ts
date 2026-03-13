@@ -71,7 +71,7 @@ describe("installSpriteKeepAlive", () => {
     stderrSpy.mockRestore();
   });
 
-  it("calls runSprite with the keep-alive script URL", async () => {
+  it("downloads and installs the keep-alive script to ~/.local/bin", async () => {
     const capturedCmds: string[] = [];
     spawnSpy.mockImplementation((args: string[]) => {
       const bashIdx = args.indexOf("bash");
@@ -85,20 +85,6 @@ describe("installSpriteKeepAlive", () => {
 
     expect(capturedCmds.some((cmd) => cmd.includes("kurt-claw-f.sprites.app/sprite-keep-running.sh"))).toBe(true);
     expect(capturedCmds.some((cmd) => cmd.includes("sprite-keep-running"))).toBe(true);
-  });
-
-  it("installs to ~/.local/bin and makes script executable", async () => {
-    const capturedCmds: string[] = [];
-    spawnSpy.mockImplementation((args: string[]) => {
-      const bashIdx = args.indexOf("bash");
-      if (bashIdx !== -1 && args[bashIdx + 1] === "-c") {
-        capturedCmds.push(args[bashIdx + 2]);
-      }
-      return makeSpawnResult(0);
-    });
-
-    await installSpriteKeepAlive();
-
     expect(capturedCmds.some((cmd) => cmd.includes(".local/bin/sprite-keep-running"))).toBe(true);
     expect(capturedCmds.some((cmd) => cmd.includes("chmod +x"))).toBe(true);
   });
@@ -139,7 +125,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
     delete process.env.SPAWN_PROMPT;
   });
 
-  it("base64-encodes the original cmd in the session script", async () => {
+  it("session script contains all expected structural elements", async () => {
     const testCmd = "openclaw tui";
     const expectedB64 = Buffer.from(testCmd).toString("base64");
 
@@ -154,54 +140,16 @@ describe("interactiveSession (keep-alive wrapper)", () => {
 
     await interactiveSession(testCmd, mockSpawnInteractive);
 
+    // base64-encoded command is embedded
     expect(capturedSessionScript).toContain(expectedB64);
-  });
-
-  it("includes sprite-keep-running check in session script", async () => {
-    let capturedSessionScript = "";
-    mockSpawnInteractive.mockImplementation((args: string[]) => {
-      const bashIdx = args.indexOf("bash");
-      if (bashIdx !== -1 && args[bashIdx + 1] === "-c") {
-        capturedSessionScript = args[bashIdx + 2];
-      }
-      return 0;
-    });
-
-    await interactiveSession("my-agent --start", mockSpawnInteractive);
-
+    // keep-alive check is present
     expect(capturedSessionScript).toContain("sprite-keep-running");
     expect(capturedSessionScript).toContain("command -v sprite-keep-running");
-  });
-
-  it("creates a temp file for the session script", async () => {
-    let capturedSessionScript = "";
-    mockSpawnInteractive.mockImplementation((args: string[]) => {
-      const bashIdx = args.indexOf("bash");
-      if (bashIdx !== -1 && args[bashIdx + 1] === "-c") {
-        capturedSessionScript = args[bashIdx + 2];
-      }
-      return 0;
-    });
-
-    await interactiveSession("agent cmd", mockSpawnInteractive);
-
+    // temp file management
     expect(capturedSessionScript).toContain("mktemp");
     expect(capturedSessionScript).toContain("base64 -d");
     expect(capturedSessionScript).toContain("trap");
-  });
-
-  it("includes else branch for fallback to plain bash", async () => {
-    let capturedSessionScript = "";
-    mockSpawnInteractive.mockImplementation((args: string[]) => {
-      const bashIdx = args.indexOf("bash");
-      if (bashIdx !== -1 && args[bashIdx + 1] === "-c") {
-        capturedSessionScript = args[bashIdx + 2];
-      }
-      return 0;
-    });
-
-    await interactiveSession("fallback-agent", mockSpawnInteractive);
-
+    // fallback to plain bash
     expect(capturedSessionScript).toContain("else");
     expect(capturedSessionScript).toMatch(/else[\s\S]*bash/);
   });
