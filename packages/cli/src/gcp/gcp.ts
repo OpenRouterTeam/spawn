@@ -1024,7 +1024,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Use shellQuote for consistent single-quote escaping (prevents shell expansion of $variables in cmd)
-  const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([
