@@ -371,8 +371,11 @@ verify_openclaw() {
 # Tests that the openclaw gateway auto-restarts after being killed:
 #   1. Verify gateway is running on :18789
 #   2. Kill it with SIGKILL (simulates a crash)
-#   3. Wait for systemd Restart=always to bring it back (~5-10s)
+#   3. Wait for systemd Restart=always to bring it back (up to 60s)
 #   4. Verify port 18789 is listening again
+# Note: slow VMs (GCP e2-micro) may need 2 restart cycles due to openclaw's
+# lock file not releasing until ~5s after kill, causing the first restart to
+# fail with "lock timeout". The 60s window covers 2 full restart cycles.
 # Returns 0 on success (gateway recovered), 1 on failure.
 # ---------------------------------------------------------------------------
 _openclaw_verify_gateway_resilience() {
@@ -407,12 +410,16 @@ _openclaw_verify_gateway_resilience() {
   fi
 
   # Step 3: Wait for auto-restart (systemd Restart=always, RestartSec=5)
-  # Allow up to 30s for systemd to detect the crash and restart the process.
-  log_step "Gateway resilience: waiting for auto-restart (up to 30s)..."
+  # Allow up to 60s: on slow VMs (e.g. GCP e2-micro), the openclaw lock file
+  # may not release until after the first restart attempt fails (~5s lock
+  # timeout), requiring a second restart cycle before the gateway is up.
+  # Timeline: RestartSec(5) + lock-timeout(5) + RestartSec(5) + boot(5) ≈ 20s.
+  # 60s gives a comfortable margin for slow/throttled VMs.
+  log_step "Gateway resilience: waiting for auto-restart (up to 60s)..."
   local recovered
   recovered=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    elapsed=0; while [ \$elapsed -lt 30 ]; do \
+    elapsed=0; while [ \$elapsed -lt 60 ]; do \
       if ${port_check}; then echo 'recovered'; exit 0; fi; \
       sleep 1; elapsed=\$((elapsed + 1)); \
     done; echo 'timeout'" 2>&1) || true
@@ -422,7 +429,7 @@ _openclaw_verify_gateway_resilience() {
     log_ok "Gateway resilience: gateway auto-restarted successfully"
     return 0
   else
-    log_err "Gateway resilience: gateway did NOT restart within 30s"
+    log_err "Gateway resilience: gateway did NOT restart within 60s"
     # Dump systemd status for diagnostics
     cloud_exec "${app}" "systemctl status openclaw-gateway 2>/dev/null || true; \
       tail -10 /tmp/openclaw-gateway.log 2>/dev/null || true" 2>&1 | tail -15 >&2
