@@ -740,11 +740,7 @@ async function main(): Promise<void> {
 
   // ── `spawn feedback` — bypass flag parsing; rest of args are the message ───
   if (rawArgs[0] === "feedback") {
-    try {
-      await cmdFeedback(rawArgs.slice(1));
-    } catch (err) {
-      handleError(err);
-    }
+    await cmdFeedback(rawArgs.slice(1));
     return;
   }
 

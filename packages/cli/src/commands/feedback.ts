@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { asyncTryCatch } from "../shared/result.js";
 
 const POSTHOG_TOKEN = "phc_7ToS2jDeWBlMu4n2JoNzoA1FnArdKwFMFoHVnAqQ6O1";
 const POSTHOG_URL = "https://us.i.posthog.com/i/v0/e/";
@@ -25,7 +26,7 @@ export async function cmdFeedback(args: string[]): Promise<void> {
     },
   };
 
-  try {
+  const result = await asyncTryCatch(async () => {
     const res = await fetch(POSTHOG_URL, {
       method: "POST",
       headers: {
@@ -38,10 +39,12 @@ export async function cmdFeedback(args: string[]): Promise<void> {
     if (!res.ok) {
       throw new Error(`PostHog returned ${String(res.status)}`);
     }
+  });
 
-    console.log(pc.green("Thanks for your feedback!"));
-  } catch {
+  if (!result.ok) {
     console.error(pc.red("Failed to send feedback. Please try again later."));
     process.exit(1);
   }
+
+  console.log(pc.green("Thanks for your feedback!"));
 }
