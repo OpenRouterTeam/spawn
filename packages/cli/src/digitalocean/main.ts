@@ -25,10 +25,17 @@ import {
   waitForSshOnly,
 } from "./digitalocean";
 
-/** Map agent names to DO marketplace image slugs */
-function getMarketplaceSlug(agent: string): string {
-  return `openrouter-spawn${agent}`;
-}
+/** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
+const MARKETPLACE_IMAGES: Record<string, string> = {
+  claude: "openrouter-spawnclaude",
+  codex: "openrouter-spawncodex",
+  openclaw: "openrouter-spawnopenclaw",
+  opencode: "openrouter-spawnopencode",
+  kilocode: "openrouter-spawnkilocode",
+  zeroclaw: "openrouter-spawnzeroclaw",
+  hermes: "openrouter-spawnhermes",
+  junie: "openrouter-spawnjunie",
+};
 
 async function main() {
   const agentName = process.argv[2];
@@ -68,9 +75,14 @@ async function main() {
       // Use pre-built marketplace image when --beta images is active
       const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
       if (betaFeatures.includes("images")) {
-        marketplaceImage = getMarketplaceSlug(agentName);
-        cloud.skipAgentInstall = true;
-        logInfo(`Using marketplace image: ${marketplaceImage}`);
+        const slug = MARKETPLACE_IMAGES[agentName];
+        if (slug) {
+          marketplaceImage = slug;
+          cloud.skipAgentInstall = true;
+          logInfo(`Using marketplace image: ${slug}`);
+        } else {
+          logInfo(`No marketplace image for ${agentName}, using fresh install`);
+        }
       }
       return await createDroplet(name, agent.cloudInitTier, dropletSize, region, marketplaceImage);
     },
