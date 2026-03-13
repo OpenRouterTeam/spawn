@@ -16,12 +16,15 @@ oauth_config:
       - channels:read
       - chat:write
       - files:read
+      - groups:history
+      - groups:read
       - reactions:write
 settings:
   event_subscriptions:
     bot_events:
       - app_mention
       - message.channels
+      - message.groups
   org_deploy_enabled: false
   socket_mode_enabled: true
   is_hosted: false

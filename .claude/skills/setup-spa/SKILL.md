@@ -29,8 +29,8 @@ Subsequent thread replies in tracked threads auto-trigger new Claude Code runs.
 1. Go to https://api.slack.com/apps > **Create New App** > **From scratch**
 2. Name it `SPA`, select the workspace
 3. **Socket Mode**: Settings > Socket Mode > Enable > generate app-level token with `connections:write` scope > save `xapp-...`
-4. **Event Subscriptions**: Features > Event Subscriptions > Enable > subscribe to bot events: `app_mention`, `message.channels`
-5. **OAuth Scopes**: Features > OAuth & Permissions > Bot Token Scopes: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `reactions:write`
+4. **Event Subscriptions**: Features > Event Subscriptions > Enable > subscribe to bot events: `app_mention`, `message.channels`, `message.groups`
+5. **OAuth Scopes**: Features > OAuth & Permissions > Bot Token Scopes: `app_mentions:read`, `channels:history`, `channels:read`, `groups:history`, `groups:read`, `chat:write`, `reactions:write`
 6. **Install to Workspace** > save `xoxb-...` token
 7. **Invite** bot to channel, get channel ID
 
