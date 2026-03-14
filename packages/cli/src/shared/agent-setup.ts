@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, shellQuote, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.
@@ -324,10 +324,28 @@ async function setupOpenclawConfig(
     await installChromeBrowser(runner);
   }
 
+  // Prompt for Telegram bot token before building the config JSON so we can
+  // include it in a single atomic write.
+  let telegramBotToken = "";
+  if (enabledSteps?.has("telegram")) {
+    logStep("Setting up Telegram...");
+    const envToken = process.env.TELEGRAM_BOT_TOKEN ?? process.env.SPAWN_TELEGRAM_BOT_TOKEN ?? "";
+    if (!envToken) {
+      logInfo("To get a bot token:");
+      logInfo("  1. Open Telegram and search for @BotFather");
+      logInfo("  2. Send /newbot and follow the prompts");
+      logInfo("  3. Copy the token (looks like 123456:ABC-DEF...)");
+      logInfo("  Press Enter to skip if you don't have one yet.");
+    }
+    telegramBotToken = (envToken || (await prompt("Telegram bot token: "))).trim();
+    if (!telegramBotToken) {
+      logInfo("No token entered — set up Telegram via the web dashboard after launch");
+    }
+  }
+
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
 
-  // Build config object for atomic JSON write — base config only (API key, gateway, model).
-  // Channel setup (Telegram, WhatsApp) is handled by `openclaw onboard` in orchestrate.ts.
+  // Build config object for atomic JSON write
   const configObj: Record<string, unknown> = {
     env: {
       OPENROUTER_API_KEY: apiKey,
@@ -346,6 +364,36 @@ async function setupOpenclawConfig(
       },
     },
   };
+
+  // Channel config — written directly to the config file.
+  // Both use dmPolicy "pairing" so users must approve new senders.
+  const channels: Record<string, unknown> = {};
+
+  if (telegramBotToken) {
+    channels.telegram = {
+      enabled: true,
+      botToken: telegramBotToken,
+      dmPolicy: "pairing",
+      groups: {
+        "*": {
+          requireMention: true,
+        },
+      },
+    };
+    logInfo("Telegram bot token configured");
+  }
+
+  if (enabledSteps?.has("whatsapp")) {
+    channels.whatsapp = {
+      dmPolicy: "pairing",
+      groupPolicy: "allowlist",
+      sendReadReceipts: true,
+    };
+  }
+
+  if (Object.keys(channels).length > 0) {
+    configObj.channels = channels;
+  }
 
   const config = JSON.stringify(configObj, null, 2);
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
@@ -378,7 +426,7 @@ async function setupOpenclawConfig(
     logWarn("Gateway token re-assertion failed (non-fatal) — dashboard may show Unauthorized");
   }
 
-  // Channel setup (Telegram, WhatsApp) is handled by `openclaw onboard` in orchestrate.ts.
+  // Channel pairing (Telegram/WhatsApp) happens in orchestrate.ts after the gateway starts.
 
   // Write USER.md bootstrap file — guides users to the web dashboard for
   // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
