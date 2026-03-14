@@ -229,6 +229,22 @@ const InstanceStateSchema = v.object({
   }),
 });
 
+const InstancesListSchema = v.object({
+  instances: v.optional(
+    v.array(
+      v.object({
+        name: v.string(),
+        publicIpAddress: v.optional(v.string()),
+        state: v.optional(
+          v.object({
+            name: v.string(),
+          }),
+        ),
+      }),
+    ),
+  ),
+});
+
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
 
 function awsCliSync(args: string[]): {
@@ -1247,22 +1263,6 @@ export async function listServers(): Promise<
     status: string;
   }[]
 > {
-  const InstancesSchema = v.object({
-    instances: v.optional(
-      v.array(
-        v.object({
-          name: v.string(),
-          publicIpAddress: v.optional(v.string()),
-          state: v.optional(
-            v.object({
-              name: v.string(),
-            }),
-          ),
-        }),
-      ),
-    ),
-  });
-
   let resp: string;
   if (_state.lightsailMode === "cli") {
     resp = await awsCli([
@@ -1274,7 +1274,7 @@ export async function listServers(): Promise<
   } else {
     resp = await lightsailRest("Lightsail_20161128.GetInstances");
   }
-  const data = parseJsonWith(resp, InstancesSchema);
+  const data = parseJsonWith(resp, InstancesListSchema);
   const instances = data?.instances ?? [];
   return instances.map((inst) => ({
     id: inst.name,
