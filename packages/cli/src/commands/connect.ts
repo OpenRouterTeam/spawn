@@ -223,3 +223,57 @@ export async function cmdEnterAgent(
     tunnelHandle.stop();
   }
 }
+
+/** Open the web dashboard for a VM by establishing an SSH tunnel and launching the browser.
+ *  Blocks until the user presses Enter, then tears down the tunnel. */
+export async function cmdOpenDashboard(connection: VMConnection): Promise<void> {
+  const validation = tryCatch(() => {
+    validateConnectionIP(connection.ip);
+    validateUsername(connection.user);
+  });
+  if (!validation.ok) {
+    p.log.error(`Security validation failed: ${getErrorMessage(validation.error)}`);
+    return;
+  }
+
+  const tunnelPort = connection.metadata?.tunnel_remote_port;
+  const urlTemplate = connection.metadata?.tunnel_browser_url_template;
+  if (!tunnelPort) {
+    p.log.error("No dashboard tunnel info found for this server.");
+    return;
+  }
+
+  p.log.step("Opening SSH tunnel to dashboard...");
+  const keys = await ensureSshKeys();
+  const tunnelResult = await asyncTryCatchIf(isOperationalError, () =>
+    startSshTunnel({
+      host: connection.ip,
+      user: connection.user,
+      remotePort: Number(tunnelPort),
+      sshKeyOpts: getSshKeyOpts(keys),
+    }),
+  );
+  if (!tunnelResult.ok) {
+    p.log.error("Failed to open SSH tunnel to dashboard.");
+    return;
+  }
+
+  const handle = tunnelResult.data;
+  if (urlTemplate) {
+    const url = urlTemplate.replace("__PORT__", String(handle.localPort));
+    openBrowser(url);
+    p.log.success(`Dashboard opened at ${pc.cyan(url)}`);
+  } else {
+    p.log.success(`Dashboard tunnel open on localhost:${handle.localPort}`);
+  }
+
+  p.log.info("Press Enter to close the dashboard tunnel.");
+  await new Promise<void>((resolve) => {
+    process.stdin.setRawMode?.(false);
+    process.stdin.resume();
+    process.stdin.once("data", () => resolve());
+  });
+
+  handle.stop();
+  p.log.step("Dashboard tunnel closed.");
+}

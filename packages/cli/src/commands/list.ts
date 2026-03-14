@@ -7,7 +7,7 @@ import pc from "picocolors";
 import { clearHistory, filterHistory, getActiveServers, removeRecord } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
-import { cmdConnect, cmdEnterAgent } from "./connect.js";
+import { cmdConnect, cmdEnterAgent, cmdOpenDashboard } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
 import { fixSpawn } from "./fix.js";
 import { cmdRun } from "./run.js";
@@ -295,6 +295,14 @@ export async function handleRecordAction(
     });
   }
 
+  if (!conn.deleted && conn.metadata?.tunnel_remote_port) {
+    options.push({
+      value: "dashboard",
+      label: "Open Dashboard",
+      hint: "Open web dashboard in browser",
+    });
+  }
+
   if (!conn.deleted) {
     options.push({
       value: "reconnect",
@@ -351,6 +359,14 @@ export async function handleRecordAction(
       );
     }
     return RecordActionOutcome.Exit;
+  }
+
+  if (action === "dashboard") {
+    const dashResult = await asyncTryCatch(() => cmdOpenDashboard(selected.connection));
+    if (!dashResult.ok) {
+      p.log.error(`Dashboard failed: ${getErrorMessage(dashResult.error)}`);
+    }
+    return RecordActionOutcome.Back;
   }
 
   if (action === "reconnect") {
