@@ -1463,6 +1463,38 @@ export async function getServerIp(dropletId: string): Promise<string | null> {
   return publicNet?.ip_address && isString(publicNet.ip_address) ? publicNet.ip_address : null;
 }
 
+/** List all DigitalOcean droplets. Returns simplified instance info for the remap picker. */
+export async function listServers(): Promise<
+  {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+  }[]
+> {
+  const resp = await doApi("GET", "/droplets");
+  const data = parseJsonObj(resp);
+  const droplets = toObjectArray(data?.droplets);
+  const results: {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+  }[] = [];
+  for (const d of droplets) {
+    const v4Networks = toObjectArray(d?.networks?.v4);
+    const publicNet = v4Networks.find((n) => n.type === "public");
+    const ip = publicNet?.ip_address && isString(publicNet.ip_address) ? publicNet.ip_address : "";
+    results.push({
+      id: String(d.id ?? ""),
+      name: isString(d.name) ? d.name : "",
+      ip,
+      status: isString(d.status) ? d.status : "",
+    });
+  }
+  return results;
+}
+
 export async function destroyServer(dropletId?: string): Promise<void> {
   const id = dropletId || _state.dropletId;
   if (!id) {

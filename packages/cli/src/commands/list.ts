@@ -10,6 +10,7 @@ import {
   getActiveServers,
   markRecordDeleted,
   removeRecord,
+  updateRecordConnection,
   updateRecordIp,
 } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
@@ -249,6 +250,138 @@ export async function resolveListFilters(
   };
 }
 
+// ── Gone server handling ────────────────────────────────────────────────────
+
+type CloudInstance = {
+  id: string;
+  name: string;
+  ip: string;
+  status: string;
+};
+
+/** Fetch live instances from a cloud provider. */
+async function fetchCloudInstances(cloud: string, record: SpawnRecord): Promise<CloudInstance[]> {
+  switch (cloud) {
+    case "hetzner": {
+      const { listServers } = await import("../hetzner/hetzner.js");
+      return listServers();
+    }
+    case "digitalocean": {
+      const { listServers } = await import("../digitalocean/digitalocean.js");
+      return listServers();
+    }
+    case "aws": {
+      const { listServers } = await import("../aws/aws.js");
+      return listServers();
+    }
+    case "gcp": {
+      const zone = record.connection?.metadata?.zone || "us-central1-a";
+      const project = record.connection?.metadata?.project || "";
+      if (!project) {
+        return [];
+      }
+      const { listServers } = await import("../gcp/gcp.js");
+      return listServers(zone, project);
+    }
+    default:
+      return [];
+  }
+}
+
+/**
+ * Handle a server that no longer exists on the cloud provider.
+ * Offers the user a choice: remap to an existing instance, delete from history, or cancel.
+ * In non-interactive mode, falls back to silent deletion (previous behavior).
+ */
+async function handleGoneServer(record: SpawnRecord, cloud: string): Promise<"deleted" | "remapped" | "cancelled"> {
+  p.log.warn("Server no longer exists on the cloud provider.");
+
+  // Non-interactive: fall back to silent deletion
+  if (process.env.SPAWN_NON_INTERACTIVE === "1" || !isInteractiveTTY()) {
+    markRecordDeleted(record);
+    if (record.connection) {
+      record.connection.deleted = true;
+    }
+    return "deleted";
+  }
+
+  // Try to fetch live instances
+  const instancesResult = await asyncTryCatch(() => fetchCloudInstances(cloud, record));
+  const instances = instancesResult.ok ? instancesResult.data : [];
+
+  const options: {
+    value: string;
+    label: string;
+    hint?: string;
+  }[] = [];
+
+  for (let i = 0; i < instances.length; i++) {
+    const inst = instances[i];
+    options.push({
+      value: `remap-${i}`,
+      label: `${inst.name} (${inst.ip || "no IP"})`,
+      hint: inst.status,
+    });
+  }
+
+  options.push({
+    value: "delete",
+    label: "Remove from history",
+    hint: "mark this entry as deleted",
+  });
+
+  options.push({
+    value: "cancel",
+    label: "Cancel",
+    hint: "go back without changes",
+  });
+
+  const action = await p.select({
+    message:
+      instances.length > 0
+        ? "Remap to an existing instance or remove from history?"
+        : "No live instances found. What would you like to do?",
+    options,
+  });
+
+  if (p.isCancel(action) || action === "cancel") {
+    return "cancelled";
+  }
+
+  if (action === "delete") {
+    markRecordDeleted(record);
+    if (record.connection) {
+      record.connection.deleted = true;
+    }
+    p.log.success("Removed from history.");
+    return "deleted";
+  }
+
+  // Remap to selected instance
+  const actionStr = String(action);
+  if (actionStr.startsWith("remap-")) {
+    const idx = Number.parseInt(action.slice(6), 10);
+    const inst = instances[idx];
+    if (inst) {
+      updateRecordConnection(record, {
+        ip: inst.ip,
+        server_id: inst.id,
+        server_name: inst.name,
+      });
+      // Update in-memory connection too
+      if (record.connection) {
+        record.connection.ip = inst.ip;
+        record.connection.server_id = inst.id;
+        record.connection.server_name = inst.name;
+      }
+      p.log.success(`Remapped to ${inst.name} (${inst.ip})`);
+      return "remapped";
+    }
+  }
+
+  return "cancelled";
+}
+
 // ── IP refresh ──────────────────────────────────────────────────────────────
 
 /**
@@ -321,11 +454,10 @@ async function refreshConnectionIp(record: SpawnRecord): Promise<"ok" | "gone" |
   }
 
   if (currentIp === null) {
-    // Server no longer exists
-    p.log.warn("Server no longer exists on the cloud provider.");
-    markRecordDeleted(record);
-    if (conn) {
-      conn.deleted = true;
+    // Server no longer exists — let user decide
+    const result = await handleGoneServer(record, conn.cloud);
+    if (result === "remapped") {
+      return "ok";
     }
     return "gone";
   }

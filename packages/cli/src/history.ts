@@ -432,6 +432,37 @@ export function updateRecordIp(record: SpawnRecord, newIp: string): boolean {
   return true;
 }
 
+/** Update connection fields (ip, server_id, server_name) on a history record. Used for remapping to a different instance. */
+export function updateRecordConnection(
+  record: SpawnRecord,
+  updates: {
+    ip?: string;
+    server_id?: string;
+    server_name?: string;
+  },
+): boolean {
+  const history = loadHistory();
+  const index = findRecordIndex(history, record);
+  if (index < 0) {
+    return false;
+  }
+  const found = history[index];
+  if (!found.connection) {
+    return false;
+  }
+  if (updates.ip !== undefined) {
+    found.connection.ip = updates.ip;
+  }
+  if (updates.server_id !== undefined) {
+    found.connection.server_id = updates.server_id;
+  }
+  if (updates.server_name !== undefined) {
+    found.connection.server_name = updates.server_name;
+  }
+  writeHistory(history);
+  return true;
+}
+
 export function getActiveServers(): SpawnRecord[] {
   const records = loadHistory();
   return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);

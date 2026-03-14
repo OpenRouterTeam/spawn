@@ -760,6 +760,38 @@ export async function getServerIp(serverId: string): Promise<string | null> {
   return isString(ipv4?.ip) ? ipv4.ip : null;
 }
 
+/** List all Hetzner servers. Returns simplified instance info for the remap picker. */
+export async function listServers(): Promise<
+  {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+  }[]
+> {
+  const resp = await hetznerApi("GET", "/servers");
+  const data = parseJsonObj(resp);
+  const servers = toObjectArray(data?.servers);
+  const results: {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+  }[] = [];
+  for (const s of servers) {
+    const publicNet = toRecord(s.public_net);
+    const ipv4 = toRecord(publicNet?.ipv4);
+    const ip = isString(ipv4?.ip) ? ipv4.ip : "";
+    results.push({
+      id: String(s.id ?? ""),
+      name: isString(s.name) ? s.name : "",
+      ip,
+      status: isString(s.status) ? s.status : "",
+    });
+  }
+  return results;
+}
+
 export async function destroyServer(serverId?: string): Promise<void> {
   const id = serverId || _state.serverId;
   if (!id) {

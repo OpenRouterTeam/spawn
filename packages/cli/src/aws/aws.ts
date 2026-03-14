@@ -1238,6 +1238,52 @@ export async function getServerIp(instanceName: string): Promise<string | null> 
   return ip || null;
 }
 
+/** List all Lightsail instances. Returns simplified instance info for the remap picker. */
+export async function listServers(): Promise<
+  {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+  }[]
+> {
+  const InstancesSchema = v.object({
+    instances: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          publicIpAddress: v.optional(v.string()),
+          state: v.optional(
+            v.object({
+              name: v.string(),
+            }),
+          ),
+        }),
+      ),
+    ),
+  });
+
+  let resp: string;
+  if (_state.lightsailMode === "cli") {
+    resp = await awsCli([
+      "lightsail",
+      "get-instances",
+      "--output",
+      "json",
+    ]);
+  } else {
+    resp = await lightsailRest("Lightsail_20161128.GetInstances");
+  }
+  const data = parseJsonWith(resp, InstancesSchema);
+  const instances = data?.instances ?? [];
+  return instances.map((inst) => ({
+    id: inst.name,
+    name: inst.name,
+    ip: inst.publicIpAddress ?? "",
+    status: inst.state?.name ?? "",
+  }));
+}
+
 export async function destroyServer(name?: string): Promise<void> {
   const target = name || _state.instanceName;
   if (!target) {
