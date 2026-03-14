@@ -937,6 +937,17 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
         return await waitForInstance();
       }
     } else {
+      // AWS Lightsail's internal HTTP retry can fire after a successful create
+      // but dropped response, returning NameExists even though the instance was
+      // created. Recover by checking if the instance is already usable.
+      if (errMsg.includes("NameExists") || errMsg.includes("already in use")) {
+        const existing = await asyncTryCatch(() => lightsailGetInstance(name));
+        if (existing.ok && (existing.data.state === "pending" || existing.data.state === "running")) {
+          logInfo(`Instance '${name}' already exists (state: ${existing.data.state}), reusing it`);
+          _state.instanceName = name;
+          return await waitForInstance();
+        }
+      }
       showNonBillingError("aws", [
         "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
         "Instance limit reached for your account",
