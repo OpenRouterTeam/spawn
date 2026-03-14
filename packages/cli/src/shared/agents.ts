@@ -66,6 +66,11 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
       hint: "connect via bot token from @BotFather",
       dataEnvVar: "TELEGRAM_BOT_TOKEN",
     },
+    {
+      value: "custom-model",
+      label: "Custom model",
+      hint: "enter an OpenRouter model ID manually",
+    },
   ],
 };
 

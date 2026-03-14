@@ -7,6 +7,7 @@ import { agentKeys } from "../manifest.js";
 import { getAgentOptionalSteps } from "../shared/agents.js";
 import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
+import { validateModelId } from "../shared/ui.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
@@ -201,7 +202,30 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
 
   // Strip the "None" sentinel — it carries no real step value
   const realSteps = selected.filter((v) => v !== NONE_STEP);
-  return new Set(realSteps);
+  const stepSet = new Set(realSteps);
+
+  // If user selected "Custom model", prompt for the model ID and set MODEL_ID env
+  if (stepSet.has("custom-model")) {
+    stepSet.delete("custom-model");
+    const modelId = await p.text({
+      message: "Model ID",
+      placeholder: "provider/model-name",
+      validate: (val) => {
+        if (!val.trim()) {
+          return "Model ID is required";
+        }
+        if (!validateModelId(val.trim())) {
+          return "Invalid format — use provider/model";
+        }
+        return undefined;
+      },
+    });
+    if (!p.isCancel(modelId) && modelId.trim()) {
+      process.env.MODEL_ID = modelId.trim();
+    }
+  }
+
+  return stepSet;
 }
 
 export { getAndValidateCloudChoices, promptSetupOptions, promptSpawnName, selectCloud };
