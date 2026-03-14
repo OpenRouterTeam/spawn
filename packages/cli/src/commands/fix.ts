@@ -42,23 +42,26 @@ export function buildFixScript(manifest: Manifest, agentKey: string): string {
     "",
   ];
 
-  // Re-inject env vars into ~/.spawnrc
+  // Re-inject env vars into ~/.spawnrc (must match generateEnvConfig() output)
   const env = agentDef.env ?? {};
   const envEntries = Object.entries(env);
-  if (envEntries.length > 0) {
-    lines.push("echo '==> Re-injecting credentials...'");
-    // Write new .spawnrc atomically: write to .new then mv into place
-    lines.push("{");
-    for (const [key, template] of envEntries) {
-      const value = resolveEnvTemplate(template);
-      lines.push(`  printf 'export %s=%s\\n' ${shellSingleQuote(key)} ${shellSingleQuote(value)}`);
-    }
-    lines.push("} > ~/.spawnrc.new");
-    lines.push("mv ~/.spawnrc.new ~/.spawnrc");
-    lines.push("chmod 600 ~/.spawnrc");
-    lines.push("echo '    Credentials updated in ~/.spawnrc'");
-    lines.push("");
+  lines.push("echo '==> Re-injecting credentials...'");
+  // Write new .spawnrc atomically: write to .new then mv into place
+  lines.push("{");
+  // Always prepend IS_SANDBOX and PATH — matches generateEnvConfig() in shared/agents.ts
+  lines.push("  printf 'export IS_SANDBOX=\\x271\\x27\\n'");
+  lines.push(
+    "  printf 'export PATH=\"$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH\"\\n'",
+  );
+  for (const [key, template] of envEntries) {
+    const value = resolveEnvTemplate(template);
+    lines.push(`  printf 'export %s=%s\\n' ${shellSingleQuote(key)} ${shellSingleQuote(value)}`);
   }
+  lines.push("} > ~/.spawnrc.new");
+  lines.push("mv ~/.spawnrc.new ~/.spawnrc");
+  lines.push("chmod 600 ~/.spawnrc");
+  lines.push("echo '    Credentials updated in ~/.spawnrc'");
+  lines.push("");
 
   // Re-run the agent's install command to get the latest version
   const installCmd = agentDef.install;
