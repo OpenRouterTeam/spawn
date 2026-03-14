@@ -50,6 +50,20 @@ describe("isBillingError", () => {
       expect(isBillingError("digitalocean", "droplet limit reached")).toBe(false);
       expect(isBillingError("digitalocean", "region unavailable")).toBe(false);
     });
+
+    it("matches billing error embedded in doApi thrown error message (regression #2395)", () => {
+      // doApi throws: `DigitalOcean API error ${status} for ${method} ${endpoint}: ${body}`
+      // The response body contains the billing message — isBillingError must detect it.
+      const apiErr =
+        'DigitalOcean API error 403 for POST /droplets: {"id":"forbidden","message":"A payment on file is required to create resources."}';
+      expect(isBillingError("digitalocean", apiErr)).toBe(true);
+    });
+
+    it("returns false for non-billing 403 in doApi error format", () => {
+      const apiErr =
+        'DigitalOcean API error 403 for POST /droplets: {"id":"forbidden","message":"Droplet limit exceeded for this account."}';
+      expect(isBillingError("digitalocean", apiErr)).toBe(false);
+    });
   });
 
   describe("aws", () => {

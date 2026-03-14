@@ -917,11 +917,11 @@ export async function createServer(
 
   const body = JSON.stringify(dropletConfig);
 
-  const createText = await doApi("POST", "/droplets", body);
-  const createData = parseJsonObj(createText);
-
-  if (!createData?.droplet?.id) {
-    const errMsg = String(createData?.message || "Unknown error");
+  // Wrap in asyncTryCatch so billing-related 403 errors thrown by doApi()
+  // can be caught and handled before propagating as a generic "API error".
+  const createApiResult = await asyncTryCatch(() => doApi("POST", "/droplets", body));
+  if (!createApiResult.ok) {
+    const errMsg = createApiResult.error.message;
     logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
 
     if (isBillingError("digitalocean", errMsg)) {
@@ -942,8 +942,7 @@ export async function createServer(
             cloud: "digitalocean",
           };
         }
-        const retryErr = String(retryData?.message || "Unknown error");
-        logError(`Retry failed: ${retryErr}`);
+        logError(`Retry failed: ${String(retryData?.message || "Unknown error")}`);
       }
     } else {
       showNonBillingError("digitalocean", [
@@ -951,6 +950,17 @@ export async function createServer(
         "Droplet limit reached (check account limits)",
       ]);
     }
+    throw new Error("Droplet creation failed");
+  }
+
+  const createData = parseJsonObj(createApiResult.data);
+
+  if (!createData?.droplet?.id) {
+    logError("Failed to create DigitalOcean droplet: unexpected API response");
+    showNonBillingError("digitalocean", [
+      "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
+      "Droplet limit reached (check account limits)",
+    ]);
     throw new Error("Droplet creation failed");
   }
 
