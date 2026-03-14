@@ -602,9 +602,10 @@ verify_junie() {
   local app="$1"
   local failures=0
 
-  # Binary check
+  # Binary check — @jetbrains/junie-cli postinstall may place the binary in
+  # non-standard locations (e.g. ~/.junie/bin/, npm global root, /usr/local/bin)
   log_step "Checking junie binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v junie" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.junie/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$(npm bin -g 2>/dev/null || echo /dev/null):\$PATH command -v junie" >/dev/null 2>&1; then
     log_ok "junie binary found"
   else
     log_err "junie binary not found"
