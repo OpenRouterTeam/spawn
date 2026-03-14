@@ -6,6 +6,8 @@ import type { Result } from "./ui";
 
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+// Embedded at bundle time — the merge script content as a string
+import openclawMergeScript from "./openclaw-merge-config.ts" with { type: "text" };
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { getErrorMessage } from "./type-guards";
@@ -387,35 +389,22 @@ async function setupOpenclawConfig(
     logInfo("Telegram bot token configured");
   }
 
-  // Deep-merge on the remote machine using bun. This reads the existing config,
-  // recursively merges our patch (spawn fields win, everything else preserved),
-  // and writes the result atomically. If no existing config, starts from scratch.
+  // Deep-merge on the remote machine using bun. Upload the merge script (a real .ts
+  // file that biome can lint) and run it with the patch as a base64-encoded env var.
+  // This reads the existing config, recursively merges our patch (spawn fields win,
+  // everything else preserved), and writes the result atomically.
   const patchB64 = Buffer.from(JSON.stringify(spawnPatch)).toString("base64");
-  const mergeScript = [
-    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
-    `_PATCH_B64="${patchB64}" bun -e '`,
-    'const fs = require("fs");',
-    'const configPath = process.env.HOME + "/.openclaw/openclaw.json";',
-    "function deepMerge(target, source) {",
-    "  const result = { ...target };",
-    "  for (const key of Object.keys(source)) {",
-    '    if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])',
-    '        && target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {',
-    "      result[key] = deepMerge(target[key], source[key]);",
-    "    } else {",
-    "      result[key] = source[key];",
-    "    }",
-    "  }",
-    "  return result;",
-    "}",
-    "let existing = {};",
-    'try { existing = JSON.parse(fs.readFileSync(configPath, "utf-8")); } catch {}',
-    'const patch = JSON.parse(Buffer.from(process.env._PATCH_B64, "base64").toString());',
-    "const merged = deepMerge(existing, patch);",
-    "fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), { mode: 0o600 });",
-    "'",
-  ].join("\n");
-  await runner.runServer(mergeScript);
+  const scriptTmp = join(getTmpDir(), `spawn_merge_${Date.now()}.ts`);
+  writeFileSync(scriptTmp, openclawMergeScript, {
+    mode: 0o600,
+  });
+  const remoteScript = "/tmp/spawn-openclaw-merge.ts";
+  await runner.uploadFile(scriptTmp, remoteScript);
+  unlinkSync(scriptTmp);
+  await runner.runServer(
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+      `_PATCH_B64=${shellQuote(patchB64)} bun run ${remoteScript}; rm -f ${remoteScript}`,
+  );
 
   // Configure browser via `openclaw config set` — the officially supported way to set
   // browser options. We set all four in a single SSH call to minimize read-modify-write
