@@ -12,8 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { asyncTryCatch, tryCatch } from "@openrouter/spawn-shared";
-import { isNumber } from "../shared/type-guards.js";
+import { asyncTryCatch, isNumber, tryCatch } from "@openrouter/spawn-shared";
 
 const mockGetOrPromptApiKey = mock(() => Promise.resolve("sk-or-v1-test-key"));
 
@@ -33,6 +32,7 @@ function createMockCloud(overrides: Partial<CloudOrchestrator> = {}): CloudOrche
   const mockRunner = {
     runServer: mock(() => Promise.resolve()),
     uploadFile: mock(() => Promise.resolve()),
+    downloadFile: mock(() => Promise.resolve()),
   };
   return {
     cloudName: "testcloud",

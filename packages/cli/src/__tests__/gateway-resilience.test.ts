@@ -45,6 +45,7 @@ function createMockRunner(): {
       script = cmd;
     }),
     uploadFile: mock(async () => {}),
+    downloadFile: mock(async () => {}),
   };
   return {
     runner,

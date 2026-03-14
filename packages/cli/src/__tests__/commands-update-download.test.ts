@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { isString } from "@openrouter/spawn-shared";
 import pkg from "../../package.json" with { type: "json" };
-import { isString } from "../shared/type-guards";
 import { createConsoleMocks, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 const VERSION = pkg.version;

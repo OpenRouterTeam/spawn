@@ -15,4 +15,4 @@ export {
   tryCatchIf,
   unwrapOr,
 } from "./result";
-export { getErrorMessage, hasStatus, isNumber, isString, toObjectArray, toRecord } from "./type-guards";
+export { getErrorMessage, hasStatus, isNumber, isPlainObject, isString, toObjectArray, toRecord } from "./type-guards";

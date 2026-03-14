@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { isString } from "../shared/type-guards";
+import { isString } from "@openrouter/spawn-shared";
 import { createConsoleMocks, restoreMocks } from "./test-helpers";
 
 // ── Import module under test ──────────────────────────────────────────────────

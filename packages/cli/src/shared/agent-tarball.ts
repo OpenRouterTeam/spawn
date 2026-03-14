@@ -4,9 +4,9 @@
 
 import type { CloudRunner } from "./agent-setup";
 
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { asyncTryCatch } from "./result";
-import { getErrorMessage } from "./type-guards";
 import { logDebug, logInfo, logStep, logWarn } from "./ui";
 
 const REPO = "OpenRouterTeam/spawn";

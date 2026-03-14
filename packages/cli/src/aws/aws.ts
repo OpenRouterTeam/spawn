@@ -5,6 +5,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
@@ -20,7 +21,6 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
-import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
   jsonEscape,
@@ -1125,6 +1125,43 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   }
   if (uploadResult.data !== 0) {
     throw new Error(`upload_file failed for ${remotePath}`);
+  }
+}
+
+export async function downloadFile(remotePath: string, localPath: string): Promise<void> {
+  if (
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
+    throw new Error(`Invalid remote path: ${remotePath}`);
+  }
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const proc = Bun.spawn(
+    [
+      "scp",
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
+      `${SSH_USER}@${_state.instanceIp}:${expandedPath}`,
+      localPath,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "inherit",
+      ],
+    },
+  );
+  const timer = setTimeout(() => killWithTimeout(proc), 120_000);
+  const dlResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!dlResult.ok) {
+    throw dlResult.error;
+  }
+  if (dlResult.data !== 0) {
+    throw new Error(`download_file failed for ${remotePath}`);
   }
 }
 

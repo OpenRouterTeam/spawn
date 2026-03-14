@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getErrorMessage, isPlainObject } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./shared/parse.js";
 import { getCacheDir, getCacheFile } from "./shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatchIf, unwrapOr } from "./shared/result.js";
-import { getErrorMessage } from "./shared/type-guards.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -152,9 +152,7 @@ function stripDangerousKeys(obj: unknown): unknown {
 
 function isValidManifest(data: unknown): data is Manifest {
   return (
-    data !== null &&
-    typeof data === "object" &&
-    !Array.isArray(data) &&
+    isPlainObject(data) &&
     "agents" in data &&
     "clouds" in data &&
     "matrix" in data &&

@@ -2,13 +2,13 @@ import type { SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
+import { isString, toRecord } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { filterHistory, markRecordDeleted } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateServerIdentifier } from "../security.js";
 import { parseJsonObj } from "../shared/parse.js";
 import { asyncTryCatchIf, isNetworkError, tryCatch, unwrapOr } from "../shared/result.js";
-import { isString, toRecord } from "../shared/type-guards.js";
 import { loadApiToken } from "../shared/ui.js";
 import { formatRelativeTime } from "./list.js";
 import { resolveDisplayName } from "./shared.js";

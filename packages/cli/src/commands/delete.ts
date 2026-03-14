@@ -2,6 +2,7 @@ import type { SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
+import { isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { authenticate as awsAuthenticate, destroyServer as awsDestroyServer, ensureAwsCli } from "../aws/aws.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
@@ -17,7 +18,6 @@ import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
-import { isString } from "../shared/type-guards.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
 import { activeServerPicker, resolveListFilters } from "./list.js";
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";

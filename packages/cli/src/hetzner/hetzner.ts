@@ -4,6 +4,7 @@ import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
+import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { parseJsonObj } from "../shared/parse";
@@ -18,7 +19,6 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
   jsonEscape,
@@ -650,6 +650,47 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
   }
   if (uploadResult.data !== 0) {
     throw new Error(`upload_file failed for ${remotePath}`);
+  }
+}
+
+export async function downloadFile(remotePath: string, localPath: string, ip?: string): Promise<void> {
+  const serverIp = ip || _state.serverIp;
+  if (
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
+    logError(`Invalid remote path: ${remotePath}`);
+    throw new Error("Invalid remote path");
+  }
+
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+
+  const proc = Bun.spawn(
+    [
+      "scp",
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
+      `root@${serverIp}:${expandedPath}`,
+      localPath,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "inherit",
+      ],
+    },
+  );
+  const timer = setTimeout(() => killWithTimeout(proc), 120_000);
+  const dlResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!dlResult.ok) {
+    throw dlResult.error;
+  }
+  if (dlResult.data !== 0) {
+    throw new Error(`download_file failed for ${remotePath}`);
   }
 }
 

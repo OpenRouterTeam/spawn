@@ -4,11 +4,12 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import { runOrchestration } from "../shared/orchestrate";
-import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
 import {
   createServer as createHetznerServer,
+  downloadFile,
   ensureHcloudToken,
   ensureSshKey,
   getConnectionInfo,
@@ -41,6 +42,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();

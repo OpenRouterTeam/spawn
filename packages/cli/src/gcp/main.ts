@@ -4,13 +4,14 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import { runOrchestration } from "../shared/orchestrate";
-import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
 import {
   authenticate,
   checkBillingEnabled,
   createInstance,
+  downloadFile,
   ensureGcloudCli,
   getConnectionInfo,
   getServerName,
@@ -43,6 +44,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();
