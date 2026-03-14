@@ -133,6 +133,47 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
   }
 }
 
+/** Merge metadata key-value pairs into a history record's connection.
+ *  Matches by spawnId when provided; falls back to most recent record with a connection. */
+export function saveMetadata(entries: Record<string, string>, spawnId?: string): void {
+  const result = tryCatchIf(isFileError, () => {
+    const history = loadHistory();
+    let found = false;
+
+    if (spawnId) {
+      const idx = history.findIndex((r) => r.id === spawnId);
+      if (idx >= 0 && history[idx].connection) {
+        const conn = history[idx].connection;
+        conn.metadata = {
+          ...conn.metadata,
+          ...entries,
+        };
+        found = true;
+      }
+    } else {
+      for (let i = history.length - 1; i >= 0; i--) {
+        const conn = history[i].connection;
+        if (conn) {
+          conn.metadata = {
+            ...conn.metadata,
+            ...entries,
+          };
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (found) {
+      writeHistory(history);
+    }
+  });
+  if (!result.ok) {
+    logWarn("Could not save metadata");
+    logDebug(getErrorMessage(result.error));
+  }
+}
+
 /** Back up a corrupted file before discarding it. Non-fatal (best-effort). */
 function backupCorruptedFile(filePath: string): void {
   const result = tryCatchIf(isFileError, () => {

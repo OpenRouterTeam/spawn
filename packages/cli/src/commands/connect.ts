@@ -1,5 +1,6 @@
 import type { VMConnection } from "../history.js";
 import type { Manifest } from "../manifest.js";
+import type { SshTunnelHandle } from "../shared/ssh.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
@@ -11,10 +12,10 @@ import {
   validateUsername,
 } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
-import { tryCatch } from "../shared/result.js";
-import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
+import { asyncTryCatchIf, isOperationalError, tryCatch } from "../shared/result.js";
+import { SSH_INTERACTIVE_OPTS, spawnInteractive, startSshTunnel } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
-import { shellQuote } from "../shared/ui.js";
+import { logWarn, openBrowser, shellQuote } from "../shared/ui.js";
 import { getErrorMessage } from "./shared.js";
 
 /** Execute a shell command and resolve/reject on process close/error */
@@ -179,11 +180,34 @@ export async function cmdEnterAgent(
     );
   }
 
+  // Re-establish SSH tunnel for web dashboard if tunnel metadata was persisted at spawn time
+  let tunnelHandle: SshTunnelHandle | undefined;
+  const tunnelPort = connection.metadata?.tunnel_remote_port;
+  if (tunnelPort && connection.ip !== "sprite-console") {
+    const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
+      const keys = await ensureSshKeys();
+      tunnelHandle = await startSshTunnel({
+        host: connection.ip,
+        user: connection.user,
+        remotePort: Number(tunnelPort),
+        sshKeyOpts: getSshKeyOpts(keys),
+      });
+      const urlTemplate = connection.metadata?.tunnel_browser_url_template;
+      if (urlTemplate) {
+        const url = urlTemplate.replace("__PORT__", String(tunnelHandle.localPort));
+        openBrowser(url);
+      }
+    });
+    if (!tunnelResult.ok) {
+      logWarn("Web dashboard tunnel failed — dashboard unavailable this session");
+    }
+  }
+
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
   const quotedRemoteCmd = shellQuote(remoteCmd);
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  return runInteractiveCommand(
+  await runInteractiveCommand(
     "ssh",
     [
       ...SSH_INTERACTIVE_OPTS,
@@ -195,4 +219,7 @@ export async function cmdEnterAgent(
     `Failed to enter ${agentName}`,
     `ssh -t ${connection.user}@${connection.ip} -- bash -lc ${quotedRemoteCmd}`,
   );
+  if (tunnelHandle) {
+    tunnelHandle.stop();
+  }
 }

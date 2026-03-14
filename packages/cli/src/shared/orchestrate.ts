@@ -8,7 +8,7 @@ import type { SshTunnelHandle } from "./ssh";
 
 import { readFileSync } from "node:fs";
 import * as v from "valibot";
-import { generateSpawnId, saveLaunchCmd, saveSpawnRecord } from "../history.js";
+import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
@@ -291,6 +291,21 @@ export async function runOrchestration(
         }
       }
     }
+
+    // Persist tunnel metadata so `spawn ls` → "Enter agent" can re-establish the tunnel.
+    // Store the remote port and browser URL template (with PORT placeholder) so the
+    // tunnel can be reconstructed with whatever local port is available on reconnect.
+    const tunnelMeta: Record<string, string> = {
+      tunnel_remote_port: String(agent.tunnel.remotePort),
+    };
+    if (agent.tunnel.browserUrl) {
+      // Use port 0 as a placeholder — on reconnect we replace it with the actual local port
+      const templateUrl = agent.tunnel.browserUrl(0);
+      if (templateUrl) {
+        tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
+      }
+    }
+    saveMetadata(tunnelMeta, spawnId);
   }
 
   // 11c. Channel setup (runs after gateway is up)
