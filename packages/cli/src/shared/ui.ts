@@ -213,6 +213,7 @@ export async function withRetry<T>(
   fn: () => Promise<Result<T>>,
   maxAttempts = 3,
   delaySec = 5,
+  exponential = false,
 ): Promise<T> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await fn(); // throws → not retried (non-retryable)
@@ -222,8 +223,9 @@ export async function withRetry<T>(
     if (attempt >= maxAttempts) {
       throw result.error;
     }
-    logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delaySec}s...`);
-    await new Promise((r) => setTimeout(r, delaySec * 1000));
+    const delay = exponential ? delaySec * 2 ** (attempt - 1) : delaySec;
+    logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}s...`);
+    await new Promise((r) => setTimeout(r, delay * 1000));
   }
   throw new Error("unreachable");
 }
