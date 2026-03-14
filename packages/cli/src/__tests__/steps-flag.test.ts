@@ -35,13 +35,11 @@ describe("validateStepNames", () => {
       "github",
       "browser",
       "telegram",
-      "whatsapp",
     ]);
     expect(valid).toEqual([
       "github",
       "browser",
       "telegram",
-      "whatsapp",
     ]);
     expect(invalid).toEqual([]);
   });
@@ -87,13 +85,6 @@ describe("OptionalStep metadata", () => {
     const telegram = steps.find((s) => s.value === "telegram");
     expect(telegram).toBeDefined();
     expect(telegram?.dataEnvVar).toBe("TELEGRAM_BOT_TOKEN");
-  });
-
-  it("openclaw whatsapp step should be marked interactive", () => {
-    const steps = getAgentOptionalSteps("openclaw");
-    const whatsapp = steps.find((s) => s.value === "whatsapp");
-    expect(whatsapp).toBeDefined();
-    expect(whatsapp?.interactive).toBe(true);
   });
 
   it("common steps should not have dataEnvVar or interactive", () => {

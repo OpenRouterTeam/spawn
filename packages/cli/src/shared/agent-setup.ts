@@ -385,14 +385,6 @@ async function setupOpenclawConfig(
     logInfo("Telegram bot token configured");
   }
 
-  if (enabledSteps?.has("whatsapp")) {
-    channels.whatsapp = {
-      dmPolicy: "pairing",
-      groupPolicy: "open",
-      sendReadReceipts: true,
-    };
-  }
-
   if (Object.keys(channels).length > 0) {
     configObj.channels = channels;
   }
@@ -429,26 +421,19 @@ async function setupOpenclawConfig(
     logWarn("Gateway auth re-assertion failed (non-fatal) — dashboard may show Unauthorized");
   }
 
-  // Channel pairing (Telegram/WhatsApp) happens in orchestrate.ts after the gateway starts.
+  // Channel pairing (Telegram) happens in orchestrate.ts after the gateway starts.
 
-  // Write USER.md bootstrap file — guides users to the web dashboard for
-  // visual tasks like WhatsApp QR code scanning that don't work in the TUI.
+  // Write USER.md bootstrap file
   const messagingLines: string[] = [];
-  if (enabledSteps?.has("telegram") || enabledSteps?.has("whatsapp")) {
-    messagingLines.push("", "## Messaging Channels", "", "The user selected messaging channels during setup.");
-    if (enabledSteps.has("telegram")) {
-      messagingLines.push(
-        "- **Telegram**: If a bot token was provided, it is already configured.",
-        "  To verify: `openclaw config get channels.telegram.botToken`",
-      );
-    }
-    if (enabledSteps.has("whatsapp")) {
-      messagingLines.push(
-        "- **WhatsApp**: Requires QR code scanning. Guide the user to the web",
-        "  dashboard to complete setup: http://localhost:18789",
-      );
-    }
-    messagingLines.push("");
+  if (enabledSteps?.has("telegram")) {
+    messagingLines.push(
+      "",
+      "## Messaging Channels",
+      "",
+      "- **Telegram**: If a bot token was provided, it is already configured.",
+      "  To verify: `openclaw config get channels.telegram.botToken`",
+      "",
+    );
   }
 
   const userMd = [
