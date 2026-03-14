@@ -23,6 +23,9 @@ import {
 
 const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
 
+/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs. */
+const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "300", 10);
+
 // ─── State ───────────────────────────────────────────────────────────────────
 
 interface SpriteState {
@@ -311,8 +314,15 @@ export async function createSprite(name: string): Promise<void> {
     );
     // Drain stderr before awaiting exit to prevent pipe buffer deadlock
     const stderrText = new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
+    // Kill the process if it exceeds the create timeout — prevents indefinite
+    // hangs when the Sprite API blocks for certain agents (kilocode, opencode)
+    const timer = setTimeout(() => killWithTimeout(proc), CREATE_TIMEOUT_SECS * 1000);
+    const createResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(timer);
+    if (!createResult.ok) {
+      throw new Error(`sprite create timed out after ${CREATE_TIMEOUT_SECS}s for '${name}'`);
+    }
+    if (createResult.data !== 0) {
       throw new Error(`Failed to create sprite '${name}': ${await stderrText}`);
     }
   });
