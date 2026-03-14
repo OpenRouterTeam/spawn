@@ -298,8 +298,12 @@ export async function runOrchestration(
 
   if (enabledSteps?.has("telegram")) {
     logStep("Telegram pairing...");
-    logInfo("DM your Telegram bot to get a pairing code, then enter it below.");
-    logInfo("Waiting for pairing code...");
+    logInfo("To pair your Telegram account:");
+    logInfo("  1. Open Telegram on your phone");
+    logInfo("  2. Search for the bot you created with @BotFather");
+    logInfo('  3. Send it any message (e.g. "hello")');
+    logInfo("  4. The bot will reply with a pairing code");
+    logInfo("  5. Enter the code below");
     process.stderr.write("\n");
     const pairingCode = (await prompt("Telegram pairing code: ")).trim();
     if (pairingCode) {
@@ -326,8 +330,10 @@ export async function runOrchestration(
     const whatsappCmd = `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw channels login --channel whatsapp`;
     prepareStdinForHandoff();
     await cloud.interactiveSession(whatsappCmd);
-    logInfo("WhatsApp linked — DM the bot to start a pairing request, then approve via:");
-    logInfo("  openclaw pairing approve whatsapp <CODE>");
+    logInfo("WhatsApp linked! To pair a contact:");
+    logInfo("  1. Have someone message your WhatsApp number");
+    logInfo("  2. They'll get a pairing code from the bot");
+    logInfo("  3. Approve via: openclaw pairing approve whatsapp <CODE>");
   }
 
   // 11d. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
