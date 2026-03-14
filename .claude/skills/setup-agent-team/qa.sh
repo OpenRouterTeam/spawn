@@ -188,6 +188,18 @@ done
 
 log "Pre-cycle cleanup done."
 
+# --- Update GitHub star counts (quality mode only) ---
+if [[ "${RUN_MODE}" == "quality" ]]; then
+    log "Updating agent star counts..."
+    bash "${SCRIPT_DIR}/update-stars.sh" "${REPO_ROOT}" 2>&1 | tee -a "${LOG_FILE}" || true
+    if [[ -n "$(git diff --name-only -- manifest.json)" ]]; then
+        git add manifest.json
+        git commit -m "chore: update agent GitHub star counts" 2>&1 | tee -a "${LOG_FILE}" || true
+        git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
+        log "Star counts committed"
+    fi
+fi
+
 # --- Load cloud credentials (quality + fixtures + e2e modes) ---
 if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]] || [[ "${RUN_MODE}" == "soak" ]]; then
     if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
