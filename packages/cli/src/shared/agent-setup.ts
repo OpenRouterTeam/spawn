@@ -6,9 +6,10 @@ import type { Result } from "./ui";
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { deepMerge } from "./parse";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
-import { getErrorMessage } from "./type-guards";
+import { getErrorMessage, isPlainObject } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**
@@ -306,30 +307,6 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   } else {
     logWarn("Google Chrome install failed (browser tool will be unavailable)");
   }
-}
-
-/**
- * Recursively deep-merge `source` into `target`, returning a new object.
- * Arrays and non-plain-objects are overwritten (not merged).
- */
-function isPlainObject(val: unknown): val is Record<string, unknown> {
-  return val !== null && typeof val === "object" && !Array.isArray(val);
-}
-
-function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {
-    ...target,
-  };
-  for (const key of Object.keys(source)) {
-    const tVal = target[key];
-    const sVal = source[key];
-    if (isPlainObject(tVal) && isPlainObject(sVal)) {
-      result[key] = deepMerge(tVal, sVal);
-    } else {
-      result[key] = sVal;
-    }
-  }
-  return result;
 }
 
 async function setupOpenclawConfig(
