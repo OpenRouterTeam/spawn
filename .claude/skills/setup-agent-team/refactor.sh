@@ -148,6 +148,16 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
         fi
     done
 
+    # Update GitHub star counts in manifest.json (low-key record keeping)
+    log "Updating agent star counts..."
+    bash "${SCRIPT_DIR}/update-stars.sh" "${REPO_ROOT}" 2>&1 | tee -a "${LOG_FILE}" || true
+    if [[ -n "$(git diff --name-only -- manifest.json)" ]]; then
+        git add manifest.json
+        git commit -m "chore: update agent GitHub star counts" 2>&1 | tee -a "${LOG_FILE}" || true
+        git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
+        log "Star counts committed"
+    fi
+
     log "Pre-cycle cleanup done."
 fi
 
