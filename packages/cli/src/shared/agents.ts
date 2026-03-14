@@ -63,7 +63,7 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
     {
       value: "telegram",
       label: "Telegram",
-      hint: "connect via bot token from @BotFather",
+      hint: "recommended — connect via bot token from @BotFather",
       dataEnvVar: "TELEGRAM_BOT_TOKEN",
     },
     {

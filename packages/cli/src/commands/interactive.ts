@@ -176,12 +176,15 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
   // 1. Arrow keys work immediately (multiple items to navigate)
   // 2. Users can explicitly skip all steps without pressing Enter on an empty list
   // 3. Users who accidentally select another option can deselect it and choose None
-  const hasBrowserDefault = filteredSteps.some((s) => s.value === "browser");
-  const defaultValues = hasBrowserDefault
-    ? filteredSteps.filter((s) => s.value === "browser").map((s) => s.value)
-    : [
-        NONE_STEP,
-      ];
+  // Pre-select browser + telegram by default (telegram has the smoothest setup UX)
+  const recommendedDefaults = [
+    "browser",
+    "telegram",
+  ];
+  const defaultValues = filteredSteps.filter((s) => recommendedDefaults.includes(s.value)).map((s) => s.value);
+  if (defaultValues.length === 0) {
+    defaultValues.push(NONE_STEP);
+  }
 
   const selected = await p.multiselect({
     message: "Setup options (↑/↓ navigate, space to select, enter to confirm)",
