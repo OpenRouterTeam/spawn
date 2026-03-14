@@ -274,7 +274,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
 }
 
 export function agentKeys(m: Manifest): string[] {
-  return Object.keys(m.agents);
+  return Object.keys(m.agents).sort((a, b) => (m.agents[b].github_stars ?? 0) - (m.agents[a].github_stars ?? 0));
 }
 
 export function cloudKeys(m: Manifest): string[] {
