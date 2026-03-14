@@ -25,6 +25,8 @@ import {
   logWarn,
   openBrowser,
   prepareStdinForHandoff,
+  prompt,
+  shellQuote,
   validateModelId,
   withRetry,
 } from "./ui";
@@ -291,14 +293,61 @@ export async function runOrchestration(
     }
   }
 
-  // 11c. Channel setup — delegate to OpenClaw's built-in onboard wizard.
-  // `openclaw onboard` interactively guides the user through Telegram, WhatsApp,
-  // and other channel configuration. Runs after the gateway starts.
-  if (enabledSteps?.has("telegram") || enabledSteps?.has("whatsapp")) {
-    const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
-    logStep("Running OpenClaw channel setup...");
+  // 11c. Channel setup (runs after gateway is up)
+  const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
+
+  if (enabledSteps?.has("telegram")) {
+    logStep("Telegram pairing...");
+    logInfo("DM your Telegram bot to get a pairing code, then enter it below.");
+    logInfo("Waiting for pairing code...");
+    process.stderr.write("\n");
+    const pairingCode = (await prompt("Telegram pairing code: ")).trim();
+    if (pairingCode) {
+      const escaped = shellQuote(pairingCode);
+      const result = await asyncTryCatchIf(isOperationalError, () =>
+        cloud.runner.runServer(
+          `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw pairing approve telegram ${escaped}`,
+        ),
+      );
+      if (result.ok) {
+        logInfo("Telegram paired successfully");
+      } else {
+        logWarn("Pairing failed — you can pair later via: openclaw pairing approve telegram <CODE>");
+      }
+    } else {
+      logInfo("No code entered — pair later via: openclaw pairing approve telegram <CODE>");
+    }
+  }
+
+  if (enabledSteps?.has("whatsapp")) {
+    // Step 1: QR code scan to link the WhatsApp device
+    logStep("Linking WhatsApp — scan the QR code with your phone...");
+    logInfo("Open WhatsApp > Settings > Linked Devices > Link a Device");
+    process.stderr.write("\n");
+    const whatsappCmd = `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw channels login --channel whatsapp`;
     prepareStdinForHandoff();
-    await cloud.interactiveSession(`source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw onboard`);
+    await cloud.interactiveSession(whatsappCmd);
+
+    // Step 2: Pairing — approve your own number so the bot responds to you
+    logStep("WhatsApp pairing...");
+    logInfo("Send a message to your bot on WhatsApp to get a pairing code, then enter it below.");
+    process.stderr.write("\n");
+    const pairingCode = (await prompt("WhatsApp pairing code: ")).trim();
+    if (pairingCode) {
+      const escaped = shellQuote(pairingCode);
+      const result = await asyncTryCatchIf(isOperationalError, () =>
+        cloud.runner.runServer(
+          `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw pairing approve whatsapp ${escaped}`,
+        ),
+      );
+      if (result.ok) {
+        logInfo("WhatsApp paired successfully");
+      } else {
+        logWarn("Pairing failed — you can pair later via: openclaw pairing approve whatsapp <CODE>");
+      }
+    } else {
+      logInfo("No code entered — pair later via: openclaw pairing approve whatsapp <CODE>");
+    }
   }
 
   // 11d. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
