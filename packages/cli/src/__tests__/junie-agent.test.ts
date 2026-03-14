@@ -8,7 +8,7 @@
  * - cloudInitTier is 'node' (npm-installed agent)
  */
 
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
 // ── Suppress stderr output from logStep/logError during tests ────────────────
 
@@ -16,6 +16,10 @@ let stderrSpy: ReturnType<typeof spyOn>;
 
 beforeEach(() => {
   stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+});
+
+afterEach(() => {
+  stderrSpy.mockRestore();
 });
 
 // ── Import module under test ──────────────────────────────────────────────────
