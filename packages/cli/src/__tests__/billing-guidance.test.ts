@@ -1,6 +1,6 @@
 import type { BillingGuidanceDeps } from "../shared/billing-guidance";
 
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 
 // ── Mock deps (injected via DI, not mock.module) ──────────────────────────
@@ -101,20 +101,22 @@ describe("handleBillingError", () => {
     mockPrompt.mockClear();
   });
 
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
   it("opens billing URL and returns true when user presses Enter", async () => {
     mockPrompt.mockImplementation(() => Promise.resolve(""));
     const deps = createMockDeps();
     const result = await handleBillingError("hetzner", deps);
     expect(result).toBe(true);
     expect(deps.openBrowser).toHaveBeenCalledWith("https://console.hetzner.cloud/");
-    stderrSpy.mockRestore();
   });
 
   it("returns false when prompt throws (Ctrl+C)", async () => {
     mockPrompt.mockImplementation(() => Promise.reject(new Error("cancelled")));
     const result = await handleBillingError("digitalocean", createMockDeps());
     expect(result).toBe(false);
-    stderrSpy.mockRestore();
   });
 
   it("works for clouds without billing URL", async () => {
@@ -123,7 +125,6 @@ describe("handleBillingError", () => {
     const result = await handleBillingError("unknown", deps);
     expect(result).toBe(true);
     expect(deps.openBrowser).not.toHaveBeenCalled();
-    stderrSpy.mockRestore();
   });
 });
 
@@ -132,6 +133,10 @@ describe("showNonBillingError", () => {
 
   beforeEach(() => {
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
   });
 
   it("does not throw", () => {
@@ -145,6 +150,5 @@ describe("showNonBillingError", () => {
         deps,
       );
     }).not.toThrow();
-    stderrSpy.mockRestore();
   });
 });

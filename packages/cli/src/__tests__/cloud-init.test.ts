@@ -47,44 +47,68 @@ describe("getPackagesForTier", () => {
 });
 
 describe("needsNode", () => {
-  it("returns true for 'node' tier", () => {
-    expect(needsNode("node")).toBe(true);
-  });
-
-  it("returns true for 'full' tier", () => {
-    expect(needsNode("full")).toBe(true);
-  });
-
-  it("returns false for 'minimal' tier", () => {
-    expect(needsNode("minimal")).toBe(false);
-  });
-
-  it("returns false for 'bun' tier", () => {
-    expect(needsNode("bun")).toBe(false);
-  });
-
+  const cases: Array<
+    [
+      Parameters<typeof needsNode>[0],
+      boolean,
+    ]
+  > = [
+    [
+      "node",
+      true,
+    ],
+    [
+      "full",
+      true,
+    ],
+    [
+      "minimal",
+      false,
+    ],
+    [
+      "bun",
+      false,
+    ],
+  ];
+  for (const [tier, expected] of cases) {
+    it(`returns ${expected} for '${tier}' tier`, () => {
+      expect(needsNode(tier)).toBe(expected);
+    });
+  }
   it("defaults to true (full tier)", () => {
     expect(needsNode()).toBe(true);
   });
 });
 
 describe("needsBun", () => {
-  it("returns true for 'bun' tier", () => {
-    expect(needsBun("bun")).toBe(true);
-  });
-
-  it("returns true for 'full' tier", () => {
-    expect(needsBun("full")).toBe(true);
-  });
-
-  it("returns false for 'minimal' tier", () => {
-    expect(needsBun("minimal")).toBe(false);
-  });
-
-  it("returns false for 'node' tier", () => {
-    expect(needsBun("node")).toBe(false);
-  });
-
+  const cases: Array<
+    [
+      Parameters<typeof needsBun>[0],
+      boolean,
+    ]
+  > = [
+    [
+      "bun",
+      true,
+    ],
+    [
+      "full",
+      true,
+    ],
+    [
+      "minimal",
+      false,
+    ],
+    [
+      "node",
+      false,
+    ],
+  ];
+  for (const [tier, expected] of cases) {
+    it(`returns ${expected} for '${tier}' tier`, () => {
+      expect(needsBun(tier)).toBe(expected);
+    });
+  }
   it("defaults to true (full tier)", () => {
     expect(needsBun()).toBe(true);
   });
