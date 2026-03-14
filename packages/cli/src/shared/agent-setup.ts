@@ -374,6 +374,7 @@ async function setupOpenclawConfig(
       enabled: true,
       botToken: telegramBotToken,
       dmPolicy: "pairing",
+      groupPolicy: "open",
       groups: {
         "*": {
           requireMention: true,
@@ -386,7 +387,7 @@ async function setupOpenclawConfig(
   if (enabledSteps?.has("whatsapp")) {
     channels.whatsapp = {
       dmPolicy: "pairing",
-      groupPolicy: "allowlist",
+      groupPolicy: "open",
       sendReadReceipts: true,
     };
   }
@@ -399,14 +400,14 @@ async function setupOpenclawConfig(
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
-  // browser options. Writing JSON directly may not be picked up by all versions.
+  // browser options. Redirect stdout to suppress doctor warnings on each call.
   const browserResult = await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set browser.executablePath /usr/bin/google-chrome-stable; " +
-        "openclaw config set browser.noSandbox true; " +
-        "openclaw config set browser.headless true; " +
-        "openclaw config set browser.defaultProfile openclaw",
+        "openclaw config set browser.executablePath /usr/bin/google-chrome-stable >/dev/null; " +
+        "openclaw config set browser.noSandbox true >/dev/null; " +
+        "openclaw config set browser.headless true >/dev/null; " +
+        "openclaw config set browser.defaultProfile openclaw >/dev/null",
     ),
   );
   if (!browserResult.ok) {
@@ -419,7 +420,7 @@ async function setupOpenclawConfig(
   const gatewayTokenResult = await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        `openclaw config set gateway.auth.token ${shellQuote(gatewayToken)}`,
+        `openclaw config set gateway.auth.token ${shellQuote(gatewayToken)} >/dev/null`,
     ),
   );
   if (!gatewayTokenResult.ok) {
