@@ -4,6 +4,7 @@ import type { VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
+import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
@@ -261,6 +262,65 @@ async function testDoToken(): Promise<boolean> {
   );
 }
 
+// ─── Account Info & Switch ──────────────────────────────────────────────────
+
+async function getAccountInfo(): Promise<{
+  email: string;
+  team: string;
+  status: string;
+} | null> {
+  if (!_state.token) {
+    return null;
+  }
+  const r = await asyncTryCatch(async () => {
+    const text = await doApi("GET", "/account", undefined, 1);
+    const data = parseJsonObj(text);
+    const rec = toRecord(data?.account);
+    if (!rec) {
+      return null;
+    }
+    const teamRec = toRecord(rec.team);
+    const teamName = teamRec && isString(teamRec.name) ? teamRec.name : "";
+    return {
+      email: isString(rec.email) ? rec.email : "unknown",
+      team: teamName,
+      status: isString(rec.status) ? rec.status : "unknown",
+    };
+  });
+  return r.ok ? r.data : null;
+}
+
+/**
+ * Show current account info and offer to switch to a different DigitalOcean account.
+ * Returns true if the user switched accounts (caller should retry the operation).
+ */
+export async function promptSwitchAccount(): Promise<boolean> {
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return false;
+  }
+
+  const info = await getAccountInfo();
+  if (info) {
+    const teamSuffix = info.team ? ` (team: ${info.team})` : "";
+    logInfo(`Logged in as: ${info.email}${teamSuffix} — status: ${info.status}`);
+  }
+
+  const shouldSwitch = await p.confirm({
+    message: "Wrong account? Switch to a different DigitalOcean account?",
+    initialValue: false,
+  });
+  if (p.isCancel(shouldSwitch) || !shouldSwitch) {
+    return false;
+  }
+
+  // Clear current auth state and saved config
+  _state.token = "";
+  await saveConfig({});
+  logStep("Cleared saved DigitalOcean credentials. Re-authenticating...");
+  await ensureDoToken();
+  return true;
+}
+
 /**
  * Check DigitalOcean account status for billing issues.
  * Uses the /v2/account endpoint which is already called during token validation.
@@ -282,6 +342,12 @@ export async function checkAccountStatus(): Promise<void> {
 
     if (status === "locked") {
       logWarn("Your DigitalOcean account is locked (usually a billing issue).");
+      // Offer to switch account before billing error flow
+      const switched = await promptSwitchAccount();
+      if (switched) {
+        // Re-check with new account
+        return;
+      }
       const shouldRetry = await handleBillingError("digitalocean");
       if (!shouldRetry) {
         throw new Error("DigitalOcean account is locked");
@@ -297,6 +363,10 @@ export async function checkAccountStatus(): Promise<void> {
       }
     } else if (status === "warning") {
       logWarn("Your DigitalOcean account has a warning status. You may experience limitations.");
+      const switched = await promptSwitchAccount();
+      if (switched) {
+        return;
+      }
     }
 
     if (emailVerified === false) {
@@ -925,6 +995,12 @@ export async function createServer(
     logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
 
     if (isBillingError("digitalocean", errMsg)) {
+      // Offer account switch before billing guidance
+      const switched = await promptSwitchAccount();
+      if (switched) {
+        logStep("Retrying droplet creation with new account...");
+        return createServer(name, tier, dropletSize, region, imageOverride);
+      }
       const shouldRetry = await handleBillingError("digitalocean");
       if (shouldRetry) {
         logStep("Retrying droplet creation...");
@@ -949,6 +1025,12 @@ export async function createServer(
         "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
         "Droplet limit reached (check account limits)",
       ]);
+      // Offer account switch for non-billing errors too (e.g. quota on wrong account)
+      const switched = await promptSwitchAccount();
+      if (switched) {
+        logStep("Retrying droplet creation with new account...");
+        return createServer(name, tier, dropletSize, region, imageOverride);
+      }
     }
     throw new Error("Droplet creation failed");
   }
