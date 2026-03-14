@@ -2,6 +2,7 @@
 // biome-ignore-all lint/plugin: parse implementations require raw try/catch around JSON.parse
 
 import * as v from "valibot";
+import { isPlainObject } from "./type-guards";
 
 /**
  * Parse a JSON string and validate it against a valibot schema.
@@ -25,8 +26,8 @@ export function parseJsonWith<T extends v.BaseSchema<unknown, unknown, v.BaseIss
  */
 export function parseJsonObj(text: string): Record<string, unknown> | null {
   try {
-    const val = JSON.parse(text);
-    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+    const val: unknown = JSON.parse(text);
+    if (isPlainObject(val)) {
       return val;
     }
     return null;
