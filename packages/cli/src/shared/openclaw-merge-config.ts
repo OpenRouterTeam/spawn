@@ -14,8 +14,7 @@
  * Biome overrides in biome.json relax node: protocol and try/catch rules for this file.
  */
 
-// biome-ignore lint/style/useNodejsImportProtocol: runs on remote VM, not in our Node.js codebase
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const configPath = `${process.env.HOME}/.openclaw/openclaw.json`;
 
