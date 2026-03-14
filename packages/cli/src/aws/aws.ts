@@ -1171,6 +1171,25 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
+/** Fetch the current public IP of an existing Lightsail instance. Returns null if it no longer exists. */
+export async function getServerIp(instanceName: string): Promise<string | null> {
+  const r = await asyncTryCatch(() => lightsailGetInstance(instanceName));
+  if (!r.ok) {
+    const msg = getErrorMessage(r.error);
+    if (
+      msg.includes("404") ||
+      msg.includes("not found") ||
+      msg.includes("Not Found") ||
+      msg.includes("NotFoundException")
+    ) {
+      return null;
+    }
+    throw r.error;
+  }
+  const ip = r.data.ip;
+  return ip || null;
+}
+
 export async function destroyServer(name?: string): Promise<void> {
   const target = name || _state.instanceName;
   if (!target) {

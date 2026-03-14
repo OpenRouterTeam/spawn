@@ -699,6 +699,26 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
+/** Fetch the current public IP of an existing Hetzner server. Returns null if the server no longer exists. */
+export async function getServerIp(serverId: string): Promise<string | null> {
+  const r = await asyncTryCatch(() => hetznerApi("GET", `/servers/${serverId}`, undefined, 1));
+  if (!r.ok) {
+    const msg = getErrorMessage(r.error);
+    if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
+      return null;
+    }
+    throw r.error;
+  }
+  const data = parseJsonObj(r.data);
+  const server = toRecord(data?.server);
+  if (!server) {
+    return null;
+  }
+  const publicNet = toRecord(server.public_net);
+  const ipv4 = toRecord(publicNet?.ipv4);
+  return isString(ipv4?.ip) ? ipv4.ip : null;
+}
+
 export async function destroyServer(serverId?: string): Promise<void> {
   const id = serverId || _state.serverId;
   if (!id) {
