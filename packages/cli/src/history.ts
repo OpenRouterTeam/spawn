@@ -416,6 +416,22 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
   return true;
 }
 
+/** Update the IP address on a history record's connection. Returns true if the record was found and updated. */
+export function updateRecordIp(record: SpawnRecord, newIp: string): boolean {
+  const history = loadHistory();
+  const index = findRecordIndex(history, record);
+  if (index < 0) {
+    return false;
+  }
+  const found = history[index];
+  if (!found.connection) {
+    return false;
+  }
+  found.connection.ip = newIp;
+  writeHistory(history);
+  return true;
+}
+
 export function getActiveServers(): SpawnRecord[] {
   const records = loadHistory();
   return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);

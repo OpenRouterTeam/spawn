@@ -1314,6 +1314,22 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
+/** Fetch the current public IP of an existing droplet. Returns null if the droplet no longer exists. */
+export async function getServerIp(dropletId: string): Promise<string | null> {
+  const r = await asyncTryCatch(() => doApi("GET", `/droplets/${dropletId}`, undefined, 1));
+  if (!r.ok) {
+    const msg = getErrorMessage(r.error);
+    if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
+      return null;
+    }
+    throw r.error;
+  }
+  const data = parseJsonObj(r.data);
+  const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
+  const publicNet = v4Networks.find((n) => n.type === "public");
+  return publicNet?.ip_address && isString(publicNet.ip_address) ? publicNet.ip_address : null;
+}
+
 export async function destroyServer(dropletId?: string): Promise<void> {
   const id = dropletId || _state.dropletId;
   if (!id) {

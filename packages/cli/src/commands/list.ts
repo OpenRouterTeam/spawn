@@ -4,7 +4,14 @@ import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { clearHistory, filterHistory, getActiveServers, removeRecord } from "../history.js";
+import {
+  clearHistory,
+  filterHistory,
+  getActiveServers,
+  markRecordDeleted,
+  removeRecord,
+  updateRecordIp,
+} from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { cmdConnect, cmdEnterAgent, cmdOpenDashboard } from "./connect.js";
@@ -242,6 +249,96 @@ export async function resolveListFilters(
   };
 }
 
+// ── IP refresh ──────────────────────────────────────────────────────────────
+
+/**
+ * Refresh the IP address for a connection by querying the cloud provider API.
+ * Updates the in-memory connection object and persists the change to history.
+ * Returns "ok" if the IP was refreshed (or unchanged), "gone" if the server
+ * no longer exists, or "skip" if refresh is not applicable (local, sprite, etc.).
+ */
+async function refreshConnectionIp(record: SpawnRecord): Promise<"ok" | "gone" | "skip"> {
+  const conn = record.connection;
+  if (!conn?.cloud || conn.cloud === "local" || conn.cloud === "sprite" || conn.deleted) {
+    return "skip";
+  }
+
+  const serverId = conn.server_id || conn.server_name || "";
+  if (!serverId) {
+    return "skip";
+  }
+
+  let currentIp: string | null = null;
+
+  switch (conn.cloud) {
+    case "digitalocean": {
+      const { ensureDoToken, getServerIp } = await import("../digitalocean/digitalocean.js");
+      await ensureDoToken();
+      currentIp = await getServerIp(serverId);
+      break;
+    }
+    case "hetzner": {
+      const { ensureHcloudToken, getServerIp } = await import("../hetzner/hetzner.js");
+      await ensureHcloudToken();
+      currentIp = await getServerIp(serverId);
+      break;
+    }
+    case "aws": {
+      const { ensureAwsCli, authenticate, getServerIp } = await import("../aws/aws.js");
+      await ensureAwsCli();
+      await authenticate();
+      currentIp = await getServerIp(serverId);
+      break;
+    }
+    case "gcp": {
+      const { ensureGcloudCli, authenticate, resolveProject, getServerIp } = await import("../gcp/gcp.js");
+      const zone = conn.metadata?.zone || "us-central1-a";
+      const project = conn.metadata?.project || "";
+      if (!project) {
+        return "skip";
+      }
+      process.env.GCP_ZONE = zone;
+      process.env.GCP_PROJECT = project;
+      await ensureGcloudCli();
+      await authenticate();
+      // Set SPAWN_NON_INTERACTIVE to suppress project prompt during refresh
+      const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
+      process.env.SPAWN_NON_INTERACTIVE = "1";
+      const resolveResult = await asyncTryCatch(() => resolveProject());
+      if (prevNonInteractive === undefined) {
+        delete process.env.SPAWN_NON_INTERACTIVE;
+      } else {
+        process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
+      }
+      if (!resolveResult.ok) {
+        return "skip";
+      }
+      currentIp = await getServerIp(serverId, zone, project);
+      break;
+    }
+    default:
+      return "skip";
+  }
+
+  if (currentIp === null) {
+    // Server no longer exists
+    p.log.warn("Server no longer exists on the cloud provider.");
+    markRecordDeleted(record);
+    if (conn) {
+      conn.deleted = true;
+    }
+    return "gone";
+  }
+
+  if (currentIp !== conn.ip) {
+    p.log.info(`Server IP changed: ${conn.ip} -> ${currentIp}`);
+    conn.ip = currentIp;
+    updateRecordIp(record, currentIp);
+  }
+
+  return "ok";
+}
+
 // ── Record actions ───────────────────────────────────────────────────────────
 
 /** Outcome of handleRecordAction — determines whether the picker loops or exits. */
@@ -347,6 +444,19 @@ export async function handleRecordAction(
 
   if (p.isCancel(action)) {
     return RecordActionOutcome.Back;
+  }
+
+  // Refresh IP from cloud API before connecting (enter/reconnect/fix)
+  if (action === "enter" || action === "reconnect" || action === "fix") {
+    const refreshResult = await asyncTryCatch(() => refreshConnectionIp(selected));
+    if (refreshResult.ok && refreshResult.data === "gone") {
+      p.log.info(`Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`);
+      return RecordActionOutcome.Back;
+    }
+    if (!refreshResult.ok) {
+      // Non-fatal: proceed with cached IP if refresh fails
+      p.log.warn(`Could not refresh server IP: ${getErrorMessage(refreshResult.error)}`);
+    }
   }
 
   if (action === "enter") {

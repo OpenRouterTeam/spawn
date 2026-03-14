@@ -1053,6 +1053,27 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
+/** Fetch the current public IP of an existing GCP instance. Returns null if it no longer exists. */
+export async function getServerIp(instanceName: string, zone: string, project: string): Promise<string | null> {
+  const result = gcloudSync([
+    "compute",
+    "instances",
+    "describe",
+    instanceName,
+    `--zone=${zone}`,
+    `--project=${project}`,
+    "--format=get(networkInterfaces[0].accessConfigs[0].natIP)",
+  ]);
+  if (result.exitCode !== 0) {
+    if (/not found|404|was not found/i.test(result.stderr)) {
+      return null;
+    }
+    throw new Error(`GCP API error: ${result.stderr}`);
+  }
+  const ip = result.stdout.trim();
+  return ip || null;
+}
+
 export async function destroyInstance(name?: string): Promise<void> {
   const instanceName = name || _state.instanceName;
   const zone = _state.zone || process.env.GCP_ZONE || DEFAULT_ZONE;
