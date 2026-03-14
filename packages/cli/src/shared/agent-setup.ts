@@ -49,7 +49,7 @@ async function installAgent(
 ): Promise<void> {
   logStep(`Installing ${agentName}...`);
   const r = await asyncTryCatch(() =>
-    withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10),
+    withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 4, 10, true),
   );
   if (!r.ok) {
     logError(`${agentName} installation failed`);
@@ -80,8 +80,9 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
             );
           })(),
         ),
-      2,
+      4,
       5,
+      true,
     ),
   );
   tryCatchIf(isOperationalError, () => unlinkSync(tmpFile));
