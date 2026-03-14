@@ -226,12 +226,12 @@ export async function cmdInteractive(): Promise<void> {
       message: "What would you like to do?",
       options: [
         {
-          value: "connect",
-          label: "Connect to existing server",
-        },
-        {
           value: "create",
           label: "Create a new server",
+        },
+        {
+          value: "connect",
+          label: "Connect to existing server",
         },
       ],
     });
