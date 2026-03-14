@@ -304,8 +304,7 @@ describe("ensureSshKeys", () => {
     expect(keys[0].name).toBe("id_rsa");
   });
 
-  it("uses all keys in non-interactive mode when multiple exist", async () => {
-    process.env.SPAWN_NON_INTERACTIVE = "1";
+  it("uses all discovered keys when multiple exist", async () => {
     createFakeKeyPair("id_ed25519", "ed25519");
     createFakeKeyPair("id_rsa", "rsa");
 
@@ -318,23 +317,8 @@ describe("ensureSshKeys", () => {
     const keys = await ensureSshKeys();
     spawnSpy.mockRestore();
     expect(keys).toHaveLength(2);
-  });
-
-  it("uses all keys when multiselect is unavailable", async () => {
-    // In test environments, @clack/prompts multiselect may not be available
-    // due to global mock.module ordering — ensureSshKeys falls back to all keys
-    createFakeKeyPair("id_ed25519", "ed25519");
-    createFakeKeyPair("id_rsa", "rsa");
-
-    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
-      const pubPath = args[args.length - 1];
-      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
-      return sshKeygenLfResult(type);
-    });
-
-    const keys = await ensureSshKeys();
-    spawnSpy.mockRestore();
-    expect(keys).toHaveLength(2);
+    expect(keys[0].name).toBe("id_ed25519");
+    expect(keys[1].name).toBe("id_rsa");
   });
 
   it("caches results across calls", async () => {
