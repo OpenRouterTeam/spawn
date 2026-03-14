@@ -287,11 +287,12 @@ export async function handleRecordAction(
   const launchCmd = conn.launch_cmd || agentDef?.launch;
 
   if (!conn.deleted && launchCmd) {
+    const hasDashboard = Boolean(conn.metadata?.tunnel_remote_port);
     const agentName = agentDef?.name || selected.agent;
     options.push({
       value: "enter",
-      label: `Enter ${agentName}`,
-      hint: agentDef?.launch || launchCmd,
+      label: hasDashboard ? `Open ${agentName} Dashboard` : `Enter ${agentName}`,
+      hint: hasDashboard ? "Launch agent + open web dashboard" : agentDef?.launch || launchCmd,
     });
   }
 
