@@ -4,7 +4,7 @@
 import type { AgentConfig } from "./agents";
 import type { Result } from "./ui";
 
-import { unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
@@ -37,6 +37,7 @@ export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
 export interface CloudRunner {
   runServer(cmd: string, timeoutSecs?: number): Promise<void>;
   uploadFile(localPath: string, remotePath: string): Promise<void>;
+  downloadFile(remotePath: string, localPath: string): Promise<void>;
 }
 
 // ─── Install helpers ────────────────────────────────────────────────────────
@@ -307,6 +308,30 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
+/**
+ * Recursively deep-merge `source` into `target`, returning a new object.
+ * Arrays and non-plain-objects are overwritten (not merged).
+ */
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    ...target,
+  };
+  for (const key of Object.keys(source)) {
+    const tVal = target[key];
+    const sVal = source[key];
+    if (isPlainObject(tVal) && isPlainObject(sVal)) {
+      result[key] = deepMerge(tVal, sVal);
+    } else {
+      result[key] = sVal;
+    }
+  }
+  return result;
+}
+
 async function setupOpenclawConfig(
   runner: CloudRunner,
   apiKey: string,
@@ -389,7 +414,23 @@ async function setupOpenclawConfig(
     configObj.channels = channels;
   }
 
-  const config = JSON.stringify(configObj, null, 2);
+  // Download existing config → deep-merge locally → re-upload.
+  // This keeps all logic in our linted TypeScript instead of a remote bun script.
+  const tmpDownload = join(getTmpDir(), `spawn_occonfig_dl_${Date.now()}`);
+  const dlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.openclaw/openclaw.json", tmpDownload));
+  let existingConfig: Record<string, unknown> = {};
+  if (dlResult.ok && existsSync(tmpDownload)) {
+    const raw = readFileSync(tmpDownload, "utf-8").trim();
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (isPlainObject(parsed)) {
+        existingConfig = parsed;
+      }
+    }
+    unlinkSync(tmpDownload);
+  }
+  const merged = deepMerge(existingConfig, configObj);
+  const config = JSON.stringify(merged, null, 2);
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // Configure browser via CLI (openclaw config set) — the supported way to set

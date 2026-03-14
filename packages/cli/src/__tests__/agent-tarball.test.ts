@@ -21,6 +21,7 @@ function createMockRunner() {
   return {
     runServer: mock(() => Promise.resolve()),
     uploadFile: mock(() => Promise.resolve()),
+    downloadFile: mock(() => Promise.resolve()),
   };
 }
 

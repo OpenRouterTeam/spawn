@@ -33,6 +33,7 @@ function createMockCloud(overrides: Partial<CloudOrchestrator> = {}): CloudOrche
   const mockRunner = {
     runServer: mock(() => Promise.resolve()),
     uploadFile: mock(() => Promise.resolve()),
+    downloadFile: mock(() => Promise.resolve()),
   };
   return {
     cloudName: "testcloud",

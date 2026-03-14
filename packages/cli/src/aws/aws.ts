@@ -1128,6 +1128,43 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   }
 }
 
+export async function downloadFile(remotePath: string, localPath: string): Promise<void> {
+  if (
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
+    throw new Error(`Invalid remote path: ${remotePath}`);
+  }
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const proc = Bun.spawn(
+    [
+      "scp",
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
+      `${SSH_USER}@${_state.instanceIp}:${expandedPath}`,
+      localPath,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "inherit",
+      ],
+    },
+  );
+  const timer = setTimeout(() => killWithTimeout(proc), 120_000);
+  const dlResult = await asyncTryCatch(() => proc.exited);
+  clearTimeout(timer);
+  if (!dlResult.ok) {
+    throw dlResult.error;
+  }
+  if (dlResult.data !== 0) {
+    throw new Error(`download_file failed for ${remotePath}`);
+  }
+}
+
 export async function interactiveSession(cmd: string): Promise<number> {
   if (!cmd || /\0/.test(cmd)) {
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");

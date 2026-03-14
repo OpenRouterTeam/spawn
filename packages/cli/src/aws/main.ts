@@ -10,6 +10,7 @@ import { agents, resolveAgent } from "./agents";
 import {
   authenticate,
   createInstance,
+  downloadFile,
   ensureAwsCli,
   ensureSshKey,
   getConnectionInfo,
@@ -39,6 +40,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();

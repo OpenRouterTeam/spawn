@@ -7,7 +7,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate";
 import { runOrchestration } from "../shared/orchestrate";
 import { getErrorMessage } from "../shared/type-guards.js";
 import { agents, resolveAgent } from "./agents";
-import { interactiveSession, runLocal, uploadFile } from "./local";
+import { downloadFile, interactiveSession, runLocal, uploadFile } from "./local";
 
 async function main() {
   const agentName = process.argv[2];
@@ -25,6 +25,7 @@ async function main() {
     runner: {
       runServer: runLocal,
       uploadFile: async (l: string, r: string) => uploadFile(l, r),
+      downloadFile: async (r: string, l: string) => downloadFile(r, l),
     },
     async authenticate() {},
     async promptSize() {},

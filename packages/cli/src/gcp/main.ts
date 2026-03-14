@@ -11,6 +11,7 @@ import {
   authenticate,
   checkBillingEnabled,
   createInstance,
+  downloadFile,
   ensureGcloudCli,
   getConnectionInfo,
   getServerName,
@@ -43,6 +44,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();

@@ -11,6 +11,7 @@ import { agents, resolveAgent } from "./agents";
 import {
   checkAccountStatus,
   createServer as createDroplet,
+  downloadFile,
   ensureDoToken,
   ensureSshKey,
   getConnectionInfo,
@@ -63,6 +64,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();

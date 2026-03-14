@@ -553,6 +553,53 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   });
 }
 
+/** Download a file from the remote sprite by catting it to stdout. */
+export async function downloadFileSprite(remotePath: string, localPath: string): Promise<void> {
+  if (
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
+    logError(`Invalid remote path: ${remotePath}`);
+    throw new Error("Invalid remote path");
+  }
+
+  const spriteCmd = getSpriteCmd()!;
+  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+
+  await spriteRetry("sprite download", async () => {
+    const proc = Bun.spawn(
+      [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        _state.name,
+        "--",
+        "cat",
+        expandedPath,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "pipe",
+        ],
+      },
+    );
+    const [stdout, stderrText] = await Promise.all([
+      new Response(proc.stdout).arrayBuffer(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      throw new Error(`download failed for ${remotePath}: ${stderrText}`);
+    }
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(localPath, Buffer.from(stdout));
+  });
+}
+
 // ─── Keep-Alive ───────────────────────────────────────────────────────────────
 
 /**
