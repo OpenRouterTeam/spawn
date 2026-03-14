@@ -445,7 +445,7 @@ async function setupOpenclawConfig(
     if (enabledSteps.has("whatsapp")) {
       messagingLines.push(
         "- **WhatsApp**: Requires QR code scanning. Guide the user to the web",
-        "  dashboard to complete setup: http://localhost:18791",
+        "  dashboard to complete setup: http://localhost:18789",
       );
     }
     messagingLines.push("");
@@ -456,12 +456,12 @@ async function setupOpenclawConfig(
     "",
     "## Web Dashboard",
     "",
-    "This machine has a web dashboard running on port 18791.",
+    "This machine has a web dashboard running on port 18789.",
     "When helping the user set up channels that require QR code scanning",
     "(WhatsApp, Telegram, etc.), always guide them to use the web dashboard",
     "instead of the TUI — QR codes cannot be scanned from a terminal.",
     "",
-    "The dashboard URL is: http://localhost:18791",
+    "The dashboard URL is: http://localhost:18789",
     "(It may also be SSH-tunneled to the user's local machine automatically.)",
     ...messagingLines,
     "",
@@ -696,7 +696,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
         tunnel: {
-          remotePort: 18791,
+          remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
       };
