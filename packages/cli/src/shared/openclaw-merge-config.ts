@@ -14,15 +14,25 @@
  * Biome overrides in biome.json relax node: protocol and try/catch rules for this file.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const configPath = `${process.env.HOME}/.openclaw/openclaw.json`;
+
+const DANGEROUS_KEYS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
 
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {
     ...target,
   };
   for (const key of Object.keys(source)) {
+    if (DANGEROUS_KEYS.has(key)) {
+      continue;
+    }
     const sv = source[key];
     const tv = target[key];
     if (sv && typeof sv === "object" && !Array.isArray(sv) && tv && typeof tv === "object" && !Array.isArray(tv)) {
@@ -50,6 +60,8 @@ if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
 }
 
 const merged = deepMerge(existing, patch satisfies Record<string, unknown>);
-writeFileSync(configPath, JSON.stringify(merged, null, 2), {
+const tmpPath = join(dirname(configPath), `.openclaw.json.tmp.${process.pid}`);
+writeFileSync(tmpPath, JSON.stringify(merged, null, 2), {
   mode: 0o600,
 });
+renameSync(tmpPath, configPath);
