@@ -353,6 +353,7 @@ async function setupOpenclawConfig(
     gateway: {
       mode: "local",
       auth: {
+        mode: "token",
         token: gatewayToken,
       },
     },
@@ -414,17 +415,18 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Re-assert gateway auth token after browser config set calls — each `openclaw config set`
+  // Re-assert gateway auth mode + token after browser config set calls — each `openclaw config set`
   // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
-  // Re-setting the token here ensures it survives those cycles and the gateway starts authenticated.
+  // Re-setting both here ensures they survive those cycles and the gateway starts authenticated.
   const gatewayTokenResult = await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set gateway.auth.mode token >/dev/null; " +
         `openclaw config set gateway.auth.token ${shellQuote(gatewayToken)} >/dev/null`,
     ),
   );
   if (!gatewayTokenResult.ok) {
-    logWarn("Gateway token re-assertion failed (non-fatal) — dashboard may show Unauthorized");
+    logWarn("Gateway auth re-assertion failed (non-fatal) — dashboard may show Unauthorized");
   }
 
   // Channel pairing (Telegram/WhatsApp) happens in orchestrate.ts after the gateway starts.
@@ -695,7 +697,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
         tunnel: {
           remotePort: 18791,
-          browserUrl: (localPort: number) => `http://localhost:${localPort}/?token=${dashboardToken}`,
+          browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
       };
     })(),
