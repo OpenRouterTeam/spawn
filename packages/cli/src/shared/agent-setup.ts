@@ -345,8 +345,12 @@ async function setupOpenclawConfig(
 
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
 
-  // Build config object for atomic JSON write
-  const configObj: Record<string, unknown> = {
+  // Build a JSON patch with our spawn-managed fields. This is deep-merged into the
+  // existing openclaw.json on the remote machine so we preserve any config OpenClaw
+  // generated during install (meta, wizard, gateway defaults, tools, skills, etc.).
+  // Writing the entire file from scratch was causing config corruption because it
+  // stripped fields OpenClaw depends on (openclaw/openclaw#6070, #9632, #21009).
+  const spawnPatch: Record<string, unknown> = {
     env: {
       OPENROUTER_API_KEY: apiKey,
     },
@@ -366,34 +370,57 @@ async function setupOpenclawConfig(
     },
   };
 
-  // Channel config — written directly to the config file.
-  // Both use dmPolicy "pairing" so users must approve new senders.
-  const channels: Record<string, unknown> = {};
-
   if (telegramBotToken) {
-    channels.telegram = {
-      enabled: true,
-      botToken: telegramBotToken,
-      dmPolicy: "pairing",
-      groupPolicy: "open",
-      groups: {
-        "*": {
-          requireMention: true,
+    spawnPatch.channels = {
+      telegram: {
+        enabled: true,
+        botToken: telegramBotToken,
+        dmPolicy: "pairing",
+        groupPolicy: "open",
+        groups: {
+          "*": {
+            requireMention: true,
+          },
         },
       },
     };
     logInfo("Telegram bot token configured");
   }
 
-  if (Object.keys(channels).length > 0) {
-    configObj.channels = channels;
-  }
+  // Deep-merge on the remote machine using bun. This reads the existing config,
+  // recursively merges our patch (spawn fields win, everything else preserved),
+  // and writes the result atomically. If no existing config, starts from scratch.
+  const patchB64 = Buffer.from(JSON.stringify(spawnPatch)).toString("base64");
+  const mergeScript = [
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
+    `_PATCH_B64="${patchB64}" bun -e '`,
+    'const fs = require("fs");',
+    'const configPath = process.env.HOME + "/.openclaw/openclaw.json";',
+    "function deepMerge(target, source) {",
+    "  const result = { ...target };",
+    "  for (const key of Object.keys(source)) {",
+    '    if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])',
+    '        && target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {',
+    "      result[key] = deepMerge(target[key], source[key]);",
+    "    } else {",
+    "      result[key] = source[key];",
+    "    }",
+    "  }",
+    "  return result;",
+    "}",
+    "let existing = {};",
+    'try { existing = JSON.parse(fs.readFileSync(configPath, "utf-8")); } catch {}',
+    'const patch = JSON.parse(Buffer.from(process.env._PATCH_B64, "base64").toString());',
+    "const merged = deepMerge(existing, patch);",
+    "fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), { mode: 0o600 });",
+    "'",
+  ].join("\n");
+  await runner.runServer(mergeScript);
 
-  const config = JSON.stringify(configObj, null, 2);
-  await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
-
-  // Configure browser via CLI (openclaw config set) — the supported way to set
-  // browser options. Redirect stdout to suppress doctor warnings on each call.
+  // Configure browser via `openclaw config set` — the officially supported way to set
+  // browser options. We set all four in a single SSH call to minimize read-modify-write
+  // cycles. Because the full config was written atomically above, the gateway auth fields
+  // are already present and should survive these calls.
   const browserResult = await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
@@ -407,9 +434,8 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Re-assert gateway auth mode + token after browser config set calls — each `openclaw config set`
-  // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
-  // Re-setting both here ensures they survive those cycles and the gateway starts authenticated.
+  // Safety net: re-assert gateway auth after browser config set calls. The `openclaw config set`
+  // CLI has known read-modify-write bugs that can drop fields (openclaw/openclaw#6070, #21009).
   const gatewayTokenResult = await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
