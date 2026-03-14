@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import {
@@ -31,7 +32,6 @@ import {
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
-import { getErrorMessage } from "./shared/type-guards.js";
 import { checkForUpdates } from "./update-check.js";
 
 const VERSION = pkg.version;

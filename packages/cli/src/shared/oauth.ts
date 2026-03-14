@@ -2,12 +2,12 @@
 
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { getErrorMessage, isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
-import { getErrorMessage, isString } from "./type-guards";
 import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────

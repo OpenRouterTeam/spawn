@@ -7,6 +7,7 @@ import type { AgentConfig } from "./agents";
 import type { SshTunnelHandle } from "./ssh";
 
 import { readFileSync } from "node:fs";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
@@ -17,7 +18,6 @@ import { getSpawnPreferencesPath } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isOperationalError, tryCatchIf } from "./result.js";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
-import { getErrorMessage } from "./type-guards";
 import {
   logDebug,
   logInfo,

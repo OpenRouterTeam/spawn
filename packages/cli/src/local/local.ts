@@ -41,6 +41,15 @@ export function uploadFile(localPath: string, remotePath: string): void {
   copyFileSync(localPath, expanded);
 }
 
+/** Copy a file locally (reverse direction), expanding ~ and $HOME in the source path. */
+export function downloadFile(remotePath: string, localPath: string): void {
+  const expanded = remotePath.replace(/^\$HOME/, getUserHome()).replace(/^~/, getUserHome());
+  mkdirSync(dirname(localPath), {
+    recursive: true,
+  });
+  copyFileSync(expanded, localPath);
+}
+
 // ─── Interactive Session ─────────────────────────────────────────────────────
 
 /** Launch an interactive shell session locally. */

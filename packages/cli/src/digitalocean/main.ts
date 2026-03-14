@@ -4,13 +4,14 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate";
 
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import { runOrchestration } from "../shared/orchestrate";
-import { getErrorMessage } from "../shared/type-guards.js";
 import { logInfo } from "../shared/ui";
 import { agents, resolveAgent } from "./agents";
 import {
   checkAccountStatus,
   createServer as createDroplet,
+  downloadFile,
   ensureDoToken,
   ensureSshKey,
   getConnectionInfo,
@@ -63,6 +64,7 @@ async function main() {
     runner: {
       runServer,
       uploadFile,
+      downloadFile,
     },
     async authenticate() {
       await promptSpawnName();

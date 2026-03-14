@@ -10,10 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { getHistoryPath, getSpawnDir } from "./shared/paths.js";
 import { isFileError, tryCatch, tryCatchIf } from "./shared/result.js";
-import { getErrorMessage } from "./shared/type-guards.js";
 import { logDebug, logWarn } from "./shared/ui.js";
 
 export interface VMConnection {

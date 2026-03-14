@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { hasStatus, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { generateEnvConfig } from "../shared/agents";
-import { hasStatus, toObjectArray, toRecord } from "../shared/type-guards";
 
 // ─── generateEnvConfig ──────────────────────────────────────────────────────
 
