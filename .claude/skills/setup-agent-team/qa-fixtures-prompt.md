@@ -25,14 +25,16 @@ List clouds that have fixture directories:
 ls -d fixtures/*/
 ```
 
-For each cloud directory, check if a corresponding `sh/test/fixtures/{cloud}/_env.sh` exists — this contains the env vars needed for API auth.
+Cloud credentials are stored in `~/.config/spawn/{cloud}.json` (loaded by `sh/shared/key-request.sh`).
 
 ## Step 2 — Check Credentials
 
-For each cloud with `_env.sh` (in `sh/test/fixtures/{cloud}/`):
-1. Read `_env.sh` to see which env vars are needed
-2. Check if those env vars are set in the current environment
-3. Skip clouds where credentials are missing (log which ones)
+For each cloud with a fixture directory, check if its required env vars are set:
+- **hetzner**: `HCLOUD_TOKEN`
+- **digitalocean**: `DO_API_TOKEN`
+- **aws**: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`
+
+Skip clouds where credentials are missing (log which ones).
 
 ## Step 3 — Collect Fixtures
 
