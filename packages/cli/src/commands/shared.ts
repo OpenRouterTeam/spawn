@@ -448,22 +448,38 @@ export function prioritizeCloudsByCredentials(
   };
 }
 
-/** Build hint overrides for the agent picker showing cloud count and credential readiness */
+/** Format a star count as a compact string (e.g. 73410 → "73.4k") */
+function formatStars(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  return String(count);
+}
+
+/** Build hint overrides for the agent picker showing stars, cloud count, and credential readiness */
 export function buildAgentPickerHints(manifest: Manifest): Record<string, string> {
   const hints: Record<string, string> = {};
   for (const agent of agentKeys(manifest)) {
     const implClouds = getImplementedClouds(manifest, agent);
+    const parts: string[] = [];
+
+    const stars = manifest.agents[agent].github_stars;
+    if (stars != null && stars > 0) {
+      parts.push(`★ ${formatStars(stars)}`);
+    }
+
     if (implClouds.length === 0) {
-      hints[agent] = "no clouds available yet";
+      parts.push("no clouds available yet");
+      hints[agent] = parts.join(" · ");
       continue;
     }
     const readyCount = implClouds.filter((c) => hasCloudCredentials(manifest.clouds[c].auth)).length;
     const cloudLabel = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
+    parts.push(cloudLabel);
     if (readyCount > 0) {
-      hints[agent] = `${cloudLabel}, ${readyCount} ready`;
-    } else {
-      hints[agent] = cloudLabel;
+      parts.push(`${readyCount} ready`);
     }
+    hints[agent] = parts.join(" · ");
   }
   return hints;
 }

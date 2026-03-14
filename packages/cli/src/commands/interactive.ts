@@ -30,7 +30,7 @@ async function selectAgent(manifest: Manifest): Promise<string> {
   const agentChoice = await p.select({
     message: "Select an agent",
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
-    initialValue: agents.includes("openclaw") ? "openclaw" : agents[0],
+    initialValue: agents[0],
   });
   if (p.isCancel(agentChoice)) {
     handleCancel();
