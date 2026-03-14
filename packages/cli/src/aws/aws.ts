@@ -5,6 +5,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
@@ -20,7 +21,6 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
-import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
   jsonEscape,

@@ -4,10 +4,10 @@ import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getUserHome } from "../shared/paths";
 import { asyncTryCatch } from "../shared/result.js";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
-import { getErrorMessage } from "../shared/type-guards";
 import {
   getServerNameFromEnv,
   logError,

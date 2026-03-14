@@ -1,6 +1,6 @@
 export { parseJsonObj, parseJsonWith } from "@openrouter/spawn-shared";
 
-import { isPlainObject } from "./type-guards";
+import { isPlainObject } from "@openrouter/spawn-shared";
 
 /**
  * Recursively deep-merge `source` into `target`, returning a new object.

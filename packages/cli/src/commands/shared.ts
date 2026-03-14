@@ -3,6 +3,7 @@ import type { Manifest } from "../manifest.js";
 
 import * as fs from "node:fs";
 import * as p from "@clack/prompts";
+import { getErrorMessage, isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
@@ -10,7 +11,6 @@ import { validateIdentifier, validatePrompt } from "../security.js";
 import { PkgVersionSchema, parseJsonObj } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
-import { getErrorMessage, isString } from "../shared/type-guards.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

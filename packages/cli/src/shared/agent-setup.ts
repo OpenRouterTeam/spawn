@@ -6,10 +6,10 @@ import type { Result } from "./ui";
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getErrorMessage, isPlainObject } from "@openrouter/spawn-shared";
 import { deepMerge } from "./parse";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
-import { getErrorMessage, isPlainObject } from "./type-guards";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
 
 /**

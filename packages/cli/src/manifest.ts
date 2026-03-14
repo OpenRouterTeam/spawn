@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getErrorMessage, isPlainObject } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./shared/parse.js";
 import { getCacheDir, getCacheFile } from "./shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatchIf, unwrapOr } from "./shared/result.js";
-import { getErrorMessage, isPlainObject } from "./shared/type-guards.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

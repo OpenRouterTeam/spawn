@@ -4,13 +4,13 @@ import type { ExecFileSyncOptions } from "node:child_process";
 import { execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { getErrorMessage, hasStatus } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { getUpdateFailedPath } from "./shared/paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
-import { getErrorMessage, hasStatus } from "./shared/type-guards";
 import { logDebug, logWarn } from "./shared/ui";
 
 const VERSION = pkg.version;

@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { asyncTryCatch } from "@openrouter/spawn-shared";
+import { asyncTryCatch, isString } from "@openrouter/spawn-shared";
 import { HISTORY_SCHEMA_VERSION } from "../history.js";
 import { loadManifest } from "../manifest";
-import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**

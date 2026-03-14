@@ -3,10 +3,10 @@
 
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
+import { isString } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
-import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";

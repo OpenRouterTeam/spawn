@@ -3,6 +3,7 @@ import type { Manifest } from "../manifest.js";
 
 import { spawnSync } from "node:child_process";
 import * as p from "@clack/prompts";
+import { isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { loadManifest } from "../manifest.js";
@@ -11,7 +12,6 @@ import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
-import { isString } from "../shared/type-guards.js";
 import { buildRecordLabel, buildRecordSubtitle } from "./list.js";
 import { getErrorMessage, handleCancel, isInteractiveTTY } from "./shared.js";
 

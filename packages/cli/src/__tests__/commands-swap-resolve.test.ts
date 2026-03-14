@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { asyncTryCatch } from "@openrouter/spawn-shared";
+import { asyncTryCatch, isString } from "@openrouter/spawn-shared";
 import { loadManifest } from "../manifest";
-import { isString } from "../shared/type-guards";
 import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks } from "./test-helpers";
 
 /**
