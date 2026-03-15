@@ -217,46 +217,46 @@ describe("cmdCloudInfo", () => {
   // ── Error paths: invalid identifier ───────────────────────────────
 
   describe("invalid cloud identifier", () => {
-    it("should reject cloud with path traversal characters", async () => {
-      await expect(cmdCloudInfo("../etc")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud with uppercase letters", async () => {
-      await expect(cmdCloudInfo("Sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud with shell metacharacters", async () => {
-      await expect(cmdCloudInfo("sprite;rm")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud with spaces", async () => {
-      await expect(cmdCloudInfo("my cloud")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject empty cloud name", async () => {
-      await expect(cmdCloudInfo("")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject whitespace-only cloud name", async () => {
-      await expect(cmdCloudInfo("   ")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud name exceeding 64 characters", async () => {
-      const longName = "a".repeat(65);
-      await expect(cmdCloudInfo(longName)).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud name with dollar sign", async () => {
-      await expect(cmdCloudInfo("spr$ite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
+    const invalidCases = [
+      [
+        "../etc",
+        "path traversal characters",
+      ],
+      [
+        "Sprite",
+        "uppercase letters",
+      ],
+      [
+        "sprite;rm",
+        "shell metacharacters",
+      ],
+      [
+        "my cloud",
+        "spaces",
+      ],
+      [
+        "",
+        "empty name",
+      ],
+      [
+        "   ",
+        "whitespace-only name",
+      ],
+      [
+        "a".repeat(65),
+        "name exceeding 64 characters",
+      ],
+      [
+        "spr$ite",
+        "dollar sign",
+      ],
+    ];
+    for (const [name, label] of invalidCases) {
+      it(`should reject cloud with ${label}`, async () => {
+        await expect(cmdCloudInfo(name)).rejects.toThrow("process.exit");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    }
   });
 
   // ── Spinner behavior ──────────────────────────────────────────────
