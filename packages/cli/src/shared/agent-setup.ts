@@ -424,8 +424,8 @@ async function setupOpenclawConfig(
   await asyncTryCatchIf(isOperationalError, () =>
     runner.runServer(
       "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set channels.telegram.enabled false >/dev/null; " +
-        "openclaw config set channels.whatsapp.enabled false >/dev/null",
+        "openclaw config set channels.telegram.enabled true >/dev/null; " +
+        "openclaw config set channels.whatsapp.enabled true >/dev/null",
     ),
   );
 
