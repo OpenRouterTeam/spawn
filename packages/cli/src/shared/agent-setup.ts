@@ -426,21 +426,25 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Re-assert gateway auth mode + token after browser config set calls — each `openclaw config set`
-  // does a read-modify-write on the config file and may drop fields written by uploadConfigFile.
-  // Re-setting both here ensures they survive those cycles and the gateway starts authenticated.
-  const gatewayTokenResult = await asyncTryCatchIf(isOperationalError, () =>
-    runner.runServer(
-      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set gateway.auth.mode token >/dev/null; " +
-        `openclaw config set gateway.auth.token ${shellQuote(gatewayToken)} >/dev/null`,
-    ),
-  );
-  if (!gatewayTokenResult.ok) {
-    logWarn("Gateway auth re-assertion failed (non-fatal) — dashboard may show Unauthorized");
+  // Re-upload our full config after `config set` calls — each `openclaw config set`
+  // does a read-modify-write that can drop fields (channels, gateway auth, etc.).
+  // Downloading first preserves any new fields `config set` added, then our
+  // configObj is deep-merged on top to restore channels and gateway auth.
+  const tmpRedownload = join(getTmpDir(), `spawn_occonfig_re_${Date.now()}`);
+  const reDlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.openclaw/openclaw.json", tmpRedownload));
+  let postSetConfig: Record<string, unknown> = {};
+  if (reDlResult.ok && existsSync(tmpRedownload)) {
+    const raw = readFileSync(tmpRedownload, "utf-8").trim();
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (isPlainObject(parsed)) {
+        postSetConfig = parsed;
+      }
+    }
+    unlinkSync(tmpRedownload);
   }
-
-  // Channel pairing (Telegram) happens in orchestrate.ts after the gateway starts.
+  const finalConfig = deepMerge(postSetConfig, configObj);
+  await uploadConfigFile(runner, JSON.stringify(finalConfig, null, 2), "$HOME/.openclaw/openclaw.json");
 
   // Write USER.md bootstrap file
   const messagingLines: string[] = [];
