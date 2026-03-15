@@ -84,7 +84,7 @@ _openclaw_ensure_gateway() {
   # Port check: ss works on all modern Linux; /dev/tcp works on macOS/some bash.
   # Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so ss must come first.
   local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
-  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     if ${port_check}; then \
       echo 'Gateway already running'; \
@@ -108,7 +108,7 @@ _openclaw_restart_gateway() {
   local app="$1"
   log_step "Restarting openclaw gateway..."
   local port_check_r='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
-  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' ') && \
     kill \"\$_gw_pid\" 2>/dev/null; sleep 2; \
@@ -150,7 +150,7 @@ input_test_openclaw() {
 
     local output
     # Embed the prompt in the command (see input_test_claude comment for why stdin won't work).
-    output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); \
@@ -341,9 +341,12 @@ verify_openclaw() {
   local app="$1"
   local failures=0
 
-  # Binary check
+  # Binary check — source .spawnrc and .bashrc to pick up all PATH entries.
+  # On Sprite VMs, npm's global prefix may be the nvm node bin dir (writable +
+  # in PATH after .bashrc), so openclaw lands there instead of ~/.npm-global/bin.
+  # Sourcing both files ensures the verify PATH matches the install PATH.
   log_step "Checking openclaw binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
