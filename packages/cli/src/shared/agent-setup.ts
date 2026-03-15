@@ -418,6 +418,17 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
+  // Write channel stubs so the dashboard renders channel cards properly,
+  // even when the user hasn't configured them yet. Without stubs the
+  // dashboard shows "Unsupported type: . Use Raw mode."
+  await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set channels.telegram.enabled false >/dev/null; " +
+        "openclaw config set channels.whatsapp.enabled false >/dev/null",
+    ),
+  );
+
   // Configure Telegram channel if a bot token was provided
   if (telegramBotToken) {
     const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
