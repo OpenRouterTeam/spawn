@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
@@ -1255,14 +1255,7 @@ export async function getServerIp(instanceName: string): Promise<string | null> 
 }
 
 /** List all Lightsail instances. Returns simplified instance info for the remap picker. */
-export async function listServers(): Promise<
-  {
-    id: string;
-    name: string;
-    ip: string;
-    status: string;
-  }[]
-> {
+export async function listServers(): Promise<CloudInstance[]> {
   let resp: string;
   if (_state.lightsailMode === "cli") {
     resp = await awsCli([

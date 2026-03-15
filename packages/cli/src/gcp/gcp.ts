@@ -1,6 +1,6 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -1121,17 +1121,7 @@ export async function getServerIp(instanceName: string, zone: string, project: s
 }
 
 /** List all GCP instances in the current project/zone. Returns simplified instance info for the remap picker. */
-export async function listServers(
-  zone: string,
-  project: string,
-): Promise<
-  {
-    id: string;
-    name: string;
-    ip: string;
-    status: string;
-  }[]
-> {
+export async function listServers(zone: string, project: string): Promise<CloudInstance[]> {
   const result = await gcloud([
     "compute",
     "instances",
@@ -1148,12 +1138,7 @@ export async function listServers(
     return [];
   }
   const items = toObjectArray(parsed.data);
-  const results: {
-    id: string;
-    name: string;
-    ip: string;
-    status: string;
-  }[] = [];
+  const results: CloudInstance[] = [];
   for (const item of items) {
     const name = isString(item.name) ? item.name : "";
     const status = isString(item.status) ? item.status : "";

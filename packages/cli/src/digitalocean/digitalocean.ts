@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
@@ -1464,23 +1464,11 @@ export async function getServerIp(dropletId: string): Promise<string | null> {
 }
 
 /** List all DigitalOcean droplets. Returns simplified instance info for the remap picker. */
-export async function listServers(): Promise<
-  {
-    id: string;
-    name: string;
-    ip: string;
-    status: string;
-  }[]
-> {
+export async function listServers(): Promise<CloudInstance[]> {
   const resp = await doApi("GET", "/droplets");
   const data = parseJsonObj(resp);
   const droplets = toObjectArray(data?.droplets);
-  const results: {
-    id: string;
-    name: string;
-    ip: string;
-    status: string;
-  }[] = [];
+  const results: CloudInstance[] = [];
   for (const d of droplets) {
     const v4Networks = toObjectArray(d?.networks?.v4);
     const publicNet = v4Networks.find((n) => n.type === "public");

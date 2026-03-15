@@ -1,5 +1,5 @@
 import type { ValueOf } from "@openrouter/spawn-shared";
-import type { SpawnRecord } from "../history.js";
+import type { CloudInstance, SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
 
 import * as p from "@clack/prompts";
@@ -251,13 +251,6 @@ export async function resolveListFilters(
 }
 
 // ── Gone server handling ────────────────────────────────────────────────────
-
-type CloudInstance = {
-  id: string;
-  name: string;
-  ip: string;
-  status: string;
-};
 
 /** Fetch live instances from a cloud provider. */
 async function fetchCloudInstances(cloud: string, record: SpawnRecord): Promise<CloudInstance[]> {

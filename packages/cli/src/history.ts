@@ -38,6 +38,14 @@ export interface SpawnRecord {
   connection?: VMConnection;
 }
 
+/** Simplified cloud instance info returned by each provider's listServers(). */
+export interface CloudInstance {
+  id: string;
+  name: string;
+  ip: string;
+  status: string;
+}
+
 // ── Schema versioning ──────────────────────────────────────────────────────
 
 export const HISTORY_SCHEMA_VERSION = 1;
