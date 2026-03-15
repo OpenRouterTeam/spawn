@@ -60,7 +60,7 @@ function extractFlagValue(
     ];
   }
 
-  if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+  if (args[idx + 1] === undefined || args[idx + 1].startsWith("-")) {
     console.error(pc.red(`Error: ${pc.bold(args[idx])} requires a value`));
     console.error(`\nUsage: ${pc.cyan(usageHint)}`);
     process.exit(1);
@@ -82,7 +82,7 @@ function extractAllFlagValues(args: string[], flag: string, usageHint: string): 
   const values: string[] = [];
   let idx = args.indexOf(flag);
   while (idx !== -1) {
-    if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+    if (args[idx + 1] === undefined || args[idx + 1].startsWith("-")) {
       console.error(pc.red(`Error: ${pc.bold(flag)} requires a value`));
       console.error(`\nUsage: ${pc.cyan(usageHint)}`);
       process.exit(1);
