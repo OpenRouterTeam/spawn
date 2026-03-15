@@ -57,52 +57,47 @@ function createMockRunner(): {
 
 describe("startGateway", () => {
   let stderrSpy: ReturnType<typeof spyOn>;
+  let capturedScript: string;
+  let unit: string;
+  let wrapper: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+    const { runner, capturedScript: getScript } = createMockRunner();
+    await startGateway(runner);
+    capturedScript = getScript();
+    unit = extractBase64Payload(capturedScript, "openclaw-gateway.unit.tmp");
+    wrapper = extractBase64Payload(capturedScript, "openclaw-gateway-wrapper");
   });
 
   afterEach(() => {
     stderrSpy.mockRestore();
   });
 
-  it("systemd unit has correct resilience config (Restart=always, RestartSec=5, After=network.target)", async () => {
-    const { runner, capturedScript } = createMockRunner();
-    await startGateway(runner);
-
-    const unit = extractBase64Payload(capturedScript(), "openclaw-gateway.unit.tmp");
+  it("systemd unit has correct resilience config (Restart=always, RestartSec=5, After=network.target)", () => {
     expect(unit).toContain("Restart=always");
     expect(unit).toContain("RestartSec=5");
     expect(unit).toContain("After=network.target");
   });
 
-  it("deploy script enables systemd service, installs cron heartbeat, and has non-systemd fallback", async () => {
-    const { runner, capturedScript } = createMockRunner();
-    await startGateway(runner);
-
-    const script = capturedScript();
-    expect(script).toContain("systemctl daemon-reload");
-    expect(script).toContain("systemctl enable openclaw-gateway");
-    expect(script).toContain("systemctl restart openclaw-gateway");
-    expect(script).toContain("nc -z 127.0.0.1 18789");
-    expect(script).toContain("crontab");
-    expect(script).toContain("openclaw-gateway");
-    expect(script).toContain("setsid");
-    expect(script).toContain("nohup");
+  it("deploy script enables systemd service, installs cron heartbeat, and has non-systemd fallback", () => {
+    expect(capturedScript).toContain("systemctl daemon-reload");
+    expect(capturedScript).toContain("systemctl enable openclaw-gateway");
+    expect(capturedScript).toContain("systemctl restart openclaw-gateway");
+    expect(capturedScript).toContain("nc -z 127.0.0.1 18789");
+    expect(capturedScript).toContain("crontab");
+    expect(capturedScript).toContain("openclaw-gateway");
+    expect(capturedScript).toContain("setsid");
+    expect(capturedScript).toContain("nohup");
   });
 
-  it("deploy script waits for gateway port and wrapper script is correct", async () => {
-    const { runner, capturedScript } = createMockRunner();
-    await startGateway(runner);
+  it("deploy script waits for gateway port and wrapper script is correct", () => {
+    expect(capturedScript).toContain("elapsed -lt 300");
+    expect(capturedScript).toContain(":18789");
+    expect(capturedScript).toContain("ss -tln");
+    expect(capturedScript).toContain("/dev/tcp/127.0.0.1/18789");
+    expect(capturedScript).toContain("nc -z 127.0.0.1 18789");
 
-    const script = capturedScript();
-    expect(script).toContain("elapsed -lt 300");
-    expect(script).toContain(":18789");
-    expect(script).toContain("ss -tln");
-    expect(script).toContain("/dev/tcp/127.0.0.1/18789");
-    expect(script).toContain("nc -z 127.0.0.1 18789");
-
-    const wrapper = extractBase64Payload(script, "openclaw-gateway-wrapper");
     expect(wrapper).toContain('source "$HOME/.spawnrc"');
     expect(wrapper).toContain("exec openclaw gateway");
   });
