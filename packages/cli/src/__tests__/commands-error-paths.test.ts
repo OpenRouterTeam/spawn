@@ -66,41 +66,55 @@ describe("Commands Error Paths", () => {
   // ── cmdRun: identifier validation ─────────────────────────────────────
 
   describe("cmdRun - identifier validation", () => {
-    it("should reject agent name with path traversal characters", async () => {
-      await expect(cmdRun("../etc/passwd", "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject agent name with uppercase letters", async () => {
-      await expect(cmdRun("Claude", "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject agent name with spaces", async () => {
-      await expect(cmdRun("claude code", "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject agent name with shell metacharacters", async () => {
-      await expect(cmdRun("claude;rm", "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud name with path traversal", async () => {
-      await expect(cmdRun("claude", "../../root")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject cloud name with special characters", async () => {
-      await expect(cmdRun("claude", "spr$ite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject agent name exceeding 64 characters", async () => {
-      const longName = "a".repeat(65);
-      await expect(cmdRun(longName, "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
+    const invalidCases: Array<
+      [
+        string,
+        string,
+        string,
+      ]
+    > = [
+      [
+        "../etc/passwd",
+        "sprite",
+        "agent path traversal",
+      ],
+      [
+        "Claude",
+        "sprite",
+        "agent uppercase letters",
+      ],
+      [
+        "claude code",
+        "sprite",
+        "agent spaces",
+      ],
+      [
+        "claude;rm",
+        "sprite",
+        "agent shell metacharacters",
+      ],
+      [
+        "claude",
+        "../../root",
+        "cloud path traversal",
+      ],
+      [
+        "claude",
+        "spr$ite",
+        "cloud special characters",
+      ],
+      [
+        "a".repeat(65),
+        "sprite",
+        "agent name exceeding 64 characters",
+      ],
+    ];
+    for (const [agent, cloud, label] of invalidCases) {
+      it(`should reject ${label}`, async () => {
+        await expect(cmdRun(agent, cloud)).rejects.toThrow("process.exit");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    }
 
     it("should accept agent name at exactly 64 characters", async () => {
       const name64 = "a".repeat(64);
@@ -156,30 +170,39 @@ describe("Commands Error Paths", () => {
   // ── cmdRun: prompt validation ─────────────────────────────────────────
 
   describe("cmdRun - prompt validation", () => {
-    it("should reject prompt with command substitution $()", async () => {
-      await expect(cmdRun("claude", "sprite", "$(rm -rf /)")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject prompt with backtick command substitution", async () => {
-      await expect(cmdRun("claude", "sprite", "`whoami`")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject prompt piping to bash", async () => {
-      await expect(cmdRun("claude", "sprite", "echo test | bash")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject prompt with rm -rf chain", async () => {
-      await expect(cmdRun("claude", "sprite", "fix bugs; rm -rf /")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject empty prompt", async () => {
-      await expect(cmdRun("claude", "sprite", "")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
+    const invalidPrompts: Array<
+      [
+        string,
+        string,
+      ]
+    > = [
+      [
+        "$(rm -rf /)",
+        "command substitution $()",
+      ],
+      [
+        "`whoami`",
+        "backtick command substitution",
+      ],
+      [
+        "echo test | bash",
+        "pipe to bash",
+      ],
+      [
+        "fix bugs; rm -rf /",
+        "rm -rf chain",
+      ],
+      [
+        "",
+        "empty prompt",
+      ],
+    ];
+    for (const [prompt, label] of invalidPrompts) {
+      it(`should reject ${label}`, async () => {
+        await expect(cmdRun("claude", "sprite", prompt)).rejects.toThrow("process.exit");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    }
 
     it("should reject prompt exceeding 10KB", async () => {
       const largePrompt = "a".repeat(10 * 1024 + 1);
@@ -199,44 +222,64 @@ describe("Commands Error Paths", () => {
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
-    it("should reject agent with invalid identifier characters", async () => {
-      await expect(cmdAgentInfo("../hack")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject agent with uppercase letters", async () => {
-      await expect(cmdAgentInfo("Claude")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject empty agent name", async () => {
-      await expect(cmdAgentInfo("")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject whitespace-only agent name", async () => {
-      await expect(cmdAgentInfo("   ")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
+    const invalidAgentNames = [
+      [
+        "../hack",
+        "invalid identifier characters",
+      ],
+      [
+        "Claude",
+        "uppercase letters",
+      ],
+      [
+        "",
+        "empty name",
+      ],
+      [
+        "   ",
+        "whitespace-only name",
+      ],
+    ];
+    for (const [name, label] of invalidAgentNames) {
+      it(`should reject agent with ${label}`, async () => {
+        await expect(cmdAgentInfo(name)).rejects.toThrow("process.exit");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    }
   });
 
   // ── cmdRun: empty input validation ────────────────────────────────────
 
   describe("cmdRun - empty input handling", () => {
-    it("should reject empty cloud name", async () => {
-      await expect(cmdRun("claude", "")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject whitespace-only cloud name", async () => {
-      await expect(cmdRun("claude", "   ")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject empty agent name", async () => {
-      await expect(cmdRun("", "sprite")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
+    const emptyCases: Array<
+      [
+        string,
+        string,
+        string,
+      ]
+    > = [
+      [
+        "claude",
+        "",
+        "empty cloud name",
+      ],
+      [
+        "claude",
+        "   ",
+        "whitespace-only cloud name",
+      ],
+      [
+        "",
+        "sprite",
+        "empty agent name",
+      ],
+    ];
+    for (const [agent, cloud, label] of emptyCases) {
+      it(`should reject ${label}`, async () => {
+        await expect(cmdRun(agent, cloud)).rejects.toThrow("process.exit");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    }
   });
 
   // ── cmdRun: valid input reaches script download ───────────────────────
