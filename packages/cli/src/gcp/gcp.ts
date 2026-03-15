@@ -1,10 +1,11 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { isString, toObjectArray } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
 import { getUserHome } from "../shared/paths";
@@ -1117,6 +1118,47 @@ export async function getServerIp(instanceName: string, zone: string, project: s
   }
   const ip = result.stdout.trim();
   return ip || null;
+}
+
+/** List all GCP instances in the current project/zone. Returns simplified instance info for the remap picker. */
+export async function listServers(zone: string, project: string): Promise<CloudInstance[]> {
+  const result = await gcloud([
+    "compute",
+    "instances",
+    "list",
+    `--project=${project}`,
+    `--zones=${zone}`,
+    "--format=json(name,networkInterfaces[0].accessConfigs[0].natIP,status)",
+  ]);
+  if (result.exitCode !== 0) {
+    return [];
+  }
+  const parsed = tryCatch((): unknown => JSON.parse(result.stdout));
+  if (!parsed.ok || !Array.isArray(parsed.data)) {
+    return [];
+  }
+  const items = toObjectArray(parsed.data);
+  const results: CloudInstance[] = [];
+  for (const item of items) {
+    const name = isString(item.name) ? item.name : "";
+    const status = isString(item.status) ? item.status : "";
+    // GCP nested: networkInterfaces[0].accessConfigs[0].natIP
+    let ip = "";
+    const ni = toObjectArray(item.networkInterfaces)[0];
+    if (ni) {
+      const ac = toObjectArray(ni.accessConfigs)[0];
+      if (ac) {
+        ip = isString(ac.natIP) ? ac.natIP : "";
+      }
+    }
+    results.push({
+      id: name,
+      name,
+      ip,
+      status,
+    });
+  }
+  return results;
 }
 
 export async function destroyInstance(name?: string): Promise<void> {
