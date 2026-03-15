@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
@@ -227,6 +227,22 @@ const InstanceStateSchema = v.object({
     }),
     publicIpAddress: v.optional(v.string()),
   }),
+});
+
+const InstancesListSchema = v.object({
+  instances: v.optional(
+    v.array(
+      v.object({
+        name: v.string(),
+        publicIpAddress: v.optional(v.string()),
+        state: v.optional(
+          v.object({
+            name: v.string(),
+          }),
+        ),
+      }),
+    ),
+  ),
 });
 
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
@@ -1236,6 +1252,29 @@ export async function getServerIp(instanceName: string): Promise<string | null> 
   }
   const ip = r.data.ip;
   return ip || null;
+}
+
+/** List all Lightsail instances. Returns simplified instance info for the remap picker. */
+export async function listServers(): Promise<CloudInstance[]> {
+  let resp: string;
+  if (_state.lightsailMode === "cli") {
+    resp = await awsCli([
+      "lightsail",
+      "get-instances",
+      "--output",
+      "json",
+    ]);
+  } else {
+    resp = await lightsailRest("Lightsail_20161128.GetInstances");
+  }
+  const data = parseJsonWith(resp, InstancesListSchema);
+  const instances = data?.instances ?? [];
+  return instances.map((inst) => ({
+    id: inst.name,
+    name: inst.name,
+    ip: inst.publicIpAddress ?? "",
+    status: inst.state?.name ?? "",
+  }));
 }
 
 export async function destroyServer(name?: string): Promise<void> {

@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import type { VMConnection } from "../history.js";
+import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
@@ -758,6 +758,26 @@ export async function getServerIp(serverId: string): Promise<string | null> {
   const publicNet = toRecord(server.public_net);
   const ipv4 = toRecord(publicNet?.ipv4);
   return isString(ipv4?.ip) ? ipv4.ip : null;
+}
+
+/** List all Hetzner servers. Returns simplified instance info for the remap picker. */
+export async function listServers(): Promise<CloudInstance[]> {
+  const resp = await hetznerApi("GET", "/servers");
+  const data = parseJsonObj(resp);
+  const servers = toObjectArray(data?.servers);
+  const results: CloudInstance[] = [];
+  for (const s of servers) {
+    const publicNet = toRecord(s.public_net);
+    const ipv4 = toRecord(publicNet?.ipv4);
+    const ip = isString(ipv4?.ip) ? ipv4.ip : "";
+    results.push({
+      id: String(s.id ?? ""),
+      name: isString(s.name) ? s.name : "",
+      ip,
+      status: isString(s.status) ? s.status : "",
+    });
+  }
+  return results;
 }
 
 export async function destroyServer(serverId?: string): Promise<void> {

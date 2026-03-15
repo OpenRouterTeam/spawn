@@ -1,6 +1,8 @@
 import type { Manifest } from "../manifest";
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { preflightCredentialCheck } from "../commands/index.js";
 import { mockClackPrompts } from "./test-helpers";
 
@@ -172,5 +174,57 @@ describe("preflightCredentialCheck", () => {
     expect(mockLog.warn).toHaveBeenCalledTimes(1);
     const warnMsg = String(mockLog.warn.mock.calls[0][0]);
     expect(warnMsg).toContain("OPENROUTER_API_KEY");
+  });
+
+  it("should not warn when OPENROUTER_API_KEY is saved in config file", async () => {
+    clearEnv("OPENROUTER_API_KEY");
+    setEnv("HCLOUD_TOKEN", "test-token");
+
+    const spawnConfigDir = path.join(process.env.HOME ?? "", ".config", "spawn");
+    fs.mkdirSync(spawnConfigDir, {
+      recursive: true,
+    });
+    const keyPath = path.join(spawnConfigDir, "openrouter.json");
+    fs.writeFileSync(
+      keyPath,
+      JSON.stringify({
+        api_key: "sk-or-v1-" + "a".repeat(64),
+      }),
+    );
+
+    const manifest = makeManifest("HCLOUD_TOKEN");
+    await preflightCredentialCheck(manifest, "testcloud");
+    fs.rmSync(keyPath, {
+      force: true,
+    });
+
+    expect(mockLog.warn).not.toHaveBeenCalled();
+  });
+
+  it("should not warn when cloud config file has saved credentials", async () => {
+    clearEnv("OPENROUTER_API_KEY");
+    clearEnv("HCLOUD_TOKEN");
+
+    const spawnConfigDir = path.join(process.env.HOME ?? "", ".config", "spawn");
+    fs.mkdirSync(spawnConfigDir, {
+      recursive: true,
+    });
+    const cloudConfigPath = path.join(spawnConfigDir, "testcloud.json");
+    fs.writeFileSync(
+      cloudConfigPath,
+      JSON.stringify({
+        token: "saved-cloud-token",
+      }),
+    );
+
+    const manifest = makeManifest("HCLOUD_TOKEN");
+    await preflightCredentialCheck(manifest, "testcloud");
+    fs.rmSync(cloudConfigPath, {
+      force: true,
+    });
+
+    // Both OPENROUTER_API_KEY and HCLOUD_TOKEN should be considered satisfied
+    // because the cloud config file exists with credentials
+    expect(mockLog.warn).not.toHaveBeenCalled();
   });
 });

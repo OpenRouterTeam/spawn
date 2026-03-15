@@ -8,6 +8,7 @@ import pc from "picocolors";
 import pkg from "../../package.json" with { type: "json" };
 import { agentKeys, cloudKeys, isStaleCache, loadManifest, matrixStatus } from "../manifest.js";
 import { validateIdentifier, validatePrompt } from "../security.js";
+import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { PkgVersionSchema, parseJsonObj } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
@@ -525,7 +526,7 @@ function hasCloudConfigCredentials(cloud: string): boolean {
 
 export function collectMissingCredentials(authVars: string[], cloud?: string): string[] {
   const missing: string[] = [];
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY && !hasSavedOpenRouterKey()) {
     missing.push("OPENROUTER_API_KEY");
   }
   for (const v of authVars) {
@@ -534,9 +535,9 @@ export function collectMissingCredentials(authVars: string[], cloud?: string): s
     }
   }
 
-  // If there are missing credentials but the cloud has saved config, don't report them as missing
+  // If the cloud has saved config credentials, all vars (including cloud-specific ones) are covered
   if (missing.length > 0 && cloud && hasCloudConfigCredentials(cloud)) {
-    return missing.filter((v) => v === "OPENROUTER_API_KEY");
+    return [];
   }
 
   return missing;

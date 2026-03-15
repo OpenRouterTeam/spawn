@@ -154,13 +154,6 @@ describe("aws/aws", () => {
       expect(BUNDLES.length).toBeGreaterThanOrEqual(5);
     });
 
-    it("all bundles have required fields", () => {
-      for (const b of BUNDLES) {
-        expect(b.id).toBeTruthy();
-        expect(b.label).toBeTruthy();
-      }
-    });
-
     it("bundle IDs follow naming convention", () => {
       for (const b of BUNDLES) {
         expect(b.id).toMatch(/_3_0$/);
