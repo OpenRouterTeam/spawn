@@ -194,6 +194,7 @@ const _state: AwsState = {
   keyPairName: "spawn-key",
 };
 
+/** Introspect internal state (used by tests). */
 export function getState() {
   return {
     awsRegion: _state.region,
