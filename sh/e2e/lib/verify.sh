@@ -24,21 +24,22 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode the prompt and embed it directly in the remote command.
-  # Base64 output is [A-Za-z0-9+/=] only — safe to embed in single quotes.
+  # Base64-encode the prompt and pass it via env var in the remote command.
+  # We assign _ENCODED_PROMPT at the start of the remote command string to
+  # avoid interpolating data into single-quoted contexts (injection risk).
   # We cannot pipe the prompt via stdin because cloud_exec uses
   # "printf '...' | base64 -d | bash", which means bash's stdin is the
-  # decoded script — not the outer process stdin. Embedding the prompt
-  # in the command avoids this stdin pass-through limitation.
+  # decoded script — not the outer process stdin.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
   # claude -p (--print) reads the prompt from stdin.
-  output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+    source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); \
+    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
     printf '%s' \"\$PROMPT\" | timeout ${INPUT_TEST_TIMEOUT} claude -p" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -56,15 +57,16 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
-  # Embed the prompt in the command (see input_test_claude comment for why stdin won't work).
+  # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+    source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); \
+    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
     timeout ${INPUT_TEST_TIMEOUT} codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -149,11 +151,12 @@ input_test_openclaw() {
     fi
 
     local output
-    # Embed the prompt in the command (see input_test_claude comment for why stdin won't work).
-    output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
+    # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
+    output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+      source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-      PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); \
+      PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
       timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -179,15 +182,16 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
-  # Embed the prompt in the command (see input_test_claude comment for why stdin won't work).
+  # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
   # Use -m/--message for non-interactive single-message mode (not -p which is --provider).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
 
   local output
-  output=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
+  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+    source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); \
+    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
     timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
