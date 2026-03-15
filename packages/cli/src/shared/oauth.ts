@@ -46,6 +46,28 @@ async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
   return result.ok ? result.data : true; // network error = skip validation
 }
 
+// ─── PKCE (S256) ────────────────────────────────────────────────────────────
+
+/** Base64url-encode a Uint8Array (RFC 7636 Appendix A). */
+function base64UrlEncode(bytes: Uint8Array): string {
+  const binStr = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+  return btoa(binStr).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Generate a cryptographically random code verifier (43 chars, URL-safe). */
+export function generateCodeVerifier(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+/** Derive the S256 code challenge: BASE64URL(SHA-256(verifier)). */
+export async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoded = new TextEncoder().encode(verifier);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", encoded));
+  return base64UrlEncode(digest);
+}
+
 // ─── OAuth Flow via Bun.serve ────────────────────────────────────────────────
 
 export function generateCsrfState(): string {
@@ -80,6 +102,8 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
   }
 
   const csrfState = generateCsrfState();
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
   let oauthCode: string | null = null;
   let oauthDenied = false;
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -162,7 +186,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
   logInfo(`OAuth server listening on port ${actualPort}`);
 
   const callbackUrl = `http://localhost:${actualPort}/callback`;
-  let authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}&state=${csrfState}`;
+  let authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}&state=${csrfState}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
   if (agentSlug) {
     authUrl += `&spawn_agent=${encodeURIComponent(agentSlug)}`;
   }
@@ -205,6 +229,8 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
       },
       body: JSON.stringify({
         code: oauthCode,
+        code_verifier: codeVerifier,
+        code_challenge_method: "S256",
       }),
       signal: AbortSignal.timeout(30_000),
     });
