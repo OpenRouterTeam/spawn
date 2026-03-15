@@ -4,10 +4,9 @@
 import type { AgentConfig } from "./agents";
 import type { Result } from "./ui";
 
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getErrorMessage, isPlainObject } from "@openrouter/spawn-shared";
-import { deepMerge } from "./parse";
+import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
@@ -348,68 +347,61 @@ async function setupOpenclawConfig(
 
   const gatewayToken = token ?? crypto.randomUUID().replace(/-/g, "");
 
-  // Build config object for atomic JSON write
-  const configObj: Record<string, unknown> = {
-    env: {
-      OPENROUTER_API_KEY: apiKey,
-    },
-    gateway: {
-      mode: "local",
-      auth: {
-        mode: "token",
-        token: gatewayToken,
-      },
-    },
-    agents: {
-      defaults: {
-        model: {
-          primary: modelId,
+  // Run `openclaw onboard --non-interactive` to create a properly structured
+  // config with auth profiles, provider setup, gateway config, and workspace.
+  // This replaces our previous manual JSON construction + deep-merge approach
+  // that bypassed OpenClaw's credential/auth profile system.
+  const onboardCmd =
+    "source ~/.spawnrc 2>/dev/null; " +
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+    "openclaw onboard --non-interactive" +
+    ` --openrouter-api-key ${shellQuote(apiKey)}` +
+    " --gateway-auth token" +
+    ` --gateway-token ${shellQuote(gatewayToken)}` +
+    " --skip-health" +
+    " --accept-risk";
+  const onboardResult = await asyncTryCatchIf(isOperationalError, () => runner.runServer(onboardCmd, 120));
+  if (!onboardResult.ok) {
+    logWarn("openclaw onboard failed — falling back to manual config");
+    // Minimal fallback: upload a basic config so the agent can still start
+    const fallbackConfig = JSON.stringify(
+      {
+        env: {
+          OPENROUTER_API_KEY: apiKey,
+        },
+        gateway: {
+          mode: "local",
+          auth: {
+            mode: "token",
+            token: gatewayToken,
+          },
+        },
+        agents: {
+          defaults: {
+            model: {
+              primary: modelId,
+            },
+          },
         },
       },
-    },
-  };
-
-  // Channel config — written directly to the config file.
-  // Both use dmPolicy "pairing" so users must approve new senders.
-  const channels: Record<string, unknown> = {};
-
-  if (telegramBotToken) {
-    channels.telegram = {
-      enabled: true,
-      botToken: telegramBotToken,
-      dmPolicy: "pairing",
-      groupPolicy: "open",
-      groups: {
-        "*": {
-          requireMention: true,
-        },
-      },
-    };
-    logInfo("Telegram bot token configured");
+      null,
+      2,
+    );
+    await uploadConfigFile(runner, fallbackConfig, "$HOME/.openclaw/openclaw.json");
   }
 
-  if (Object.keys(channels).length > 0) {
-    configObj.channels = channels;
-  }
-
-  // Download existing config → deep-merge locally → re-upload.
-  // This keeps all logic in our linted TypeScript instead of a remote bun script.
-  const tmpDownload = join(getTmpDir(), `spawn_occonfig_dl_${Date.now()}`);
-  const dlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.openclaw/openclaw.json", tmpDownload));
-  let existingConfig: Record<string, unknown> = {};
-  if (dlResult.ok && existsSync(tmpDownload)) {
-    const raw = readFileSync(tmpDownload, "utf-8").trim();
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (isPlainObject(parsed)) {
-        existingConfig = parsed;
-      }
+  // Set custom model if user selected one different from the onboard default
+  if (modelId !== "openrouter/auto") {
+    const modelResult = await asyncTryCatchIf(isOperationalError, () =>
+      runner.runServer(
+        "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+          `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
+      ),
+    );
+    if (!modelResult.ok) {
+      logWarn("Custom model config failed (non-fatal)");
     }
-    unlinkSync(tmpDownload);
   }
-  const merged = deepMerge(existingConfig, configObj);
-  const config = JSON.stringify(merged, null, 2);
-  await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Redirect stdout to suppress doctor warnings on each call.
@@ -426,25 +418,23 @@ async function setupOpenclawConfig(
     logWarn("Browser config setup failed (non-fatal)");
   }
 
-  // Re-upload our full config after `config set` calls — each `openclaw config set`
-  // does a read-modify-write that can drop fields (channels, gateway auth, etc.).
-  // Downloading first preserves any new fields `config set` added, then our
-  // configObj is deep-merged on top to restore channels and gateway auth.
-  const tmpRedownload = join(getTmpDir(), `spawn_occonfig_re_${Date.now()}`);
-  const reDlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.openclaw/openclaw.json", tmpRedownload));
-  let postSetConfig: Record<string, unknown> = {};
-  if (reDlResult.ok && existsSync(tmpRedownload)) {
-    const raw = readFileSync(tmpRedownload, "utf-8").trim();
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (isPlainObject(parsed)) {
-        postSetConfig = parsed;
-      }
+  // Configure Telegram channel if a bot token was provided
+  if (telegramBotToken) {
+    const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
+      runner.runServer(
+        "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+          "openclaw config set channels.telegram.enabled true >/dev/null; " +
+          `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
+          "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
+          "openclaw config set channels.telegram.groupPolicy open >/dev/null",
+      ),
+    );
+    if (telegramResult.ok) {
+      logInfo("Telegram bot token configured");
+    } else {
+      logWarn("Telegram config failed (non-fatal)");
     }
-    unlinkSync(tmpRedownload);
   }
-  const finalConfig = deepMerge(postSetConfig, configObj);
-  await uploadConfigFile(runner, JSON.stringify(finalConfig, null, 2), "$HOME/.openclaw/openclaw.json");
 
   // Write USER.md bootstrap file
   const messagingLines: string[] = [];
@@ -474,6 +464,7 @@ async function setupOpenclawConfig(
     ...messagingLines,
     "",
   ].join("\n");
+  // Workspace dir is created by `openclaw onboard`; ensure it exists for the fallback path.
   await runner.runServer("mkdir -p ~/.openclaw/workspace");
   await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
 }
