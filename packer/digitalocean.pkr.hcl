@@ -45,6 +45,9 @@ source "digitalocean" "spawn" {
     "nyc1", "nyc3", "sfo3", "tor1", "ams3",
     "lon1", "fra1", "blr1", "sgp1", "syd1",
   ]
+
+  # Default is 30m which times out for distant regions (blr1, sgp1, syd1)
+  transfer_timeout = "60m"
 }
 
 build {
