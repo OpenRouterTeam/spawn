@@ -78,7 +78,7 @@ describe("credentialHints", () => {
   });
 
   describe("when all required env vars are set", () => {
-    it("reports credentials appear set and suggests they may be invalid", () => {
+    it("reports credentials appear set, suggests they may be invalid, and lists env var names", () => {
       setEnv("HCLOUD_TOKEN", "test-token");
       setEnv("OPENROUTER_API_KEY", "sk-or-v1-test");
       const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
@@ -86,13 +86,6 @@ describe("credentialHints", () => {
       expect(joined).toContain("Credentials appear to be set");
       expect(joined).toContain("invalid or expired");
       expect(joined).toContain("spawn hetzner");
-    });
-
-    it("lists the env var names when all are set", () => {
-      setEnv("HCLOUD_TOKEN", "test-token");
-      setEnv("OPENROUTER_API_KEY", "sk-or-v1-test");
-      const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-      const joined = hints.join("\n");
       expect(joined).toContain("HCLOUD_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
     });

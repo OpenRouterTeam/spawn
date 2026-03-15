@@ -164,31 +164,15 @@ describe("cmdCloudInfo", () => {
   // ── Cloud with no implemented agents ──────────────────────────────
 
   describe("cloud with no implemented agents", () => {
-    it("should show no-agents message", async () => {
+    it("shows cloud name, no-agents message, and notes for agent-less cloud", async () => {
       global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
       const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("No implemented agents");
-    });
-
-    it("should still show cloud name for agent-less cloud", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
-      await loadManifest(true);
-
-      await cmdCloudInfo("emptycloud");
-      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Empty Cloud");
       expect(output).toContain("Cloud with no agents");
-    });
-
-    it("should display notes for agent-less cloud", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
-      await loadManifest(true);
-
-      await cmdCloudInfo("emptycloud");
-      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("special setup instructions");
     });
   });
