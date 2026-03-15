@@ -22,6 +22,8 @@ export interface AgentConfig {
   name: string;
   /** Default model ID passed to configure() (no interactive prompt — override via MODEL_ID env var). */
   modelDefault?: string;
+  /** Env var name for setting the model on the remote (e.g. ZEROCLAW_MODEL, LLM_MODEL). */
+  modelEnvVar?: string;
   /** Pre-provision hook (runs before server creation, e.g., prompt for GitHub auth). */
   preProvision?: () => Promise<void>;
   /** Install the agent on the remote machine. */
@@ -66,11 +68,6 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
       hint: "connect via bot token from @BotFather",
       dataEnvVar: "TELEGRAM_BOT_TOKEN",
     },
-    {
-      value: "custom-model",
-      label: "Custom model",
-      hint: "enter an OpenRouter model ID manually",
-    },
   ],
 };
 
@@ -85,6 +82,11 @@ const COMMON_STEPS: OptionalStep[] = [
     value: "reuse-api-key",
     label: "Reuse saved OpenRouter key",
     hint: "off = create a fresh key via OAuth",
+  },
+  {
+    value: "custom-model",
+    label: "Custom model",
+    hint: "enter an OpenRouter model ID manually",
   },
 ];
 

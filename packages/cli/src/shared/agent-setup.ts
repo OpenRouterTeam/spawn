@@ -726,6 +726,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
+      modelEnvVar: "KILOCODE_MODEL",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
@@ -744,6 +745,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
+      modelEnvVar: "ZEROCLAW_MODEL",
       preProvision: detectGithubAuth,
       install: async () => {
         // Direct binary install from pinned release (v0.1.9a "latest" has no assets,
@@ -774,6 +776,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     hermes: {
       name: "Hermes Agent",
       cloudInitTier: "minimal",
+      modelEnvVar: "LLM_MODEL",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
@@ -794,6 +797,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     junie: {
       name: "Junie",
       cloudInitTier: "node",
+      modelEnvVar: "JUNIE_MODEL",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(

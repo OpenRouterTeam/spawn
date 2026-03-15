@@ -174,7 +174,12 @@ export async function runOrchestration(
   // 7. Wait for readiness
   await cloud.waitForReady();
 
-  const envContent = generateEnvConfig(agent.envVars(apiKey));
+  const envPairs = agent.envVars(apiKey);
+  // Inject agent-specific model env var when a custom model is selected
+  if (modelId && agent.modelEnvVar) {
+    envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+  }
+  const envContent = generateEnvConfig(envPairs);
 
   // 8. Install agent (skip entirely for snapshot boots, try tarball first on cloud VMs)
   if (cloud.skipAgentInstall) {
