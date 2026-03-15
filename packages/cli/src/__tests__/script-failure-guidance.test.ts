@@ -401,8 +401,10 @@ describe("getSignalGuidance", () => {
 });
 
 describe("buildRetryCommand", () => {
-  it("should return simple command without prompt", () => {
+  it("should return simple command when prompt is absent, undefined, or empty", () => {
     expect(buildRetryCommand("claude", "sprite")).toBe("spawn claude sprite");
+    expect(buildRetryCommand("codex", "vultr", undefined)).toBe("spawn codex vultr");
+    expect(buildRetryCommand("codex", "vultr", "")).toBe("spawn codex vultr");
   });
 
   it("should include --prompt when prompt is provided", () => {
@@ -432,14 +434,6 @@ describe("buildRetryCommand", () => {
   it("should escape double quotes in prompt", () => {
     const result = buildRetryCommand("claude", "sprite", 'Fix "all" bugs');
     expect(result).toBe('spawn claude sprite --prompt "Fix \\"all\\" bugs"');
-  });
-
-  it("should return simple command when prompt is undefined", () => {
-    expect(buildRetryCommand("codex", "vultr", undefined)).toBe("spawn codex vultr");
-  });
-
-  it("should return simple command when prompt is empty string", () => {
-    expect(buildRetryCommand("codex", "vultr", "")).toBe("spawn codex vultr");
   });
 
   // ── spawnName parameter (issue #1709) ────────────────────────────────────
