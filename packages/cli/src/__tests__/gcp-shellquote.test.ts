@@ -65,7 +65,5 @@ describe("shellQuote", () => {
     const quoted = shellQuote(dangerous);
     // The quoted string wraps in single quotes, preventing expansion
     expect(quoted).toBe("'$(rm -rf /)'");
-    expect(quoted.startsWith("'")).toBe(true);
-    expect(quoted.endsWith("'")).toBe(true);
   });
 });
