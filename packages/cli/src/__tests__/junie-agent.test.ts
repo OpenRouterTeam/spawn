@@ -42,7 +42,6 @@ function createMockRunner() {
 describe("Junie agent config", () => {
   it("is registered in createCloudAgents", () => {
     const { agents } = createCloudAgents(createMockRunner());
-    expect(agents["junie"]).toBeDefined();
     expect(agents["junie"].name).toBe("Junie");
   });
 
