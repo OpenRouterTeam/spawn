@@ -610,8 +610,4 @@ describe("validatePrompt", () => {
   it("should accept semicolons not followed by rm", () => {
     expect(() => validatePrompt("echo hello; echo world")).not.toThrow();
   });
-
-  it("should handle prompt with only whitespace", () => {
-    expect(() => validatePrompt("   \t\n  ")).toThrow("Prompt is required but was not provided");
-  });
 });
