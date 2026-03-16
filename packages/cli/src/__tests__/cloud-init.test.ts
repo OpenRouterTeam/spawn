@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
+import { getPackagesForTier, needsBun, needsNode } from "../shared/cloud-init.js";
 
 describe("getPackagesForTier", () => {
   const MINIMAL_PACKAGES = [
@@ -111,12 +111,5 @@ describe("needsBun", () => {
   }
   it("defaults to true (full tier)", () => {
     expect(needsBun()).toBe(true);
-  });
-});
-
-describe("NODE_INSTALL_CMD", () => {
-  it("is a curl-based install command targeting Node 22", () => {
-    expect(NODE_INSTALL_CMD).toContain("curl");
-    expect(NODE_INSTALL_CMD).toContain("22");
   });
 });
