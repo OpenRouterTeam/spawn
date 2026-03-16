@@ -250,7 +250,9 @@ export async function runOrchestration(
 
   // GitHub CLI setup (skip if user unchecked in setup options)
   if (!enabledSteps || enabledSteps.has("github")) {
-    await offerGithubAuth(cloud.runner);
+    // Pass explicitlyRequested=true when user opted in via setup options so the
+    // step always runs even if no local gh token was found during detectGithubAuth.
+    await offerGithubAuth(cloud.runner, enabledSteps?.has("github"));
   }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
