@@ -744,17 +744,6 @@ async function dispatchCommand(
 }
 
 async function main(): Promise<void> {
-  // ── Windows detection ─────────────────────────────────────────────────────
-  if (process.platform === "win32") {
-    console.error(pc.red("Spawn requires WSL (Windows Subsystem for Linux).\n"));
-    console.error("  1. Open PowerShell as Administrator and run:");
-    console.error(pc.cyan("     wsl --install\n"));
-    console.error("  2. Restart your computer, then open Ubuntu from the Start Menu");
-    console.error("  3. Inside WSL, install Spawn:");
-    console.error(pc.cyan("     curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash\n"));
-    process.exit(1);
-  }
-
   const rawArgs = process.argv.slice(2);
 
   // ── `spawn pick` — bypass all flag parsing; used by bash scripts ──────────
