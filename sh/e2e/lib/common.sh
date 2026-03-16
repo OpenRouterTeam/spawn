@@ -130,6 +130,46 @@ cloud_install_wait() {
 }
 
 # ---------------------------------------------------------------------------
+# Per-agent provision timeout overrides
+#
+# Some agents (e.g. junie) have heavier installs that exceed the default
+# PROVISION_TIMEOUT on slower clouds. This map lets us set per-agent defaults
+# without raising the global timeout for all agents.
+#
+# Override precedence:
+#   1. PROVISION_TIMEOUT_<agent> env var (explicit override)
+#   2. Built-in per-agent default (below)
+#   3. Global PROVISION_TIMEOUT
+# ---------------------------------------------------------------------------
+_PROVISION_TIMEOUT_junie=1200
+
+get_provision_timeout() {
+  local agent="$1"
+  # Sanitize agent name: whitelist [A-Za-z0-9_] only, replacing all else with _
+  # This prevents shell metacharacter injection before eval on lines below
+  local safe_agent
+  safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
+
+  # Check for env var override: PROVISION_TIMEOUT_<agent>
+  local env_var="PROVISION_TIMEOUT_${safe_agent}"
+  eval "local env_val=\${${env_var}:-}"
+  if [ -n "${env_val}" ]; then
+    case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
+  fi
+
+  # Check for built-in per-agent default
+  local builtin_var="_PROVISION_TIMEOUT_${safe_agent}"
+  eval "local builtin_val=\${${builtin_var}:-}"
+  if [ -n "${builtin_val}" ]; then
+    printf '%s' "${builtin_val}"
+    return
+  fi
+
+  # Fall back to global
+  printf '%s' "${PROVISION_TIMEOUT}"
+}
+
+# ---------------------------------------------------------------------------
 # require_common_env
 #
 # Validates tools and env vars common to ALL clouds (bun, jq, OPENROUTER_API_KEY).

@@ -50,13 +50,17 @@ provision_agent() {
   # "droplet limit exceeded"). Waits 30s between retries, up to 3 attempts.
   # Only retries when stderr contains a droplet-limit / quota error pattern.
   # ---------------------------------------------------------------------------
+  # Resolve per-agent provision timeout (junie gets 1200s, others get default)
+  local effective_provision_timeout
+  effective_provision_timeout=$(get_provision_timeout "${agent}")
+
   local _provision_max_retries=3
   local _provision_attempt=1
   local _provision_verified=0
 
   while [ "${_provision_attempt}" -le "${_provision_max_retries}" ]; do
 
-  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)${_provision_attempt:+ [attempt ${_provision_attempt}/${_provision_max_retries}]}"
+  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${effective_provision_timeout}s)${_provision_attempt:+ [attempt ${_provision_attempt}/${_provision_max_retries}]}"
 
   # Remove stale exit file
   rm -f "${exit_file}"
@@ -116,7 +120,7 @@ CLOUD_ENV
 
   # Poll for completion or timeout (bash 3.2 compatible — no wait -n)
   local waited=0
-  while [ "${waited}" -lt "${PROVISION_TIMEOUT}" ]; do
+  while [ "${waited}" -lt "${effective_provision_timeout}" ]; do
     if [ -f "${exit_file}" ]; then
       break
     fi
@@ -126,7 +130,7 @@ CLOUD_ENV
 
   # Kill if still running (the interactive SSH/CLI session hangs)
   if [ ! -f "${exit_file}" ]; then
-    log_warn "Provision timed out after ${PROVISION_TIMEOUT}s — killing (install may still succeed)"
+    log_warn "Provision timed out after ${effective_provision_timeout}s — killing (install may still succeed)"
     # Kill the entire process tree — the subshell spawns bun → sprite exec -tty
     # which won't die from just killing the subshell PID. Without this, orphaned
     # sprite exec sessions keep running and corrupt the sprite config file.
