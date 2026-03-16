@@ -51,7 +51,7 @@ export function buildFixScript(manifest: Manifest, agentKey: string): string {
   // Always prepend IS_SANDBOX and PATH — matches generateEnvConfig() in shared/agents.ts
   lines.push("  printf 'export IS_SANDBOX=\\x271\\x27\\n'");
   lines.push(
-    "  printf 'export PATH=\"$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH\"\\n'",
+    "  printf 'export PATH=\"$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH\"\\n'",
   );
   for (const [key, template] of envEntries) {
     const value = resolveEnvTemplate(template);
