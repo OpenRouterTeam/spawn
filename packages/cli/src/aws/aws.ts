@@ -127,7 +127,7 @@ export const BUNDLES: Bundle[] = [
   },
 ];
 
-export const DEFAULT_BUNDLE = BUNDLES[0]; // nano_3_0
+export const DEFAULT_BUNDLE = BUNDLES[2]; // small_3_0 (2 GB)
 
 /** Per-agent default bundles — heavier agents need more RAM. */
 const AGENT_BUNDLE_DEFAULTS: Record<string, string> = {
@@ -696,7 +696,7 @@ export async function promptBundle(agentName?: string): Promise<void> {
   const agentDefault = agentName ? AGENT_BUNDLE_DEFAULTS[agentName] : undefined;
   const defaultId = agentDefault ?? DEFAULT_BUNDLE.id;
 
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+  if (process.env.SPAWN_CUSTOM !== "1" || process.env.SPAWN_NON_INTERACTIVE === "1") {
     _state.selectedBundle = defaultId;
     return;
   }
