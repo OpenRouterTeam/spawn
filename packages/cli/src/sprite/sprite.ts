@@ -519,7 +519,7 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   const spriteCmd = getSpriteCmd()!;
   // Generate a random temp path on remote to prevent symlink attacks
   const tempRandom = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const basename = remotePath.split("/").pop() || "file";
+  const basename = normalizedRemote.split("/").pop() || "file";
   const tempRemote = `/tmp/sprite_upload_${basename}_${tempRandom}`;
 
   await spriteRetry("sprite upload", async () => {
@@ -535,7 +535,7 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         "--",
         "bash",
         "-c",
-        `mkdir -p $(dirname '${remotePath}') && mv '${tempRemote}' '${remotePath}'`,
+        `mkdir -p $(dirname '${normalizedRemote}') && mv '${tempRemote}' '${normalizedRemote}'`,
       ],
       {
         stdio: [
@@ -567,7 +567,7 @@ export async function downloadFileSprite(remotePath: string, localPath: string):
   }
 
   const spriteCmd = getSpriteCmd()!;
-  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
 
   await spriteRetry("sprite download", async () => {
     const proc = Bun.spawn(

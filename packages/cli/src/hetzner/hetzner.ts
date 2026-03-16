@@ -634,7 +634,7 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
       ...SSH_BASE_OPTS,
       ...keyOpts,
       localPath,
-      `root@${serverIp}:${remotePath}`,
+      `root@${serverIp}:${normalizedRemote}`,
     ],
     {
       stdio: [
@@ -668,7 +668,7 @@ export async function downloadFile(remotePath: string, localPath: string, ip?: s
   }
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
 
   const proc = Bun.spawn(
     [

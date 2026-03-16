@@ -1008,7 +1008,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   }
   const username = resolveUsername();
   // Expand $HOME on remote side
-  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -1054,7 +1054,7 @@ export async function downloadFile(remotePath: string, localPath: string): Promi
     throw new Error("Invalid remote path");
   }
   const username = resolveUsername();
-  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
