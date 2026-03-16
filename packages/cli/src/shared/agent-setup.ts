@@ -64,7 +64,7 @@ async function installAgent(
  * Allows shell variable references ($HOME, ${HOME}) but rejects anything
  * that could break out of double-quoted shell interpolation.
  */
-function validateRemotePath(remotePath: string): void {
+function validateRemotePath(remotePath: string): string {
   // Allow alphanumerics, forward slashes, dots, underscores, tildes, hyphens,
   // and shell variable syntax ($, {, }).  Reject everything else — especially
   // backticks, semicolons, pipes, quotes, newlines, and null bytes.
@@ -76,13 +76,14 @@ function validateRemotePath(remotePath: string): void {
   if (normalizedRemote.includes("..")) {
     throw new Error(`uploadConfigFile: remotePath must not contain "..": ${remotePath}`);
   }
+  return normalizedRemote;
 }
 
 /**
  * Upload a config file to the remote machine via a temp file and mv.
  */
 async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
-  validateRemotePath(remotePath);
+  const safePath = validateRemotePath(remotePath);
 
   const tmpFile = join(getTmpDir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, {
@@ -98,7 +99,7 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
             const tempRemote = `/tmp/spawn_config_${Date.now()}`;
             await runner.uploadFile(tmpFile, tempRemote);
             await runner.runServer(
-              `mkdir -p $(dirname "${remotePath}") && chmod 600 ${shellQuote(tempRemote)} && mv ${shellQuote(tempRemote)} "${remotePath}"`,
+              `mkdir -p $(dirname "${safePath}") && chmod 600 ${shellQuote(tempRemote)} && mv ${shellQuote(tempRemote)} "${safePath}"`,
             );
           })(),
         ),
