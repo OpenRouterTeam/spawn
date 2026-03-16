@@ -1065,8 +1065,20 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
   logStep("Waiting for droplet to become active...");
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const text = await doApi("GET", `/droplets/${dropletId}`);
-    const data = parseJsonObj(text);
+    // Use asyncTryCatch to handle transient 404s: DO sometimes returns 404
+    // immediately after droplet creation before the resource propagates.
+    const r = await asyncTryCatch(() => doApi("GET", `/droplets/${dropletId}`));
+    if (!r.ok) {
+      const msg = r.error instanceof Error ? r.error.message : String(r.error);
+      if (msg.includes("404")) {
+        // Transient — droplet not yet visible in the API, retry
+        logStepInline(`Droplet not yet visible (${attempt}/${maxAttempts})`);
+        await sleep(5000);
+        continue;
+      }
+      throw r.error;
+    }
+    const data = parseJsonObj(r.data);
     const status = data?.droplet?.status;
 
     if (status === "active") {
