@@ -4,6 +4,7 @@ import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
+import { normalize } from "node:path";
 import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -1307,10 +1308,11 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
@@ -1346,10 +1348,11 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 
 export async function downloadFile(remotePath: string, localPath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");

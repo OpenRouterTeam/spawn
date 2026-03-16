@@ -3,7 +3,7 @@
 import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getUserHome } from "../shared/paths";
 import { asyncTryCatch } from "../shared/result.js";
@@ -506,10 +506,11 @@ async function runSpriteSilent(cmd: string): Promise<void> {
  * The -file flag format is "localpath:remotepath".
  */
 export async function uploadFileSprite(localPath: string, remotePath: string): Promise<void> {
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
@@ -555,10 +556,11 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 
 /** Download a file from the remote sprite by catting it to stdout. */
 export async function downloadFileSprite(remotePath: string, localPath: string): Promise<void> {
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");

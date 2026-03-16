@@ -5,7 +5,7 @@ import type { AgentConfig } from "./agents";
 import type { Result } from "./ui";
 
 import { unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
@@ -68,11 +68,12 @@ function validateRemotePath(remotePath: string): void {
   // Allow alphanumerics, forward slashes, dots, underscores, tildes, hyphens,
   // and shell variable syntax ($, {, }).  Reject everything else — especially
   // backticks, semicolons, pipes, quotes, newlines, and null bytes.
-  if (!/^[\w/.~${}:-]+$/.test(remotePath)) {
+  const normalizedRemote = normalize(remotePath);
+  if (!/^[\w/.~${}:-]+$/.test(normalizedRemote)) {
     throw new Error(`uploadConfigFile: remotePath contains unsafe characters: ${remotePath}`);
   }
-  // Block path traversal
-  if (remotePath.includes("..")) {
+  // Block path traversal (normalize resolves . segments first)
+  if (normalizedRemote.includes("..")) {
     throw new Error(`uploadConfigFile: remotePath must not contain "..": ${remotePath}`);
   }
 }
