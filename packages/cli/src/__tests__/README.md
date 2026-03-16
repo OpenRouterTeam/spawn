@@ -31,6 +31,8 @@ bun test src/__tests__/manifest.test.ts
 - `commands-display.test.ts` — `cmdAgentInfo` (happy path), `cmdHelp`
 - `commands-cloud-info.test.ts` — `cmdCloudInfo` display
 - `commands-update-download.test.ts` — `cmdUpdate`, script download and execution
+- `cmd-feedback.test.ts` — `spawn feedback` command: empty message rejection, URL construction
+- `cmd-fix.test.ts` — `spawn fix` command: SSH connection repair via DI-injected runScript
 
 ### Commands: error paths
 - `commands-error-paths.test.ts` — Validation failures, unknown agents/clouds, prompt rejection
@@ -44,6 +46,8 @@ bun test src/__tests__/manifest.test.ts
 - `script-failure-guidance.test.ts` — `getScriptFailureGuidance`, `getSignalGuidance`, `buildRetryCommand`
 - `download-and-failure.test.ts` — Download fallback pipeline, failure reporting
 - `run-path-credential-display.test.ts` — `prioritizeCloudsByCredentials`, run-path validation
+- `delete-spinner.test.ts` — `confirmAndDelete`: spinner messages from stderr, final result display
+- `steps-flag.test.ts` — `--steps` and `--config` flags: `findUnknownFlag`, `getAgentOptionalSteps`, `validateStepNames`
 
 ### Security
 - `security.test.ts` — `validateIdentifier`, `validateScriptContent`, `validatePrompt` (core, boundary, encoding edge cases)
@@ -71,6 +75,9 @@ bun test src/__tests__/manifest.test.ts
 - `credential-hints.test.ts` — `credentialHints`
 - `cloud-credentials.test.ts` — `hasCloudCredentials`
 - `preflight-credentials.test.ts` — `preflightCredentialCheck`
+- `result-helpers.test.ts` — `asyncTryCatch`, `asyncTryCatchIf`, `tryCatch`, `tryCatchIf`, `mapResult`, `unwrapOr`
+- `config-priority.test.ts` — `loadSpawnConfig` default values, field merging, and override priority
+- `spawn-config.test.ts` — `loadSpawnConfig` file parsing, validation, size limits, and null-byte rejection
 
 ### Cloud-specific
 - `aws.test.ts` — AWS credential cache, SigV4 signing helpers
@@ -83,6 +90,7 @@ bun test src/__tests__/manifest.test.ts
 - `do-snapshot.test.ts` — `findSpawnSnapshot`: DigitalOcean snapshot lookup, filtering, error handling
 - `sprite-keep-alive.test.ts` — `installSpriteKeepAlive` download/install, graceful failure, session script wrapping
 - `ui-utils.test.ts` — `validateServerName`, `validateRegionName`, `toKebabCase`, `sanitizeTermValue`, `jsonEscape`
+- `gcp-shellquote.test.ts` — `shellQuote` GCP-specific quoting edge cases
 
 ### Agent-specific
 - `junie-agent.test.ts` — Junie CLI agent configuration validation
@@ -92,6 +100,7 @@ bun test src/__tests__/manifest.test.ts
 
 ### OAuth and auth
 - `oauth-code-validation.test.ts` — `OAUTH_CODE_REGEX` format validation
+- `oauth-pkce.test.ts` — `generateCodeVerifier`, `generateCodeChallenge` PKCE S256 flow
 
 ### History (extended)
 - `history-spawn-id.test.ts` — Unique spawn IDs, `saveVmConnection`/`saveLaunchCmd` by spawnId, concurrent spawn isolation
