@@ -21,6 +21,8 @@ export {
 } from "./info.js";
 // interactive.ts — cmdInteractive, cmdAgentInteractive
 export { cmdAgentInteractive, cmdInteractive } from "./interactive.js";
+// link.ts — cmdLink
+export { cmdLink } from "./link.js";
 // list.ts — cmdList, cmdLast, cmdListClear, history display
 export {
   buildRecordLabel,

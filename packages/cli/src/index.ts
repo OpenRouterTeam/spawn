@@ -15,6 +15,7 @@ import {
   cmdHelp,
   cmdInteractive,
   cmdLast,
+  cmdLink,
   cmdList,
   cmdListClear,
   cmdMatrix,
@@ -128,6 +129,12 @@ function checkUnknownFlags(args: string[]): void {
     console.error();
     console.error(`  For ${pc.cyan("spawn pick")}:`);
     console.error(`    ${pc.cyan("--default")}           Pre-selected value in the picker`);
+    console.error();
+    console.error(`  For ${pc.cyan("spawn link")}:`);
+    console.error(`    ${pc.cyan("-a, --agent")}         Agent running on the server`);
+    console.error(`    ${pc.cyan("-c, --cloud")}         Cloud provider the server is on`);
+    console.error(`    ${pc.cyan("-u, --user")}          SSH user (default: root)`);
+    console.error(`    ${pc.cyan("--name")}              Custom name for this linked spawn`);
     console.error();
     console.error(`  For ${pc.cyan("spawn list")}:`);
     console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
@@ -726,6 +733,14 @@ async function dispatchCommand(
   }
   if (SUBCOMMANDS[cmd]) {
     await dispatchSubcommand(cmd, filteredArgs);
+    return;
+  }
+  if (cmd === "link" || cmd === "reconnect") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    await cmdLink(filteredArgs);
     return;
   }
   if (VERB_ALIASES.has(cmd)) {
