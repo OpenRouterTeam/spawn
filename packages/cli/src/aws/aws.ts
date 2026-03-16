@@ -5,6 +5,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -52,6 +53,11 @@ const AwsCredsSchema = v.object({
   region: v.optional(v.string()),
 });
 
+/** Validate that an AWS secret access key matches the expected 40-char base64 format. */
+function validateAwsSecretKey(key: string): boolean {
+  return /^[A-Za-z0-9/+=]{40}$/.test(key);
+}
+
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const configPath = getAwsConfigPath();
   const dir = configPath.replace(/\/[^/]+$/, "");
@@ -80,7 +86,7 @@ export function loadCredsFromConfig(): {
       if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
         return null;
       }
-      if (data.secretAccessKey.length < 16) {
+      if (!validateAwsSecretKey(data.secretAccessKey)) {
         return null;
       }
       return {
@@ -306,6 +312,9 @@ async function awsCli(args: string[]): Promise<string> {
 async function lightsailRest(target: string, body = "{}"): Promise<string> {
   if (!_state.accessKeyId || !_state.secretAccessKey) {
     throw new Error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set for REST API calls");
+  }
+  if (!validateAwsSecretKey(_state.secretAccessKey)) {
+    throw new Error("AWS secret access key has invalid format: expected 40 characters matching /^[A-Za-z0-9/+=]{40}$/");
   }
 
   const region = _state.region;
@@ -1121,10 +1130,11 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
@@ -1157,10 +1167,11 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 }
 
 export async function downloadFile(remotePath: string, localPath: string): Promise<void> {
+  const normalizedRemote = normalize(remotePath);
   if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) ||
-    remotePath.includes("..") ||
-    remotePath.split("/").some((s) => s.startsWith("-"))
+    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
+    normalizedRemote.includes("..") ||
+    normalizedRemote.split("/").some((s) => s.startsWith("-"))
   ) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
