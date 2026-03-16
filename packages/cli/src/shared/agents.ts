@@ -68,6 +68,36 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
       hint: "connect via bot token from @BotFather",
       dataEnvVar: "TELEGRAM_BOT_TOKEN",
     },
+    {
+      value: "whatsapp",
+      label: "WhatsApp",
+      hint: "link via QR code after launch",
+    },
+    {
+      value: "discord",
+      label: "Discord",
+      hint: "connect via bot token",
+    },
+    {
+      value: "slack",
+      label: "Slack",
+      hint: "connect via bot + app tokens",
+    },
+    {
+      value: "signal",
+      label: "Signal",
+      hint: "link via signal-cli",
+    },
+    {
+      value: "googlechat",
+      label: "Google Chat",
+      hint: "connect via webhook",
+    },
+    {
+      value: "bluebubbles",
+      label: "BlueBubbles",
+      hint: "iMessage bridge via BlueBubbles server",
+    },
   ],
 };
 
