@@ -169,8 +169,8 @@ describe("aws/aws", () => {
   });
 
   describe("DEFAULT_BUNDLE", () => {
-    it("is nano_3_0", () => {
-      expect(DEFAULT_BUNDLE.id).toBe("nano_3_0");
+    it("is small_3_0", () => {
+      expect(DEFAULT_BUNDLE.id).toBe("small_3_0");
     });
 
     it("references a valid bundle", () => {
