@@ -89,9 +89,10 @@ export function generateSpawnId(): string {
   return randomUUID();
 }
 
-/** Atomically write a JSON file: write to .tmp, then rename into place. */
+/** Atomically write a JSON file: write to a process-unique .tmp, then rename into place.
+ * The unique suffix prevents races when multiple concurrent spawn processes write history. */
 function atomicWriteJson(filePath: string, data: unknown): void {
-  const tmpPath = filePath + ".tmp";
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", {
     mode: 0o600,
   });

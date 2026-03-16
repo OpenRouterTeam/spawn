@@ -667,6 +667,7 @@ function getStartupScript(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
+    "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,

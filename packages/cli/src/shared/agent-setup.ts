@@ -257,11 +257,11 @@ async function detectGithubAuth(): Promise<void> {
   hostGitEmail = readHostGitConfig("user.email");
 }
 
-export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
+export async function offerGithubAuth(runner: CloudRunner, explicitlyRequested?: boolean): Promise<void> {
   if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
     return;
   }
-  if (!githubAuthRequested) {
+  if (!githubAuthRequested && !explicitlyRequested) {
     return;
   }
 
