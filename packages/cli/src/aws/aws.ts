@@ -1145,7 +1145,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       ...SSH_BASE_OPTS,
       ...keyOpts,
       localPath,
-      `${SSH_USER}@${_state.instanceIp}:${remotePath}`,
+      `${SSH_USER}@${_state.instanceIp}:${normalizedRemote}`,
     ],
     {
       stdio: [
@@ -1176,7 +1176,7 @@ export async function downloadFile(remotePath: string, localPath: string): Promi
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const proc = Bun.spawn(
     [
       "scp",

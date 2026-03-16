@@ -5,7 +5,7 @@ import type { AgentConfig } from "./agents";
 import type { Result } from "./ui";
 
 import { unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getTmpDir } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
@@ -64,24 +64,26 @@ async function installAgent(
  * Allows shell variable references ($HOME, ${HOME}) but rejects anything
  * that could break out of double-quoted shell interpolation.
  */
-function validateRemotePath(remotePath: string): void {
+function validateRemotePath(remotePath: string): string {
   // Allow alphanumerics, forward slashes, dots, underscores, tildes, hyphens,
   // and shell variable syntax ($, {, }).  Reject everything else — especially
   // backticks, semicolons, pipes, quotes, newlines, and null bytes.
-  if (!/^[\w/.~${}:-]+$/.test(remotePath)) {
+  const normalizedRemote = normalize(remotePath);
+  if (!/^[\w/.~${}:-]+$/.test(normalizedRemote)) {
     throw new Error(`uploadConfigFile: remotePath contains unsafe characters: ${remotePath}`);
   }
-  // Block path traversal
-  if (remotePath.includes("..")) {
+  // Block path traversal (normalize resolves . segments first)
+  if (normalizedRemote.includes("..")) {
     throw new Error(`uploadConfigFile: remotePath must not contain "..": ${remotePath}`);
   }
+  return normalizedRemote;
 }
 
 /**
  * Upload a config file to the remote machine via a temp file and mv.
  */
 async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
-  validateRemotePath(remotePath);
+  const safePath = validateRemotePath(remotePath);
 
   const tmpFile = join(getTmpDir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, {
@@ -97,7 +99,7 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
             const tempRemote = `/tmp/spawn_config_${Date.now()}`;
             await runner.uploadFile(tmpFile, tempRemote);
             await runner.runServer(
-              `mkdir -p $(dirname "${remotePath}") && chmod 600 ${shellQuote(tempRemote)} && mv ${shellQuote(tempRemote)} "${remotePath}"`,
+              `mkdir -p $(dirname "${safePath}") && chmod 600 ${shellQuote(tempRemote)} && mv ${shellQuote(tempRemote)} "${safePath}"`,
             );
           })(),
         ),
