@@ -647,8 +647,21 @@ async function ensureSshKey(): Promise<string> {
 
 const GCP_SSH_USER = "root";
 
+/** Defense-in-depth: allowed username pattern (alphanumeric, underscore, hyphen). */
+const SAFE_USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
+
 function resolveUsername(): string {
   return GCP_SSH_USER;
+}
+
+/** Assert username is safe for shell interpolation (defense-in-depth). */
+function assertSafeUsername(username: string): void {
+  if (!SAFE_USERNAME_RE.test(username)) {
+    throw new Error(
+      `Invalid GCP username '${username}': must match /^[a-zA-Z0-9_-]+$/. ` +
+        "This is a defense-in-depth check — the username should already be validated upstream.",
+    );
+  }
 }
 
 // ─── Server Name ────────────────────────────────────────────────────────────
@@ -664,6 +677,11 @@ export async function promptSpawnName(): Promise<void> {
 // ─── Cloud Init Startup Script ──────────────────────────────────────────────
 
 function getStartupScript(tier: CloudInitTier = "full"): string {
+  // Defense-in-depth: validate username before any shell interpolation.
+  // resolveUsername() currently returns a constant, but if it ever changes
+  // to accept dynamic input, this prevents shell injection in the startup script.
+  assertSafeUsername(resolveUsername());
+
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
@@ -705,6 +723,7 @@ export async function createInstance(
   tier?: CloudInitTier,
 ): Promise<VMConnection> {
   const username = resolveUsername();
+  assertSafeUsername(username);
   const pubKeys = await ensureSshKey();
   // Build ssh-keys metadata: one "user:key" entry per line
   const sshKeysMetadata = pubKeys
