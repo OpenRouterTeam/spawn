@@ -145,9 +145,10 @@ _PROVISION_TIMEOUT_junie=1200
 
 get_provision_timeout() {
   local agent="$1"
-  # Sanitize agent name for variable lookup (replace hyphens with underscores)
+  # Sanitize agent name: whitelist [A-Za-z0-9_] only, replacing all else with _
+  # This prevents shell metacharacter injection before eval on lines below
   local safe_agent
-  safe_agent=$(printf '%s' "${agent}" | tr '-' '_')
+  safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
 
   # Check for env var override: PROVISION_TIMEOUT_<agent>
   local env_var="PROVISION_TIMEOUT_${safe_agent}"
