@@ -629,8 +629,6 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
   logInfo("ZeroClaw configured for autonomous operation");
 }
 
-// ─── Swap Space Setup ─────────────────────────────────────────────────────────
-
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 function openCodeInstallCmd(): string {
