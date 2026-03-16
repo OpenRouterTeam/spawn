@@ -60,9 +60,29 @@ async function installAgent(
 }
 
 /**
+ * Validate that a remote path contains only safe characters.
+ * Allows shell variable references ($HOME, ${HOME}) but rejects anything
+ * that could break out of double-quoted shell interpolation.
+ */
+function validateRemotePath(remotePath: string): void {
+  // Allow alphanumerics, forward slashes, dots, underscores, tildes, hyphens,
+  // and shell variable syntax ($, {, }).  Reject everything else — especially
+  // backticks, semicolons, pipes, quotes, newlines, and null bytes.
+  if (!/^[\w/.~${}:-]+$/.test(remotePath)) {
+    throw new Error(`uploadConfigFile: remotePath contains unsafe characters: ${remotePath}`);
+  }
+  // Block path traversal
+  if (remotePath.includes("..")) {
+    throw new Error(`uploadConfigFile: remotePath must not contain "..": ${remotePath}`);
+  }
+}
+
+/**
  * Upload a config file to the remote machine via a temp file and mv.
  */
 async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
+  validateRemotePath(remotePath);
+
   const tmpFile = join(getTmpDir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, {
     mode: 0o600,
@@ -77,7 +97,7 @@ async function uploadConfigFile(runner: CloudRunner, content: string, remotePath
             const tempRemote = `/tmp/spawn_config_${Date.now()}`;
             await runner.uploadFile(tmpFile, tempRemote);
             await runner.runServer(
-              `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+              `mkdir -p $(dirname "${remotePath}") && chmod 600 ${shellQuote(tempRemote)} && mv ${shellQuote(tempRemote)} "${remotePath}"`,
             );
           })(),
         ),
@@ -143,7 +163,12 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
   }
 }`;
 
+  // Safety: base64 output only contains [A-Za-z0-9+/=] — never single quotes —
+  // so interpolating into a single-quoted shell string is safe.
   const settingsB64 = Buffer.from(settingsJson).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(settingsB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   // Build ~/.claude.json on the remote using $HOME so the workspace trust
   // entry uses the actual home directory path (e.g. /root, /home/user).
