@@ -152,9 +152,6 @@ function hasLocalGithubToken(): boolean {
   );
 }
 
-/** Sentinel value for the "None" option in the setup options multiselect. */
-const NONE_STEP = "__none__";
-
 /**
  * Show a multiselect prompt for optional post-provision setup steps.
  * Returns a Set of enabled step values, or undefined if there are no steps.
@@ -173,26 +170,13 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
     return undefined;
   }
 
-  // Nothing pre-selected — let users opt in to what they want
-  const defaultValues = [
-    NONE_STEP,
-  ];
-
   const selected = await p.multiselect({
-    message: "Setup options (↑/↓ navigate, space to select, enter to confirm)",
-    options: [
-      {
-        value: NONE_STEP,
-        label: "None",
-        hint: "skip all setup steps",
-      },
-      ...filteredSteps.map((s) => ({
-        value: s.value,
-        label: s.label,
-        hint: s.hint,
-      })),
-    ],
-    initialValues: defaultValues,
+    message: "Setup options (↑/↓ navigate, space=toggle, a=all, enter=confirm)",
+    options: filteredSteps.map((s) => ({
+      value: s.value,
+      label: s.label,
+      hint: s.hint,
+    })),
     required: false,
   });
 
@@ -200,9 +184,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
     return new Set<string>();
   }
 
-  // Strip the "None" sentinel — it carries no real step value
-  const realSteps = selected.filter((v) => v !== NONE_STEP);
-  const stepSet = new Set(realSteps);
+  const stepSet = new Set(selected);
 
   // If user selected "Custom model", prompt for the model ID and set MODEL_ID env
   if (stepSet.has("custom-model")) {
