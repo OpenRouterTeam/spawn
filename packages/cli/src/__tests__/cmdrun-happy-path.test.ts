@@ -441,7 +441,7 @@ describe("cmdRun happy-path pipeline", () => {
   // ── Dry-run mode ──────────────────────────────────────────────────────────
 
   describe("dry-run mode skips download", () => {
-    it("should not download script in dry-run mode", async () => {
+    it("should skip download, skip history, and show preview with agent/cloud info", async () => {
       global.fetch = mockFetchForDownload({
         primaryOk: true,
       });
@@ -449,31 +449,15 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite", undefined, true);
 
-      // In dry-run, only manifest fetch should occur (no script download)
+      // No script download — only manifest fetch
       const scriptFetches = fetchCalls.filter((c) => c.url.includes("openrouter.ai") && !c.url.includes("manifest"));
       expect(scriptFetches).toHaveLength(0);
-    });
 
-    it("should not save history in dry-run mode", async () => {
-      global.fetch = mockFetchForDownload({
-        primaryOk: true,
-      });
-      await loadManifest(true);
-
-      await cmdRun("claude", "sprite", undefined, true);
-
+      // No history written
       const historyPath = join(historyDir, "history.json");
       expect(existsSync(historyPath)).toBe(false);
-    });
 
-    it("should show dry-run preview with agent and cloud info", async () => {
-      global.fetch = mockFetchForDownload({
-        primaryOk: true,
-      });
-      await loadManifest(true);
-
-      await cmdRun("claude", "sprite", undefined, true);
-
+      // Preview shows agent and cloud names
       const allOutput = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(allOutput).toContain("Claude Code");
       expect(allOutput).toContain("Sprite");
@@ -495,7 +479,7 @@ describe("cmdRun happy-path pipeline", () => {
   // ── Launch message formatting ─────────────────────────────────────────────
 
   describe("launch step message", () => {
-    it("should show 'Launching <agent> on <cloud>' for normal run", async () => {
+    it("should show 'Launching <agent> on <cloud>' without 'with prompt' when no prompt given", async () => {
       global.fetch = mockFetchForDownload({
         primaryOk: true,
       });
@@ -508,6 +492,7 @@ describe("cmdRun happy-path pipeline", () => {
       expect(launchMsg).toBeDefined();
       expect(launchMsg).toContain("Claude Code");
       expect(launchMsg).toContain("Sprite");
+      expect(launchMsg).not.toContain("with prompt");
     });
 
     it("should append 'with prompt...' when prompt is provided", async () => {
@@ -521,19 +506,6 @@ describe("cmdRun happy-path pipeline", () => {
       const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toContain("with prompt");
-    });
-
-    it("should append '...' without prompt when no prompt provided", async () => {
-      global.fetch = mockFetchForDownload({
-        primaryOk: true,
-      });
-      await loadManifest(true);
-
-      await cmdRun("claude", "sprite");
-
-      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
-      const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
-      expect(launchMsg).not.toContain("with prompt");
     });
   });
 
