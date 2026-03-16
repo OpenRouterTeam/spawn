@@ -183,7 +183,31 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
    **NEVER close a PR** — only the security team can close PRs. If a PR is stale, broken, or superseded, comment explaining the issue and move on.
    **NEVER touch human-created PRs** — only interact with PRs that have `-- refactor/` in their description.
 
-6. **community-coordinator** (Sonnet)
+7. **style-reviewer** (Sonnet) — Best match for `style` or `lint` labeled issues. Proactive: enforce project rules and conventions from `CLAUDE.md` and `.claude/rules/`.
+
+   **Proactive scan procedure:**
+   1. Run `bunx @biomejs/biome check src/` in the CLI package — fix all violations (lint, format, grit rules like `no-type-assertion`)
+   2. Check shell scripts against `.claude/rules/shell-scripts.md`:
+      - No `echo -e` (must use `printf`)
+      - No `source <(cmd)` in curl-piped scripts
+      - No `((var++))` with `set -e`
+      - No `set -u` (use `${VAR:-}` instead)
+      - No `python3 -c` / `python -c` (use `bun -e` or `jq`)
+      - No relative paths for sourcing (`source ./lib/...`)
+   3. Check TypeScript against `.claude/rules/type-safety.md`:
+      - No `as` type assertions (except `as const`)
+      - No `require()` / `module.exports` (ESM only)
+      - No manual multi-level typeguards (use valibot)
+      - No `vitest` imports (use `bun:test`)
+   4. Check test files against `.claude/rules/testing.md`:
+      - No `homedir` from `node:os` (use `process.env.HOME`)
+      - No subprocess spawning (`execSync`, `spawnSync`, `Bun.spawn`)
+      - Tests must import from real source, not copy-paste functions
+
+   Only create a PR if actual violations are found. ONE PR max, fixing all violations found.
+   Run `bunx @biomejs/biome check src/` and `bun test` after every change to confirm fixes don't break anything.
+
+7. **community-coordinator** (Sonnet)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
    **COMPLETELY IGNORE issues labeled `discovery-team`, `cloud-proposal`, or `agent-proposal`** — those are managed by the discovery team. Do NOT comment on them, do NOT change labels, do NOT interact in any way. Filter them out:
@@ -220,7 +244,7 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
 ## Commit Markers
 
 Every commit: `Agent: <agent-name>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
-Values: security-auditor, ux-engineer, complexity-hunter, test-engineer, code-health, pr-maintainer, community-coordinator, team-lead.
+Values: security-auditor, ux-engineer, complexity-hunter, test-engineer, code-health, pr-maintainer, style-reviewer, community-coordinator, team-lead.
 
 ## Git Worktrees (MANDATORY)
 

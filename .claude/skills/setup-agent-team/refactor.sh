@@ -151,6 +151,10 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
     log "Pre-cycle cleanup done."
 fi
 
+# Update Claude Code to latest version before launching
+log "Updating Claude Code..."
+claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
+
 # Launch Claude Code with mode-specific prompt
 # Enable agent teams (required for team-based workflows)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
