@@ -74,27 +74,73 @@ Each pr-reviewer MUST:
 
 6. **Security review** of every changed file:
    - Command injection, credential leaks, path traversal, XSS/injection, unsafe eval/source, curl|bash safety, macOS bash 3.x compat
+   - **Collect findings as structured data** — for each finding, record:
+     - `path`: file path relative to repo root (e.g., `packages/cli/src/shared/oauth.ts`)
+     - `line`: the line number in the file where the finding occurs (use the END line of a range)
+     - `start_line` (optional): if the finding spans multiple lines, the START line
+     - `severity`: CRITICAL, HIGH, MEDIUM, or LOW
+     - `description`: what the issue is and why it matters
 
 7. **Test** (in worktree): `bash -n` on .sh files, `bun test` for .ts files
 
-8. **Decision** — Before posting any review, verify it applies to the **current HEAD commit**:
-   - CRITICAL/HIGH found → `gh pr review NUMBER --request-changes` + label `security-review-required`
-   - MEDIUM/LOW or clean → `gh pr review NUMBER --approve` + label `security-approved` + `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
+8. **Decision** — Post the review using the GitHub API with **inline comments pinned to specific lines**.
+   First, get the HEAD commit SHA:
+   ```bash
+   HEAD_SHA=$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefOid --jq .headRefOid)
+   ```
+
+   Build and post the review JSON:
+   ```bash
+   gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/reviews \
+     --method POST \
+     --input <(cat <<REVIEW_JSON
+   {
+     "commit_id": "${HEAD_SHA}",
+     "event": "APPROVE_OR_REQUEST_CHANGES",
+     "body": "## Security Review\n**Verdict**: ...\n**Commit**: ${HEAD_SHA}\n### Findings\n- [SEVERITY] file:line — description\n...\n### Tests\n- bash -n: PASS/FAIL, bun test: PASS/FAIL/N/A\n---\n*-- security/pr-reviewer*",
+     "comments": [
+       {
+         "path": "relative/file/path.ts",
+         "line": 42,
+         "body": "**[SEVERITY]** Description of the finding\n\n*-- security/pr-reviewer*"
+       },
+       {
+         "path": "sh/cloud/agent.sh",
+         "start_line": 10,
+         "line": 15,
+         "body": "**[SEVERITY]** Description of multi-line finding\n\n*-- security/pr-reviewer*"
+       }
+     ]
+   }
+   REVIEW_JSON
+   )
+   ```
+
+   **Rules for the review JSON:**
+   - `event` MUST be `"APPROVE"` or `"REQUEST_CHANGES"` (not both — replace the placeholder)
+   - CRITICAL/HIGH found → `"REQUEST_CHANGES"` + label `security-review-required`
+   - MEDIUM/LOW or clean → `"APPROVE"` + label `security-approved` + `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
+   - `comments` array: one entry per finding, each pinned to the exact `path` and `line` from Step 6
+   - For single-line findings: set only `line`
+   - For multi-line findings: set both `start_line` (first line) and `line` (last line)
+   - If there are NO findings, omit the `comments` array or pass `[]`
+   - The summary `body` still lists all findings for overview — inline comments are supplementary
 
 9. **Clean up**: `cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/pr-NUMBER --force`
 
-10. **Review body format** — MUST include the HEAD commit SHA for traceability:
+10. **Review body format** — The summary `body` in the review JSON MUST include:
    ```
    ## Security Review
    **Verdict**: [APPROVED / CHANGES REQUESTED]
    **Commit**: [HEAD_COMMIT_SHA]
    ### Findings
-   - [SEVERITY] file:line — description
+   - [SEVERITY] file:line — description (also pinned as inline comment)
    ### Tests
    - bash -n: [PASS/FAIL], bun test: [PASS/FAIL/N/A], curl|bash: [OK/MISSING], macOS compat: [OK/ISSUES]
    ---
    *-- security/pr-reviewer*
    ```
+   Each finding ALSO appears as an inline comment on the exact file:line in the PR diff.
 
 11. Report: PR number, verdict, finding count, merge status.
 
