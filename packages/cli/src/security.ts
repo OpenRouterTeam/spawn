@@ -480,6 +480,78 @@ export function validateMetadataValue(value: string, fieldName: string): void {
   }
 }
 
+/**
+ * Validates a tunnel browser URL template from connection history metadata.
+ * SECURITY-CRITICAL: This URL is passed to openBrowser() — a malicious URL
+ * could direct the user to a phishing site.
+ *
+ * Only allows URLs that point to localhost (http://localhost: or http://127.0.0.1:)
+ * with a __PORT__ placeholder or a numeric port.
+ *
+ * @param url - The tunnel_browser_url_template value to validate
+ * @throws Error if the URL is not a safe localhost URL
+ */
+export function validateTunnelUrl(url: string): void {
+  if (!url || url.trim() === "") {
+    return; // Empty/missing is fine — caller skips browser open
+  }
+
+  if (url.length > 2048) {
+    throw new Error(
+      `Tunnel URL template is too long (${url.length} characters, maximum is 2048)\n\n` +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+
+  // Only allow http://localhost:<port-or-placeholder> or http://127.0.0.1:<port-or-placeholder>
+  // The __PORT__ placeholder gets replaced at runtime with the actual local tunnel port.
+  const SAFE_TUNNEL_URL =
+    /^http:\/\/(?:localhost|127\.0\.0\.1):(?:__PORT__|\d{1,5})(?:\/[a-zA-Z0-9._~:/?#[\]@!$&'()*+,;=%-]*)?$/;
+  if (!SAFE_TUNNEL_URL.test(url)) {
+    throw new Error(
+      `Invalid tunnel URL template: "${url}"\n\n` +
+        "Tunnel URLs must start with http://localhost: or http://127.0.0.1:\n" +
+        "followed by a port number or __PORT__ placeholder.\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+}
+
+/**
+ * Validates a tunnel remote port from connection history metadata.
+ * SECURITY-CRITICAL: This port is passed to startSshTunnel() — an out-of-range
+ * value could cause unexpected behavior.
+ *
+ * @param port - The tunnel_remote_port value to validate (string from metadata)
+ * @throws Error if the port is not a valid number in range 1-65535
+ */
+export function validateTunnelPort(port: string): void {
+  if (!port || port.trim() === "") {
+    return; // Empty/missing is fine — caller skips tunnel setup
+  }
+
+  // Must be purely numeric (no shell metacharacters)
+  if (!/^\d+$/.test(port)) {
+    throw new Error(
+      `Invalid tunnel port: "${port}"\n\n` +
+        "Tunnel port must be a numeric value between 1 and 65535.\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+
+  const num = Number.parseInt(port, 10);
+  if (num < 1 || num > 65535) {
+    throw new Error(
+      `Invalid tunnel port: ${num} (must be between 1 and 65535)\n\n` +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+}
+
 // Sensitive path patterns that should never be read as prompt files
 // These protect credentials and system files from accidental exfiltration
 const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{

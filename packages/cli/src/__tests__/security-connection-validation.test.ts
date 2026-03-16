@@ -10,6 +10,8 @@ import {
   validateMetadataValue,
   validatePreLaunchCmd,
   validateServerIdentifier,
+  validateTunnelPort,
+  validateTunnelUrl,
   validateUsername,
 } from "../security.js";
 
@@ -439,6 +441,111 @@ describe("validateMetadataValue", () => {
       expect(() => validateMetadataValue("$(evil)", "gcp_zone")).toThrow(/Invalid gcp_zone/);
       expect(() => validateMetadataValue("bad;value", "gcp_project")).toThrow(/Invalid gcp_project/);
       expect(() => validateMetadataValue("a".repeat(129), "my_field")).toThrow(/my_field is too long/);
+    });
+  });
+});
+
+describe("validateTunnelUrl", () => {
+  describe("valid inputs", () => {
+    it("should accept localhost URLs with __PORT__ placeholder", () => {
+      expect(() => validateTunnelUrl("http://localhost:__PORT__")).not.toThrow();
+      expect(() => validateTunnelUrl("http://127.0.0.1:__PORT__")).not.toThrow();
+    });
+
+    it("should accept localhost URLs with numeric ports", () => {
+      expect(() => validateTunnelUrl("http://localhost:8080")).not.toThrow();
+      expect(() => validateTunnelUrl("http://127.0.0.1:3000")).not.toThrow();
+    });
+
+    it("should accept localhost URLs with path components", () => {
+      expect(() => validateTunnelUrl("http://localhost:__PORT__/dashboard")).not.toThrow();
+      expect(() => validateTunnelUrl("http://127.0.0.1:__PORT__/app/ui")).not.toThrow();
+      expect(() => validateTunnelUrl("http://localhost:8080/?token=abc")).not.toThrow();
+    });
+
+    it("should accept empty or missing values", () => {
+      expect(() => validateTunnelUrl("")).not.toThrow();
+      expect(() => validateTunnelUrl("   ")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs — phishing prevention", () => {
+    it("should reject external URLs", () => {
+      expect(() => validateTunnelUrl("https://evil.com")).toThrow(/Invalid tunnel URL/);
+      expect(() => validateTunnelUrl("http://attacker.com:8080")).toThrow(/Invalid tunnel URL/);
+    });
+
+    it("should reject https localhost (tunnel is always http)", () => {
+      expect(() => validateTunnelUrl("https://localhost:__PORT__")).toThrow(/Invalid tunnel URL/);
+    });
+
+    it("should reject URLs without port", () => {
+      expect(() => validateTunnelUrl("http://localhost")).toThrow(/Invalid tunnel URL/);
+      expect(() => validateTunnelUrl("http://localhost/")).toThrow(/Invalid tunnel URL/);
+    });
+
+    it("should reject non-HTTP schemes", () => {
+      expect(() => validateTunnelUrl("javascript:alert(1)")).toThrow(/Invalid tunnel URL/);
+      expect(() => validateTunnelUrl("file:///etc/passwd")).toThrow(/Invalid tunnel URL/);
+      expect(() => validateTunnelUrl("ftp://localhost:21")).toThrow(/Invalid tunnel URL/);
+    });
+
+    it("should reject URLs that are too long", () => {
+      const longUrl = "http://localhost:__PORT__/" + "a".repeat(2048);
+      expect(() => validateTunnelUrl(longUrl)).toThrow(/too long/);
+    });
+
+    it("should reject URLs with credentials", () => {
+      expect(() => validateTunnelUrl("http://user:pass@localhost:8080")).toThrow(/Invalid tunnel URL/);
+    });
+
+    it("should reject lookalike hosts", () => {
+      expect(() => validateTunnelUrl("http://localhost.evil.com:8080")).toThrow(/Invalid tunnel URL/);
+      expect(() => validateTunnelUrl("http://127.0.0.2:8080")).toThrow(/Invalid tunnel URL/);
+    });
+  });
+});
+
+describe("validateTunnelPort", () => {
+  describe("valid inputs", () => {
+    it("should accept valid port numbers", () => {
+      expect(() => validateTunnelPort("1")).not.toThrow();
+      expect(() => validateTunnelPort("80")).not.toThrow();
+      expect(() => validateTunnelPort("443")).not.toThrow();
+      expect(() => validateTunnelPort("8080")).not.toThrow();
+      expect(() => validateTunnelPort("65535")).not.toThrow();
+    });
+
+    it("should accept empty or missing values", () => {
+      expect(() => validateTunnelPort("")).not.toThrow();
+      expect(() => validateTunnelPort("   ")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs", () => {
+    it("should reject non-numeric values", () => {
+      expect(() => validateTunnelPort("abc")).toThrow(/Invalid tunnel port/);
+      expect(() => validateTunnelPort("80abc")).toThrow(/Invalid tunnel port/);
+      expect(() => validateTunnelPort("80; rm -rf /")).toThrow(/Invalid tunnel port/);
+    });
+
+    it("should reject port 0", () => {
+      expect(() => validateTunnelPort("0")).toThrow(/Invalid tunnel port/);
+    });
+
+    it("should reject ports above 65535", () => {
+      expect(() => validateTunnelPort("65536")).toThrow(/Invalid tunnel port/);
+      expect(() => validateTunnelPort("99999")).toThrow(/Invalid tunnel port/);
+    });
+
+    it("should reject negative ports", () => {
+      expect(() => validateTunnelPort("-1")).toThrow(/Invalid tunnel port/);
+    });
+
+    it("should reject shell metacharacters", () => {
+      expect(() => validateTunnelPort("$(whoami)")).toThrow(/Invalid tunnel port/);
+      expect(() => validateTunnelPort("`id`")).toThrow(/Invalid tunnel port/);
+      expect(() => validateTunnelPort("8080|cat")).toThrow(/Invalid tunnel port/);
     });
   });
 });

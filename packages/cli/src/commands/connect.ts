@@ -9,6 +9,8 @@ import {
   validateLaunchCmd,
   validatePreLaunchCmd,
   validateServerIdentifier,
+  validateTunnelPort,
+  validateTunnelUrl,
   validateUsername,
 } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
@@ -184,6 +186,22 @@ export async function cmdEnterAgent(
   let tunnelHandle: SshTunnelHandle | undefined;
   const tunnelPort = connection.metadata?.tunnel_remote_port;
   if (tunnelPort && connection.ip !== "sprite-console") {
+    // SECURITY: Validate tunnel metadata before use (prevent phishing via tampered history)
+    const tunnelValidation = tryCatch(() => {
+      validateTunnelPort(tunnelPort);
+      const tpl = connection.metadata?.tunnel_browser_url_template;
+      if (tpl) {
+        validateTunnelUrl(tpl);
+      }
+    });
+    if (!tunnelValidation.ok) {
+      p.log.error(`Security validation failed: ${getErrorMessage(tunnelValidation.error)}`);
+      p.log.info("Your spawn history file may be corrupted or tampered with.");
+      p.log.info(`Location: ${getHistoryPath()}`);
+      p.log.info("To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'");
+      process.exit(1);
+    }
+
     const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
       const keys = await ensureSshKeys();
       tunnelHandle = await startSshTunnel({
@@ -240,6 +258,21 @@ export async function cmdOpenDashboard(connection: VMConnection): Promise<void> 
   const urlTemplate = connection.metadata?.tunnel_browser_url_template;
   if (!tunnelPort) {
     p.log.error("No dashboard tunnel info found for this server.");
+    return;
+  }
+
+  // SECURITY: Validate tunnel metadata before use (prevent phishing via tampered history)
+  const tunnelValidation = tryCatch(() => {
+    validateTunnelPort(tunnelPort);
+    if (urlTemplate) {
+      validateTunnelUrl(urlTemplate);
+    }
+  });
+  if (!tunnelValidation.ok) {
+    p.log.error(`Security validation failed: ${getErrorMessage(tunnelValidation.error)}`);
+    p.log.info("Your spawn history file may be corrupted or tampered with.");
+    p.log.info(`Location: ${getHistoryPath()}`);
+    p.log.info("To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'");
     return;
   }
 
