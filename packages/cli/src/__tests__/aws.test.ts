@@ -65,12 +65,26 @@ describe("aws/credential-cache", () => {
       expect(loadCredsFromConfig()).toBeNull();
     });
 
+    it("returns null when secretAccessKey has invalid format", async () => {
+      await Bun.write(
+        getAwsConfigPath(),
+        JSON.stringify({
+          accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+          secretAccessKey: "has spaces and $pecial chars!!!!!!!!!!",
+        }),
+        {
+          mode: 0o600,
+        },
+      );
+      expect(loadCredsFromConfig()).toBeNull();
+    });
+
     it("returns null for invalid accessKeyId format", async () => {
       await Bun.write(
         getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "invalid key!",
-          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
+          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         }),
         {
           mode: 0o600,
@@ -84,7 +98,7 @@ describe("aws/credential-cache", () => {
         getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
+          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
           region: "eu-west-1",
         }),
         {
@@ -94,7 +108,7 @@ describe("aws/credential-cache", () => {
       const result = loadCredsFromConfig();
       expect(result).not.toBeNull();
       expect(result?.accessKeyId).toBe("AKIAIOSFODNN7EXAMPLE");
-      expect(result?.secretAccessKey).toBe("wJalrXUtnFEMI/K7MDENG/bPxRfiCY");
+      expect(result?.secretAccessKey).toBe("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
       expect(result?.region).toBe("eu-west-1");
     });
 
@@ -103,7 +117,7 @@ describe("aws/credential-cache", () => {
         getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
+          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         }),
         {
           mode: 0o600,
@@ -119,10 +133,10 @@ describe("aws/credential-cache", () => {
       if (existsSync(getAwsConfigPath())) {
         unlinkSync(getAwsConfigPath());
       }
-      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCY", "us-west-2");
+      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-west-2");
       const result = loadCredsFromConfig();
       expect(result?.accessKeyId).toBe("AKIAIOSFODNN7EXAMPLE");
-      expect(result?.secretAccessKey).toBe("wJalrXUtnFEMI/K7MDENG/bPxRfiCY");
+      expect(result?.secretAccessKey).toBe("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
       expect(result?.region).toBe("us-west-2");
     });
 
@@ -130,15 +144,15 @@ describe("aws/credential-cache", () => {
       if (existsSync(getAwsConfigPath())) {
         unlinkSync(getAwsConfigPath());
       }
-      const secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCY==";
+      const secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEX/mpp+k==";
       await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", secret, "ap-northeast-1");
       const result = loadCredsFromConfig();
       expect(result?.secretAccessKey).toBe(secret);
     });
 
     it("overwrites existing config file", async () => {
-      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCY", "us-east-1");
-      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE2", "newSecretKeyNewSecretKey1234567", "eu-central-1");
+      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1");
+      await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE2", "newSecretKeyNewSecretKey1234567123456789", "eu-central-1");
       const result = loadCredsFromConfig();
       expect(result?.accessKeyId).toBe("AKIAIOSFODNN7EXAMPLE2");
       expect(result?.region).toBe("eu-central-1");
