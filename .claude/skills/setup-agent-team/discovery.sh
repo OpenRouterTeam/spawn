@@ -95,6 +95,10 @@ if [[ ! -f "${MANIFEST}" ]]; then
     exit 1
 fi
 
+# Update Claude Code to latest version before launching
+log_info "Updating Claude Code..."
+claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log_warn "Claude Code update failed (continuing with current version)"
+
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 # Persist into .spawnrc so all Claude sessions on this VM inherit the flag
 if [[ -f "${HOME}/.spawnrc" ]]; then
