@@ -610,11 +610,10 @@ export async function downloadFileSprite(remotePath: string, localPath: string):
  * as long as the agent is running — preventing inactivity shutdown.
  *
  * Non-fatal: logs a warning if download fails so deployment still proceeds.
- * Reference: https://kurt-claw-f.sprites.app/sprite-keep-running.sh
  */
 export async function installSpriteKeepAlive(): Promise<void> {
   logStep("Installing Sprite keep-alive...");
-  const scriptUrl = "https://kurt-claw-f.sprites.app/sprite-keep-running.sh";
+  const scriptUrl = "https://openrouter.ai/labs/spawn/shared/sprite-keep-running.sh";
   const keepAliveResult = await asyncTryCatch(() =>
     runSprite(
       "mkdir -p ~/.local/bin && " +
