@@ -89,3 +89,6 @@ export function getTmpDir(): string {
  */
 export const RC_MARKER_START = "# >>> spawn >>>";
 export const RC_MARKER_END = "# <<< spawn <<<";
+
+/** Legacy single-line marker written by installer versions before start/end markers. */
+export const RC_MARKER_LEGACY = "# Added by spawn installer";

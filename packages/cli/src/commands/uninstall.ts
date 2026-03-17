@@ -2,7 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { getCacheDir, getSpawnDir, getUserHome, RC_MARKER_END, RC_MARKER_START } from "../shared/paths.js";
+import {
+  getCacheDir,
+  getSpawnDir,
+  getUserHome,
+  RC_MARKER_END,
+  RC_MARKER_LEGACY,
+  RC_MARKER_START,
+} from "../shared/paths.js";
 import { tryCatch } from "../shared/result.js";
 import { getErrorMessage } from "./shared.js";
 
@@ -13,9 +20,6 @@ const RC_FILES = [
   ".profile",
   ".zshrc",
 ];
-
-/** Legacy marker from older installer versions (before start/end markers). */
-const LEGACY_MARKER = "# Added by spawn installer";
 
 /** Remove spawn-related PATH blocks from an RC file.
  *  Handles both the new start/end marker format and the legacy single-comment format. */
@@ -52,7 +56,7 @@ function cleanRcFile(rcPath: string): boolean {
     }
 
     // Legacy format: "# Added by spawn installer" followed by a PATH export
-    if (line === LEGACY_MARKER) {
+    if (line === RC_MARKER_LEGACY) {
       const next = lines[i + 1] ?? "";
       if (next.includes(".local/bin") || next.includes(".bun/bin")) {
         if (cleaned.length > 0 && cleaned[cleaned.length - 1] === "") {
