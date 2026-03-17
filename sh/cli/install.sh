@@ -212,18 +212,22 @@ ensure_in_path() {
         *)      rc_file="${HOME}/.bashrc" ;;
     esac
 
+    # Marker comments — keep in sync with packages/cli/src/shared/paths.ts
+    local marker_start="# >>> spawn >>>"
+    local marker_end="# <<< spawn <<<"
+
     # Helper: add a dir to rc files if not already present
     _patch_rc() {
         local dir="$1"
         local line="export PATH=\"${dir}:\$PATH\""
         if [ -n "$rc_file" ]; then
             if ! grep -qF "${dir}" "$rc_file" 2>/dev/null; then
-                printf '\n# Added by spawn installer\n%s\n' "$line" >> "$rc_file"
+                printf '\n%s\n%s\n%s\n' "$marker_start" "$line" "$marker_end" >> "$rc_file"
             fi
             case "${SHELL:-/bin/bash}" in */bash)
                 for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
                     if [ -f "$profile" ] && ! grep -qF "${dir}" "$profile" 2>/dev/null; then
-                        printf '\n# Added by spawn installer\n%s\n' "$line" >> "$profile"
+                        printf '\n%s\n%s\n%s\n' "$marker_start" "$line" "$marker_end" >> "$profile"
                     fi
                 done
             ;; esac
