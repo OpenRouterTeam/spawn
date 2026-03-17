@@ -134,6 +134,9 @@ export function getConnectionInfo(): {
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
+/** Guard to prevent re-entrant OAuth recovery (doApi → tryDoOAuth → doApi → …). */
+let _recovering401 = false;
+
 async function doApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${DO_API_BASE}${endpoint}`;
 
@@ -156,6 +159,42 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
         signal: AbortSignal.timeout(30_000),
       });
       const text = await resp.text();
+
+      // 401: token expired/revoked — try OAuth recovery once before giving up
+      if (resp.status === 401 && !_recovering401) {
+        logWarn("DigitalOcean token expired or revoked, attempting OAuth recovery...");
+        _recovering401 = true;
+        const recoveryResult = await asyncTryCatch(async () => {
+          const newToken = await tryDoOAuth();
+          if (newToken) {
+            _state.token = newToken;
+            await saveTokenToConfig(newToken);
+            logInfo("OAuth recovery succeeded, retrying request...");
+            // Retry the same request with the new token
+            const retryResp = await fetch(url, {
+              ...opts,
+              headers: {
+                ...headers,
+                Authorization: `Bearer ${newToken}`,
+              },
+              signal: AbortSignal.timeout(30_000),
+            });
+            const retryText = await retryResp.text();
+            if (!retryResp.ok) {
+              throw new Error(
+                `DigitalOcean API error ${retryResp.status} for ${method} ${endpoint}: ${retryText.slice(0, 200)}`,
+              );
+            }
+            return retryText;
+          }
+          return null;
+        });
+        _recovering401 = false;
+        if (recoveryResult.ok && recoveryResult.data !== null) {
+          return recoveryResult.data;
+        }
+        throw new Error(`DigitalOcean API error 401 for ${method} ${endpoint}: ${text.slice(0, 200)}`);
+      }
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
         logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
@@ -1516,7 +1555,14 @@ export async function destroyServer(dropletId?: string): Promise<void> {
 /** @internal Exposed for testing only. */
 export const _testHelpers = {
   testDoToken,
+  doApi,
   get state() {
     return _state;
+  },
+  get recovering401() {
+    return _recovering401;
+  },
+  set recovering401(v: boolean) {
+    _recovering401 = v;
   },
 };

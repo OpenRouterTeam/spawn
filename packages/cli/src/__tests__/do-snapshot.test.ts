@@ -5,22 +5,29 @@
  * invalid IDs, name filtering, and network failures.
  */
 
-import { afterAll, afterEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 
 // ── Import under test ─────────────────────────────────────────────────────
 // digitalocean.ts only imports a CSS constant from oauth, so no mock needed.
 
-const { findSpawnSnapshot } = await import("../digitalocean/digitalocean");
+const { findSpawnSnapshot, _testHelpers } = await import("../digitalocean/digitalocean");
 
 describe("findSpawnSnapshot", () => {
   const originalFetch = globalThis.fetch;
 
+  beforeEach(() => {
+    // Prevent doApi from triggering real OAuth recovery on 401 during tests
+    _testHelpers.recovering401 = true;
+  });
+
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    _testHelpers.recovering401 = false;
   });
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+    _testHelpers.recovering401 = false;
   });
 
   it("returns the latest snapshot ID sorted by created_at", async () => {
