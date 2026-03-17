@@ -214,216 +214,78 @@ describe("cmdMatrix output", () => {
   });
 
   describe("grid view (wide terminal)", () => {
-    it("should display cloud names in header row", async () => {
-      await setManifest(smallManifest);
+    let origColumns: number;
 
-      // Force wide terminal for grid view
-      const origColumns = process.stdout.columns;
+    beforeEach(() => {
+      origColumns = process.stdout.columns;
       Object.defineProperty(process.stdout, "columns", {
         value: 200,
         configurable: true,
       });
+    });
 
-      await cmdMatrix();
-
+    afterEach(() => {
       Object.defineProperty(process.stdout, "columns", {
         value: origColumns,
         configurable: true,
       });
+    });
+
+    it("should display headers, icons, and legend", async () => {
+      await setManifest(smallManifest);
+      await cmdMatrix();
 
       const output = captureOutput(consoleMocks.log);
+      // Cloud names in header row
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
-    });
-
-    it("should display agent names in row labels", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 200,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
+      // Agent names in row labels
       expect(output).toContain("Claude Code");
       expect(output).toContain("Codex");
-    });
-
-    it("should use + icon for implemented combinations", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 200,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
+      // Icons for implemented (+) and missing (-)
       expect(output).toContain("+");
-    });
-
-    it("should use - icon for missing combinations", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 200,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
       expect(output).toContain("-");
-    });
-
-    it("should display grid legend in footer", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 200,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
+      // Legend in footer
       expect(output).toContain("implemented");
       expect(output).toContain("not yet available");
     });
   });
 
   describe("compact view (narrow terminal)", () => {
-    it("should display compact view when terminal is narrow", async () => {
-      await setManifest(smallManifest);
+    let origColumns: number;
 
-      const origColumns = process.stdout.columns;
+    beforeEach(() => {
+      origColumns = process.stdout.columns;
       // Force very narrow terminal to trigger compact view
       Object.defineProperty(process.stdout, "columns", {
         value: 40,
         configurable: true,
       });
+    });
 
-      await cmdMatrix();
-
+    afterEach(() => {
       Object.defineProperty(process.stdout, "columns", {
         value: origColumns,
         configurable: true,
       });
+    });
+
+    it("should display agent/cloud counts, support status, and legend", async () => {
+      await setManifest(smallManifest);
+      await cmdMatrix();
 
       const output = captureOutput(consoleMocks.log);
       // Compact view shows "Agent" header and "Clouds" count column
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-    });
-
-    it("should show count/total for each agent in compact view", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 40,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
       // claude: 2/2, codex: 1/2
       expect(output).toContain("2/2");
       expect(output).toContain("1/2");
-    });
-
-    it("should show 'all clouds supported' for fully implemented agent", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 40,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
       // claude is implemented on both clouds
       expect(output).toContain("all clouds supported");
-    });
-
-    it("should show missing cloud names for partially implemented agent", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 40,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
       // codex is missing on hetzner
       expect(output).toContain("Hetzner Cloud");
-    });
-
-    it("should show compact legend in footer", async () => {
-      await setManifest(smallManifest);
-
-      const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", {
-        value: 40,
-        configurable: true,
-      });
-
-      await cmdMatrix();
-
-      Object.defineProperty(process.stdout, "columns", {
-        value: origColumns,
-        configurable: true,
-      });
-
-      const output = captureOutput(consoleMocks.log);
+      // Legend uses color names
       expect(output).toContain("green");
       expect(output).toContain("yellow");
     });
@@ -669,8 +531,24 @@ describe("cmdClouds output", () => {
     });
 
     it("should display auth hints for clouds with env var auth", async () => {
+      // Clear cloud tokens so the output always shows "needs" regardless of the host environment.
+      // Saved values are restored in afterEach via consoleMocks/fetch restore, but env vars
+      // need their own save/restore since afterEach doesn't handle them.
+      const savedSprite = process.env.SPRITE_TOKEN;
+      const savedHcloud = process.env.HCLOUD_TOKEN;
+      delete process.env.SPRITE_TOKEN;
+      delete process.env.HCLOUD_TOKEN;
+
       await setManifest(smallManifest);
       await cmdClouds();
+
+      // Restore before asserting so a failure doesn't leak env state
+      if (savedSprite !== undefined) {
+        process.env.SPRITE_TOKEN = savedSprite;
+      }
+      if (savedHcloud !== undefined) {
+        process.env.HCLOUD_TOKEN = savedHcloud;
+      }
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("needs");
