@@ -255,7 +255,7 @@ async function testDoToken(): Promise<boolean> {
     return false;
   }
   return unwrapOr(
-    await asyncTryCatchIf(isNetworkError, async () => {
+    await asyncTryCatch(async () => {
       const text = await doApi("GET", "/account", undefined, 1);
       return text.includes('"uuid"');
     }),
@@ -1510,3 +1510,13 @@ export async function destroyServer(dropletId?: string): Promise<void> {
   await doApi("DELETE", `/droplets/${id}`);
   logInfo(`Droplet ${id} destroyed`);
 }
+
+// ─── Test Helpers ─────────────────────────────────────────────────────────────
+
+/** @internal Exposed for testing only. */
+export const _testHelpers = {
+  testDoToken,
+  get state() {
+    return _state;
+  },
+};
