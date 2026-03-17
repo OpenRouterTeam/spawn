@@ -899,7 +899,7 @@ async function waitForSsh(maxAttempts = 36): Promise<void> {
   });
 }
 
-export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
+export async function waitForCloudInit(maxAttempts = 120): Promise<void> {
   await waitForSsh();
 
   logStep("Waiting for startup script completion...");
