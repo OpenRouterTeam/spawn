@@ -297,7 +297,7 @@ if [[ "${RUN_MODE}" == "triage" ]]; then
     CLAUDE_MODEL_FLAG="--model google/gemini-3-flash-preview"
 fi
 
-claude -p "$(cat "${PROMPT_FILE}")" ${CLAUDE_MODEL_FLAG} >> "${LOG_FILE}" 2>&1 &
+claude -p "$(cat "${PROMPT_FILE}")" ${CLAUDE_MODEL_FLAG:+"${CLAUDE_MODEL_FLAG}"} >> "${LOG_FILE}" 2>&1 &
 CLAUDE_PID=$!
 log "Claude started (pid=${CLAUDE_PID})"
 
