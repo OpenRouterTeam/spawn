@@ -36,12 +36,15 @@ log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%
 
 # --- Safe sed substitution (escapes sed metacharacters in replacement) ---
 # Usage: safe_substitute PLACEHOLDER VALUE FILE
+# Escapes \, &, |, and newlines in VALUE to prevent sed injection.
 safe_substitute() {
     local placeholder="$1"
     local value="$2"
     local file="$3"
     local escaped
     escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    # Escape literal newlines for sed replacement (backslash + newline)
+    escaped="${escaped//$'\n'/\\$'\n'}"
     sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
     rm -f "${file}.bak"
 }
