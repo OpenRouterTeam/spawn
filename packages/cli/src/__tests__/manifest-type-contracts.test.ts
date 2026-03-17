@@ -209,16 +209,24 @@ describe("Cloud type values", () => {
     validTypes.add(cloud.type);
   }
 
-  it("should have a reasonable number of distinct cloud types", () => {
-    // There should be a few types (vm, cloud, container, sandbox, local, etc.)
-    // but not so many that it's disorganized
-    expect(validTypes.size).toBeGreaterThanOrEqual(2);
-    expect(validTypes.size).toBeLessThanOrEqual(10);
-  });
-
   it("cloud types should be lowercase", () => {
     for (const type of validTypes) {
       expect(type).toBe(type.toLowerCase());
+    }
+  });
+
+  it("all cloud types should be from the known set", () => {
+    const knownTypes = new Set([
+      "api",
+      "cli",
+      "local",
+      "vm",
+      "container",
+      "sandbox",
+      "cloud",
+    ]);
+    for (const [key, cloud] of allClouds) {
+      expect(knownTypes, `cloud "${key}" has unknown type "${cloud.type}"`).toContain(cloud.type);
     }
   });
 });
