@@ -670,6 +670,50 @@ const NPM_GLOBAL_PATH_PERSIST =
   "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || " +
   "echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }";
 
+/**
+ * Shell snippet that verifies the kilocode binary is actually available after
+ * npm install. @kilocode/cli v7+ uses a postinstall script that downloads a
+ * native binary. On some clouds (notably GCP with cloudInitTier "node"), the
+ * postinstall can fail silently, leaving the bin symlink pointing to a JS
+ * wrapper but no actual native binary to exec.
+ *
+ * This snippet:
+ * 1. Checks if `kilocode` is already working
+ * 2. If not, finds the npm package dir and re-runs the postinstall
+ * 3. If still not found, searches for the native binary in the package dir
+ *    and symlinks it into a PATH-accessible location
+ */
+const KILOCODE_BINARY_VERIFY =
+  "{ " +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  // Quick check: if kilocode already works, nothing to do
+  "if command -v kilocode >/dev/null 2>&1 && kilocode --version >/dev/null 2>&1; then exit 0; fi; " +
+  // Find the npm package directory (works with both --prefix and default installs)
+  '_kc_pkg="$(npm prefix -g 2>/dev/null)/lib/node_modules/@kilocode/cli"; ' +
+  '[ -d "$_kc_pkg" ] || _kc_pkg="$HOME/.npm-global/lib/node_modules/@kilocode/cli"; ' +
+  'if [ -d "$_kc_pkg" ]; then ' +
+  // Re-run the postinstall script explicitly
+  'echo "==> kilocode binary not found, re-running postinstall..."; ' +
+  'cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "if command -v kilocode >/dev/null 2>&1 && kilocode --version >/dev/null 2>&1; then exit 0; fi; " +
+  // Postinstall re-run didn't help — search for native binary in the package
+  'echo "==> Searching for kilocode binary in package directory..."; ' +
+  '_kc_bin="$(find "$_kc_pkg" -name "kilocode*" -type f -perm /111 2>/dev/null | head -1)"; ' +
+  'if [ -n "$_kc_bin" ]; then ' +
+  '_kc_dest="$(npm prefix -g 2>/dev/null || echo /usr/local)/bin/kilocode"; ' +
+  '[ -w "$(dirname "$_kc_dest")" ] || _kc_dest="$HOME/.npm-global/bin/kilocode"; ' +
+  'mkdir -p "$(dirname "$_kc_dest")"; ' +
+  'ln -sf "$_kc_bin" "$_kc_dest"; ' +
+  'echo "==> Linked kilocode binary: $_kc_bin -> $_kc_dest"; ' +
+  "fi; " +
+  "fi; " +
+  // Final check
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "command -v kilocode >/dev/null 2>&1 || " +
+  '{ echo "WARNING: kilocode binary still not found after recovery attempts"; }; ' +
+  "}";
+
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 // Last zeroclaw release that shipped Linux prebuilt binaries (v0.1.9a has none).
@@ -765,7 +809,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Kilo Code",
-          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @kilocode/cli && ${NPM_GLOBAL_PATH_PERSIST}`,
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @kilocode/cli && ${NPM_GLOBAL_PATH_PERSIST} && ${KILOCODE_BINARY_VERIFY}`,
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
