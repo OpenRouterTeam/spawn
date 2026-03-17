@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guidance-data.js";
-import { generateSpawnId, getActiveServers, saveSpawnRecord } from "../history.js";
+import { generateSpawnId, getActiveServers, loadHistory, saveSpawnRecord } from "../history.js";
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
@@ -898,10 +898,32 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     );
   }
 
+  // Read the spawn record saved during orchestration to populate connection fields
+  const history = loadHistory();
+  const record = history
+    .filter((r) => r.agent === resolvedAgent && r.cloud === resolvedCloud && r.connection && !r.connection.deleted)
+    .pop();
+
   const result: SpawnResult = {
     status: "success",
     cloud: resolvedCloud,
     agent: resolvedAgent,
+    ...(record?.connection
+      ? {
+          ip_address: record.connection.ip,
+          ssh_user: record.connection.user,
+          ...(record.connection.server_id
+            ? {
+                server_id: record.connection.server_id,
+              }
+            : {}),
+          ...(record.connection.server_name
+            ? {
+                server_name: record.connection.server_name,
+              }
+            : {}),
+        }
+      : {}),
   };
 
   headlessOutput(result, outputFormat);
