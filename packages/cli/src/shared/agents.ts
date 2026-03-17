@@ -16,6 +16,8 @@ export interface OptionalStep {
   dataEnvVar?: string;
   /** When true, step requires interactive input (e.g. QR scan) — skipped in headless. */
   interactive?: boolean;
+  /** When true, step is pre-selected in the multiselect (user can uncheck). */
+  defaultOn?: boolean;
 }
 
 export interface AgentConfig {
@@ -56,6 +58,14 @@ export interface TunnelConfig {
 
 /** Extra setup steps for specific agents (merged with COMMON_STEPS). */
 const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
+  hermes: [
+    {
+      value: "yolo-mode",
+      label: "YOLO mode",
+      hint: "let Hermes install tools without approval prompts",
+      defaultOn: true,
+    },
+  ],
   openclaw: [
     {
       value: "browser",

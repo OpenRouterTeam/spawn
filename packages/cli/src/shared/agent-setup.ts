@@ -866,7 +866,16 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
         `OPENAI_API_KEY=${apiKey}`,
+        "HERMES_YOLO_MODE=1",
       ],
+      configure: async (_apiKey, _modelId, enabledSteps) => {
+        // YOLO mode is on by default (in envVars above). If the user explicitly
+        // unchecked it in setup options, remove it from .spawnrc.
+        if (enabledSteps && !enabledSteps.has("yolo-mode")) {
+          await runner.runServer("sed -i '/HERMES_YOLO_MODE/d' ~/.spawnrc");
+          logInfo("YOLO mode disabled — Hermes will prompt before installing tools");
+        }
+      },
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
     },

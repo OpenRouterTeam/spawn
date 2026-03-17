@@ -170,6 +170,8 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
     return undefined;
   }
 
+  const defaultOnValues = filteredSteps.filter((s) => s.defaultOn).map((s) => s.value);
+
   const selected = await p.multiselect({
     message: "Setup options (↑/↓ navigate, space=toggle, a=all, enter=confirm)",
     options: filteredSteps.map((s) => ({
@@ -177,6 +179,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
       label: s.label,
       hint: s.hint,
     })),
+    initialValues: defaultOnValues.length > 0 ? defaultOnValues : undefined,
     required: false,
   });
 
