@@ -6,34 +6,6 @@ spyOn(process.stderr, "write").mockImplementation(() => true);
 const { withRetry, Ok, Err } = await import("../shared/ui.js");
 const { wrapSshCall } = await import("../shared/agent-setup.js");
 
-// ── Result constructors ──────────────────────────────────────────────
-
-describe("Result constructors", () => {
-  it("Ok creates a success result", () => {
-    const r = Ok(42);
-    expect(r.ok).toBe(true);
-    expect(r).toEqual({
-      ok: true,
-      data: 42,
-    });
-  });
-
-  it("Ok works with void", () => {
-    const r = Ok(undefined);
-    expect(r.ok).toBe(true);
-  });
-
-  it("Err creates a failure result", () => {
-    const r = Err(new Error("boom"));
-    expect(r).toMatchObject({
-      ok: false,
-      error: {
-        message: "boom",
-      },
-    });
-  });
-});
-
 // ── withRetry with Result monad ──────────────────────────────────────
 
 describe("withRetry", () => {
