@@ -1,21 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { findUnknownFlag } from "../flags";
 import { getAgentOptionalSteps, validateStepNames } from "../shared/agents";
-
-describe("--steps and --config flags", () => {
-  it("should recognize --steps and --config as known flags", () => {
-    expect(
-      findUnknownFlag([
-        "--steps",
-      ]),
-    ).toBeNull();
-    expect(
-      findUnknownFlag([
-        "--config",
-      ]),
-    ).toBeNull();
-  });
-});
 
 describe("validateStepNames", () => {
   it("should validate known steps for claude", () => {

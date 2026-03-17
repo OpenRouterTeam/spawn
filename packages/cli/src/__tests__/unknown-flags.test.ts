@@ -189,6 +189,7 @@ describe("Unknown Flag Detection", () => {
 
 describe("KNOWN_FLAGS completeness", () => {
   it("should contain all expected flags", () => {
+    // This list must match flags.ts exactly — add here whenever KNOWN_FLAGS grows.
     const expected = [
       "--help",
       "-h",
@@ -213,11 +214,27 @@ describe("KNOWN_FLAGS completeness", () => {
       "--clear",
       "--custom",
       "--reauth",
+      "--zone",
+      "--region",
+      "--machine-type",
+      "--size",
       "--prune",
       "--json",
+      "--beta",
+      "--model",
+      "-m",
+      "--config",
+      "--steps",
+      "--user",
+      "-u",
     ];
+    // Every flag in the expected list must exist in KNOWN_FLAGS.
     for (const flag of expected) {
       expect(KNOWN_FLAGS.has(flag)).toBe(true);
+    }
+    // Every flag in KNOWN_FLAGS must be in the expected list — catches silent additions.
+    for (const flag of KNOWN_FLAGS) {
+      expect(expected).toContain(flag);
     }
   });
 });

@@ -1,23 +1,4 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { findUnknownFlag, KNOWN_FLAGS } from "../flags";
-
-describe("--custom flag", () => {
-  describe("flag registration", () => {
-    it("should be in KNOWN_FLAGS", () => {
-      expect(KNOWN_FLAGS.has("--custom")).toBe(true);
-    });
-
-    it("should not be detected as unknown flag", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--custom",
-        ]),
-      ).toBeNull();
-    });
-  });
-});
 
 describe("AWS --custom prompts", () => {
   const savedCustom = process.env.SPAWN_CUSTOM;
