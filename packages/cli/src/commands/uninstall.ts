@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { getCacheDir, getSpawnDir, getUserHome } from "../shared/paths.js";
+import { getCacheDir, getSpawnDir, getUserHome, RC_MARKER_END, RC_MARKER_START } from "../shared/paths.js";
 import { tryCatch } from "../shared/result.js";
 import { getErrorMessage } from "./shared.js";
 
@@ -14,10 +14,11 @@ const RC_FILES = [
   ".zshrc",
 ];
 
-/** Marker comment added by the spawn installer. */
-const INSTALLER_COMMENT = "# Added by spawn installer";
+/** Legacy marker from older installer versions (before start/end markers). */
+const LEGACY_MARKER = "# Added by spawn installer";
 
-/** Remove spawn-related PATH lines (and their preceding comment) from an RC file. */
+/** Remove spawn-related PATH blocks from an RC file.
+ *  Handles both the new start/end marker format and the legacy single-comment format. */
 function cleanRcFile(rcPath: string): boolean {
   const readResult = tryCatch(() => fs.readFileSync(rcPath, "utf-8"));
   if (!readResult.ok) {
@@ -28,14 +29,32 @@ function cleanRcFile(rcPath: string): boolean {
   const lines = content.split("\n");
   const cleaned: string[] = [];
   let changed = false;
+  let insideBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Skip the installer comment + the PATH export line that follows it
-    if (line === INSTALLER_COMMENT) {
+
+    // New format: skip everything between start/end markers (inclusive)
+    if (line === RC_MARKER_START) {
+      // Remove preceding blank line if present
+      if (cleaned.length > 0 && cleaned[cleaned.length - 1] === "") {
+        cleaned.pop();
+      }
+      insideBlock = true;
+      changed = true;
+      continue;
+    }
+    if (insideBlock) {
+      if (line === RC_MARKER_END) {
+        insideBlock = false;
+      }
+      continue;
+    }
+
+    // Legacy format: "# Added by spawn installer" followed by a PATH export
+    if (line === LEGACY_MARKER) {
       const next = lines[i + 1] ?? "";
       if (next.includes(".local/bin") || next.includes(".bun/bin")) {
-        // Also skip the blank line before the comment if present
         if (cleaned.length > 0 && cleaned[cleaned.length - 1] === "") {
           cleaned.pop();
         }
@@ -44,6 +63,7 @@ function cleanRcFile(rcPath: string): boolean {
         continue;
       }
     }
+
     cleaned.push(line);
   }
 

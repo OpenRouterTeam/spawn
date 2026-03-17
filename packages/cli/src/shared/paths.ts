@@ -82,3 +82,10 @@ export function getSshDir(): string {
 export function getTmpDir(): string {
   return tmpdir();
 }
+
+/**
+ * Shell RC marker comments used by install.sh and uninstall.ts.
+ * Keep in sync with sh/cli/install.sh — both files use these exact strings.
+ */
+export const RC_MARKER_START = "# >>> spawn >>>";
+export const RC_MARKER_END = "# <<< spawn <<<";
