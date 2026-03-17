@@ -3,6 +3,7 @@ import type { ExecFileSyncOptions } from "node:child_process";
 
 import { execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { getErrorMessage, hasStatus } from "@openrouter/spawn-shared";
 import pc from "picocolors";
@@ -11,6 +12,7 @@ import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
 import { getUpdateFailedPath } from "./shared/paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
+import { getInstallCmd, getInstallScriptUrl, getWhichCommand, isWindows } from "./shared/shell";
 import { logDebug, logWarn } from "./shared/ui";
 
 const VERSION = pkg.version;
@@ -140,14 +142,17 @@ function printUpdateBanner(latestVersion: string): void {
 /**
  * Find the spawn binary to re-exec after an update.
  *
- * Prefers `which spawn` (PATH resolution) over process.argv[1] because the
- * installer may place the new binary in a different directory than where the
- * currently running binary lives, causing re-exec to run the stale old binary.
+ * Prefers PATH resolution over process.argv[1] because the installer may place
+ * the new binary in a different directory than where the currently running
+ * binary lives, causing re-exec to run the stale old binary.
+ *
+ * Uses `where` on Windows, `which` on macOS/Linux.
  */
 function findUpdatedBinary(): string {
+  const whichCmd = getWhichCommand();
   const r = tryCatch(() =>
     executor.execFileSync(
-      "which",
+      whichCmd,
       [
         "spawn",
       ],
@@ -161,7 +166,8 @@ function findUpdatedBinary(): string {
       },
     ),
   );
-  const found = r.ok && r.data ? r.data.toString().trim() : "";
+  // `where` on Windows may return multiple lines; take the first
+  const found = r.ok && r.data ? r.data.toString().trim().split("\n")[0].trim() : "";
   if (found) {
     return found;
   }
@@ -200,11 +206,11 @@ function reExecWithArgs(): void {
 function performAutoUpdate(latestVersion: string): void {
   printUpdateBanner(latestVersion);
 
-  // Hardcoded CDN URL — no variable interpolation, eliminates CWE-78 concern entirely
-  const installUrl = `${SPAWN_CDN}/cli/install.sh`;
+  const installUrl = getInstallScriptUrl(SPAWN_CDN);
+  const installCmd = getInstallCmd(SPAWN_CDN);
 
   const updateResult = tryCatch(() => {
-    // Two-step approach: fetch script bytes with curl, then execute via bash -c
+    // Fetch script bytes with curl (available on all modern platforms)
     const scriptBytes = executor.execFileSync(
       "curl",
       [
@@ -223,16 +229,43 @@ function performAutoUpdate(latestVersion: string): void {
       },
     );
     const scriptContent = scriptBytes ? scriptBytes.toString() : "";
-    executor.execFileSync(
-      "bash",
-      [
-        "-c",
-        scriptContent,
-      ],
-      {
-        stdio: "inherit",
-      },
-    );
+
+    if (isWindows()) {
+      // Windows: write to temp file and execute via PowerShell
+      const tmpFile = path.join(tmpdir(), `spawn-install-${Date.now()}.ps1`);
+      fs.writeFileSync(tmpFile, scriptContent);
+      const psResult = tryCatch(() =>
+        executor.execFileSync(
+          "powershell.exe",
+          [
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            tmpFile,
+          ],
+          {
+            stdio: "inherit",
+          },
+        ),
+      );
+      // Best-effort cleanup of temp file
+      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+      if (!psResult.ok) {
+        throw psResult.error;
+      }
+    } else {
+      // macOS/Linux: execute via bash -c
+      executor.execFileSync(
+        "bash",
+        [
+          "-c",
+          scriptContent,
+        ],
+        {
+          stdio: "inherit",
+        },
+      );
+    }
   });
 
   if (updateResult.ok) {
@@ -246,7 +279,7 @@ function performAutoUpdate(latestVersion: string): void {
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
     console.error();
-    console.error(pc.cyan(`  curl -fsSL ${installUrl} | bash`));
+    console.error(pc.cyan(`  ${installCmd}`));
     console.error();
     // Continue with original command despite update failure
   }

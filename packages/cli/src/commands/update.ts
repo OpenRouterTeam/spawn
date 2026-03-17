@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process";
+import { unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "../manifest.js";
 import { parseJsonWith } from "../shared/parse.js";
-import { asyncTryCatch, tryCatch } from "../shared/result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
+import { getInstallCmd, getInstallScriptUrl, isWindows } from "../shared/shell.js";
 import { getErrorMessage, PkgVersionSchema, VERSION } from "./shared.js";
 
-const INSTALL_URL = `${SPAWN_CDN}/cli/install.sh`;
-const INSTALL_CMD = `curl --proto '=https' -fsSL ${INSTALL_URL} | bash`;
+const INSTALL_URL = getInstallScriptUrl(SPAWN_CDN);
+const INSTALL_CMD = getInstallCmd(SPAWN_CDN);
 
 async function fetchRemoteVersion(): Promise<string> {
   // Primary: plain-text version file from GitHub release artifact (static URL)
@@ -41,9 +44,49 @@ async function fetchRemoteVersion(): Promise<string> {
   return data.version;
 }
 
-function defaultRunUpdate(): void {
-  // Two-step: fetch with --proto '=https', then execute via bash -c
-  // Prevents protocol downgrade on hostile networks (matches update-check.ts pattern)
+function runWindowsUpdate(): void {
+  const scriptContent = execFileSync(
+    "curl",
+    [
+      "--proto",
+      "=https",
+      "-fsSL",
+      INSTALL_URL,
+    ],
+    {
+      encoding: "utf8",
+      stdio: [
+        "pipe",
+        "pipe",
+        "inherit",
+      ],
+    },
+  );
+  // Write to temp file and execute via PowerShell (avoids string escaping issues)
+  const tmpFile = `${tmpdir()}\\spawn-install-${Date.now()}.ps1`;
+  writeFileSync(tmpFile, scriptContent ?? "");
+  const execResult = tryCatch(() =>
+    execFileSync(
+      "powershell.exe",
+      [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        tmpFile,
+      ],
+      {
+        stdio: "inherit",
+      },
+    ),
+  );
+  // Best-effort cleanup of temp file
+  tryCatchIf(isFileError, () => unlinkSync(tmpFile));
+  if (!execResult.ok) {
+    throw execResult.error;
+  }
+}
+
+function runUnixUpdate(): void {
   const scriptContent = execFileSync(
     "curl",
     [
@@ -71,6 +114,14 @@ function defaultRunUpdate(): void {
       stdio: "inherit",
     },
   );
+}
+
+function defaultRunUpdate(): void {
+  if (isWindows()) {
+    runWindowsUpdate();
+  } else {
+    runUnixUpdate();
+  }
 }
 
 async function performUpdate(runUpdate: () => void = defaultRunUpdate): Promise<void> {

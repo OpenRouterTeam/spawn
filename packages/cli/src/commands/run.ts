@@ -10,6 +10,7 @@ import { generateSpawnId, getActiveServers, loadHistory, saveSpawnRecord } from 
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
+import { getLocalShell } from "../shared/shell.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -482,13 +483,14 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   process.exit(130);
 }
 
-// ── Bash execution ───────────────────────────────────────────────────────────
+// ── Script execution ─────────────────────────────────────────────────────────
 
-function spawnBash(script: string, env: Record<string, string | undefined>): void {
+function spawnScript(script: string, env: Record<string, string | undefined>): void {
+  const [shell, flag] = getLocalShell();
   const result = spawnSync(
-    "bash",
+    shell,
     [
-      "-c",
+      flag,
       script,
     ],
     {
@@ -543,7 +545,7 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   // gets a pristine file descriptor (prevents silent hangs / early exit)
   prepareStdinForHandoff();
 
-  spawnBash(script, env);
+  spawnScript(script, env);
 }
 
 /**
@@ -700,8 +702,8 @@ function headlessError(
   process.exit(exitCode);
 }
 
-/** Run a bash script in headless mode (all output to stderr, no interactive session) */
-function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<number> {
+/** Run a script in headless mode (all output to stderr, no interactive session) */
+function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<number> {
   validateScriptContent(script);
 
   const env = {
@@ -720,11 +722,12 @@ function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawn
     env.SPAWN_NAME_KEBAB = toKebabCase(spawnName);
   }
 
+  const [shell, flag] = getLocalShell();
   return new Promise<number>((resolve, reject) => {
     const child = spawn(
-      "bash",
+      shell,
       [
-        "-c",
+        flag,
         script,
       ],
       {
@@ -885,7 +888,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
   }
 
-  const exitCode = await runBashHeadless(scriptContent, prompt, debug, spawnName);
+  const exitCode = await runScriptHeadless(scriptContent, prompt, debug, spawnName);
 
   if (exitCode !== 0) {
     headlessError(
