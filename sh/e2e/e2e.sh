@@ -192,16 +192,68 @@ run_single_agent() {
 
   local status="fail"
 
-  # Provision -> Verify -> Input Test
-  if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
-    if verify_agent "${agent}" "${app_name}"; then
-      if run_input_test "${agent}" "${app_name}"; then
-        status="pass"
+  # ---------------------------------------------------------------------------
+  # Per-agent timeout: run provision/verify/input_test in a subshell with a
+  # wall-clock timeout. This prevents any single step from hanging indefinitely
+  # and ensures a result file is always written (pass, fail, or timeout).
+  # Fixes #2714: sprite-zeroclaw and digitalocean-opencode stalling with no result.
+  # ---------------------------------------------------------------------------
+  local effective_agent_timeout
+  effective_agent_timeout=$(get_agent_timeout "${agent}")
+  log_info "Agent timeout: ${effective_agent_timeout}s"
+
+  local status_file="${LOG_DIR}/${app_name}.agent-status"
+  rm -f "${status_file}"
+
+  # Run core logic in a subshell so we can kill it on timeout
+  (
+    local _inner_status="fail"
+    if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
+      if verify_agent "${agent}" "${app_name}"; then
+        if run_input_test "${agent}" "${app_name}"; then
+          _inner_status="pass"
+        fi
       fi
     fi
+    printf '%s' "${_inner_status}" > "${status_file}"
+  ) &
+  local agent_pid=$!
+
+  # Poll for completion or timeout (bash 3.2 compatible — no wait -n)
+  local agent_waited=0
+  while [ "${agent_waited}" -lt "${effective_agent_timeout}" ]; do
+    if [ -f "${status_file}" ]; then
+      break
+    fi
+    # Also break if the subshell exited without writing (crash/error)
+    if ! kill -0 "${agent_pid}" 2>/dev/null; then
+      break
+    fi
+    sleep 5
+    agent_waited=$((agent_waited + 5))
+  done
+
+  # Collect result or handle timeout
+  if [ -f "${status_file}" ]; then
+    status=$(cat "${status_file}")
+    wait "${agent_pid}" 2>/dev/null || true
+  elif kill -0 "${agent_pid}" 2>/dev/null; then
+    # Timed out — kill the subshell and its children
+    log_err "${agent} timed out after ${effective_agent_timeout}s — killing"
+    pkill -P "${agent_pid}" 2>/dev/null || true
+    kill "${agent_pid}" 2>/dev/null || true
+    wait "${agent_pid}" 2>/dev/null || true
+    status="fail"
+  else
+    # Subshell exited without writing status file (unexpected error)
+    log_err "${agent} subshell exited without writing status"
+    wait "${agent_pid}" 2>/dev/null || true
+    status="fail"
   fi
 
-  # Teardown (always attempt)
+  rm -f "${status_file}"
+
+  # Teardown (always attempt, even after timeout)
   teardown_agent "${app_name}" || log_warn "Teardown failed for ${app_name}"
 
   local agent_end

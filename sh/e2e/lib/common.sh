@@ -9,11 +9,15 @@ ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode hermes junie"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-720}"
 INSTALL_WAIT="${INSTALL_WAIT:-600}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
+# Per-agent overall timeout: max wall-clock time for provision + verify + input test.
+# Ensures a result file is always written even if a step hangs indefinitely.
+AGENT_TIMEOUT="${AGENT_TIMEOUT:-1800}"
 # Validate numeric env vars that get interpolated into remote command strings.
 # A non-numeric value here could lead to shell injection via SSH commands.
 case "${PROVISION_TIMEOUT}" in ''|*[!0-9]*) PROVISION_TIMEOUT=720 ;; esac
 case "${INSTALL_WAIT}" in ''|*[!0-9]*) INSTALL_WAIT=600 ;; esac
 case "${INPUT_TEST_TIMEOUT}" in ''|*[!0-9]*) INPUT_TEST_TIMEOUT=120 ;; esac
+case "${AGENT_TIMEOUT}" in ''|*[!0-9]*) AGENT_TIMEOUT=1800 ;; esac
 
 # ---------------------------------------------------------------------------
 # OpenRouter API key fallback
@@ -142,6 +146,7 @@ cloud_install_wait() {
 #   3. Global PROVISION_TIMEOUT
 # ---------------------------------------------------------------------------
 _PROVISION_TIMEOUT_junie=1200
+_AGENT_TIMEOUT_junie=2400
 
 get_provision_timeout() {
   local agent="$1"
@@ -167,6 +172,39 @@ get_provision_timeout() {
 
   # Fall back to global
   printf '%s' "${PROVISION_TIMEOUT}"
+}
+
+# ---------------------------------------------------------------------------
+# get_agent_timeout AGENT
+#
+# Returns the overall wall-clock timeout (seconds) for a single agent run
+# (provision + verify + input test). Same override precedence as above:
+#   1. AGENT_TIMEOUT_<agent> env var
+#   2. Built-in per-agent default (_AGENT_TIMEOUT_<agent>)
+#   3. Global AGENT_TIMEOUT
+# ---------------------------------------------------------------------------
+get_agent_timeout() {
+  local agent="$1"
+  local safe_agent
+  safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
+
+  # Check for env var override: AGENT_TIMEOUT_<agent>
+  local env_var="AGENT_TIMEOUT_${safe_agent}"
+  eval "local env_val=\${${env_var}:-}"
+  if [ -n "${env_val}" ]; then
+    case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
+  fi
+
+  # Check for built-in per-agent default
+  local builtin_var="_AGENT_TIMEOUT_${safe_agent}"
+  eval "local builtin_val=\${${builtin_var}:-}"
+  if [ -n "${builtin_val}" ]; then
+    printf '%s' "${builtin_val}"
+    return
+  fi
+
+  # Fall back to global
+  printf '%s' "${AGENT_TIMEOUT}"
 }
 
 # ---------------------------------------------------------------------------
