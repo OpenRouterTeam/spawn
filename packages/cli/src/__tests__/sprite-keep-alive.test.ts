@@ -83,7 +83,9 @@ describe("installSpriteKeepAlive", () => {
 
     await installSpriteKeepAlive();
 
-    expect(capturedCmds.some((cmd) => cmd.includes("kurt-claw-f.sprites.app/sprite-keep-running.sh"))).toBe(true);
+    expect(capturedCmds.some((cmd) => cmd.includes("openrouter.ai/labs/spawn/shared/sprite-keep-running.sh"))).toBe(
+      true,
+    );
     expect(capturedCmds.some((cmd) => cmd.includes("sprite-keep-running"))).toBe(true);
     expect(capturedCmds.some((cmd) => cmd.includes(".local/bin/sprite-keep-running"))).toBe(true);
     expect(capturedCmds.some((cmd) => cmd.includes("chmod +x"))).toBe(true);
