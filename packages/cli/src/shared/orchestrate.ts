@@ -16,6 +16,7 @@ import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
 import { getSpawnPreferencesPath } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isOperationalError, tryCatchIf } from "./result.js";
+import { isWindows } from "./shell";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import {
@@ -199,21 +200,19 @@ export async function runOrchestration(
   // 9. Inject environment variables via .spawnrc
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
+
+  // On Windows local execution, use PowerShell-compatible env setup.
+  // Remote servers (SSH) are always Linux, so bash commands are correct for all non-local clouds.
+  const isLocalWindows = cloud.cloudName === "local" && isWindows();
+  const envSetupCmd = isLocalWindows
+    ? `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`
+    : `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+      "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
+      `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
+      "done";
+
   const envResult = await asyncTryCatch(() =>
-    withRetry(
-      "env setup",
-      () =>
-        wrapSshCall(
-          cloud.runner.runServer(
-            `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-              "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
-              `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
-              "done",
-          ),
-        ),
-      2,
-      5,
-    ),
+    withRetry("env setup", () => wrapSshCall(cloud.runner.runServer(envSetupCmd)), 2, 5),
   );
   if (!envResult.ok) {
     logWarn("Environment setup had errors");

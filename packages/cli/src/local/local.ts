@@ -3,16 +3,18 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { getUserHome } from "../shared/paths";
+import { getLocalShell } from "../shared/shell";
 import { spawnInteractive } from "../shared/ssh";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
 /** Run a shell command locally and wait for it to finish. */
 export async function runLocal(cmd: string): Promise<void> {
+  const [shell, flag] = getLocalShell();
   const proc = Bun.spawn(
     [
-      "bash",
-      "-c",
+      shell,
+      flag,
       cmd,
     ],
     {
@@ -54,9 +56,10 @@ export function downloadFile(remotePath: string, localPath: string): void {
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
+  const [shell, flag] = getLocalShell();
   return spawnInteractive([
-    "bash",
-    "-c",
+    shell,
+    flag,
     cmd,
   ]);
 }
