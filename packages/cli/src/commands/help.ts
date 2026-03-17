@@ -42,6 +42,7 @@ function getHelpUsageSection(): string {
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn feedback "message"            Send feedback to the Spawn team
+  spawn uninstall                    Uninstall spawn CLI and optionally remove data
   spawn update                       Check for CLI updates
   spawn version                      Show version (or --version, -v)
   spawn help                         Show this help message (or --help, -h)`;

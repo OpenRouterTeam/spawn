@@ -68,5 +68,7 @@ export {
 } from "./shared.js";
 // status.ts — cmdStatus
 export { cmdStatus } from "./status.js";
+// uninstall.ts — cmdUninstall
+export { cmdUninstall } from "./uninstall.js";
 // update.ts — cmdUpdate
 export { cmdUpdate } from "./update.js";
