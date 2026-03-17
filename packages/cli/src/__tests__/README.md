@@ -33,6 +33,7 @@ bun test src/__tests__/manifest.test.ts
 - `commands-update-download.test.ts` — `cmdUpdate`, script download and execution
 - `cmd-feedback.test.ts` — `spawn feedback` command: empty message rejection, URL construction
 - `cmd-fix.test.ts` — `spawn fix` command: SSH connection repair via DI-injected runScript
+- `cmd-link.test.ts` — `spawn link` command: TCP reachability check, SSH agent detection via DI
 
 ### Commands: error paths
 - `commands-error-paths.test.ts` — Validation failures, unknown agents/clouds, prompt rejection
