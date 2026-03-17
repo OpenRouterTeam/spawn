@@ -207,6 +207,7 @@ export function getState() {
     lightsailMode: _state.lightsailMode,
     instanceName: _state.instanceName,
     instanceIp: _state.instanceIp,
+    selectedBundle: _state.selectedBundle,
   };
 }
 

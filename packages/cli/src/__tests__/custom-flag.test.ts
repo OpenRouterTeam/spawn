@@ -36,9 +36,9 @@ describe("AWS --custom prompts", () => {
   it("promptBundle should respect env var over --custom", async () => {
     process.env.LIGHTSAIL_BUNDLE = "small_3_0";
     process.env.SPAWN_CUSTOM = "1";
-    const { promptBundle } = await import("../aws/aws");
-    // Should use env var without prompting
+    const { promptBundle, getState } = await import("../aws/aws");
     await promptBundle();
+    expect(getState().selectedBundle).toBe("small_3_0");
   });
 });
 
