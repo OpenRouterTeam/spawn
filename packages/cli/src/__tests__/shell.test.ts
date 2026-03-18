@@ -14,13 +14,14 @@ describe("isWindows", () => {
     expect(isWindows("win32")).toBe(true);
   });
 
-  it("returns false for darwin", () => {
-    expect(isWindows("darwin")).toBe(false);
-  });
-
-  it("returns false for linux", () => {
-    expect(isWindows("linux")).toBe(false);
-  });
+  for (const platform of [
+    "darwin",
+    "linux",
+  ] as const) {
+    it(`returns false for ${platform}`, () => {
+      expect(isWindows(platform)).toBe(false);
+    });
+  }
 
   it("uses process.platform when no override", () => {
     expect(isWindows()).toBe(process.platform === "win32");
@@ -34,17 +35,16 @@ describe("getLocalShell", () => {
     expect(flag).toBe("-Command");
   });
 
-  it("returns bash on macOS", () => {
-    const [shell, flag] = getLocalShell("darwin");
-    expect(shell).toBe("bash");
-    expect(flag).toBe("-c");
-  });
-
-  it("returns bash on Linux", () => {
-    const [shell, flag] = getLocalShell("linux");
-    expect(shell).toBe("bash");
-    expect(flag).toBe("-c");
-  });
+  for (const platform of [
+    "darwin",
+    "linux",
+  ] as const) {
+    it(`returns bash on ${platform === "darwin" ? "macOS" : "Linux"}`, () => {
+      const [shell, flag] = getLocalShell(platform);
+      expect(shell).toBe("bash");
+      expect(flag).toBe("-c");
+    });
+  }
 });
 
 describe("getInstallScriptUrl", () => {
@@ -52,13 +52,14 @@ describe("getInstallScriptUrl", () => {
     expect(getInstallScriptUrl(CDN, "win32")).toBe(`${CDN}/cli/install.ps1`);
   });
 
-  it("returns .sh URL on macOS", () => {
-    expect(getInstallScriptUrl(CDN, "darwin")).toBe(`${CDN}/cli/install.sh`);
-  });
-
-  it("returns .sh URL on Linux", () => {
-    expect(getInstallScriptUrl(CDN, "linux")).toBe(`${CDN}/cli/install.sh`);
-  });
+  for (const platform of [
+    "darwin",
+    "linux",
+  ] as const) {
+    it(`returns .sh URL on ${platform === "darwin" ? "macOS" : "Linux"}`, () => {
+      expect(getInstallScriptUrl(CDN, platform)).toBe(`${CDN}/cli/install.sh`);
+    });
+  }
 });
 
 describe("getInstallCmd", () => {
@@ -69,12 +70,17 @@ describe("getInstallCmd", () => {
     expect(cmd).toContain("install.ps1");
   });
 
-  it("returns curl | bash on macOS", () => {
-    const cmd = getInstallCmd(CDN, "darwin");
-    expect(cmd).toContain("curl");
-    expect(cmd).toContain("bash");
-    expect(cmd).toContain("install.sh");
-  });
+  for (const platform of [
+    "darwin",
+    "linux",
+  ] as const) {
+    it(`returns curl | bash on ${platform === "darwin" ? "macOS" : "Linux"}`, () => {
+      const cmd = getInstallCmd(CDN, platform);
+      expect(cmd).toContain("curl");
+      expect(cmd).toContain("bash");
+      expect(cmd).toContain("install.sh");
+    });
+  }
 });
 
 describe("getWhichCommand", () => {
@@ -82,11 +88,12 @@ describe("getWhichCommand", () => {
     expect(getWhichCommand("win32")).toBe("where");
   });
 
-  it("returns 'which' on macOS", () => {
-    expect(getWhichCommand("darwin")).toBe("which");
-  });
-
-  it("returns 'which' on Linux", () => {
-    expect(getWhichCommand("linux")).toBe("which");
-  });
+  for (const platform of [
+    "darwin",
+    "linux",
+  ] as const) {
+    it(`returns 'which' on ${platform === "darwin" ? "macOS" : "Linux"}`, () => {
+      expect(getWhichCommand(platform)).toBe("which");
+    });
+  }
 });
