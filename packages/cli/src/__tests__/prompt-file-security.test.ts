@@ -1,4 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { validatePromptFilePath, validatePromptFileStats } from "../security.js";
 
 describe("validatePromptFilePath", () => {
@@ -113,6 +115,48 @@ describe("validatePromptFilePath", () => {
     expect(() => validatePromptFilePath("/backup/id_ed25519")).toThrow("SSH key");
     expect(() => validatePromptFilePath("id_ecdsa")).toThrow("SSH key");
     expect(() => validatePromptFilePath("/tmp/id_rsa.pub")).toThrow("SSH key");
+  });
+
+  describe("symlink bypass protection", () => {
+    const home = process.env.HOME ?? "";
+    const testDir = join(home, ".spawn-test-symlinks");
+    const sshDir = join(testDir, ".ssh");
+    const envFile = join(testDir, ".env");
+
+    beforeEach(() => {
+      mkdirSync(sshDir, {
+        recursive: true,
+      });
+      writeFileSync(join(sshDir, "id_rsa"), "fake-key");
+      writeFileSync(envFile, "SECRET=value");
+    });
+
+    afterEach(() => {
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      });
+    });
+
+    it("should reject symlinks pointing to sensitive SSH files", () => {
+      const symlink = join(testDir, "innocent.txt");
+      symlinkSync(join(sshDir, "id_rsa"), symlink);
+      expect(() => validatePromptFilePath(symlink)).toThrow("SSH");
+    });
+
+    it("should reject symlinks pointing to .env files", () => {
+      const symlink = join(testDir, "notes.txt");
+      symlinkSync(envFile, symlink);
+      expect(() => validatePromptFilePath(symlink)).toThrow("environment file");
+    });
+
+    it("should accept symlinks pointing to non-sensitive files", () => {
+      const safeFile = join(testDir, "safe.txt");
+      writeFileSync(safeFile, "hello");
+      const symlink = join(testDir, "link.txt");
+      symlinkSync(safeFile, symlink);
+      expect(() => validatePromptFilePath(symlink)).not.toThrow();
+    });
   });
 });
 
