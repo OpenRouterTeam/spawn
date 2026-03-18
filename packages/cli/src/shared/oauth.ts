@@ -1,6 +1,6 @@
 // shared/oauth.ts — OpenRouter OAuth flow + API key management
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { getErrorMessage, isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
@@ -259,7 +259,7 @@ async function saveOpenRouterKey(key: string): Promise<void> {
       recursive: true,
       mode: 0o700,
     });
-    await Bun.write(
+    writeFileSync(
       configPath,
       JSON.stringify(
         {
