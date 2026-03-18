@@ -87,7 +87,7 @@ _openclaw_ensure_gateway() {
   # Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so ss must come first.
   local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
     if ${port_check}; then \
       echo 'Gateway already running'; \
     else \
@@ -111,7 +111,7 @@ _openclaw_restart_gateway() {
   log_step "Restarting openclaw gateway..."
   local port_check_r='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
     _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' ') && \
     kill \"\$_gw_pid\" 2>/dev/null; sleep 2; \
     _oc_bin=\$(command -v openclaw) || exit 1; \
@@ -154,7 +154,7 @@ input_test_openclaw() {
     # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
     output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
       source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
-      export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+      export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
       timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
@@ -348,9 +348,10 @@ verify_openclaw() {
   # Binary check — source .spawnrc and .bashrc to pick up all PATH entries.
   # On Sprite VMs, npm's global prefix may be the nvm node bin dir (writable +
   # in PATH after .bashrc), so openclaw lands there instead of ~/.npm-global/bin.
-  # Sourcing both files ensures the verify PATH matches the install PATH.
+  # On GCP VMs (root user), npm installs to /usr/local/bin directly (no --prefix).
+  # Include /usr/local/bin explicitly so the check doesn't rely solely on .spawnrc.
   log_step "Checking openclaw binary..."
-  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; command -v openclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
@@ -392,7 +393,7 @@ _openclaw_verify_gateway_resilience() {
   # Step 1: Confirm gateway is currently running
   log_step "Gateway resilience: checking gateway is running..."
   if ! cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
     ${port_check}" >/dev/null 2>&1; then
     log_warn "Gateway not running — skipping resilience test"
     return 0
@@ -402,7 +403,7 @@ _openclaw_verify_gateway_resilience() {
   # Step 2: Kill the gateway with SIGKILL (simulate hard crash)
   log_step "Gateway resilience: killing gateway (SIGKILL)..."
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
     _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' '); \
     if [ -n \"\$_gw_pid\" ]; then kill -9 \$_gw_pid 2>/dev/null; fi" >/dev/null 2>&1 || true
 
@@ -425,7 +426,7 @@ _openclaw_verify_gateway_resilience() {
   log_step "Gateway resilience: waiting for auto-restart (up to 60s)..."
   local recovered
   recovered=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
     elapsed=0; while [ \$elapsed -lt 60 ]; do \
       if ${port_check}; then echo 'recovered'; exit 0; fi; \
       sleep 1; elapsed=\$((elapsed + 1)); \
