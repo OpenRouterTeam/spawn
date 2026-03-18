@@ -170,6 +170,75 @@ describe("tryTarballInstall", () => {
     expect(runner.runServer).not.toHaveBeenCalled();
   });
 
+  describe("single-asset architecture guard", () => {
+    it("includes x86_64 arch guard when only x86_64 asset exists", async () => {
+      const x86Only = {
+        assets: [
+          {
+            name: "spawn-agent-claude-x86_64-20260305.tar.gz",
+            browser_download_url:
+              "https://github.com/OpenRouterTeam/spawn/releases/download/agent-claude-latest/spawn-agent-claude-x86_64-20260305.tar.gz",
+          },
+        ],
+      };
+      const fetchFn = mockFetch(new Response(JSON.stringify(x86Only)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "claude", fetchFn);
+
+      const cmd = String(runner.runServer.mock.calls[0][0]);
+      expect(cmd).toContain("uname -m");
+      expect(cmd).toContain("exit 1");
+      expect(cmd).toContain("Tarball is x86_64 but VM is");
+    });
+
+    it("includes arm64 arch guard when only arm64 asset exists", async () => {
+      const armOnly = {
+        assets: [
+          {
+            name: "spawn-agent-claude-arm64-20260305.tar.gz",
+            browser_download_url:
+              "https://github.com/OpenRouterTeam/spawn/releases/download/agent-claude-latest/spawn-agent-claude-arm64-20260305.tar.gz",
+          },
+        ],
+      };
+      const fetchFn = mockFetch(new Response(JSON.stringify(armOnly)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "claude", fetchFn);
+
+      const cmd = String(runner.runServer.mock.calls[0][0]);
+      expect(cmd).toContain("uname -m");
+      expect(cmd).toContain("exit 1");
+      expect(cmd).toContain("Tarball is arm64 but VM is");
+    });
+
+    it("uses arch selection (no exit 1) when both assets exist", async () => {
+      const bothArch = {
+        assets: [
+          {
+            name: "spawn-agent-claude-x86_64-20260305.tar.gz",
+            browser_download_url:
+              "https://github.com/OpenRouterTeam/spawn/releases/download/agent-claude-latest/spawn-agent-claude-x86_64-20260305.tar.gz",
+          },
+          {
+            name: "spawn-agent-claude-arm64-20260305.tar.gz",
+            browser_download_url:
+              "https://github.com/OpenRouterTeam/spawn/releases/download/agent-claude-latest/spawn-agent-claude-arm64-20260305.tar.gz",
+          },
+        ],
+      };
+      const fetchFn = mockFetch(new Response(JSON.stringify(bothArch)));
+      const runner = createMockRunner();
+
+      await tryTarballInstall(runner, "claude", fetchFn);
+
+      const cmd = String(runner.runServer.mock.calls[0][0]);
+      expect(cmd).toContain("uname -m");
+      expect(cmd).not.toContain("exit 1");
+    });
+  });
+
   describe("non-root home directory mirroring", () => {
     let mirrorCmd: string;
 

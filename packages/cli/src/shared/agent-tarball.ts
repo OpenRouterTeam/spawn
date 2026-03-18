@@ -106,7 +106,13 @@ export async function tryTarballInstall(
       `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
       `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   } else {
-    downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+    // Only one arch available — validate the remote VM matches before downloading.
+    // If the arch doesn't match, fail so the caller falls back to live install.
+    const isArm = !!armUrl;
+    const archGuard = isArm
+      ? '_arch=$(uname -m); if [ "$_arch" != "aarch64" ] && [ "$_arch" != "arm64" ]; then echo "Tarball is arm64 but VM is $_arch" >&2; exit 1; fi; '
+      : '_arch=$(uname -m); if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then echo "Tarball is x86_64 but VM is $_arch" >&2; exit 1; fi; ';
+    downloadCmd = `${archGuard}curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   }
 
   // Phase 3: Remote execution — catch-all because any failure means "fall back to live install"
