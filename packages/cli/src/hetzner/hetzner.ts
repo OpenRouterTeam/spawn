@@ -295,11 +295,12 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
-    "set -e",
     "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
-    "apt-get update -y",
-    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+    "# Guarantee the cloud-init marker is written on exit (success, failure, or signal)",
+    "trap 'touch /home/ubuntu/.cloud-init-complete 2>/dev/null; touch /root/.cloud-init-complete' EXIT",
+    "apt-get update -y || true",
+    `apt-get install -y --no-install-recommends ${packages.join(" ")} || true`,
   ];
   if (needsNode(tier)) {
     lines.push(`${NODE_INSTALL_CMD} || true`);
@@ -313,7 +314,6 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   lines.push(
     "echo 'export PATH=\"$HOME/.local/bin:$HOME/.bun/bin:$PATH\"' >> /root/.bashrc",
     "echo 'export PATH=\"$HOME/.local/bin:$HOME/.bun/bin:$PATH\"' >> /root/.zshrc",
-    "touch /home/ubuntu/.cloud-init-complete 2>/dev/null; touch /root/.cloud-init-complete",
   );
   return lines.join("\n");
 }
