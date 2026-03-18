@@ -223,6 +223,30 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
   throw new Error("doApi: unreachable");
 }
 
+/**
+ * Paginate a DigitalOcean GET collection endpoint.
+ * Returns all items from the given `key` across all pages.
+ */
+async function doGetAll(endpoint: string, key: string): Promise<Record<string, unknown>[]> {
+  const perPage = 50;
+  const sep = endpoint.includes("?") ? "&" : "?";
+  let page = 1;
+  const all: Record<string, unknown>[] = [];
+  for (;;) {
+    const resp = await doApi("GET", `${endpoint}${sep}per_page=${perPage}&page=${page}`);
+    const data = parseJsonObj(resp);
+    const items = toObjectArray(data?.[key]);
+    for (const item of items) {
+      all.push(toRecord(item) ?? {});
+    }
+    if (items.length < perPage) {
+      break;
+    }
+    page = page + 1;
+  }
+  return all;
+}
+
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
 function loadConfig(): Record<string, unknown> | null {
@@ -769,10 +793,8 @@ export async function ensureDoToken(): Promise<boolean> {
 export async function ensureSshKey(): Promise<void> {
   const selectedKeys = await ensureSshKeys();
 
-  // Fetch registered keys once before the loop to avoid N+1 API calls
-  const keysText = await doApi("GET", "/account/keys");
-  const data = parseJsonObj(keysText);
-  const keys = toObjectArray(data?.ssh_keys);
+  // Fetch all registered keys (paginated) once before the loop to avoid N+1 API calls
+  const keys = await doGetAll("/account/keys", "ssh_keys");
 
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
@@ -809,9 +831,8 @@ export async function ensureSshKey(): Promise<void> {
       logWarn(`SSH key '${key.name}' registration may have failed, continuing...`);
       continue;
     }
-    const regText = regResult.data;
-
-    if (regText.includes('"id"')) {
+    const regData = parseJsonObj(regResult.data);
+    if (regData?.ssh_key) {
       logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
       continue;
     }
@@ -1003,12 +1024,9 @@ export async function createServer(
     `Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ${imageLabel})...`,
   );
 
-  // Get all SSH key IDs
-  const keysText = await doApi("GET", "/account/keys");
-  const keysData = parseJsonObj(keysText);
-  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
-    .map((k) => (isNumber(k.id) ? k.id : 0))
-    .filter((n) => n > 0);
+  // Get all SSH key IDs (paginated to avoid missing keys beyond page 1)
+  const allKeys = await doGetAll("/account/keys", "ssh_keys");
+  const sshKeyIds: number[] = allKeys.map((k) => (isNumber(k.id) ? k.id : 0)).filter((n) => n > 0);
 
   const dropletConfig: Record<string, unknown> = {
     name,
@@ -1519,9 +1537,7 @@ export async function getServerIp(dropletId: string): Promise<string | null> {
 
 /** List all DigitalOcean droplets. Returns simplified instance info for the remap picker. */
 export async function listServers(): Promise<CloudInstance[]> {
-  const resp = await doApi("GET", "/droplets");
-  const data = parseJsonObj(resp);
-  const droplets = toObjectArray(data?.droplets);
+  const droplets = await doGetAll("/droplets", "droplets");
   const results: CloudInstance[] = [];
   for (const d of droplets) {
     const v4Networks = toObjectArray(d?.networks?.v4);
