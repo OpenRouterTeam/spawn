@@ -714,6 +714,132 @@ const KILOCODE_BINARY_VERIFY =
   '{ echo "WARNING: kilocode binary still not found after recovery attempts"; }; ' +
   "}";
 
+// ─── Auto-Update Service ─────────────────────────────────────────────────────
+
+/**
+ * Install a systemd timer + service that periodically updates the agent
+ * binary and system packages without disrupting running instances.
+ *
+ * Safety for running instances:
+ * - Binary agents (Go, Rust): Linux keeps old inode in memory; replacement on disk is safe
+ * - npm agents: Node.js caches all loaded modules in memory at startup. npm install -g
+ *   replaces files on disk via a staging dir. Running processes are unaffected since
+ *   CLI agents load everything at startup (no lazy imports after the swap).
+ *
+ * The new version takes effect on next restart via the existing restart loop.
+ * Skipped for local cloud and non-systemd systems.
+ */
+export async function setupAutoUpdate(runner: CloudRunner, agentName: string, updateCmd: string): Promise<void> {
+  logStep("Setting up agent auto-update service...");
+
+  const wrapperScript = [
+    "#!/bin/bash",
+    "set -eo pipefail",
+    'LOGFILE="/var/log/spawn-auto-update.log"',
+    'LOCKFILE="/var/lock/spawn-auto-update.lock"',
+    "",
+    'log() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$LOGFILE"; }',
+    "",
+    "# Exclusive lock — skip if another update is already running",
+    'exec 9>"$LOCKFILE"',
+    "if ! flock -n 9; then",
+    '  log "Another update is already running, skipping"',
+    "  exit 0",
+    "fi",
+    "",
+    '[ -f "$HOME/.spawnrc" ] && source "$HOME/.spawnrc" 2>/dev/null',
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH"',
+    "",
+    "# ── Phase 1: System package updates ──",
+    'log "Updating system packages"',
+    "if command -v apt-get >/dev/null 2>&1; then",
+    "  _sudo_sys=''",
+    '  [ "$(id -u)" != "0" ] && _sudo_sys="sudo"',
+    "  export DEBIAN_FRONTEND=noninteractive",
+    "  # Disable Ubuntu's unattended-upgrades to avoid dpkg lock contention.",
+    "  # We handle all updates here — running both causes lock conflicts.",
+    "  if $_sudo_sys systemctl is-active --quiet unattended-upgrades 2>/dev/null; then",
+    "    $_sudo_sys systemctl disable --now unattended-upgrades 2>/dev/null || true",
+    '    log "Disabled unattended-upgrades (spawn handles updates)"',
+    "  fi",
+    "  # Wait up to 5 min for any in-progress dpkg/apt operation to finish",
+    '  $_sudo_sys flock -w 300 /var/lib/dpkg/lock-frontend apt-get update -qq >> "$LOGFILE" 2>&1 || log "apt-get update failed (non-fatal)"',
+    '  $_sudo_sys flock -w 300 /var/lib/dpkg/lock-frontend apt-get upgrade -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" >> "$LOGFILE" 2>&1 || log "apt-get upgrade failed (non-fatal)"',
+    '  $_sudo_sys apt-get autoremove -y -qq >> "$LOGFILE" 2>&1 || true',
+    '  log "System packages updated"',
+    "fi",
+    "",
+    "# ── Phase 2: Agent update ──",
+    `log "Starting ${agentName} update"`,
+    updateCmd + ' >> "$LOGFILE" 2>&1',
+    "_exit=$?",
+    'if [ "$_exit" -eq 0 ]; then',
+    `  log "${agentName} update completed successfully"`,
+    "else",
+    `  log "${agentName} update failed (exit code $_exit)"`,
+    "fi",
+    'exit "$_exit"',
+  ].join("\n");
+
+  // __USER__ and __HOME__ are sed-substituted at deploy time
+  const unitFile = [
+    "[Unit]",
+    `Description=Spawn auto-update for ${agentName}`,
+    "After=network-online.target",
+    "Wants=network-online.target",
+    "",
+    "[Service]",
+    "Type=oneshot",
+    "ExecStart=/usr/local/bin/spawn-auto-update",
+    "User=__USER__",
+    "Environment=HOME=__HOME__",
+    "TimeoutStartSec=1800",
+    "",
+    "[Install]",
+    "WantedBy=multi-user.target",
+  ].join("\n");
+
+  const timerFile = [
+    "[Unit]",
+    `Description=Run spawn auto-update for ${agentName} every 6 hours`,
+    "",
+    "[Timer]",
+    "OnBootSec=15min",
+    "OnUnitActiveSec=6h",
+    "RandomizedDelaySec=30min",
+    "Persistent=true",
+    "",
+    "[Install]",
+    "WantedBy=timers.target",
+  ].join("\n");
+
+  const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
+  const unitB64 = Buffer.from(unitFile).toString("base64");
+  const timerB64 = Buffer.from(timerFile).toString("base64");
+
+  const script = [
+    "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
+    '_sudo=""',
+    '[ "$(id -u)" != "0" ] && _sudo="sudo"',
+    "printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-auto-update > /dev/null",
+    "$_sudo chmod +x /usr/local/bin/spawn-auto-update",
+    "printf '%s' '" + unitB64 + "' | base64 -d > /tmp/spawn-auto-update.service.tmp",
+    'sed -i "s|__USER__|$(whoami)|;s|__HOME__|$HOME|" /tmp/spawn-auto-update.service.tmp',
+    "$_sudo mv /tmp/spawn-auto-update.service.tmp /etc/systemd/system/spawn-auto-update.service",
+    "printf '%s' '" + timerB64 + "' | base64 -d | $_sudo tee /etc/systemd/system/spawn-auto-update.timer > /dev/null",
+    "$_sudo systemctl daemon-reload",
+    "$_sudo systemctl enable spawn-auto-update.timer 2>/dev/null",
+    "$_sudo systemctl start spawn-auto-update.timer",
+  ].join("\n");
+
+  const result = await asyncTryCatch(() => runner.runServer(script));
+  if (result.ok) {
+    logInfo("Agent auto-update service installed (runs every 6 hours)");
+  } else {
+    logWarn("Auto-update setup failed (non-fatal, agent still works)");
+  }
+}
+
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 // Last zeroclaw release that shipped Linux prebuilt binaries (v0.1.9a has none).
@@ -738,6 +864,10 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupClaudeCodeConfig(runner, apiKey),
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+      updateCmd:
+        'export PATH="$HOME/.claude/local/bin:$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin:$PATH"; ' +
+        "npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || " +
+        "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash",
     },
 
     codex: {
@@ -755,6 +885,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
+        "npm install -g ${_NPM_G_FLAGS:-} @openai/codex@latest",
     },
 
     openclaw: (() => {
@@ -786,6 +919,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
+        updateCmd:
+          'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
+          "npm install -g ${_NPM_G_FLAGS:-} openclaw@latest",
       };
     })(),
 
@@ -798,6 +934,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      updateCmd: openCodeInstallCmd(),
     },
 
     kilocode: {
@@ -817,6 +954,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
+        "npm install -g ${_NPM_G_FLAGS:-} @kilocode/cli@latest",
     },
 
     zeroclaw: {
@@ -848,6 +988,18 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
         "export PATH=$HOME/.local/bin:$HOME/.cargo/bin:$PATH; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+      updateCmd:
+        'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; ' +
+        `_ZC_ARCH="$(uname -m)"; ` +
+        `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
+        `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
+        "else exit 1; fi; " +
+        `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/latest/download/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
+        `_ZC_TMP="$(mktemp -d)"; ` +
+        `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
+        `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
+        `install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw" && ` +
+        `rm -rf "$_ZC_TMP"`,
     },
 
     hermes: {
@@ -878,6 +1030,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       },
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
+      updateCmd:
+        "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
     },
 
     junie: {
@@ -896,6 +1050,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
+        "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
     },
   };
 }

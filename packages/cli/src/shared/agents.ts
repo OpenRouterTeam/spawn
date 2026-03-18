@@ -46,6 +46,8 @@ export interface AgentConfig {
   skipTarball?: boolean;
   /** SSH tunnel config for web dashboards. */
   tunnel?: TunnelConfig;
+  /** Shell command to update the agent to its latest version (used by auto-update timer). */
+  updateCmd?: string;
 }
 
 /** Configuration for SSH-tunneling a remote port to localhost. */
@@ -127,6 +129,12 @@ const COMMON_STEPS: OptionalStep[] = [
     value: "custom-model",
     label: "Custom model",
     hint: "enter an OpenRouter model ID manually",
+  },
+  {
+    value: "auto-update",
+    label: "Auto-update",
+    hint: "keep agent + system packages up to date (every 6h)",
+    defaultOn: true,
   },
 ];
 

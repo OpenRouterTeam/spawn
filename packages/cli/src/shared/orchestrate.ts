@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
-import { offerGithubAuth, wrapSshCall } from "./agent-setup";
+import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup";
 import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
@@ -252,6 +252,11 @@ export async function runOrchestration(
     // Pass explicitlyRequested=true when user opted in via setup options so the
     // step always runs even if no local gh token was found during detectGithubAuth.
     await offerGithubAuth(cloud.runner, enabledSteps?.has("github"));
+  }
+
+  // 10c. Auto-update service (systemd timer — cloud VMs only, default on)
+  if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
+    await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
   }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
