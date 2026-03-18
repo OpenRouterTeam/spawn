@@ -862,8 +862,8 @@ const DROPLET_SIZES: DropletSize[] = [
     label: "2 vCPU \u00b7 2 GB RAM \u00b7 $18/mo",
   },
   {
-    id: "s-2vcpu-4gb",
-    label: "2 vCPU \u00b7 4 GB RAM \u00b7 $24/mo",
+    id: "s-2vcpu-4gb-intel",
+    label: "2 vCPU \u00b7 4 GB RAM \u00b7 $28/mo (Intel, available in all regions)",
   },
   {
     id: "s-4vcpu-8gb",
