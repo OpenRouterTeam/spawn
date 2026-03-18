@@ -4,7 +4,7 @@ import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
@@ -66,7 +66,7 @@ export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: st
     mode: 0o700,
   });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
-  await Bun.write(configPath, payload, {
+  writeFileSync(configPath, payload, {
     mode: 0o600,
   });
 }

@@ -3,7 +3,7 @@
 import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
@@ -239,7 +239,7 @@ async function saveConfig(values: Record<string, unknown>): Promise<void> {
     recursive: true,
     mode: 0o700,
   });
-  await Bun.write(configPath, JSON.stringify(values, null, 2) + "\n", {
+  writeFileSync(configPath, JSON.stringify(values, null, 2) + "\n", {
     mode: 0o600,
   });
 }

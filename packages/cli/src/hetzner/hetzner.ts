@@ -3,7 +3,7 @@
 import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -130,7 +130,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
     mode: 0o700,
   });
   const escaped = jsonEscape(token);
-  await Bun.write(configPath, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+  writeFileSync(configPath, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
     mode: 0o600,
   });
 }
