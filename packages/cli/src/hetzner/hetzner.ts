@@ -361,7 +361,7 @@ interface LocationOption {
   label: string;
 }
 
-const LOCATIONS: LocationOption[] = [
+const FALLBACK_LOCATIONS: LocationOption[] = [
   {
     id: "fsn1",
     label: "Falkenstein, Germany",
@@ -384,7 +384,39 @@ const LOCATIONS: LocationOption[] = [
   },
 ];
 
-export const DEFAULT_LOCATION = "fsn1";
+export const DEFAULT_LOCATION = "nbg1";
+
+/**
+ * Fetch available locations from the Hetzner API.
+ * Falls back to a hardcoded list if the API call fails.
+ */
+async function fetchLocations(): Promise<LocationOption[]> {
+  const result = await asyncTryCatch(async () => {
+    const items = await hetznerGetAll("/locations", "locations");
+    const locs: LocationOption[] = [];
+    for (const item of items) {
+      const name = isString(item.name) ? item.name : "";
+      const city = isString(item.city) ? item.city : "";
+      const country = isString(item.country) ? item.country : "";
+      const description = isString(item.description) ? item.description : "";
+      if (!name) {
+        continue;
+      }
+      // Build a label like "Falkenstein, DE" or fall back to the API description
+      const label = city && country ? `${city}, ${country}` : description || name;
+      locs.push({
+        id: name,
+        label,
+      });
+    }
+    return locs;
+  });
+  if (result.ok && result.data.length > 0) {
+    return result.data;
+  }
+  logWarn("Could not fetch locations from Hetzner API, using built-in list");
+  return FALLBACK_LOCATIONS;
+}
 
 // ─── Interactive Pickers ─────────────────────────────────────────────────────
 
@@ -407,26 +439,43 @@ export async function promptServerType(): Promise<string> {
   return selectFromList(items, "Hetzner server type", DEFAULT_SERVER_TYPE);
 }
 
-export async function promptLocation(): Promise<string> {
-  if (process.env.HETZNER_LOCATION) {
+export async function promptLocation(excludeLocations?: string[]): Promise<string> {
+  if (process.env.HETZNER_LOCATION && !excludeLocations?.length) {
     logInfo(`Using location from environment: ${process.env.HETZNER_LOCATION}`);
     return process.env.HETZNER_LOCATION;
   }
 
-  if (process.env.SPAWN_CUSTOM !== "1") {
-    return DEFAULT_LOCATION;
+  // Fetch dynamic locations from the API (falls back to hardcoded list)
+  let locations = await fetchLocations();
+
+  // Filter out locations that already failed (e.g. disabled by Hetzner)
+  if (excludeLocations?.length) {
+    locations = locations.filter((l) => !excludeLocations.includes(l.id));
+    if (locations.length === 0) {
+      logError("No available Hetzner locations remaining");
+      throw new Error("All locations unavailable");
+    }
   }
 
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    return DEFAULT_LOCATION;
+  // Non-custom and non-interactive modes: pick the first available default
+  if ((process.env.SPAWN_CUSTOM !== "1" || process.env.SPAWN_NON_INTERACTIVE === "1") && !excludeLocations?.length) {
+    // Prefer DEFAULT_LOCATION if it exists in the list, otherwise first available
+    const hasDefault = locations.some((l) => l.id === DEFAULT_LOCATION);
+    return hasDefault ? DEFAULT_LOCATION : locations[0].id;
   }
 
   process.stderr.write("\n");
-  const items = LOCATIONS.map((l) => `${l.id}|${l.label}`);
-  return selectFromList(items, "Hetzner location", DEFAULT_LOCATION);
+  const items = locations.map((l) => `${l.id}|${l.label}`);
+  const defaultLoc = locations.some((l) => l.id === DEFAULT_LOCATION) ? DEFAULT_LOCATION : locations[0].id;
+  return selectFromList(items, "Hetzner location", defaultLoc);
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
+
+/** Check if a Hetzner API error indicates a location is unavailable (HTTP 412 resource_unavailable). */
+function isLocationUnavailableError(errMsg: string): boolean {
+  return /resource_unavailable|location disabled|location.*unavailable/i.test(errMsg);
+}
 
 export async function createServer(
   name: string,
@@ -435,7 +484,7 @@ export async function createServer(
   tier?: CloudInitTier,
 ): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
-  const loc = location || process.env.HETZNER_LOCATION || "fsn1";
+  let loc = location || process.env.HETZNER_LOCATION || DEFAULT_LOCATION;
   const image = "ubuntu-24.04";
 
   if (!validateRegionName(loc)) {
@@ -443,90 +492,134 @@ export async function createServer(
     throw new Error("Invalid location");
   }
 
-  logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc})...`);
-
-  // Get all SSH key IDs (paginated to avoid missing keys beyond page 1)
+  // Get all SSH key IDs once (paginated to avoid missing keys beyond page 1)
   const allKeys = await hetznerGetAll("/ssh_keys", "ssh_keys");
   const sshKeyIds: number[] = allKeys.map((k) => (isNumber(k.id) ? k.id : 0)).filter(Boolean);
-
   const userdata = getCloudInitUserdata(tier);
-  const body = JSON.stringify({
-    name,
-    server_type: sType,
-    location: loc,
-    image,
-    ssh_keys: sshKeyIds,
-    user_data: userdata,
-    start_after_create: true,
-  });
 
-  const resp = await hetznerApi("POST", "/servers", body);
-  const data = parseJsonObj(resp);
+  // Track locations that failed so the user isn't offered them again
+  const failedLocations: string[] = [];
+  const maxLocationRetries = 3;
 
-  // Hetzner success responses contain "error": null in action objects,
-  // so check for presence of .server object, not absence of "error" string.
-  const server = toRecord(data?.server);
-  if (!server) {
-    const errMsg = String(toRecord(data?.error)?.message || "Unknown error");
-    logError(`Failed to create Hetzner server: ${errMsg}`);
+  for (let attempt = 0; attempt <= maxLocationRetries; attempt++) {
+    logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc})...`);
 
-    if (isBillingError("hetzner", errMsg)) {
-      const shouldRetry = await handleBillingError("hetzner");
-      if (shouldRetry) {
-        logStep("Retrying server creation...");
-        const retryResp = await hetznerApi("POST", "/servers", body);
-        const retryData = parseJsonObj(retryResp);
-        const retryServer = toRecord(retryData?.server);
-        if (retryServer) {
-          _state.serverId = String(retryServer.id);
-          const retryNet = toRecord(retryServer.public_net);
-          const retryIpv4 = toRecord(retryNet?.ipv4);
-          _state.serverIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
-          if (_state.serverId && _state.serverId !== "null" && _state.serverIp && _state.serverIp !== "null") {
-            logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
-            return {
-              ip: _state.serverIp,
-              user: "root",
-              server_id: _state.serverId,
-              server_name: name,
-              cloud: "hetzner",
-            };
-          }
+    const body = JSON.stringify({
+      name,
+      server_type: sType,
+      location: loc,
+      image,
+      ssh_keys: sshKeyIds,
+      user_data: userdata,
+      start_after_create: true,
+    });
+
+    const createResult = await asyncTryCatch(() => hetznerApi("POST", "/servers", body));
+
+    // Handle API-level errors (HTTP 412, etc.) that throw before we get JSON
+    if (!createResult.ok) {
+      const errMsg = getErrorMessage(createResult.error);
+
+      if (isLocationUnavailableError(errMsg) && process.env.SPAWN_NON_INTERACTIVE !== "1") {
+        failedLocations.push(loc);
+        logWarn(`Location '${loc}' is currently unavailable. Please pick a different location.`);
+        const newLoc = await promptLocation(failedLocations);
+        if (newLoc === loc) {
+          throw createResult.error;
         }
-        const retryErr = String(toRecord(retryData?.error)?.message || "Unknown error");
-        logError(`Retry failed: ${retryErr}`);
+        loc = newLoc;
+        continue;
       }
-    } else {
-      showNonBillingError("hetzner", [
-        "Server type or location unavailable",
-        "Server limit reached for your account",
-      ]);
+
+      throw createResult.error;
     }
-    throw new Error(`Server creation failed: ${errMsg}`);
+
+    const data = parseJsonObj(createResult.data);
+
+    // Hetzner success responses contain "error": null in action objects,
+    // so check for presence of .server object, not absence of "error" string.
+    const server = toRecord(data?.server);
+    if (!server) {
+      const errMsg = String(toRecord(data?.error)?.message || "Unknown error");
+      const errCode = String(toRecord(data?.error)?.code || "");
+
+      // Location unavailable — let user re-pick
+      if (
+        (isLocationUnavailableError(errMsg) || isLocationUnavailableError(errCode)) &&
+        process.env.SPAWN_NON_INTERACTIVE !== "1"
+      ) {
+        failedLocations.push(loc);
+        logWarn(`Location '${loc}' is currently unavailable. Please pick a different location.`);
+        const newLoc = await promptLocation(failedLocations);
+        if (newLoc === loc) {
+          throw new Error(`Server creation failed: ${errMsg}`);
+        }
+        loc = newLoc;
+        continue;
+      }
+
+      logError(`Failed to create Hetzner server: ${errMsg}`);
+
+      if (isBillingError("hetzner", errMsg)) {
+        const shouldRetry = await handleBillingError("hetzner");
+        if (shouldRetry) {
+          logStep("Retrying server creation...");
+          const retryResp = await hetznerApi("POST", "/servers", body);
+          const retryData = parseJsonObj(retryResp);
+          const retryServer = toRecord(retryData?.server);
+          if (retryServer) {
+            _state.serverId = String(retryServer.id);
+            const retryNet = toRecord(retryServer.public_net);
+            const retryIpv4 = toRecord(retryNet?.ipv4);
+            _state.serverIp = isString(retryIpv4?.ip) ? retryIpv4.ip : "";
+            if (_state.serverId && _state.serverId !== "null" && _state.serverIp && _state.serverIp !== "null") {
+              logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
+              return {
+                ip: _state.serverIp,
+                user: "root",
+                server_id: _state.serverId,
+                server_name: name,
+                cloud: "hetzner",
+              };
+            }
+          }
+          const retryErr = String(toRecord(retryData?.error)?.message || "Unknown error");
+          logError(`Retry failed: ${retryErr}`);
+        }
+      } else {
+        showNonBillingError("hetzner", [
+          "Server type or location unavailable",
+          "Server limit reached for your account",
+        ]);
+      }
+      throw new Error(`Server creation failed: ${errMsg}`);
+    }
+
+    _state.serverId = String(server.id);
+    const publicNet = toRecord(server.public_net);
+    const ipv4 = toRecord(publicNet?.ipv4);
+    _state.serverIp = isString(ipv4?.ip) ? ipv4.ip : "";
+
+    if (!_state.serverId || _state.serverId === "null") {
+      logError("Failed to extract server ID from API response");
+      throw new Error("No server ID");
+    }
+    if (!_state.serverIp || _state.serverIp === "null") {
+      logError("Failed to extract server IP from API response");
+      throw new Error("No server IP");
+    }
+
+    logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
+    return {
+      ip: _state.serverIp,
+      user: "root",
+      server_id: _state.serverId,
+      server_name: name,
+      cloud: "hetzner",
+    };
   }
 
-  _state.serverId = String(server.id);
-  const publicNet = toRecord(server.public_net);
-  const ipv4 = toRecord(publicNet?.ipv4);
-  _state.serverIp = isString(ipv4?.ip) ? ipv4.ip : "";
-
-  if (!_state.serverId || _state.serverId === "null") {
-    logError("Failed to extract server ID from API response");
-    throw new Error("No server ID");
-  }
-  if (!_state.serverIp || _state.serverIp === "null") {
-    logError("Failed to extract server IP from API response");
-    throw new Error("No server IP");
-  }
-
-  logInfo(`Server created: ID=${_state.serverId}, IP=${_state.serverIp}`);
-  return {
-    ip: _state.serverIp,
-    user: "root",
-    server_id: _state.serverId,
-    server_name: name,
-    cloud: "hetzner",
-  };
+  throw new Error("Server creation failed: too many location retries");
 }
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
