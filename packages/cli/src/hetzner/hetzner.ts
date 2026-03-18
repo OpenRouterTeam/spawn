@@ -120,6 +120,32 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
   throw new Error("hetznerApi: unreachable");
 }
 
+/**
+ * Paginate a Hetzner GET collection endpoint.
+ * Returns all items from the given `key` across all pages.
+ */
+async function hetznerGetAll(endpoint: string, key: string): Promise<Record<string, unknown>[]> {
+  const sep = endpoint.includes("?") ? "&" : "?";
+  let page = 1;
+  const all: Record<string, unknown>[] = [];
+  for (;;) {
+    const resp = await hetznerApi("GET", `${endpoint}${sep}per_page=50&page=${page}`);
+    const data = parseJsonObj(resp);
+    const items = toObjectArray(data?.[key]);
+    for (const item of items) {
+      all.push(toRecord(item) ?? {});
+    }
+    // Check if there's a next page
+    const meta = toRecord(toRecord(data?.meta)?.pagination);
+    const nextPage = isNumber(meta?.next_page) ? meta.next_page : 0;
+    if (nextPage <= page || nextPage === 0) {
+      break;
+    }
+    page = nextPage;
+  }
+  return all;
+}
+
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
 async function saveTokenToConfig(token: string): Promise<void> {
@@ -213,10 +239,8 @@ export async function ensureHcloudToken(): Promise<void> {
 export async function ensureSshKey(): Promise<void> {
   const selectedKeys = await ensureSshKeys();
 
-  // Fetch registered keys once before the loop to avoid N+1 API calls
-  const resp = await hetznerApi("GET", "/ssh_keys");
-  const data = parseJsonObj(resp);
-  const sshKeys = toObjectArray(data?.ssh_keys);
+  // Fetch all registered keys (paginated) once before the loop to avoid N+1 API calls
+  const sshKeys = await hetznerGetAll("/ssh_keys", "ssh_keys");
 
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
@@ -421,12 +445,9 @@ export async function createServer(
 
   logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc})...`);
 
-  // Get all SSH key IDs
-  const keysResp = await hetznerApi("GET", "/ssh_keys");
-  const keysData = parseJsonObj(keysResp);
-  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
-    .map((k) => (isNumber(k.id) ? k.id : 0))
-    .filter(Boolean);
+  // Get all SSH key IDs (paginated to avoid missing keys beyond page 1)
+  const allKeys = await hetznerGetAll("/ssh_keys", "ssh_keys");
+  const sshKeyIds: number[] = allKeys.map((k) => (isNumber(k.id) ? k.id : 0)).filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -765,9 +786,7 @@ export async function getServerIp(serverId: string): Promise<string | null> {
 
 /** List all Hetzner servers. Returns simplified instance info for the remap picker. */
 export async function listServers(): Promise<CloudInstance[]> {
-  const resp = await hetznerApi("GET", "/servers");
-  const data = parseJsonObj(resp);
-  const servers = toObjectArray(data?.servers);
+  const servers = await hetznerGetAll("/servers", "servers");
   const results: CloudInstance[] = [];
   for (const s of servers) {
     const publicNet = toRecord(s.public_net);
