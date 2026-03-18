@@ -5,7 +5,7 @@ import type { CloudInitTier } from "../shared/agents";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { normalize } from "node:path";
+import { dirname, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -60,7 +60,7 @@ function validateAwsSecretKey(key: string): boolean {
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const configPath = getAwsConfigPath();
-  const dir = configPath.replace(/\/[^/]+$/, "");
+  const dir = dirname(configPath);
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,

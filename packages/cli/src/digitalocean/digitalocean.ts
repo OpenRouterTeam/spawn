@@ -4,7 +4,7 @@ import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents";
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { normalize } from "node:path";
+import { dirname, normalize } from "node:path";
 import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -234,7 +234,7 @@ function loadConfig(): Record<string, unknown> | null {
 
 async function saveConfig(values: Record<string, unknown>): Promise<void> {
   const configPath = getSpawnCloudConfigPath("digitalocean");
-  const dir = configPath.replace(/\/[^/]+$/, "");
+  const dir = dirname(configPath);
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,
