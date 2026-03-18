@@ -28,7 +28,9 @@ import {
 
 /** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
 const AGENT_MIN_SIZE: Record<string, string> = {
-  openclaw: "s-2vcpu-4gb",
+  // s-2vcpu-4gb-intel is used instead of s-2vcpu-4gb because the non-intel variant
+  // is not available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
+  openclaw: "s-2vcpu-4gb-intel",
 };
 
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
