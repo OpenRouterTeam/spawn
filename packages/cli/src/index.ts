@@ -591,6 +591,17 @@ function hasTrailingHelpFlag(args: string[]): boolean {
   return args.slice(1).some((a) => HELP_FLAGS.includes(a));
 }
 
+const VERSION_FLAGS = [
+  "--version",
+  "-v",
+  "-V",
+];
+
+/** Check if trailing args contain a version flag */
+function hasTrailingVersionFlag(args: string[]): boolean {
+  return args.slice(1).some((a) => VERSION_FLAGS.includes(a));
+}
+
 /** Handle list/ls/history commands with filters and --clear */
 async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
   if (hasTrailingHelpFlag(filteredArgs)) {
@@ -664,6 +675,14 @@ async function dispatchVerbAlias(
   headless: boolean,
   outputFormat?: string,
 ): Promise<void> {
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
+  if (hasTrailingVersionFlag(filteredArgs)) {
+    showVersion();
+    return;
+  }
   if (filteredArgs.length > 1) {
     const remaining = filteredArgs.slice(1);
     warnExtraArgs(remaining, 2);
@@ -756,6 +775,15 @@ async function dispatchCommand(
     if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) {
       return;
     }
+  }
+
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
+  if (hasTrailingVersionFlag(filteredArgs)) {
+    showVersion();
+    return;
   }
 
   warnExtraArgs(filteredArgs, 2);
