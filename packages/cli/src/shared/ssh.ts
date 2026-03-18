@@ -112,7 +112,6 @@ export function sleep(ms: number): Promise<void> {
 export function killWithTimeout(
   proc: {
     kill(signal?: number): void;
-    readonly killed: boolean;
   },
   gracePeriodMs = 5000,
 ): void {
@@ -121,11 +120,7 @@ export function killWithTimeout(
     return;
   }
   const sigkillTimer = setTimeout(() => {
-    tryCatch(() => {
-      if (!proc.killed) {
-        proc.kill(9);
-      }
-    });
+    tryCatch(() => proc.kill(9));
   }, gracePeriodMs);
   // Don't let this timer keep the event loop alive — the process may already
   // be dead from SIGTERM, so there's no reason to block exit for 5 seconds.
