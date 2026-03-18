@@ -3,6 +3,7 @@
  * SECURITY-CRITICAL: These functions protect against injection attacks
  */
 
+import { existsSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Allowlist pattern for agent and cloud identifiers
@@ -631,8 +632,15 @@ export function validatePromptFilePath(filePath: string): void {
     );
   }
 
-  // Normalize the path to resolve .. and symlink-like textual tricks
-  const resolved = resolve(filePath);
+  // Normalize the path to resolve .. and textual tricks
+  let resolved = resolve(filePath);
+
+  // Follow symlinks to validate the real target path, not the symlink name.
+  // Without this, a symlink like `innocent.txt -> ~/.ssh/id_rsa` would bypass
+  // sensitive path checks because the resolved string wouldn't match patterns.
+  if (existsSync(resolved)) {
+    resolved = realpathSync(resolved);
+  }
 
   // Check against sensitive path patterns
   for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
