@@ -86,6 +86,10 @@ while [ $# -gt 0 ]; do
         exit 1
       fi
       PARALLEL_COUNT="$1"
+      if ! printf '%s' "${PARALLEL_COUNT}" | grep -qE '^[0-9]+$' || [ "${PARALLEL_COUNT}" -lt 1 ] || [ "${PARALLEL_COUNT}" -gt 50 ]; then
+        printf "Error: --parallel must be between 1 and 50\n" >&2
+        exit 1
+      fi
       shift
       ;;
     --sequential)
