@@ -2,6 +2,7 @@ import type { Manifest } from "../manifest.js";
 
 import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
@@ -10,7 +11,7 @@ import { generateSpawnId, getActiveServers, loadHistory, saveSpawnRecord } from 
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
-import { getLocalShell } from "../shared/shell.js";
+import { getLocalShell, isWindows } from "../shared/shell.js";
 import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -579,6 +580,80 @@ function runBashScript(
   return errMsg;
 }
 
+// ── Windows bundle execution ─────────────────────────────────────────────────
+
+/**
+ * On Windows, bash wrappers can't run. Instead, download the pre-built JS
+ * bundle from GitHub releases and run it directly with bun.
+ * The bash wrapper ultimately does: `bun run {cloud}.js {agent}` — we replicate that.
+ */
+async function downloadBundle(cloud: string): Promise<string> {
+  const bundleUrl = `https://github.com/${REPO}/releases/download/${cloud}-latest/${cloud}.js`;
+  const s = p.spinner();
+  s.start("Downloading spawn bundle...");
+
+  const r = await asyncTryCatch(async () => {
+    const res = await fetch(bundleUrl, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      redirect: "follow",
+    });
+    if (!res.ok) {
+      s.stop(pc.red("Download failed"));
+      p.log.error(`Bundle not found at ${bundleUrl} (HTTP ${res.status})`);
+      process.exit(2);
+    }
+    const text = await res.text();
+    s.stop("Bundle downloaded");
+    return text;
+  });
+  if (!r.ok) {
+    s.stop(pc.red("Download failed"));
+    throw r.error;
+  }
+  return r.data;
+}
+
+function runBundleSync(
+  bundleContent: string,
+  cloud: string,
+  agent: string,
+  env: Record<string, string | undefined>,
+): void {
+  const tmpFile = path.join(fs.mkdtempSync(path.join(tmpdir(), "spawn-")), `${cloud}.js`);
+  fs.writeFileSync(tmpFile, bundleContent);
+
+  const result = spawnSync(
+    "bun",
+    [
+      "run",
+      tmpFile,
+      agent,
+    ],
+    {
+      stdio: "inherit",
+      env,
+    },
+  );
+
+  // Best-effort cleanup
+  tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+
+  if (result.error) {
+    throw result.error;
+  }
+  const code = result.status;
+  const signal = result.signal;
+  if (code === 0) {
+    return;
+  }
+  if (code !== null) {
+    const msg = code === 130 ? "Script interrupted by user (Ctrl+C)" : `Script exited with code ${code}`;
+    throw new Error(msg);
+  }
+  const sig = signal ?? "unknown signal";
+  throw new Error(`Script was killed by ${sig}`);
+}
+
 export async function execScript(
   cloud: string,
   agent: string,
@@ -588,16 +663,6 @@ export async function execScript(
   debug?: boolean,
   spawnName?: string,
 ): Promise<void> {
-  const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
-  const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
-
-  const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
-  if (!dlResult.ok) {
-    reportDownloadError(ghUrl, dlResult.error);
-    return; // Exit early - cannot proceed without script content
-  }
-  const scriptContent = dlResult.data;
-
   // Generate a unique spawn ID and record the spawn before execution
   const spawnId = generateSpawnId();
   const saveResult = tryCatchIf(isFileError, () =>
@@ -618,15 +683,57 @@ export async function execScript(
         : {}),
     }),
   );
-  // Non-fatal: don't block the spawn if history write fails
   if (!saveResult.ok && debug) {
     console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(saveResult.error)}`));
   }
-
-  // Pass spawn ID to the bash script so connection data can be linked back
   process.env.SPAWN_ID = spawnId;
 
-  const lastErr = runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
+  if (isWindows()) {
+    // Windows: download the pre-built JS bundle and run directly with bun
+    // (bash wrappers contain bash syntax that PowerShell cannot parse)
+    const dlResult = await asyncTryCatch(() => downloadBundle(cloud));
+    if (!dlResult.ok) {
+      const ghUrl = `https://github.com/${REPO}/releases/download/${cloud}-latest/${cloud}.js`;
+      reportDownloadError(ghUrl, dlResult.error);
+      return;
+    }
+
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+    };
+    if (prompt) {
+      env.SPAWN_PROMPT = prompt;
+      env.SPAWN_MODE = "non-interactive";
+    }
+    if (debug) {
+      env.SPAWN_DEBUG = "1";
+    }
+    if (spawnName) {
+      env.SPAWN_NAME = spawnName;
+      env.SPAWN_NAME_KEBAB = toKebabCase(spawnName);
+    }
+    prepareStdinForHandoff();
+
+    const r = tryCatch(() => runBundleSync(dlResult.data, cloud, agent, env));
+    if (!r.ok) {
+      const errMsg = getErrorMessage(r.error);
+      handleUserInterrupt(errMsg, dashboardUrl);
+      reportScriptFailure(errMsg, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
+    }
+    return;
+  }
+
+  // macOS/Linux: download the bash wrapper script and run via bash
+  const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
+  const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
+
+  const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
+  if (!dlResult.ok) {
+    reportDownloadError(ghUrl, dlResult.error);
+    return;
+  }
+
+  const lastErr = runBashScript(dlResult.data, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
   }
@@ -750,6 +857,57 @@ function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spa
   });
 }
 
+/** Run a JS bundle with bun in headless mode (Windows — no bash wrapper) */
+function runBundleHeadless(
+  bundlePath: string,
+  agent: string,
+  prompt?: string,
+  debug?: boolean,
+  spawnName?: string,
+): Promise<number> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+  };
+  env.SPAWN_HEADLESS = "1";
+  env.SPAWN_MODE = "non-interactive";
+  if (prompt) {
+    env.SPAWN_PROMPT = prompt;
+  }
+  if (debug) {
+    env.SPAWN_DEBUG = "1";
+  }
+  if (spawnName) {
+    env.SPAWN_NAME = spawnName;
+    env.SPAWN_NAME_KEBAB = toKebabCase(spawnName);
+  }
+
+  return new Promise<number>((resolve, reject) => {
+    const child = spawn(
+      "bun",
+      [
+        "run",
+        bundlePath,
+        agent,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "inherit",
+        ],
+        env,
+      },
+    );
+    if (child.stdout) {
+      child.stdout.pipe(process.stderr);
+    }
+    child.on("close", (code: number | null) => {
+      resolve(code ?? 1);
+    });
+    child.on("error", reject);
+  });
+}
+
 export async function cmdRunHeadless(agent: string, cloud: string, opts: HeadlessOptions = {}): Promise<void> {
   const { prompt, debug, outputFormat, spawnName } = opts;
 
@@ -813,82 +971,144 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     }
   }
 
-  // Phase 2: Load script — prefer local source when SPAWN_CLI_DIR is set (exit code 2)
-  let scriptContent: string;
-  const cliDir = process.env.SPAWN_CLI_DIR;
-  let localScriptResolved = "";
+  // Phase 2+3: Load and execute
+  let exitCode: number;
 
-  if (cliDir) {
-    // Reject cloud/agent names containing path traversal characters
-    const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
-    const safeCloud = !hasBadChars(resolvedCloud);
-    const safeAgent = !hasBadChars(resolvedAgent);
+  if (isWindows()) {
+    // Windows: download JS bundle and run with bun (bash wrappers won't work)
+    const cliDir = process.env.SPAWN_CLI_DIR;
+    let localMainResolved = "";
 
-    if (safeCloud && safeAgent) {
-      const resolvedCliDir = path.resolve(cliDir);
-      const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
-      const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
-      if (realResult.ok) {
-        // Ensure the resolved path stays inside the CLI dir (no path traversal)
-        const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
-        if (realResult.data.startsWith(prefix)) {
-          localScriptResolved = realResult.data;
+    if (cliDir) {
+      const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+      if (!hasBadChars(resolvedCloud) && !hasBadChars(resolvedAgent)) {
+        const resolvedCliDir = path.resolve(cliDir);
+        const candidatePath = path.join(resolvedCliDir, "packages", "cli", "src", resolvedCloud, "main.ts");
+        const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
+        if (realResult.ok) {
+          const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+          if (realResult.data.startsWith(prefix)) {
+            localMainResolved = realResult.data;
+          }
         }
       }
-      // File doesn't exist — fall through to remote fetch
     }
-  }
 
-  if (localScriptResolved) {
-    scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
     if (debug) {
-      console.error(`[headless] Using local script: ${localScriptResolved}`);
+      console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud} (Windows bundle mode)...`);
     }
-  } else {
-    const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
-    const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
 
-    const fetchResult = await asyncTryCatch(async () => {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(FETCH_TIMEOUT),
-      });
-      if (res.ok) {
+    if (localMainResolved) {
+      exitCode = await runBundleHeadless(localMainResolved, resolvedAgent, prompt, debug, spawnName);
+    } else {
+      const bundleUrl = `https://github.com/${REPO}/releases/download/${resolvedCloud}-latest/${resolvedCloud}.js`;
+      const fetchResult = await asyncTryCatch(async () => {
+        const res = await fetch(bundleUrl, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+          redirect: "follow",
+        });
+        if (!res.ok) {
+          headlessError(
+            resolvedAgent,
+            resolvedCloud,
+            "DOWNLOAD_ERROR",
+            `Bundle not found (HTTP ${res.status})`,
+            outputFormat,
+            2,
+          );
+        }
         return res.text();
-      }
-      const ghRes = await fetch(ghUrl, {
-        signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
-      if (!ghRes.ok) {
+      if (!fetchResult.ok) {
         headlessError(
           resolvedAgent,
           resolvedCloud,
           "DOWNLOAD_ERROR",
-          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+          `Failed to download bundle: ${getErrorMessage(fetchResult.error)}`,
           outputFormat,
           2,
         );
       }
-      return ghRes.text();
-    });
-    if (!fetchResult.ok) {
-      headlessError(
-        resolvedAgent,
-        resolvedCloud,
-        "DOWNLOAD_ERROR",
-        `Failed to download script: ${getErrorMessage(fetchResult.error)}`,
-        outputFormat,
-        2,
-      );
+      // Write bundle to temp file and run with bun
+      const tmpFile = path.join(fs.mkdtempSync(path.join(tmpdir(), "spawn-")), `${resolvedCloud}.js`);
+      fs.writeFileSync(tmpFile, fetchResult.data);
+      exitCode = await runBundleHeadless(tmpFile, resolvedAgent, prompt, debug, spawnName);
+      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
     }
-    scriptContent = fetchResult.data;
-  }
+  } else {
+    // macOS/Linux: download bash wrapper script
+    let scriptContent: string;
+    const cliDir = process.env.SPAWN_CLI_DIR;
+    let localScriptResolved = "";
 
-  // Phase 3: Execute script (exit code 1)
-  if (debug) {
-    console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
-  }
+    if (cliDir) {
+      const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+      const safeCloud = !hasBadChars(resolvedCloud);
+      const safeAgent = !hasBadChars(resolvedAgent);
 
-  const exitCode = await runScriptHeadless(scriptContent, prompt, debug, spawnName);
+      if (safeCloud && safeAgent) {
+        const resolvedCliDir = path.resolve(cliDir);
+        const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
+        const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
+        if (realResult.ok) {
+          const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+          if (realResult.data.startsWith(prefix)) {
+            localScriptResolved = realResult.data;
+          }
+        }
+      }
+    }
+
+    if (localScriptResolved) {
+      scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
+      if (debug) {
+        console.error(`[headless] Using local script: ${localScriptResolved}`);
+      }
+    } else {
+      const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
+      const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
+
+      const fetchResult = await asyncTryCatch(async () => {
+        const res = await fetch(url, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+        if (res.ok) {
+          return res.text();
+        }
+        const ghRes = await fetch(ghUrl, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+        if (!ghRes.ok) {
+          headlessError(
+            resolvedAgent,
+            resolvedCloud,
+            "DOWNLOAD_ERROR",
+            `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+            outputFormat,
+            2,
+          );
+        }
+        return ghRes.text();
+      });
+      if (!fetchResult.ok) {
+        headlessError(
+          resolvedAgent,
+          resolvedCloud,
+          "DOWNLOAD_ERROR",
+          `Failed to download script: ${getErrorMessage(fetchResult.error)}`,
+          outputFormat,
+          2,
+        );
+      }
+      scriptContent = fetchResult.data;
+    }
+
+    if (debug) {
+      console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
+    }
+
+    exitCode = await runScriptHeadless(scriptContent, prompt, debug, spawnName);
+  }
 
   if (exitCode !== 0) {
     headlessError(
