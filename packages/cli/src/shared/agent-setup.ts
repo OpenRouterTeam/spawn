@@ -1037,7 +1037,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     junie: {
       name: "Junie",
       cloudInitTier: "node",
-      modelEnvVar: "JUNIE_MODEL",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
