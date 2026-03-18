@@ -7,7 +7,7 @@ import * as v from "valibot";
 import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
-import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./result.js";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch } from "./result.js";
 import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ export function hasSavedOpenRouterKey(): boolean {
 
 /** Load a previously saved OpenRouter API key from ~/.config/spawn/openrouter.json. */
 function loadSavedOpenRouterKey(): string | null {
-  const result = tryCatchIf(isFileError, () => {
+  const result = tryCatch(() => {
     const configPath = getSpawnCloudConfigPath("openrouter");
     const data = parseJsonObj(readFileSync(configPath, "utf-8"));
     if (!data) {

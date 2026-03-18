@@ -11,7 +11,7 @@ import { validateIdentifier, validatePrompt } from "../security.js";
 import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { PkgVersionSchema, parseJsonObj } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
-import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
+import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -507,7 +507,7 @@ export function formatCredStatusLine(varName: string, urlHint?: string): string 
 /** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
 function hasCloudConfigCredentials(cloud: string): boolean {
   return unwrapOr(
-    tryCatchIf(isFileError, () => {
+    tryCatch(() => {
       const configPath = getSpawnCloudConfigPath(cloud);
       if (!fs.existsSync(configPath)) {
         return false;
