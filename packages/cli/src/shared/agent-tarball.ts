@@ -70,7 +70,6 @@ export async function tryTarballInstall(
     return {
       x86Url: x86Asset?.browser_download_url || "",
       armUrl: armAsset?.browser_download_url || "",
-      url: x86Asset?.browser_download_url || armAsset?.browser_download_url || "",
     };
   });
   if (!metaResult.ok) {
@@ -81,7 +80,7 @@ export async function tryTarballInstall(
   if (!metaResult.data) {
     return false;
   }
-  const { x86Url, armUrl, url } = metaResult.data;
+  const { x86Url, armUrl } = metaResult.data;
 
   // Phase 2: URL validation + command building (deterministic — no try/catch needed)
   // SECURITY: Validate URLs match expected GitHub releases pattern.
@@ -100,13 +99,26 @@ export async function tryTarballInstall(
   const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
   let downloadCmd: string;
   if (x86Url && armUrl) {
+    // Both architectures available — let the remote VM pick the right one
     downloadCmd =
       "_arch=$(uname -m); " +
       `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
       `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
       `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+  } else if (x86Url) {
+    // Only x86_64 available — verify remote arch matches before installing
+    downloadCmd =
+      "_arch=$(uname -m); " +
+      'if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ' +
+      'echo "Tarball is x86_64 but remote is $_arch" >&2; exit 1; fi; ' +
+      `curl -fsSL --connect-timeout 10 --max-time 120 '${x86Url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   } else {
-    downloadCmd = `curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+    // Only arm64 available — verify remote arch matches before installing
+    downloadCmd =
+      "_arch=$(uname -m); " +
+      'if [ "$_arch" != "aarch64" ] && [ "$_arch" != "arm64" ]; then ' +
+      'echo "Tarball is arm64 but remote is $_arch" >&2; exit 1; fi; ' +
+      `curl -fsSL --connect-timeout 10 --max-time 120 '${armUrl}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
   }
 
   // Phase 3: Remote execution — catch-all because any failure means "fall back to live install"
