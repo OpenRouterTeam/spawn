@@ -406,9 +406,9 @@ export async function setupShellEnvironment(): Promise<void> {
   // (e.g., `sprite exec ... bash -c CMD`) still works and sources PATH config.
   const zshResult = await asyncTryCatch(async () => runSpriteSilent("command -v zsh"));
   if (zshResult.ok) {
-    const bashProfile = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
+    const bashProfile = "\n# [spawn:bash]\n[[ $- == *i* ]] && exec /usr/bin/zsh -l\n";
     const bpB64 = Buffer.from(bashProfile).toString("base64");
-    await runSprite(`printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`);
+    await runSprite(`printf '%s' '${bpB64}' | base64 -d >> ~/.bash_profile`);
   } else {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }

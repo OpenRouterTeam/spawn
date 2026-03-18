@@ -87,7 +87,11 @@ export async function prompt(question: string): Promise<string> {
   if (!r.ok) {
     throw r.error;
   }
-  return p.isCancel(r.data) ? "" : (r.data || "").trim();
+  if (p.isCancel(r.data)) {
+    process.stderr.write("\n");
+    process.exit(0);
+  }
+  return (r.data || "").trim();
 }
 
 /**
@@ -125,7 +129,8 @@ export async function selectFromList(items: string[], promptText: string, defaul
   });
 
   if (p.isCancel(result)) {
-    return "";
+    process.stderr.write("\n");
+    process.exit(0);
   }
   return isString(result) ? result : String(result);
 }

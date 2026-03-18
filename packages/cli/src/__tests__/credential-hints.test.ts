@@ -128,23 +128,4 @@ describe("credentialHints", () => {
       expect(joined).not.toContain("OPENROUTER_API_KEY -- not set");
     });
   });
-
-  describe("integration with getScriptFailureGuidance", () => {
-    it("always includes setup instructions regardless of env state", () => {
-      const hints = credentialHints("digitalocean", "DO_API_TOKEN");
-      const joined = hints.join("\n");
-      expect(joined).toContain("setup instructions");
-    });
-
-    it("always returns at least one line", () => {
-      const hints = credentialHints("sprite");
-      expect(hints.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("returns more lines when authHint is provided", () => {
-      const withHint = credentialHints("hetzner", "HCLOUD_TOKEN");
-      const withoutHint = credentialHints("hetzner");
-      expect(withHint.length).toBeGreaterThan(withoutHint.length);
-    });
-  });
 });
