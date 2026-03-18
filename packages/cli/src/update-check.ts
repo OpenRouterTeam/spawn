@@ -10,7 +10,7 @@ import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
 import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
-import { getUpdateFailedPath } from "./shared/paths";
+import { getUpdateCheckedPath, getUpdateFailedPath } from "./shared/paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
 import { getInstallCmd, getInstallScriptUrl, getWhichCommand, isWindows } from "./shared/shell";
 import { logDebug, logWarn } from "./shared/ui";
@@ -26,6 +26,7 @@ export const executor = {
 
 const FETCH_TIMEOUT = 10000; // 10 seconds
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour — skip network check if last success was recent
 
 // Use ASCII-safe symbols when unicode is disabled (SSH, dumb terminals)
 const isAscii = process.env.TERM === "linux";
@@ -115,6 +116,33 @@ function markUpdateFailed(): void {
 function clearUpdateFailed(): void {
   tryCatchIf(isFileError, () => {
     fs.unlinkSync(getUpdateFailedPath());
+  });
+}
+
+// ── Success Cache ───────────────────────────────────────────────────────────
+
+function isUpdateCheckedRecently(): boolean {
+  return unwrapOr(
+    tryCatchIf(isFileError, () => {
+      const checkedPath = getUpdateCheckedPath();
+      const content = fs.readFileSync(checkedPath, "utf8").trim();
+      const checkedAt = Number.parseInt(content, 10);
+      if (Number.isNaN(checkedAt)) {
+        return false;
+      }
+      return Date.now() - checkedAt < UPDATE_CHECK_INTERVAL_MS;
+    }),
+    false,
+  );
+}
+
+function markUpdateChecked(): void {
+  tryCatchIf(isFileError, () => {
+    const checkedPath = getUpdateCheckedPath();
+    fs.mkdirSync(path.dirname(checkedPath), {
+      recursive: true,
+    });
+    fs.writeFileSync(checkedPath, String(Date.now()));
   });
 }
 
@@ -288,8 +316,8 @@ function performAutoUpdate(latestVersion: string): void {
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
- * Check for updates on every run and auto-update if available.
- * Uses a 10-second timeout to avoid blocking for too long.
+ * Check for updates and auto-update if available.
+ * Caches successful checks for 1 hour to avoid blocking every run with network I/O.
  */
 export async function checkForUpdates(): Promise<void> {
   // Skip in test environment
@@ -307,11 +335,18 @@ export async function checkForUpdates(): Promise<void> {
     return;
   }
 
-  // Always fetch the latest version on every run
+  // Skip if we already checked successfully within the last hour
+  if (isUpdateCheckedRecently()) {
+    return;
+  }
+
   const latestVersion = await fetchLatestVersion();
   if (!latestVersion) {
     return;
   }
+
+  // Record successful check so we don't hit the network again for an hour
+  markUpdateChecked();
 
   // Auto-update if newer version is available
   if (compareVersions(VERSION, latestVersion)) {

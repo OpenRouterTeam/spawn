@@ -10,6 +10,20 @@ function clearUpdateBackoff() {
   tryCatch(() => fs.unlinkSync(path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed")));
 }
 
+/** Remove the .update-checked cache file so tests always start fresh */
+function clearUpdateChecked() {
+  tryCatch(() => fs.unlinkSync(path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-checked")));
+}
+
+/** Write a timestamp to the .update-checked cache file */
+function writeUpdateChecked(timestamp: number) {
+  const dir = path.join(process.env.HOME || "/tmp", ".config", "spawn");
+  fs.mkdirSync(dir, {
+    recursive: true,
+  });
+  fs.writeFileSync(path.join(dir, ".update-checked"), String(timestamp));
+}
+
 function mockEnv() {
   const originalEnv = {
     ...process.env,
@@ -34,6 +48,7 @@ describe("update-check", () => {
   beforeEach(() => {
     originalEnv = mockEnv();
     clearUpdateBackoff();
+    clearUpdateChecked();
     consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
     // Mock process.exit to prevent tests from exiting
     processExitSpy = spyOn(process, "exit").mockImplementation(() => {
@@ -291,6 +306,48 @@ describe("update-check", () => {
       fetchSpy.mockRestore();
       execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
+    });
+
+    it("should skip fetch when last successful check was recent", async () => {
+      // Write a recent timestamp (5 minutes ago)
+      writeUpdateChecked(Date.now() - 5 * 60 * 1000);
+
+      const fetchSpy = spyOn(global, "fetch");
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it("should fetch when last successful check is older than 1 hour", async () => {
+      // Write an old timestamp (2 hours ago)
+      writeUpdateChecked(Date.now() - 2 * 60 * 60 * 1000);
+
+      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      expect(fetchSpy).toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it("should write cache file after successful version fetch", async () => {
+      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      const checkedPath = path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-checked");
+      const content = fs.readFileSync(checkedPath, "utf8").trim();
+      const checkedAt = Number.parseInt(content, 10);
+      expect(Date.now() - checkedAt).toBeLessThan(5000);
+
+      fetchSpy.mockRestore();
     });
 
     it("should re-exec even when run without arguments (bare spawn)", async () => {

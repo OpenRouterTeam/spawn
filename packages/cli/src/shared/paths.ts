@@ -73,6 +73,11 @@ export function getUpdateFailedPath(): string {
   return join(getUserHome(), ".config", "spawn", ".update-failed");
 }
 
+/** Return the path to the last-successful-update-check sentinel file. */
+export function getUpdateCheckedPath(): string {
+  return join(getUserHome(), ".config", "spawn", ".update-checked");
+}
+
 /** Return the path to the user's ~/.ssh directory. */
 export function getSshDir(): string {
   return join(getUserHome(), ".ssh");
