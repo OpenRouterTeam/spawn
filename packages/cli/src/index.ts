@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { getErrorMessage } from "@openrouter/spawn-shared";
+import { getErrorMessage, isString, toRecord } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import {
@@ -320,7 +320,8 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
 
 /** Print a descriptive error for a failed prompt file read and exit */
 function handlePromptFileError(promptFile: string, err: unknown): never {
-  const code = err && typeof err === "object" && "code" in err ? err.code : "";
+  const errObj = toRecord(err);
+  const code = isString(errObj?.code) ? errObj.code : "";
   if (code === "ENOENT") {
     console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
     console.error("\nCheck the path and try again.");
@@ -353,7 +354,8 @@ async function readPromptFile(promptFile: string): Promise<string> {
   });
   if (!statsResult.ok) {
     const err = statsResult.error;
-    const code = err && typeof err === "object" && "code" in err ? err.code : "";
+    const errRec = toRecord(err);
+    const code = isString(errRec?.code) ? errRec.code : "";
     if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
       handlePromptFileError(promptFile, err);
     }
