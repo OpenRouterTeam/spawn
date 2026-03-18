@@ -183,55 +183,22 @@ describe("validateServerIdentifier", () => {
 
 describe("validateLaunchCmd", () => {
   describe("valid inputs — real commands from agent-setup.ts (issue #2052 regression)", () => {
-    it("should accept claude launch command with PATH setup", () => {
-      expect(() =>
-        validateLaunchCmd(
-          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
-        ),
-      ).not.toThrow();
-    });
+    const agentLaunchCmds = [
+      "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+      "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+      "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+      "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+      "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+      "source ~/.spawnrc 2>/dev/null; hermes",
+      "claude",
+      "aider",
+    ];
 
-    it("should accept codex launch command", () => {
-      expect(() =>
-        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex"),
-      ).not.toThrow();
-    });
-
-    it("should accept openclaw launch command with PATH setup", () => {
-      expect(() =>
-        validateLaunchCmd(
-          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
-        ),
-      ).not.toThrow();
-    });
-
-    it("should accept opencode launch command", () => {
-      expect(() =>
-        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode"),
-      ).not.toThrow();
-    });
-
-    it("should accept kilocode launch command", () => {
-      expect(() =>
-        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode"),
-      ).not.toThrow();
-    });
-
-    it("should accept zeroclaw launch command with cargo env and PATH", () => {
-      expect(() =>
-        validateLaunchCmd(
-          "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
-        ),
-      ).not.toThrow();
-    });
-
-    it("should accept hermes launch command", () => {
-      expect(() => validateLaunchCmd("source ~/.spawnrc 2>/dev/null; hermes")).not.toThrow();
-    });
-
-    it("should accept a simple binary with no preamble", () => {
-      expect(() => validateLaunchCmd("claude")).not.toThrow();
-      expect(() => validateLaunchCmd("aider")).not.toThrow();
+    it("should accept all real agent launch commands", () => {
+      for (const cmd of agentLaunchCmds) {
+        expect(() => validateLaunchCmd(cmd), cmd).not.toThrow();
+      }
     });
 
     it("should accept empty/blank commands (caller falls back to manifest)", () => {
@@ -286,28 +253,19 @@ describe("validateLaunchCmd", () => {
 
 describe("validatePreLaunchCmd", () => {
   describe("valid inputs — background daemon patterns", () => {
-    it("should accept openclaw gateway pre_launch from manifest (#2474)", () => {
-      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
-    });
+    const validPreLaunchPatterns = [
+      "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &", // #2474 regression
+      "nohup myagent server &",
+      "myagent server > /tmp/myagent.log 2>&1 &",
+      "myagent daemon &",
+      "nohup openclaw gateway >> /tmp/openclaw-gateway.log 2>&1 &",
+      "nohup openclaw gateway > /tmp/openclaw.log &",
+    ];
 
-    it("should accept nohup with simple binary and backgrounding", () => {
-      expect(() => validatePreLaunchCmd("nohup myagent server &")).not.toThrow();
-    });
-
-    it("should accept binary with redirect and backgrounding (no nohup)", () => {
-      expect(() => validatePreLaunchCmd("myagent server > /tmp/myagent.log 2>&1 &")).not.toThrow();
-    });
-
-    it("should accept simple backgrounded command", () => {
-      expect(() => validatePreLaunchCmd("myagent daemon &")).not.toThrow();
-    });
-
-    it("should accept nohup with append redirect", () => {
-      expect(() => validatePreLaunchCmd("nohup openclaw gateway >> /tmp/openclaw-gateway.log 2>&1 &")).not.toThrow();
-    });
-
-    it("should accept redirect without stderr merge", () => {
-      expect(() => validatePreLaunchCmd("nohup openclaw gateway > /tmp/openclaw.log &")).not.toThrow();
+    it("should accept all valid background daemon patterns", () => {
+      for (const cmd of validPreLaunchPatterns) {
+        expect(() => validatePreLaunchCmd(cmd), cmd).not.toThrow();
+      }
     });
 
     it("should accept empty/blank commands", () => {
