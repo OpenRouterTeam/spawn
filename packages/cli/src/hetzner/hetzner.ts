@@ -401,6 +401,53 @@ export async function promptLocation(): Promise<string> {
   return selectFromList(items, "Hetzner location", DEFAULT_LOCATION);
 }
 
+// ─── Snapshot Lookup ─────────────────────────────────────────────────────────
+
+export async function findSpawnSnapshot(agentName: string): Promise<string | null> {
+  const r = await asyncTryCatch(async () => {
+    // Hetzner snapshots: filter by description prefix (snapshots have description, not name filtering)
+    const prefix = `spawn-${agentName}-`;
+    const text = await hetznerApi("GET", "/images?type=snapshot&per_page=100", undefined, 1);
+    const data = parseJsonObj(text);
+    const allImages = toObjectArray(data?.images);
+    const images = allImages.filter((img) => isString(img.description) && img.description.startsWith(prefix));
+    if (images.length === 0) {
+      return null;
+    }
+
+    // Sort by created descending to get the latest snapshot
+    images.sort((a, b) => {
+      const aDate = isString(a.created) ? a.created : "";
+      const bDate = isString(b.created) ? b.created : "";
+      return bDate.localeCompare(aDate);
+    });
+
+    const latestId = images[0].id;
+    if (!isNumber(latestId) || latestId <= 0) {
+      return null;
+    }
+
+    logInfo(`Found pre-built snapshot for ${agentName} (ID: ${latestId})`);
+    return String(latestId);
+  });
+  return r.ok ? r.data : null;
+}
+
+// ─── SSH-Only Wait (for snapshot boots) ──────────────────────────────────────
+
+export async function waitForSshOnly(ip?: string): Promise<void> {
+  const serverIp = ip || _state.serverIp;
+  const selectedKeys = await ensureSshKeys();
+  const keyOpts = getSshKeyOpts(selectedKeys);
+  await sharedWaitForSsh({
+    host: serverIp,
+    user: "root",
+    maxAttempts: 36,
+    extraSshOpts: keyOpts,
+  });
+  logInfo("SSH available (snapshot boot — skipping cloud-init)");
+}
+
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
 export async function createServer(
@@ -408,17 +455,19 @@ export async function createServer(
   serverType?: string,
   location?: string,
   tier?: CloudInitTier,
+  snapshotId?: string,
 ): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   const loc = location || process.env.HETZNER_LOCATION || "fsn1";
-  const image = "ubuntu-24.04";
+  const image = snapshotId ? Number(snapshotId) : "ubuntu-24.04";
+  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : "ubuntu-24.04";
 
   if (!validateRegionName(loc)) {
     logError("Invalid HETZNER_LOCATION");
     throw new Error("Invalid location");
   }
 
-  logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc})...`);
+  logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc}, image: ${imageLabel})...`);
 
   // Get all SSH key IDs
   const keysResp = await hetznerApi("GET", "/ssh_keys");
@@ -427,16 +476,21 @@ export async function createServer(
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter(Boolean);
 
-  const userdata = getCloudInitUserdata(tier);
-  const body = JSON.stringify({
+  const serverConfig: Record<string, unknown> = {
     name,
     server_type: sType,
     location: loc,
     image,
     ssh_keys: sshKeyIds,
-    user_data: userdata,
     start_after_create: true,
-  });
+  };
+
+  // Only include cloud-init userdata when NOT booting from a snapshot
+  if (!snapshotId) {
+    serverConfig.user_data = getCloudInitUserdata(tier);
+  }
+
+  const body = JSON.stringify(serverConfig);
 
   const resp = await hetznerApi("POST", "/servers", body);
   const data = parseJsonObj(resp);
