@@ -6,7 +6,7 @@ import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
-import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
+import { asyncTryCatch, tryCatch, unwrapOr } from "./result.js";
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
@@ -242,7 +242,7 @@ export async function withRetry<T>(
  */
 export function loadApiToken(cloud: string): string | null {
   return unwrapOr(
-    tryCatchIf(isFileError, () => {
+    tryCatch(() => {
       const data = parseJsonObj(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
       if (!data) {
         return null;

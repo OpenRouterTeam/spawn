@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { getErrorMessage, isPlainObject } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./shared/parse.js";
 import { getCacheDir, getCacheFile } from "./shared/paths.js";
-import { asyncTryCatch, isFileError, tryCatchIf, unwrapOr } from "./shared/result.js";
+import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ function logError(message: string, err?: unknown): void {
 }
 
 function readCache(): Manifest | null {
-  const result = tryCatchIf(isFileError, () => {
+  const result = tryCatch(() => {
     const raw = parseJsonObj(readFileSync(getCacheFile(), "utf-8"));
     if (!raw) {
       return null;
@@ -213,7 +213,7 @@ function tryLoadLocalManifest(): Manifest | null {
     return null;
   }
 
-  const result = tryCatchIf(isFileError, () => {
+  const result = tryCatch(() => {
     const localPath = join(process.cwd(), "manifest.json");
     if (existsSync(localPath)) {
       const raw = parseJsonObj(readFileSync(localPath, "utf-8"));
