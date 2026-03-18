@@ -12,6 +12,7 @@ import {
   downloadFile,
   ensureHcloudToken,
   ensureSshKey,
+  findSpawnSnapshot,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -21,6 +22,7 @@ import {
   runServer,
   uploadFile,
   waitForCloudInit,
+  waitForSshOnly,
 } from "./hetzner";
 
 async function main() {
@@ -35,10 +37,12 @@ async function main() {
 
   let serverType = "";
   let location = "";
+  let snapshotId: string | null = null;
 
   const cloud: CloudOrchestrator = {
     cloudName: "hetzner",
     cloudLabel: "Hetzner Cloud",
+    skipAgentInstall: false,
     runner: {
       runServer,
       uploadFile,
@@ -54,11 +58,20 @@ async function main() {
       location = await promptLocation();
     },
     async createServer(name: string) {
-      return await createHetznerServer(name, serverType, location, agent.cloudInitTier);
+      // Check for a pre-built snapshot before provisioning
+      snapshotId = await findSpawnSnapshot(agentName);
+      if (snapshotId) {
+        cloud.skipAgentInstall = true;
+      }
+      return await createHetznerServer(name, serverType, location, agent.cloudInitTier, snapshotId ?? undefined);
     },
     getServerName,
     async waitForReady() {
-      await waitForCloudInit();
+      if (snapshotId) {
+        await waitForSshOnly();
+      } else {
+        await waitForCloudInit();
+      }
     },
     interactiveSession,
     getConnectionInfo,
