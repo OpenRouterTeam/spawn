@@ -192,6 +192,30 @@ If spawn fails to install, try these steps:
    export PATH="$HOME/.local/bin:$PATH"
    ```
 
+### Windows (PowerShell)
+
+1. **Use the PowerShell installer** — not the bash one:
+   ```powershell
+   irm https://openrouter.ai/labs/spawn/cli/install.ps1 | iex
+   ```
+   The `.ps1` extension is required. The default `install.sh` is bash and won't work in PowerShell.
+
+2. **Set credentials via environment variables** before launching:
+   ```powershell
+   $env:OPENROUTER_API_KEY = "sk-or-v1-xxxxx"
+   $env:DO_API_TOKEN = "dop_v1_xxxxx"      # For DigitalOcean
+   $env:HCLOUD_TOKEN = "xxxxx"              # For Hetzner
+   spawn openclaw digitalocean
+   ```
+
+3. **Local build failures during auto-update** are normal on Windows — the CLI falls back to a pre-built binary automatically. You may see a brief build error followed by a successful update.
+
+4. **EISDIR or EEXIST errors on config files**: If you see errors about `digitalocean.json` being a directory, delete it:
+   ```powershell
+   Remove-Item -Recurse -Force "$HOME\.config\spawn\digitalocean.json" -ErrorAction SilentlyContinue
+   spawn openclaw digitalocean
+   ```
+
 ### Agent launch failures
 
 If an agent fails to install or launch on a cloud:
