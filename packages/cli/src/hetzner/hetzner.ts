@@ -411,14 +411,75 @@ export async function createServer(
     start_after_create: true,
   });
 
-  const resp = await hetznerApi("POST", "/servers", body);
-  const data = parseJsonObj(resp);
+  let currentLoc = loc;
+  let currentBody = body;
 
-  // Hetzner success responses contain "error": null in action objects,
-  // so check for presence of .server object, not absence of "error" string.
-  const server = toRecord(data?.server);
-  if (!server) {
-    const errMsg = toRecord(data?.error)?.message || "Unknown error";
+  // Retry loop for location fallback
+  for (let locationAttempt = 0; locationAttempt < 2; locationAttempt++) {
+    const resp = await hetznerApi("POST", "/servers", currentBody);
+    const data = parseJsonObj(resp);
+
+    // Hetzner success responses contain "error": null in action objects,
+    // so check for presence of .server object, not absence of "error" string.
+    const server = toRecord(data?.server);
+    if (server) {
+      // Success — extract server info below
+      hetznerServerId = String(server.id);
+      const publicNet = toRecord(server.public_net);
+      const ipv4 = toRecord(publicNet?.ipv4);
+      hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
+
+      if (!hetznerServerId || hetznerServerId === "null") {
+        logError("Failed to extract server ID from API response");
+        throw new Error("No server ID");
+      }
+      if (!hetznerServerIp || hetznerServerIp === "null") {
+        logError("Failed to extract server IP from API response");
+        throw new Error("No server IP");
+      }
+
+      logInfo(`Server created: ID=${hetznerServerId}, IP=${hetznerServerIp}`);
+      saveVmConnection(hetznerServerIp, "root", hetznerServerId, name, "hetzner");
+      return;
+    }
+
+    const errObj = toRecord(data?.error);
+    const errMsg = isString(errObj?.message) ? errObj.message : "Unknown error";
+    const errCode = isString(errObj?.code) ? errObj.code : "";
+
+    // Location unavailable — offer fallback to user-selected location
+    if (
+      locationAttempt === 0 &&
+      (errCode === "resource_unavailable" || /location.*disabled/i.test(errMsg)) &&
+      process.env.SPAWN_NON_INTERACTIVE !== "1"
+    ) {
+      logWarn(`Location '${currentLoc}' is unavailable: ${errMsg}`);
+      logWarn("Please choose a different location:");
+      process.stderr.write("\n");
+
+      const otherLocations = LOCATIONS.filter((l) => l.id !== currentLoc);
+      const items = otherLocations.map((l) => `${l.id}|${l.label}`);
+      const newLoc = await selectFromList(items, "Hetzner location", otherLocations[0]?.id || "nbg1");
+
+      if (!validateRegionName(newLoc)) {
+        logError("Invalid location selected");
+        throw new Error(`Server creation failed: ${errMsg}`);
+      }
+
+      logStep(`Retrying with location '${newLoc}'...`);
+      currentLoc = newLoc;
+      currentBody = JSON.stringify({
+        name,
+        server_type: sType,
+        location: newLoc,
+        image,
+        ssh_keys: sshKeyIds,
+        user_data: userdata,
+        start_after_create: true,
+      });
+      continue;
+    }
+
     logError(`Failed to create Hetzner server: ${errMsg}`);
     logWarn("Common issues:");
     logWarn("  - Insufficient account balance or payment method required");
@@ -428,22 +489,7 @@ export async function createServer(
     throw new Error(`Server creation failed: ${errMsg}`);
   }
 
-  hetznerServerId = String(server.id);
-  const publicNet = toRecord(server.public_net);
-  const ipv4 = toRecord(publicNet?.ipv4);
-  hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
-
-  if (!hetznerServerId || hetznerServerId === "null") {
-    logError("Failed to extract server ID from API response");
-    throw new Error("No server ID");
-  }
-  if (!hetznerServerIp || hetznerServerIp === "null") {
-    logError("Failed to extract server IP from API response");
-    throw new Error("No server IP");
-  }
-
-  logInfo(`Server created: ID=${hetznerServerId}, IP=${hetznerServerIp}`);
-  saveVmConnection(hetznerServerIp, "root", hetznerServerId, name, "hetzner");
+  throw new Error("Server creation failed after location fallback");
 }
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────

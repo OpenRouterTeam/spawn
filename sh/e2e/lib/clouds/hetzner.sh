@@ -41,7 +41,7 @@ _hetzner_headless_env() {
 
   printf 'export HETZNER_SERVER_NAME="%s"\n' "${app}"
   printf 'export HETZNER_SERVER_TYPE="%s"\n' "${HETZNER_SERVER_TYPE:-cx23}"
-  printf 'export HETZNER_LOCATION="%s"\n' "${HETZNER_LOCATION:-fsn1}"
+  printf 'export HETZNER_LOCATION="%s"\n' "${HETZNER_LOCATION:-nbg1}"
 }
 
 # ---------------------------------------------------------------------------
