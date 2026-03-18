@@ -1004,7 +1004,7 @@ async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
     const state = infoResult.ok ? infoResult.data.state : "";
     const ip = infoResult.ok ? infoResult.data.ip : "";
 
-    if (state === "running") {
+    if (state === "running" && ip.trim()) {
       _state.instanceIp = ip.trim();
       logStepDone();
       logInfo(`Instance running: IP=${_state.instanceIp}`);
@@ -1017,7 +1017,8 @@ async function waitForInstance(maxAttempts = 60): Promise<VMConnection> {
       };
     }
 
-    logStepInline(`Instance state: ${state || "pending"} (${attempt}/${maxAttempts})`);
+    const detail = state === "running" ? "running, waiting for IP" : state || "pending";
+    logStepInline(`Instance state: ${detail} (${attempt}/${maxAttempts})`);
     await sleep(pollDelay);
   }
 
