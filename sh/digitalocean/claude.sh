@@ -21,6 +21,14 @@ _ensure_bun() {
 # bun from the foreground process group and broke @clack/prompts multiselect.
 # Now SIGTERM is detected from exit code 143 (128 + 15) after the child exits.
 _run_with_restart() {
+    # In headless mode (E2E / --headless), skip the restart loop entirely.
+    # Restarting in headless mode creates duplicate droplets, exhausting the
+    # account's droplet quota and causing all subsequent agents to fail.
+    if [ "${SPAWN_HEADLESS:-}" = "1" ]; then
+        "$@"
+        return $?
+    fi
+
     local attempt=0
     local backoff=2
     while [ "$attempt" -lt "$_MAX_RETRIES" ]; do
