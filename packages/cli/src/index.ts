@@ -852,6 +852,13 @@ async function main(): Promise<void> {
     process.env.SPAWN_REAUTH = "1";
   }
 
+  // Extract --fast boolean flag — enables images + tarballs + parallel setup
+  const fastIdx = filteredArgs.indexOf("--fast");
+  if (fastIdx !== -1) {
+    filteredArgs.splice(fastIdx, 1);
+    process.env.SPAWN_FAST = "1";
+  }
+
   // Extract all --beta <feature> flags (repeatable, opt-in to experimental features)
   const VALID_BETA_FEATURES = new Set([
     "tarball",
@@ -867,8 +874,14 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+  // --fast implies all beta features
+  if (process.env.SPAWN_FAST === "1") {
+    betaFeatures.push("tarball", "images");
+  }
   if (betaFeatures.length > 0) {
-    process.env.SPAWN_BETA = betaFeatures.join(",");
+    process.env.SPAWN_BETA = [
+      ...new Set(betaFeatures),
+    ].join(",");
   }
 
   // Extract --model / -m <value> flag → MODEL_ID env var (must be before --config so it takes priority)
