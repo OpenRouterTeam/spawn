@@ -103,7 +103,7 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      if (marketplaceImage) {
+      if (marketplaceImage || cloud.skipCloudInit) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();

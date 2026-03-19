@@ -38,6 +38,8 @@ export interface CloudOrchestrator {
   runner: CloudRunner;
   /** When true, skip tarball + agent install (e.g. booting from a pre-baked snapshot). */
   skipAgentInstall?: boolean;
+  /** When true, skip cloud-init wait — just wait for SSH (e.g. minimal-tier agent with tarball). */
+  skipCloudInit?: boolean;
   authenticate(): Promise<void>;
   checkAccountReady?(): Promise<void>;
   promptSize(): Promise<void>;
@@ -120,6 +122,18 @@ export async function runOrchestration(
   const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
   const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
   const useTarball = fastMode || betaFeatures.has("tarball");
+
+  // Skip cloud-init for minimal-tier agents when using tarballs or snapshots.
+  // Ubuntu 24.04 base images already have curl + git, so minimal agents (claude,
+  // opencode, zeroclaw, hermes) don't need the cloud-init package install step.
+  // This saves ~30-60s by just waiting for SSH instead of polling for cloud-init completion.
+  if (
+    cloud.cloudName !== "local" &&
+    (useTarball || cloud.skipAgentInstall) &&
+    (agent.cloudInitTier === "minimal" || !agent.cloudInitTier)
+  ) {
+    cloud.skipCloudInit = true;
+  }
 
   // 1b. Size/bundle selection (must happen before createServer)
   await cloud.promptSize();

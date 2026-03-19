@@ -67,7 +67,7 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId) {
+      if (snapshotId || cloud.skipCloudInit) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();

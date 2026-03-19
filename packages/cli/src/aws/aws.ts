@@ -1039,6 +1039,11 @@ async function waitForSsh(maxAttempts = 36): Promise<void> {
   });
 }
 
+export async function waitForSshOnly(): Promise<void> {
+  await waitForSsh();
+  logInfo("SSH available (skipping cloud-init)");
+}
+
 export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
   await waitForSsh();
   const keyOpts = getSshKeyOpts(await ensureSshKeys());

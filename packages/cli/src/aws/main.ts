@@ -22,6 +22,7 @@ import {
   runServer,
   uploadFile,
   waitForCloudInit,
+  waitForSshOnly,
 } from "./aws";
 
 async function main() {
@@ -58,7 +59,11 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      await waitForCloudInit();
+      if (cloud.skipCloudInit) {
+        await waitForSshOnly();
+      } else {
+        await waitForCloudInit();
+      }
     },
     interactiveSession,
     getConnectionInfo,
