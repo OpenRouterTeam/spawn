@@ -11,7 +11,7 @@ import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup";
-import { tryTarballInstall } from "./agent-tarball";
+import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
 import { getSpawnPreferencesPath } from "./paths";
@@ -117,92 +117,189 @@ export async function runOrchestration(
   // 1. Authenticate with cloud provider
   await cloud.authenticate();
 
-  // 1b. Pre-flight account readiness check (billing, email verification, etc.)
-  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
-  if (cloud.checkAccountReady) {
-    const r = await asyncTryCatch(() => cloud.checkAccountReady!());
-    if (!r.ok) {
-      logWarn("Account readiness check failed — proceeding anyway");
-      logDebug(getErrorMessage(r.error));
-    }
-  }
+  const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+  const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
+  const useTarball = fastMode || betaFeatures.has("tarball");
 
-  // 2. Get API key (immediately after cloud auth — before any other prompts
-  //    so the "opening browser" message leads directly to OpenRouter OAuth)
-  const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
-  const apiKey = await resolveApiKey(agentName, cloud.cloudName);
-
-  // 3. Pre-provision hooks (e.g., GitHub auth prompt — non-fatal)
-  //     Uses try/catch (not guarded) because hooks can throw ANY provider-specific error.
-  if (agent.preProvision) {
-    const r = await asyncTryCatch(() => agent.preProvision!());
-    if (!r.ok) {
-      logWarn("Pre-provision hook failed — continuing");
-      logDebug(getErrorMessage(r.error));
-    }
-  }
-
-  // 4. Model ID — priority: --model flag (MODEL_ID env) > preferences file > agent default
-  const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
-  const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
-  if (rawModelId && !modelId) {
-    logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
-  }
-
-  // 5. Size/bundle selection
+  // 1b. Size/bundle selection (must happen before createServer)
   await cloud.promptSize();
 
-  // 6. Provision server
+  // 2. Provision server
   const spawnId = generateSpawnId();
   const serverName = await cloud.getServerName();
-  const connection = await cloud.createServer(serverName);
 
-  // 6b. Record the spawn atomically with connection data
-  const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-  saveSpawnRecord({
-    id: spawnId,
-    agent: agentName,
-    cloud: cloud.cloudName,
-    timestamp: new Date().toISOString(),
-    ...(spawnName
-      ? {
-          name: spawnName,
-        }
-      : {}),
-    connection,
-  });
+  if (fastMode && cloud.cloudName !== "local") {
+    // ── Fast mode: server boot + setup prompts run concurrently ─────────
+    // Start server creation, then do API key prompt, pre-provision, tarball
+    // download, and account check in parallel with server boot.
 
-  // 7. Wait for readiness
-  await cloud.waitForReady();
+    const serverBootPromise = (async () => {
+      const conn = await cloud.createServer(serverName);
+      const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+      saveSpawnRecord({
+        id: spawnId,
+        agent: agentName,
+        cloud: cloud.cloudName,
+        timestamp: new Date().toISOString(),
+        ...(spawnName
+          ? {
+              name: spawnName,
+            }
+          : {}),
+        connection: conn,
+      });
+      await cloud.waitForReady();
+      return conn;
+    })();
 
-  const envPairs = agent.envVars(apiKey);
-  // Inject agent-specific model env var when a custom model is selected
-  if (modelId && agent.modelEnvVar) {
-    envPairs.push(`${agent.modelEnvVar}=${modelId}`);
-  }
-  const envContent = generateEnvConfig(envPairs);
+    const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
 
-  // 8. Install agent (skip entirely for snapshot boots, try tarball first on cloud VMs)
-  if (cloud.skipAgentInstall) {
-    logInfo("Snapshot boot — skipping agent install");
+    // These all run concurrently with server boot
+    const [bootResult, apiKeyResult, , , tarballResult] = await Promise.allSettled([
+      serverBootPromise,
+      resolveApiKey(agentName, cloud.cloudName),
+      cloud.checkAccountReady
+        ? asyncTryCatch(() => cloud.checkAccountReady!())
+        : Promise.resolve({
+            ok: true,
+          }),
+      agent.preProvision
+        ? asyncTryCatch(() => agent.preProvision!())
+        : Promise.resolve({
+            ok: true,
+          }),
+      !cloud.skipAgentInstall && !agent.skipTarball ? downloadTarballLocally(agentName) : Promise.resolve(null),
+    ]);
+
+    // Server boot must succeed
+    if (bootResult.status === "rejected") {
+      throw bootResult.reason;
+    }
+
+    // API key must succeed
+    if (apiKeyResult.status === "rejected") {
+      throw apiKeyResult.reason;
+    }
+    const apiKey = apiKeyResult.value;
+
+    // Model ID
+    const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
+    const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+    if (rawModelId && !modelId) {
+      logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+    }
+
+    // Env config (computed locally, no SSH needed)
+    const envPairs = agent.envVars(apiKey);
+    if (modelId && agent.modelEnvVar) {
+      envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+    }
+    const envContent = generateEnvConfig(envPairs);
+
+    // Install agent — parallel tarball upload, fallback to remote, then live
+    if (cloud.skipAgentInstall) {
+      logInfo("Snapshot boot — skipping agent install");
+    } else {
+      let installed = false;
+      const localTarball = tarballResult.status === "fulfilled" ? tarballResult.value : null;
+      if (localTarball) {
+        installed = await uploadAndExtractTarball(cloud.runner, localTarball.localPath);
+        localTarball.cleanup();
+      }
+      if (!installed && useTarball && !agent.skipTarball) {
+        const tarball = options?.tryTarball ?? tryTarballInstall;
+        installed = await tarball(cloud.runner, agentName);
+      }
+      if (!installed) {
+        await agent.install();
+      }
+    }
+
+    // Inject env + continue with shared post-install flow
+    await injectEnvVars(cloud, envContent);
+    await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
   } else {
-    let installedFromTarball = false;
-    const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
-    if (cloud.cloudName !== "local" && !agent.skipTarball && betaFeatures.has("tarball")) {
-      const tarball = options?.tryTarball ?? tryTarballInstall;
-      installedFromTarball = await tarball(cloud.runner, agentName);
-    }
-    if (!installedFromTarball) {
-      await agent.install();
-    }
-  }
+    // ── Standard sequential flow ────────────────────────────────────────
 
-  // 9. Inject environment variables via .spawnrc
+    // 1b. Pre-flight account readiness check
+    if (cloud.checkAccountReady) {
+      const r = await asyncTryCatch(() => cloud.checkAccountReady!());
+      if (!r.ok) {
+        logWarn("Account readiness check failed — proceeding anyway");
+        logDebug(getErrorMessage(r.error));
+      }
+    }
+
+    // 2. Get API key
+    const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
+    const apiKey = await resolveApiKey(agentName, cloud.cloudName);
+
+    // 3. Pre-provision hooks
+    if (agent.preProvision) {
+      const r = await asyncTryCatch(() => agent.preProvision!());
+      if (!r.ok) {
+        logWarn("Pre-provision hook failed — continuing");
+        logDebug(getErrorMessage(r.error));
+      }
+    }
+
+    // 4. Model ID
+    const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
+    const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+    if (rawModelId && !modelId) {
+      logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+    }
+
+    // 5. Provision server
+    const connection = await cloud.createServer(serverName);
+    const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+    saveSpawnRecord({
+      id: spawnId,
+      agent: agentName,
+      cloud: cloud.cloudName,
+      timestamp: new Date().toISOString(),
+      ...(spawnName
+        ? {
+            name: spawnName,
+          }
+        : {}),
+      connection,
+    });
+
+    // 6. Wait for readiness
+    await cloud.waitForReady();
+
+    // 7. Env config
+    const envPairs = agent.envVars(apiKey);
+    if (modelId && agent.modelEnvVar) {
+      envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+    }
+    const envContent = generateEnvConfig(envPairs);
+
+    // 8. Install agent
+    if (cloud.skipAgentInstall) {
+      logInfo("Snapshot boot — skipping agent install");
+    } else {
+      let installedFromTarball = false;
+      if (cloud.cloudName !== "local" && !agent.skipTarball && useTarball) {
+        const tarball = options?.tryTarball ?? tryTarballInstall;
+        installedFromTarball = await tarball(cloud.runner, agentName);
+      }
+      if (!installedFromTarball) {
+        await agent.install();
+      }
+    }
+
+    // Inject env + continue with shared post-install flow
+    await injectEnvVars(cloud, envContent);
+    await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
+  }
+}
+
+async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
 
-  // On Windows local execution, use PowerShell-compatible env setup.
-  // Remote servers (SSH) are always Linux, so bash commands are correct for all non-local clouds.
   const isLocalWindows = cloud.cloudName === "local" && isWindows();
   const envSetupCmd = isLocalWindows
     ? `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`
@@ -217,13 +314,22 @@ export async function runOrchestration(
   if (!envResult.ok) {
     logWarn("Environment setup had errors");
   }
+}
 
-  // 10. Parse enabled setup steps from env (set by --steps, --config, or interactive prompts)
+async function postInstall(
+  cloud: CloudOrchestrator,
+  agent: AgentConfig,
+  agentName: string,
+  apiKey: string,
+  modelId: string | undefined,
+  spawnId: string,
+  _options?: OrchestrationOptions,
+): Promise<void> {
+  // Parse enabled setup steps
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
   if (stepsEnv !== undefined) {
     const stepNames = stepsEnv.split(",").filter(Boolean);
-    // Validate step names and warn about unknowns
     if (stepNames.length > 0) {
       const { validateStepNames } = await import("./agents.js");
       const { valid, invalid } = validateStepNames(agentName, stepNames);
@@ -232,12 +338,11 @@ export async function runOrchestration(
       }
       enabledSteps = new Set(valid);
     } else {
-      // --steps "" → disable all optional steps
       enabledSteps = new Set();
     }
   }
 
-  // 10b. Agent-specific configuration
+  // Agent-specific configuration
   if (agent.configure) {
     const configResult = await asyncTryCatch(() =>
       withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId, enabledSteps)), 2, 5),
@@ -247,28 +352,25 @@ export async function runOrchestration(
     }
   }
 
-  // GitHub CLI setup (skip if user unchecked in setup options)
+  // GitHub CLI setup
   if (!enabledSteps || enabledSteps.has("github")) {
-    // Pass explicitlyRequested=true when user opted in via setup options so the
-    // step always runs even if no local gh token was found during detectGithubAuth.
     await offerGithubAuth(cloud.runner, enabledSteps?.has("github"));
   }
 
-  // 10c. Auto-update service (systemd timer — cloud VMs only, default on)
+  // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
     await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
   }
 
-  // 11. Pre-launch hooks (e.g. OpenClaw gateway)
+  // Pre-launch hooks
   if (agent.preLaunch) {
     await agent.preLaunch();
   }
 
-  // 11b. SSH tunnel for web dashboard
+  // SSH tunnel for web dashboard
   let tunnelHandle: SshTunnelHandle | undefined;
   if (agent.tunnel) {
     if (cloud.getConnectionInfo) {
-      // SSH-based cloud: tunnel the remote port to localhost
       const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
         const conn = cloud.getConnectionInfo();
         const keys = await ensureSshKeys();
@@ -289,7 +391,6 @@ export async function runOrchestration(
         logWarn("Web dashboard tunnel failed — use the TUI instead");
       }
     } else if (cloud.cloudName === "local") {
-      // Local: no tunnel needed, open browser directly
       if (agent.tunnel.browserUrl) {
         const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
         if (url) {
@@ -298,14 +399,10 @@ export async function runOrchestration(
       }
     }
 
-    // Persist tunnel metadata so `spawn ls` → "Enter agent" can re-establish the tunnel.
-    // Store the remote port and browser URL template (with PORT placeholder) so the
-    // tunnel can be reconstructed with whatever local port is available on reconnect.
     const tunnelMeta: Record<string, string> = {
       tunnel_remote_port: String(agent.tunnel.remotePort),
     };
     if (agent.tunnel.browserUrl) {
-      // Use port 0 as a placeholder — on reconnect we replace it with the actual local port
       const templateUrl = agent.tunnel.browserUrl(0);
       if (templateUrl) {
         tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
@@ -314,7 +411,7 @@ export async function runOrchestration(
     saveMetadata(tunnelMeta, spawnId);
   }
 
-  // 11c. Channel setup (runs after gateway is up)
+  // Channel setup
   const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
 
   if (enabledSteps?.has("telegram")) {
@@ -344,27 +441,23 @@ export async function runOrchestration(
     }
   }
 
-  // 11d. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
   if (agent.preLaunchMsg) {
     process.stderr.write("\n");
     logInfo(`Tip: ${agent.preLaunchMsg}`);
   }
 
-  // 12. Launch interactive session
+  // Launch interactive session
   logInfo(`${agent.name} is ready`);
   process.stderr.write("\n");
   logInfo(`${cloud.cloudLabel} setup completed successfully!`);
   process.stderr.write("\n");
   logStep("Starting agent...");
 
-  // Clean up stdin state accumulated during provisioning (readline, @clack/prompts
-  // raw mode, keypress listeners) so Bun.spawn gets a pristine FD handoff
   prepareStdinForHandoff();
 
   const launchCmd = agent.launchCmd();
   saveLaunchCmd(launchCmd, spawnId);
 
-  // Wrap in restart loop for cloud VMs — not for local execution
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
   const exitCode = await cloud.interactiveSession(sessionCmd);
 
