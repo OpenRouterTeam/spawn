@@ -412,8 +412,9 @@ describe("cmdFix", () => {
     await loadManifest(true);
     global.fetch = savedFetch;
 
-    await cmdFix("nonexistent-id");
+    await expect(cmdFix("nonexistent-id")).rejects.toThrow("process.exit");
 
+    expect(processExitSpy).toHaveBeenCalledWith(1);
     expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("not found"));
   });
 
