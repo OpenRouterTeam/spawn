@@ -14,9 +14,9 @@ INPUT_TEST_MARKER="SPAWN_E2E_OK"
 # _validate_base64 VALUE
 #
 # Validates that VALUE contains only base64-safe characters ([A-Za-z0-9+/=]).
-# Dies with an error if the check fails. This makes the safety assumption
-# explicit: encoded_prompt is safe to embed in a remote command string because
-# it provably contains no shell metacharacters.
+# Dies with an error if the check fails. Defense-in-depth: even though the
+# prompt is written to a remote temp file (not interpolated into a command
+# string), we still validate as a safety net.
 # ---------------------------------------------------------------------------
 _validate_base64() {
   local val="$1"
@@ -25,6 +25,26 @@ _validate_base64() {
     log_err "SECURITY: encoded_prompt contains non-base64 characters — aborting"
     return 1
   fi
+}
+
+# ---------------------------------------------------------------------------
+# _stage_prompt_remotely APP ENCODED_PROMPT
+#
+# Writes the base64-encoded prompt to a temp file on the remote host.
+# This isolates prompt data from the complex agent command strings:
+#   - The write command is a trivial one-liner, easy to audit
+#   - The encoded prompt is validated base64 ([A-Za-z0-9+/=]) so it
+#     cannot break out of single quotes — safe by construction
+#   - The main agent commands read from /tmp/.e2e-prompt and never
+#     have prompt data interpolated into them
+# ---------------------------------------------------------------------------
+_stage_prompt_remotely() {
+  local app="$1"
+  local encoded_prompt="$2"
+  # Single quotes around the encoded prompt prevent shell expansion.
+  # Base64 charset [A-Za-z0-9+/=] cannot contain single quotes, so
+  # this is safe even without validation (validated anyway as defense-in-depth).
+  cloud_exec "${app}" "printf '%s' '${encoded_prompt}' > /tmp/.e2e-prompt"
 }
 
 # ---------------------------------------------------------------------------
@@ -41,23 +61,21 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode the prompt and pass it via env var in the remote command.
-  # We assign _ENCODED_PROMPT at the start of the remote command string to
-  # avoid interpolating data into single-quoted contexts (injection risk).
-  # We cannot pipe the prompt via stdin because cloud_exec uses
-  # "printf '...' | base64 -d | bash", which means bash's stdin is the
-  # decoded script — not the outer process stdin.
+  # Base64-encode the prompt and stage it to a remote temp file.
+  # This avoids interpolating prompt data into the agent command string.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
+  _stage_prompt_remotely "${app}" "${encoded_prompt}"
 
   local output
   # claude -p (--print) reads the prompt from stdin.
-  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+  # The prompt is read from the staged temp file — no interpolation in this command.
+  output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
+    PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     printf '%s' \"\$PROMPT\" | timeout ${INPUT_TEST_TIMEOUT} claude -p" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -75,17 +93,19 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
-  # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
+  # Base64-encode the prompt and stage it to a remote temp file.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
+  _stage_prompt_remotely "${app}" "${encoded_prompt}"
 
   local output
-  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+  # The prompt is read from the staged temp file — no interpolation in this command.
+  output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
+    PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     timeout ${INPUT_TEST_TIMEOUT} codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -154,10 +174,11 @@ input_test_openclaw() {
 
   log_step "Running input test for openclaw..."
 
-  # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
+  # Base64-encode the prompt and stage it to a remote temp file.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
+  _stage_prompt_remotely "${app}" "${encoded_prompt}"
 
   while [ "${attempt}" -lt "${max_attempts}" ]; do
     attempt=$((attempt + 1))
@@ -171,12 +192,12 @@ input_test_openclaw() {
     fi
 
     local output
-    # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
-    output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+    # The prompt is read from the staged temp file — no interpolation in this command.
+    output=$(cloud_exec "${app}" "\
       source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-      PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
+      PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
       timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
@@ -202,17 +223,19 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
-  # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
+  # Base64-encode the prompt and stage it to a remote temp file.
   # Use -m/--message for non-interactive single-message mode (not -p which is --provider).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
+  _stage_prompt_remotely "${app}" "${encoded_prompt}"
 
   local output
-  output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
+  # The prompt is read from the staged temp file — no interpolation in this command.
+  output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' \"\$_ENCODED_PROMPT\" | base64 -d); \
+    PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
