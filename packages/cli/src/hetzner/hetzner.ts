@@ -18,6 +18,7 @@ import {
   waitForSsh as sharedWaitForSsh,
   sleep,
   spawnInteractive,
+  waitForSshSnapshotBoot,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import {
@@ -505,16 +506,8 @@ export async function findSpawnSnapshot(agentName: string): Promise<string | nul
 // ─── SSH-Only Wait (for snapshot boots) ──────────────────────────────────────
 
 export async function waitForSshOnly(ip?: string): Promise<void> {
-  const serverIp = ip || _state.serverIp;
-  const selectedKeys = await ensureSshKeys();
-  const keyOpts = getSshKeyOpts(selectedKeys);
-  await sharedWaitForSsh({
-    host: serverIp,
-    user: "root",
-    maxAttempts: 36,
-    extraSshOpts: keyOpts,
-  });
-  logInfo("SSH available (snapshot boot — skipping cloud-init)");
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  await waitForSshSnapshotBoot(ip ?? _state.serverIp, keyOpts);
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────

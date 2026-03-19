@@ -362,3 +362,17 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   logError(`SSH handshake failed after ${handshakeAttempts} attempts`);
   throw new Error("SSH connectivity timeout — handshake never succeeded");
 }
+
+/**
+ * Wait for SSH availability on a snapshot-booted VM (no cloud-init needed).
+ * Used by cloud modules that support snapshot-based provisioning (Hetzner, DigitalOcean).
+ */
+export async function waitForSshSnapshotBoot(ip: string, extraSshOpts: string[]): Promise<void> {
+  await waitForSsh({
+    host: ip,
+    user: "root",
+    maxAttempts: 36,
+    extraSshOpts,
+  });
+  logInfo("SSH available (snapshot boot — skipping cloud-init)");
+}
