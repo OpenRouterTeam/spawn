@@ -173,8 +173,7 @@ fi
 # ---------------------------------------------------------------------------
 # Count clouds to decide single vs multi-cloud mode
 # ---------------------------------------------------------------------------
-cloud_count=0
-for _ in ${CLOUDS}; do cloud_count=$((cloud_count + 1)); done
+cloud_count=$(printf '%s\n' "${CLOUDS}" | wc -w | tr -d ' ')
 
 # ---------------------------------------------------------------------------
 # run_single_agent AGENT
@@ -420,8 +419,8 @@ run_agents_for_cloud() {
 
   local pass_count=0
   local fail_count=0
-  for _ in ${cloud_passed}; do pass_count=$((pass_count + 1)); done
-  for _ in ${cloud_failed}; do fail_count=$((fail_count + 1)); done
+  if [ -n "${cloud_passed}" ]; then pass_count=$(printf '%s\n' "${cloud_passed}" | wc -w | tr -d ' '); fi
+  if [ -n "${cloud_failed}" ]; then fail_count=$(printf '%s\n' "${cloud_failed}" | wc -w | tr -d ' '); fi
 
   printf '%s %s %s %s %s' "${pass_count}" "${fail_count}" "${cloud_duration_str}" "${cloud_passed}" "|${cloud_failed}" \
     > "${log_dir}/${cloud}.summary"
@@ -587,7 +586,14 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    rm -rf "${LOG_DIR}"
+    case "${LOG_DIR}" in
+      /tmp/spawn-e2e.*)
+        rm -rf "${LOG_DIR}"
+        ;;
+      *)
+        log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
+        ;;
+    esac
   fi
 }
 trap final_cleanup EXIT

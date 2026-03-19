@@ -11,6 +11,23 @@ INPUT_TEST_PROMPT="Reply with exactly the text SPAWN_E2E_OK and nothing else."
 INPUT_TEST_MARKER="SPAWN_E2E_OK"
 
 # ---------------------------------------------------------------------------
+# _validate_base64 VALUE
+#
+# Validates that VALUE contains only base64-safe characters ([A-Za-z0-9+/=]).
+# Dies with an error if the check fails. This makes the safety assumption
+# explicit: encoded_prompt is safe to embed in a remote command string because
+# it provably contains no shell metacharacters.
+# ---------------------------------------------------------------------------
+_validate_base64() {
+  local val="$1"
+  # Use printf + grep to avoid bash regex portability issues (bash 3.x on macOS)
+  if ! printf '%s' "${val}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+    log_err "SECURITY: encoded_prompt contains non-base64 characters — aborting"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Per-agent input test functions
 #
 # Each function:
@@ -32,6 +49,7 @@ input_test_claude() {
   # decoded script — not the outer process stdin.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
+  _validate_base64 "${encoded_prompt}" || return 1
 
   local output
   # claude -p (--print) reads the prompt from stdin.
@@ -60,6 +78,7 @@ input_test_codex() {
   # Pass encoded prompt via env var (see input_test_claude comment for why stdin won't work).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
+  _validate_base64 "${encoded_prompt}" || return 1
 
   local output
   output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
@@ -138,6 +157,7 @@ input_test_openclaw() {
   # Base64-encode prompt, then pipe via stdin to avoid interpolating into the command string.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
+  _validate_base64 "${encoded_prompt}" || return 1
 
   while [ "${attempt}" -lt "${max_attempts}" ]; do
     attempt=$((attempt + 1))
@@ -186,6 +206,7 @@ input_test_zeroclaw() {
   # Use -m/--message for non-interactive single-message mode (not -p which is --provider).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
+  _validate_base64 "${encoded_prompt}" || return 1
 
   local output
   output=$(cloud_exec "${app}" "_ENCODED_PROMPT='${encoded_prompt}'; \
