@@ -34,10 +34,10 @@ locals {
 source "hcloud" "spawn" {
   token        = var.hcloud_token
   image        = "ubuntu-24.04"
-  location     = "fsn1"
-  # 4 GB RAM — Claude's native installer and zeroclaw's Rust build
-  # get OOM-killed on smaller instances. Snapshots built here work on all sizes.
-  server_type  = "cx23"
+  location     = "nbg1"
+  # cpx22 (AMD) available in nbg1/hel1/sin — cx23 only available in hel1.
+  # 4 GB RAM needed — Claude's installer and zeroclaw's Rust build get OOM-killed on smaller instances.
+  server_type  = "cpx22"
   ssh_username = "root"
 
   snapshot_name = local.image_name
