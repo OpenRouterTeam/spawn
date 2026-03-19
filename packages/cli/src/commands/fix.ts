@@ -7,7 +7,7 @@ import { isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { loadManifest } from "../manifest.js";
-import { validateConnectionIP, validateServerIdentifier, validateUsername } from "../security.js";
+import { validateConnectionIP, validateIdentifier, validateServerIdentifier, validateUsername } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS } from "../shared/ssh.js";
@@ -31,6 +31,9 @@ function resolveEnvTemplate(template: string): string {
 
 /** Build a bash script to re-inject env vars and reinstall the agent remotely. */
 export function buildFixScript(manifest: Manifest, agentKey: string): string {
+  // SECURITY: validate agentKey before using it to index the manifest
+  validateIdentifier(agentKey, "Agent name");
+
   const agentDef = manifest.agents[agentKey];
   if (!agentDef) {
     throw new Error(`Unknown agent: ${agentKey}`);
@@ -137,6 +140,7 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
 
   // SECURITY: validate all connection fields before use
   const validationResult = tryCatch(() => {
+    validateIdentifier(record.agent, "Agent name");
     validateConnectionIP(conn.ip);
     validateUsername(conn.user);
     if (conn.server_name) {

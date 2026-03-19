@@ -151,6 +151,18 @@ describe("buildFixScript", () => {
     expect(() => buildFixScript(mockManifest, "unknown-agent")).toThrow("Unknown agent: unknown-agent");
   });
 
+  it("throws for agent key with shell metacharacters", () => {
+    expect(() => buildFixScript(mockManifest, "claude;rm -rf /")).toThrow("can only contain");
+  });
+
+  it("throws for agent key with path traversal", () => {
+    expect(() => buildFixScript(mockManifest, "../etc/passwd")).toThrow("can only contain");
+  });
+
+  it("throws for agent key with command substitution", () => {
+    expect(() => buildFixScript(mockManifest, "claude$(whoami)")).toThrow("can only contain");
+  });
+
   it("shell-escapes single quotes in env var values", () => {
     const manifest = {
       ...mockManifest,
@@ -220,6 +232,14 @@ describe("fixSpawn", () => {
     });
     await fixSpawn(record, mockManifest);
     expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Unknown agent"));
+  });
+
+  it("shows security error for agent name with shell metacharacters", async () => {
+    const record = makeRecord({
+      agent: "claude;rm -rf /",
+    });
+    await fixSpawn(record, mockManifest);
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Security validation failed"));
   });
 
   it("calls the script runner with correct args on success", async () => {
