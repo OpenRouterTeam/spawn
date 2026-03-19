@@ -662,4 +662,141 @@ describe("runOrchestration", () => {
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
   });
+
+  // ── Fast mode (SPAWN_FAST=1) ──────────────────────────────────────
+
+  describe("fast mode (SPAWN_FAST=1)", () => {
+    let savedSpawnFast: string | undefined;
+
+    beforeEach(() => {
+      savedSpawnFast = process.env.SPAWN_FAST;
+      process.env.SPAWN_FAST = "1";
+    });
+
+    afterEach(() => {
+      if (savedSpawnFast !== undefined) {
+        process.env.SPAWN_FAST = savedSpawnFast;
+      } else {
+        delete process.env.SPAWN_FAST;
+      }
+    });
+
+    it("calls createServer and getApiKey for non-local cloud", async () => {
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      expect(cloud.createServer).toHaveBeenCalledTimes(1);
+      expect(mockGetOrPromptApiKey).toHaveBeenCalledTimes(1);
+      expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("throws when createServer rejects", async () => {
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+        createServer: mock(() => Promise.reject(new Error("server boot failed"))),
+      });
+      const agent = createMockAgent();
+
+      const result = await asyncTryCatch(() => runOrchestration(cloud, agent, "testagent", defaultOpts));
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe("server boot failed");
+      }
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("throws when getApiKey rejects", async () => {
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      const agent = createMockAgent();
+      const failingGetApiKey = mock(() => Promise.reject(new Error("api key failed")));
+
+      const result = await asyncTryCatch(() =>
+        runOrchestration(cloud, agent, "testagent", {
+          ...defaultOpts,
+          getApiKey: failingGetApiKey,
+        }),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toBe("api key failed");
+      }
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("falls back to agent.install when no tarball available", async () => {
+      const install = mock(() => Promise.resolve());
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      const agent = createMockAgent({
+        install,
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      // downloadTarballLocally returns null (mocked globally), no local tarball
+      // tryTarball also returns false → falls through to agent.install
+      expect(install).toHaveBeenCalledTimes(1);
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("uses sequential path for local cloud even with SPAWN_FAST=1", async () => {
+      const callOrder: string[] = [];
+      mockGetOrPromptApiKey.mockImplementation(async () => {
+        callOrder.push("getApiKey");
+        return "sk-or-v1-test-key";
+      });
+      const cloud = createMockCloud({
+        cloudName: "local",
+        createServer: mock(async () => {
+          callOrder.push("createServer");
+          return {
+            ip: "127.0.0.1",
+            user: "root",
+            server_name: "local",
+            cloud: "local",
+          };
+        }),
+      });
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      // In sequential mode, getApiKey runs before createServer
+      expect(callOrder.indexOf("getApiKey")).toBeLessThan(callOrder.indexOf("createServer"));
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("continues when preProvision and checkAccountReady fail (non-fatal)", async () => {
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+        checkAccountReady: mock(() => Promise.reject(new Error("account check failed"))),
+      });
+      const agent = createMockAgent({
+        preProvision: mock(() => Promise.reject(new Error("pre-provision failed"))),
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      // Orchestration should complete despite non-fatal failures
+      expect(cloud.createServer).toHaveBeenCalledTimes(1);
+      expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+  });
 });
