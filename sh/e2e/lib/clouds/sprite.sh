@@ -254,7 +254,7 @@ _sprite_teardown() {
 _sprite_cleanup_stale() {
   local now
   now=$(date +%s)
-  local max_age=1800  # 30 minutes in seconds
+  local max_age="${_CLEANUP_MAX_AGE:-1800}"  # default 30 min; pre-run uses shorter
 
   # List all sprites
   local sprite_output

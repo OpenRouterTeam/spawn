@@ -243,7 +243,7 @@ _gcp_cleanup_stale() {
   local project="${GCP_PROJECT:-}"
   local now
   now=$(date +%s)
-  local max_age=1800  # 30 minutes in seconds
+  local max_age="${_CLEANUP_MAX_AGE:-1800}"  # default 30 min; pre-run uses shorter
 
   if [ -z "${project}" ]; then
     log_warn "GCP_PROJECT not set — skipping stale cleanup"
