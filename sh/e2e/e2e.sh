@@ -586,7 +586,14 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    rm -rf "${LOG_DIR}"
+    case "${LOG_DIR}" in
+      /tmp/spawn-e2e.*)
+        rm -rf "${LOG_DIR}"
+        ;;
+      *)
+        log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
+        ;;
+    esac
   fi
 }
 trap final_cleanup EXIT
