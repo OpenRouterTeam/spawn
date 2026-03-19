@@ -226,7 +226,7 @@ export async function cmdFix(spawnId?: string, options?: FixOptions): Promise<vo
     if (!record) {
       p.log.error(`Spawn not found: ${pc.bold(spawnId)}`);
       p.log.info(`Run ${pc.cyan("spawn list")} to see your active spawns.`);
-      return;
+      process.exit(1);
     }
     await fixSpawn(record, manifest, options);
     return;
@@ -242,7 +242,7 @@ export async function cmdFix(spawnId?: string, options?: FixOptions): Promise<vo
   if (!isInteractiveTTY()) {
     p.log.error("spawn fix requires an interactive terminal or a spawn name/ID.");
     p.log.info(`Usage: ${pc.cyan("spawn fix <spawn-id>")}`);
-    return;
+    process.exit(1);
   }
 
   // Interactive picker: show active servers and let user choose
@@ -264,7 +264,7 @@ export async function cmdFix(spawnId?: string, options?: FixOptions): Promise<vo
   const record = servers.find((r) => (r.id || r.timestamp) === selected);
   if (!record) {
     p.log.error("Spawn not found.");
-    return;
+    process.exit(1);
   }
 
   await fixSpawn(record, manifest, options);
