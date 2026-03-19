@@ -118,7 +118,7 @@ export async function runOrchestration(
   await cloud.authenticate();
 
   const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
-  const fastMode = process.env.SPAWN_FAST === "1";
+  const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
   const useTarball = fastMode || betaFeatures.has("tarball");
 
   // 1b. Size/bundle selection (must happen before createServer)
