@@ -193,11 +193,23 @@ _sprite_exec() {
   local _stderr_tmp
   _stderr_tmp=$(mktemp /tmp/sprite-exec-err.XXXXXX) || return 1
 
+  # Base64-encode the command to prevent shell injection when passed to the
+  # remote bash. The encoded string contains only [A-Za-z0-9+/=] characters,
+  # making it safe to pipe through the sprite CLI exec interface.
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
+  # Validate base64 output contains only safe characters (defense-in-depth).
+  if ! printf '%s' "${encoded_cmd}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+    rm -f "${_stderr_tmp}"
+    return 1
+  fi
+
   while [ "${_attempt}" -lt "${_max}" ]; do
     _sprite_fix_config
-    # Pipe the command via stdin to avoid interpolating it into the remote
-    # command string — eliminates shell injection risk.
-    printf '%s' "${cmd}" | _sprite_cmd exec -s "${app}" -- bash 2>"${_stderr_tmp}"
+    # Decode and execute on the remote side — the encoded payload is safe
+    # against shell metacharacters (;, |, $(), backticks).
+    printf '%s' "${encoded_cmd}" | _sprite_cmd exec -s "${app}" -- bash -c 'base64 -d | bash' 2>"${_stderr_tmp}"
     local _rc=$?
     if [ "${_rc}" -eq 0 ]; then
       rm -f "${_stderr_tmp}"
