@@ -4,9 +4,12 @@
 
 import type { CloudRunner } from "./agent-setup";
 
+import { unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { asyncTryCatch } from "./result";
+import { asyncTryCatch, tryCatch } from "./result";
 import { logDebug, logInfo, logStep, logWarn } from "./ui";
 
 const REPO = "OpenRouterTeam/spawn";
@@ -152,5 +155,163 @@ export async function tryTarballInstall(
   }
 
   logInfo("Agent installed from pre-built tarball");
+  return true;
+}
+
+// ─── Parallel tarball: local download + SCP upload ──────────────────────────
+
+interface TarballMeta {
+  x86Url: string;
+  armUrl: string;
+  url: string;
+}
+
+/** Fetch tarball metadata from GitHub Releases. Shared by both install paths. */
+async function fetchTarballMeta(agentName: string, fetchFn: typeof fetch = fetch): Promise<TarballMeta | null> {
+  const tag = `agent-${agentName}-latest`;
+  const resp = await fetchFn(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!resp.ok) {
+    return null;
+  }
+
+  const json: unknown = await resp.json();
+  const parsed = v.safeParse(ReleaseSchema, json);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const x86Asset = parsed.output.assets.find((a) => a.name.includes("-x86_64-") && a.name.endsWith(".tar.gz"));
+  const armAsset = parsed.output.assets.find((a) => a.name.includes("-arm64-") && a.name.endsWith(".tar.gz"));
+
+  if (!x86Asset && !armAsset) {
+    return null;
+  }
+
+  return {
+    x86Url: x86Asset?.browser_download_url || "",
+    armUrl: armAsset?.browser_download_url || "",
+    url: x86Asset?.browser_download_url || armAsset?.browser_download_url || "",
+  };
+}
+
+/** Validate a tarball URL matches the expected GitHub releases pattern. */
+function isValidTarballUrl(url: string): boolean {
+  return /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/.test(url);
+}
+
+export interface LocalTarball {
+  localPath: string;
+  cleanup: () => void;
+}
+
+/**
+ * Download the agent tarball to a local temp file (for parallel boot + download).
+ * Returns the local path and cleanup function, or null on failure.
+ * Always downloads x86_64 (all current cloud VMs are x86_64).
+ */
+export async function downloadTarballLocally(
+  agentName: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<LocalTarball | null> {
+  logStep("Downloading tarball locally (parallel)...");
+
+  const r = await asyncTryCatch(async () => {
+    const meta = await fetchTarballMeta(agentName, fetchFn);
+    if (!meta) {
+      logWarn("No pre-built tarball available");
+      return null;
+    }
+
+    // Prefer x86_64 (all current cloud VMs default to x86_64)
+    const downloadUrl = meta.x86Url || meta.url;
+    if (!downloadUrl || !isValidTarballUrl(downloadUrl)) {
+      logWarn("Tarball URL failed safety validation");
+      return null;
+    }
+
+    const resp = await fetchFn(downloadUrl, {
+      signal: AbortSignal.timeout(120_000),
+      redirect: "follow",
+    });
+    if (!resp.ok || !resp.body) {
+      logWarn("Tarball download failed");
+      return null;
+    }
+
+    const localPath = join(tmpdir(), `spawn-agent-${agentName}-${Date.now()}.tar.gz`);
+    await Bun.write(localPath, resp);
+
+    logInfo("Tarball downloaded locally");
+    return {
+      localPath,
+      cleanup: () => {
+        tryCatch(() => unlinkSync(localPath));
+      },
+    };
+  });
+
+  if (!r.ok) {
+    logWarn("Local tarball download failed");
+    logDebug(getErrorMessage(r.error));
+    return null;
+  }
+  return r.data;
+}
+
+/**
+ * Upload a locally-downloaded tarball to the remote VM and extract it.
+ * Returns true on success, false on failure.
+ */
+export async function uploadAndExtractTarball(runner: CloudRunner, localPath: string): Promise<boolean> {
+  logStep("Uploading tarball to server...");
+  const remotePath = "/tmp/spawn-agent-parallel.tar.gz";
+  const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+
+  const uploadResult = await asyncTryCatch(() => runner.uploadFile(localPath, remotePath));
+  if (!uploadResult.ok) {
+    logWarn("Tarball upload failed");
+    logDebug(getErrorMessage(uploadResult.error));
+    return false;
+  }
+
+  const extractResult = await asyncTryCatch(() =>
+    runner.runServer(
+      `${sudo} tar xz -C / -f ${remotePath} && ${sudo} test -f /root/.spawn-tarball && rm -f ${remotePath}`,
+      150,
+    ),
+  );
+  if (!extractResult.ok) {
+    logWarn("Tarball extraction failed on remote VM");
+    logDebug(getErrorMessage(extractResult.error));
+    return false;
+  }
+
+  // Mirror /root/ files for non-root SSH users
+  const mirrorCmd = [
+    'if [ "$(id -u)" != "0" ]; then',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "/root/$_d" ]; then',
+    '      mkdir -p "$HOME/$_d"',
+    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    "    fi",
+    "  done",
+    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
+    '    if [ -d "$HOME/$_d" ]; then',
+    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    "    fi",
+    "  done",
+    "fi",
+  ].join("\n");
+  await asyncTryCatch(() => runner.runServer(mirrorCmd, 30));
+
+  logInfo("Agent installed from pre-built tarball (parallel upload)");
   return true;
 }

@@ -11,7 +11,7 @@ import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup";
-import { tryTarballInstall } from "./agent-tarball";
+import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
 import { getSpawnPreferencesPath } from "./paths";
@@ -172,8 +172,33 @@ export async function runOrchestration(
     connection,
   });
 
-  // 7. Wait for readiness
-  await cloud.waitForReady();
+  // 7. Wait for readiness + parallel tarball download
+  const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+  const useParallel =
+    betaFeatures.has("parallel") && cloud.cloudName !== "local" && !agent.skipTarball && !cloud.skipAgentInstall;
+
+  let parallelTarball: {
+    localPath: string;
+    cleanup: () => void;
+  } | null = null;
+
+  if (useParallel) {
+    // Download tarball locally while server boots — both run concurrently
+    const [readyResult, downloadResult] = await Promise.allSettled([
+      cloud.waitForReady(),
+      downloadTarballLocally(agentName),
+    ]);
+
+    if (readyResult.status === "rejected") {
+      throw readyResult.reason;
+    }
+
+    if (downloadResult.status === "fulfilled" && downloadResult.value) {
+      parallelTarball = downloadResult.value;
+    }
+  } else {
+    await cloud.waitForReady();
+  }
 
   const envPairs = agent.envVars(apiKey);
   // Inject agent-specific model env var when a custom model is selected
@@ -187,11 +212,24 @@ export async function runOrchestration(
     logInfo("Snapshot boot — skipping agent install");
   } else {
     let installedFromTarball = false;
-    const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
-    if (cloud.cloudName !== "local" && !agent.skipTarball && betaFeatures.has("tarball")) {
+
+    // Parallel path: upload the locally-downloaded tarball
+    if (parallelTarball) {
+      installedFromTarball = await uploadAndExtractTarball(cloud.runner, parallelTarball.localPath);
+      parallelTarball.cleanup();
+    }
+
+    // Fallback: remote tarball download (--beta tarball or --beta parallel)
+    if (
+      !installedFromTarball &&
+      cloud.cloudName !== "local" &&
+      !agent.skipTarball &&
+      (betaFeatures.has("tarball") || betaFeatures.has("parallel"))
+    ) {
       const tarball = options?.tryTarball ?? tryTarballInstall;
       installedFromTarball = await tarball(cloud.runner, agentName);
     }
+
     if (!installedFromTarball) {
       await agent.install();
     }

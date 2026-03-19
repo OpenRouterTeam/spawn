@@ -856,14 +856,16 @@ async function main(): Promise<void> {
   const VALID_BETA_FEATURES = new Set([
     "tarball",
     "images",
+    "parallel",
   ]);
-  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta images");
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
       console.error("\nAvailable beta features:");
-      console.error(`  ${pc.cyan("tarball")}  Use pre-built tarball for agent installation`);
-      console.error(`  ${pc.cyan("images")}   Use pre-built DO marketplace images (faster boot)`);
+      console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
+      console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
+      console.error(`  ${pc.cyan("parallel")}  Download tarball while server boots (implies tarball)`);
       process.exit(1);
     }
   }
