@@ -313,6 +313,14 @@ run_agents_for_cloud() {
   local cloud_passed=""
   local cloud_failed=""
 
+  # Pre-run stale cleanup: remove orphaned e2e instances from previous
+  # interrupted runs before starting new agents. This prevents "quota exceeded"
+  # failures caused by leftover instances that are under the post-run cleanup
+  # max_age threshold (30 min) but still consuming account capacity.
+  if [ "${SKIP_CLEANUP}" -eq 0 ]; then
+    cloud_cleanup_stale || log_warn "Pre-run stale cleanup encountered errors"
+  fi
+
   # Resolve effective parallelism (respect per-cloud cap)
   local effective_parallel="${PARALLEL_COUNT}"
   if [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
