@@ -32,19 +32,25 @@ _validate_base64() {
 #
 # Writes the base64-encoded prompt to a temp file on the remote host.
 # This isolates prompt data from the complex agent command strings:
-#   - The write command is a trivial one-liner, easy to audit
-#   - The encoded prompt is validated base64 ([A-Za-z0-9+/=]) so it
-#     cannot break out of single quotes — safe by construction
+#   - The encoded prompt is never interpolated into the command string
+#   - Instead, it is injected via printf format substitution into a
+#     remote command that uses a shell variable (_EP), so the value
+#     never appears literally in the command passed to cloud_exec
 #   - The main agent commands read from /tmp/.e2e-prompt and never
 #     have prompt data interpolated into them
 # ---------------------------------------------------------------------------
 _stage_prompt_remotely() {
   local app="$1"
   local encoded_prompt="$2"
-  # Single quotes around the encoded prompt prevent shell expansion.
-  # Base64 charset [A-Za-z0-9+/=] cannot contain single quotes, so
-  # this is safe even without validation (validated anyway as defense-in-depth).
-  cloud_exec "${app}" "printf '%s' '${encoded_prompt}' > /tmp/.e2e-prompt"
+  # Build the remote command via printf so encoded_prompt is never
+  # interpolated into the command string directly. The %s substitution
+  # places the value into a single-quoted shell variable assignment on the
+  # remote side. Single quotes prevent all shell expansion; base64 charset
+  # [A-Za-z0-9+/=] cannot contain single quotes, so the quoting is safe by
+  # construction (validated by _validate_base64 as defense-in-depth).
+  local remote_cmd
+  remote_cmd=$(printf "_EP='%s'; printf '%%s' \"\$_EP\" > /tmp/.e2e-prompt" "${encoded_prompt}")
+  cloud_exec "${app}" "${remote_cmd}"
 }
 
 # ---------------------------------------------------------------------------
