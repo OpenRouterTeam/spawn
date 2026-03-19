@@ -15,7 +15,7 @@ import { tryTarballInstall } from "./agent-tarball";
 import { generateEnvConfig } from "./agents";
 import { getOrPromptApiKey } from "./oauth";
 import { getSpawnPreferencesPath } from "./paths";
-import { asyncTryCatch, asyncTryCatchIf, isFileError, isOperationalError, tryCatchIf } from "./result.js";
+import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell";
 import { startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
@@ -94,7 +94,7 @@ const PreferencesSchema = v.object({
 });
 
 function loadPreferredModel(agentName: string): string | null {
-  const result = tryCatchIf(isFileError, () => {
+  const result = tryCatch(() => {
     const raw = JSON.parse(readFileSync(getSpawnPreferencesPath(), "utf-8"));
     const parsed = v.safeParse(PreferencesSchema, raw);
     if (!parsed.success) {
