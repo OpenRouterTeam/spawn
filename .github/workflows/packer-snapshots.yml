@@ -49,7 +49,7 @@ jobs:
 
           # Build a flat include array: [{agent, cloud}, ...]
           INCLUDE=$(jq -nc --argjson agents "$AGENTS" --argjson clouds "$CLOUDS" \
-            '[($agents[] | . as $a) | ($clouds[] | {agent: $a, cloud: .})]')
+            '[$agents[] as $a | $clouds[] as $c | {agent: $a, cloud: $c}]')
           echo "include=${INCLUDE}" >> "$GITHUB_OUTPUT"
         env:
           SINGLE_AGENT_INPUT: ${{ inputs.agent }}
