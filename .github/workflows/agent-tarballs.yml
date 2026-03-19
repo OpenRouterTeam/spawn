@@ -163,8 +163,9 @@ jobs:
           # Delete stale asset for this arch if present (from a previous build today)
           gh release delete-asset "${TAG}" "${TARBALL}" --yes 2>/dev/null || true
           # Also clean up any older-dated tarball for this arch
+          # grep returns exit 1 when no matches — pipe through cat to avoid pipefail killing the step
           gh release view "${TAG}" --json assets --jq ".assets[].name" 2>/dev/null \
-            | grep "spawn-agent-${AGENT_NAME}-${ARCH}-" \
+            | { grep "spawn-agent-${AGENT_NAME}-${ARCH}-" || true; } \
             | while IFS= read -r old; do
                 gh release delete-asset "${TAG}" "${old}" --yes 2>/dev/null || true
               done
