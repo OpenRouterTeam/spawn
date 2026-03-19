@@ -697,6 +697,8 @@ describe("runOrchestration", () => {
     });
 
     it("throws when createServer rejects", async () => {
+      const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
+      process.env.SPAWN_NON_INTERACTIVE = "1";
       const cloud = createMockCloud({
         cloudName: "hetzner",
         createServer: mock(() => Promise.reject(new Error("server boot failed"))),
@@ -707,8 +709,9 @@ describe("runOrchestration", () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.message).toBe("server boot failed");
+        expect(result.error.message).toBe("Non-interactive mode: cannot retry");
       }
+      process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
       stderrSpy.mockRestore();
       exitSpy.mockRestore();
     });

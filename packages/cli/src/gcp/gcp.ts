@@ -30,6 +30,7 @@ import {
   openBrowser,
   prompt,
   promptSpawnNameShared,
+  retryOrQuit,
   sanitizeTermValue,
   selectFromList,
   shellQuote,
@@ -431,17 +432,20 @@ export async function authenticate(): Promise<void> {
     return;
   }
 
-  logWarn("No active Google Cloud account -- launching gcloud auth login...");
-  const exitCode = await gcloudInteractive([
-    "auth",
-    "login",
-  ]);
-  if (exitCode !== 0) {
+  for (;;) {
+    logWarn("No active Google Cloud account -- launching gcloud auth login...");
+    const exitCode = await gcloudInteractive([
+      "auth",
+      "login",
+    ]);
+    if (exitCode === 0) {
+      logInfo("Authenticated with Google Cloud");
+      return;
+    }
     logError("Authentication failed. You can also set credentials via:");
     logError("  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json");
-    throw new Error("gcloud auth failed");
+    await retryOrQuit("Try Google Cloud authentication again?");
   }
-  logInfo("Authenticated with Google Cloud");
 }
 
 // ─── Project Resolution ─────────────────────────────────────────────────────

@@ -33,6 +33,7 @@ import {
   logWarn,
   prompt,
   promptSpawnNameShared,
+  retryOrQuit,
   sanitizeTermValue,
   selectFromList,
   shellQuote,
@@ -211,28 +212,30 @@ export async function ensureHcloudToken(): Promise<void> {
     _state.hcloudToken = "";
   }
 
-  // 3. Manual entry
-  logStep("Hetzner Cloud API Token Required");
-  logWarn("Get a token from: https://console.hetzner.cloud/projects -> API Tokens");
+  // 3. Manual entry (retry loop — never exits unless user says no)
+  for (;;) {
+    logStep("Hetzner Cloud API Token Required");
+    logWarn("Get a token from: https://console.hetzner.cloud/projects -> API Tokens");
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const token = await prompt("Enter your Hetzner Cloud API token: ");
-    if (!token) {
-      logError("Token cannot be empty");
-      continue;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const token = await prompt("Enter your Hetzner Cloud API token: ");
+      if (!token) {
+        logError("Token cannot be empty");
+        continue;
+      }
+      _state.hcloudToken = token.trim();
+      if (await testHcloudToken()) {
+        await saveTokenToConfig(_state.hcloudToken);
+        logInfo("Hetzner Cloud token validated and saved");
+        return;
+      }
+      logError("Token is invalid");
+      _state.hcloudToken = "";
     }
-    _state.hcloudToken = token.trim();
-    if (await testHcloudToken()) {
-      await saveTokenToConfig(_state.hcloudToken);
-      logInfo("Hetzner Cloud token validated and saved");
-      return;
-    }
-    logError("Token is invalid");
-    _state.hcloudToken = "";
+
+    logError("No valid token after 3 attempts");
+    await retryOrQuit("Enter a new Hetzner token?");
   }
-
-  logError("No valid token after 3 attempts");
-  throw new Error("Hetzner authentication failed");
 }
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────

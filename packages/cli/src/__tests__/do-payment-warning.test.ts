@@ -91,7 +91,7 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
     // Empty prompt responses → manual entry fails × 3 → throws
     mockPrompt.mockImplementation(() => Promise.resolve(""));
 
-    await expect(ensureDoToken()).rejects.toThrow("DigitalOcean authentication failed");
+    await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
 
     expect(warnMessages.some((msg) => msg.includes("payment method"))).toBe(true);
     expect(warnMessages.some((msg) => msg.includes("cloud.digitalocean.com/account/billing"))).toBe(true);
@@ -121,7 +121,7 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
     mockLoadApiToken.mockImplementation(() => null);
     mockPrompt.mockImplementation(() => Promise.resolve(""));
 
-    await expect(ensureDoToken()).rejects.toThrow("DigitalOcean authentication failed");
+    await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
 
     const billingWarning = warnMessages.find((msg) => msg.includes("billing"));
     expect(billingWarning).toBeDefined();

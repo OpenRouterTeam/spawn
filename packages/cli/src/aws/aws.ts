@@ -33,6 +33,7 @@ import {
   logWarn,
   prompt,
   promptSpawnNameShared,
+  retryOrQuit,
   sanitizeTermValue,
   selectFromList,
   shellQuote,
@@ -623,49 +624,57 @@ export async function authenticate(): Promise<void> {
     }
   }
 
-  // 4. Interactive credential entry
+  // 4. Interactive credential entry (retry loop — never exits unless user says no)
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     logError("AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.");
     throw new Error("No AWS credentials");
   }
 
-  if (skipCache) {
-    logStep("Re-entering AWS credentials (--reauth):");
-  } else {
-    logStep("Enter your AWS credentials:");
-  }
-  const accessKey = await prompt("AWS Access Key ID: ");
-  if (!accessKey) {
-    throw new Error("No access key provided");
-  }
-  const secretKey = await prompt("AWS Secret Access Key: ");
-  if (!secretKey) {
-    throw new Error("No secret key provided");
-  }
-
-  process.env.AWS_ACCESS_KEY_ID = accessKey;
-  process.env.AWS_SECRET_ACCESS_KEY = secretKey;
-  process.env.AWS_DEFAULT_REGION = region;
-  _state.accessKeyId = accessKey;
-  _state.secretAccessKey = secretKey;
-
-  if (hasAwsCli()) {
-    const result = awsCliSync([
-      "sts",
-      "get-caller-identity",
-    ]);
-    if (result.exitCode === 0) {
-      _state.lightsailMode = "cli";
-      await saveCredsToConfig(accessKey, secretKey, region);
-      logInfo(`AWS CLI configured, using region: ${region}`);
-      return;
+  for (;;) {
+    if (skipCache) {
+      logStep("Re-entering AWS credentials (--reauth):");
+    } else {
+      logStep("Enter your AWS credentials:");
     }
-  }
+    const accessKey = await prompt("AWS Access Key ID: ");
+    if (!accessKey) {
+      await retryOrQuit("AWS credentials invalid. Try again?");
+      continue;
+    }
+    const secretKey = await prompt("AWS Secret Access Key: ");
+    if (!secretKey) {
+      await retryOrQuit("AWS credentials invalid. Try again?");
+      continue;
+    }
 
-  _state.lightsailMode = "rest";
-  await saveCredsToConfig(accessKey, secretKey, region);
-  logInfo("Using Lightsail REST API directly");
-  logInfo(`Using region: ${region}`);
+    process.env.AWS_ACCESS_KEY_ID = accessKey;
+    process.env.AWS_SECRET_ACCESS_KEY = secretKey;
+    process.env.AWS_DEFAULT_REGION = region;
+    _state.accessKeyId = accessKey;
+    _state.secretAccessKey = secretKey;
+
+    if (hasAwsCli()) {
+      const result = awsCliSync([
+        "sts",
+        "get-caller-identity",
+      ]);
+      if (result.exitCode === 0) {
+        _state.lightsailMode = "cli";
+        await saveCredsToConfig(accessKey, secretKey, region);
+        logInfo(`AWS CLI configured, using region: ${region}`);
+        return;
+      }
+      logError("AWS credentials are invalid");
+      await retryOrQuit("AWS credentials invalid. Try again?");
+      continue;
+    }
+
+    _state.lightsailMode = "rest";
+    await saveCredsToConfig(accessKey, secretKey, region);
+    logInfo("Using Lightsail REST API directly");
+    logInfo(`Using region: ${region}`);
+    return;
+  }
 }
 
 // ─── Region Prompt ──────────────────────────────────────────────────────────
