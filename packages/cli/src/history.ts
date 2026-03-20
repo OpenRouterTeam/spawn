@@ -317,29 +317,50 @@ function recoverFromArchives(): SpawnRecord[] {
   return result.ok ? result.data : [];
 }
 
+/** Backfill missing `id` field on parsed records (pre-migration records lack it). */
+function backfillRecordIds(records: v.InferOutput<typeof SpawnRecordSchema>[]): SpawnRecord[] {
+  return records.map((r) => ({
+    ...r,
+    id: r.id ?? generateSpawnId(),
+  }));
+}
+
 /** Parse raw JSON into SpawnRecord[], handling all format versions. */
 function parseHistoryData(raw: unknown): SpawnRecord[] | null {
   // v1 format: { version: 1, records: [...] } — strict check
   const v1 = v.safeParse(HistoryFileV1Schema, raw);
   if (v1.success) {
-    return v1.output.records;
+    return backfillRecordIds(v1.output.records);
   }
 
   // Loose v1: version=1 but some individual records are malformed
   const v1Loose = v.safeParse(HistoryFileV1LooseSchema, raw);
   if (v1Loose.success) {
     const allRecords = v1Loose.output.records;
-    const valid = allRecords.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    const valid: v.InferOutput<typeof SpawnRecordSchema>[] = [];
+    for (const el of allRecords) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        valid.push(result.output);
+      }
+    }
     const dropped = allRecords.length - valid.length;
     if (dropped > 0) {
       console.error(`Warning: Dropped ${dropped} malformed record(s) from history.`);
     }
-    return valid;
+    return backfillRecordIds(valid);
   }
 
   // v0 format: bare array (pre-versioning; migrated to v1 on next write)
   if (Array.isArray(raw)) {
-    return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    const valid: v.InferOutput<typeof SpawnRecordSchema>[] = [];
+    for (const el of raw) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        valid.push(result.output);
+      }
+    }
+    return backfillRecordIds(valid);
   }
 
   // Unrecognized format

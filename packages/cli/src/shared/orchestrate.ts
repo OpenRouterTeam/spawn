@@ -441,18 +441,20 @@ async function postInstall(
   // SSH tunnel for web dashboard
   let tunnelHandle: SshTunnelHandle | undefined;
   if (agent.tunnel) {
+    const tunnelCfg = agent.tunnel; // capture for closure (TS can't narrow across async boundaries)
     if (cloud.getConnectionInfo) {
+      const getConnInfo = cloud.getConnectionInfo; // capture for closure
       const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
-        const conn = cloud.getConnectionInfo();
+        const conn = getConnInfo();
         const keys = await ensureSshKeys();
         tunnelHandle = await startSshTunnel({
           host: conn.host,
           user: conn.user,
-          remotePort: agent.tunnel.remotePort,
+          remotePort: tunnelCfg.remotePort,
           sshKeyOpts: getSshKeyOpts(keys),
         });
-        if (agent.tunnel.browserUrl) {
-          const url = agent.tunnel.browserUrl(tunnelHandle.localPort);
+        if (tunnelCfg.browserUrl) {
+          const url = tunnelCfg.browserUrl(tunnelHandle.localPort);
           if (url) {
             openBrowser(url);
           }
