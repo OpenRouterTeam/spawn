@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { mockClackPrompts } from "./test-helpers";
+import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 mockClackPrompts();
 
@@ -17,54 +17,6 @@ function mockSpawnSync(exitCode: number, stdout = "", stderr = "") {
     resourceUsage: undefined,
     pid: 1234,
   } satisfies ReturnType<typeof Bun.spawnSync>);
-}
-
-function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
-  const mockProc = {
-    pid: 1234,
-    exitCode: Promise.resolve(exitCode),
-    exited: Promise.resolve(exitCode),
-    stdout: new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(stdout));
-        c.close();
-      },
-    }),
-    stderr: new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(stderr));
-        c.close();
-      },
-    }),
-    kill: mock(() => {}),
-    ref: () => {},
-    unref: () => {},
-    stdin: new WritableStream(),
-    resourceUsage: () =>
-      ({
-        cpuTime: {
-          system: 0,
-          user: 0,
-          total: 0,
-        },
-        maxRSS: 0,
-        sharedMemorySize: 0,
-        unsharedDataSize: 0,
-        unsharedStackSize: 0,
-        minorPageFaults: 0,
-        majorPageFaults: 0,
-        swapCount: 0,
-        inBlock: 0,
-        outBlock: 0,
-        ipcMessagesSent: 0,
-        ipcMessagesReceived: 0,
-        signalsReceived: 0,
-        voluntaryContextSwitches: 0,
-        involuntaryContextSwitches: 0,
-      }) satisfies ReturnType<ReturnType<typeof Bun.spawn>["resourceUsage"]>,
-  };
-  // biome-ignore lint: test mock
-  return spyOn(Bun, "spawn").mockReturnValue(mockProc as ReturnType<typeof Bun.spawn>);
 }
 
 let origEnv: NodeJS.ProcessEnv;
