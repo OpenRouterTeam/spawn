@@ -1,10 +1,12 @@
 /**
  * cmd-list-cov.test.ts — Coverage tests for commands/list.ts
  *
- * Focuses on uncovered paths: buildRecordLabel, buildRecordSubtitle,
- * resolveListFilters, showEmptyListMessage, cmdListClear, cmdList
- * non-interactive path, cmdLast with no history, handleRecordAction branches.
- * (formatRelativeTime is covered in commands-exported-utils.test.ts)
+ * Focuses on uncovered paths: resolveListFilters, showEmptyListMessage,
+ * cmdList non-interactive path, handleRecordAction branches.
+ * (buildRecordLabel/buildRecordSubtitle covered in cmdlast.test.ts)
+ * (cmdListClear covered in clear-history.test.ts)
+ * (cmdLast covered in cmdlast.test.ts)
+ * (formatRelativeTime covered in commands-exported-utils.test.ts)
  */
 
 import type { SpawnRecord } from "../history.js";
@@ -17,7 +19,7 @@ import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks 
 
 const clack = mockClackPrompts();
 
-const { buildRecordLabel, buildRecordSubtitle, cmdList, cmdListClear, cmdLast } = await import("../commands/index.js");
+const { cmdList } = await import("../commands/index.js");
 const { resolveListFilters, handleRecordAction, RecordActionOutcome } = await import("../commands/list.js");
 
 const mockManifest = createMockManifest();
@@ -52,90 +54,6 @@ describe("commands/list.ts coverage", () => {
       });
     }
     restoreMocks(consoleMocks.log, consoleMocks.error);
-  });
-
-  // ── buildRecordLabel ──────────────────────────────────────────────────
-
-  describe("buildRecordLabel", () => {
-    it("returns name when set", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-        name: "my-server",
-      };
-      expect(buildRecordLabel(r)).toBe("my-server");
-    });
-
-    it("falls back to server_name when no name", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-        connection: {
-          ip: "1.2.3.4",
-          user: "root",
-          server_name: "srv-123",
-        },
-      };
-      expect(buildRecordLabel(r)).toBe("srv-123");
-    });
-
-    it("returns 'unnamed' when no name or server_name", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-      };
-      expect(buildRecordLabel(r)).toBe("unnamed");
-    });
-  });
-
-  // ── buildRecordSubtitle ───────────────────────────────────────────────
-
-  describe("buildRecordSubtitle", () => {
-    it("includes agent, cloud, and time", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: new Date().toISOString(),
-      };
-      const subtitle = buildRecordSubtitle(r, mockManifest);
-      expect(subtitle).toContain("Claude Code");
-      expect(subtitle).toContain("Sprite");
-    });
-
-    it("shows [deleted] for deleted connections", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: new Date().toISOString(),
-        connection: {
-          ip: "1.2.3.4",
-          user: "root",
-          deleted: true,
-        },
-      };
-      const subtitle = buildRecordSubtitle(r, mockManifest);
-      expect(subtitle).toContain("[deleted]");
-    });
-
-    it("falls back to key when manifest is null", () => {
-      const r: SpawnRecord = {
-        id: "1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: new Date().toISOString(),
-      };
-      const subtitle = buildRecordSubtitle(r, null);
-      expect(subtitle).toContain("claude");
-      expect(subtitle).toContain("sprite");
-    });
   });
 
   // ── resolveListFilters ────────────────────────────────────────────────
@@ -179,37 +97,6 @@ describe("commands/list.ts coverage", () => {
       const result = await resolveListFilters("sprite");
       expect(result.cloudFilter).toBe("sprite");
       expect(result.agentFilter).toBeUndefined();
-    });
-  });
-
-  // ── cmdListClear ──────────────────────────────────────────────────────
-
-  describe("cmdListClear", () => {
-    it("reports no history when empty", async () => {
-      await cmdListClear();
-      expect(clack.logInfo).toHaveBeenCalled();
-    });
-
-    it("clears history when confirmed in non-interactive mode", async () => {
-      const records: SpawnRecord[] = [
-        {
-          id: "1",
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T00:00:00Z",
-        },
-      ];
-      writeFileSync(
-        join(testDir, "history.json"),
-        JSON.stringify({
-          version: 1,
-          records,
-        }),
-      );
-      // Make non-interactive
-      process.env.SPAWN_NON_INTERACTIVE = "1";
-      await cmdListClear();
-      expect(clack.logSuccess).toHaveBeenCalled();
     });
   });
 
@@ -361,16 +248,6 @@ describe("commands/list.ts coverage", () => {
       const result = await resolveListFilters("nonexistent", "sprite");
       expect(result.agentFilter).toBe("nonexistent");
       expect(result.cloudFilter).toBe("sprite");
-    });
-  });
-
-  // ── cmdLast ───────────────────────────────────────────────────────────
-
-  describe("cmdLast", () => {
-    it("shows no-history message when empty", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
-      await cmdLast();
-      expect(clack.logInfo).toHaveBeenCalled();
     });
   });
 

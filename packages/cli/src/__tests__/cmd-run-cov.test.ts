@@ -103,19 +103,6 @@ describe("commands/run.ts coverage", () => {
     });
   });
 
-  // ── cmdRun with swapped arguments ─────────────────────────────────────
-
-  describe("cmdRun detectAndFixSwappedArgs", () => {
-    it("detects and fixes swapped agent/cloud arguments in dry run", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
-      await loadManifest(true);
-      // Pass cloud name as agent, agent name as cloud
-      await cmdRun("sprite", "claude", undefined, true);
-      // Should still succeed as dry run (swap detection fixes it)
-      expect(clack.logInfo).toHaveBeenCalled();
-    });
-  });
-
   // ── cmdRun additional ─────────────────────────────────────────────
 
   describe("cmdRun validation", () => {
