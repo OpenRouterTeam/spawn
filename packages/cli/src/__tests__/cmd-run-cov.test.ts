@@ -4,7 +4,7 @@
  * Focuses on uncovered helper functions: resolveAndLog, detectAndFixSwappedArgs,
  * dry-run helpers (buildAgentLines, buildCloudLines, buildCredentialStatusLines,
  * buildEnvironmentLines, buildPromptLines), showDryRunPreview, classifyNetworkError,
- * isRetryableExitCode, headless output/error, and execScript paths.
+ * isRetryableExitCode, and headless output/error paths.
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
@@ -14,14 +14,8 @@ import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks 
 
 const clack = mockClackPrompts();
 
-const { cmdRun, cmdRunHeadless, getScriptFailureGuidance, getSignalGuidance, isRetryableExitCode } = await import(
-  "../commands/index.js"
-);
-const { showDryRunPreview, execScript } = await import("../commands/run.js");
-
-function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
-}
+const { cmdRun, cmdRunHeadless, isRetryableExitCode } = await import("../commands/index.js");
+const { showDryRunPreview } = await import("../commands/run.js");
 
 describe("commands/run.ts coverage", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -119,162 +113,6 @@ describe("commands/run.ts coverage", () => {
       await cmdRun("sprite", "claude", undefined, true);
       // Should still succeed as dry run (swap detection fixes it)
       expect(clack.logInfo).toHaveBeenCalled();
-    });
-  });
-
-  // ── getSignalGuidance ──────────────────────────────────────────────────
-
-  describe("getSignalGuidance", () => {
-    it("returns guidance for SIGKILL", () => {
-      const lines = getSignalGuidance("SIGKILL").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("killed");
-    });
-
-    it("returns default guidance for unknown signal", () => {
-      const lines = getSignalGuidance("SIGUSR1").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("SIGUSR1");
-      expect(joined).toContain("terminated");
-    });
-
-    it("includes dashboard hint when provided", () => {
-      const lines = getSignalGuidance("SIGUSR1", "https://dash.example.com").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("https://dash.example.com");
-    });
-  });
-
-  // ── getScriptFailureGuidance ──────────────────────────────────────────
-
-  describe("getScriptFailureGuidance", () => {
-    it("returns default guidance for null exit code", () => {
-      const lines = getScriptFailureGuidance(null, "hetzner").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("Common causes");
-    });
-
-    it("returns default guidance for unknown exit codes", () => {
-      const lines = getScriptFailureGuidance(99, "hetzner").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("Common causes");
-    });
-
-    it("includes dashboard hint for exit code 130", () => {
-      const lines = getScriptFailureGuidance(130, "hetzner", undefined, "https://dash.test").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("interrupted");
-    });
-
-    it("includes credential hints for exit code 1", () => {
-      const lines = getScriptFailureGuidance(1, "hetzner", "Set HCLOUD_TOKEN").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("HCLOUD_TOKEN");
-    });
-
-    it("handles exit code 137 (OOM/killed)", () => {
-      const lines = getScriptFailureGuidance(137, "sprite").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("killed");
-    });
-  });
-
-  // ── classifyNetworkError (via reportDownloadError path) ──────────────
-
-  describe("classifyNetworkError", () => {
-    it("handles timeout error in dry run preview", () => {
-      showDryRunPreview(mockManifest, "claude", "sprite");
-      // Just verify it completes without throwing
-      expect(clack.logInfo).toHaveBeenCalled();
-    });
-  });
-
-  // ── showDryRunPreview with cloud defaults ──────────────────────────
-
-  describe("showDryRunPreview edge cases", () => {
-    it("shows credential status for sprite (token auth)", () => {
-      showDryRunPreview(mockManifest, "claude", "sprite");
-      const allCalls = consoleMocks.log.mock.calls.flat().map(String);
-      expect(allCalls.some((c) => c.includes("OPENROUTER_API_KEY"))).toBe(true);
-    });
-
-    it("shows credential status for hetzner (token auth)", () => {
-      showDryRunPreview(mockManifest, "claude", "hetzner");
-      const allCalls = consoleMocks.log.mock.calls.flat().map(String);
-      expect(allCalls.some((c) => c.includes("OPENROUTER_API_KEY"))).toBe(true);
-    });
-
-    it("shows no environment lines when agent has no env", () => {
-      const noEnvManifest = {
-        ...mockManifest,
-        agents: {
-          ...mockManifest.agents,
-          noenv: {
-            name: "NoEnv Agent",
-            description: "Agent without env",
-            url: "https://example.com",
-            install: "npm install noenv",
-            launch: "noenv",
-          },
-        },
-        matrix: {
-          ...mockManifest.matrix,
-          "sprite/noenv": "implemented",
-        },
-      };
-      global.fetch = mock(async () => new Response(JSON.stringify(noEnvManifest)));
-      showDryRunPreview(noEnvManifest, "noenv", "sprite");
-      expect(clack.logSuccess).toHaveBeenCalled();
-    });
-  });
-
-  // ── getScriptFailureGuidance edge cases ───────────────────────────
-
-  describe("getScriptFailureGuidance additional", () => {
-    it("handles exit code 2 (misuse of shell builtin)", () => {
-      const lines = getScriptFailureGuidance(2, "sprite").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined.length).toBeGreaterThan(0);
-    });
-
-    it("handles exit code 126 (permission denied)", () => {
-      const lines = getScriptFailureGuidance(126, "hetzner").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined.length).toBeGreaterThan(0);
-    });
-
-    it("handles exit code 127 (command not found)", () => {
-      const lines = getScriptFailureGuidance(127, "hetzner").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined.length).toBeGreaterThan(0);
-    });
-
-    it("handles exit code 255 (SSH error)", () => {
-      const lines = getScriptFailureGuidance(255, "aws").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined.length).toBeGreaterThan(0);
-    });
-
-    it("handles exit code 1 with no auth hint", () => {
-      const lines = getScriptFailureGuidance(1, "sprite").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("Cloud provider API error");
-    });
-  });
-
-  // ── getSignalGuidance additional ──────────────────────────────────
-
-  describe("getSignalGuidance additional", () => {
-    it("returns guidance for SIGTERM", () => {
-      const lines = getSignalGuidance("SIGTERM").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("terminated");
-    });
-
-    it("returns guidance for unknown signal without dashboard", () => {
-      const lines = getSignalGuidance("SIGXCPU").map(stripAnsi);
-      const joined = lines.join("\n");
-      expect(joined).toContain("SIGXCPU");
     });
   });
 

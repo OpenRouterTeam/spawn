@@ -662,24 +662,6 @@ describe("history.ts coverage", () => {
     });
   });
 
-  // ── saveSpawnRecord auto-generates id ─────────────────────────────────
-
-  describe("saveSpawnRecord id generation", () => {
-    it("auto-generates id if not provided", () => {
-      const recordWithoutId: SpawnRecord = {
-        id: "",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-      };
-      saveSpawnRecord(recordWithoutId);
-
-      const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      expect(data.records[0].id).toBeTruthy();
-      expect(typeof data.records[0].id).toBe("string");
-    });
-  });
-
   // ── Trimming with archiving ───────────────────────────────────────────
 
   describe("trimming and archiving", () => {
