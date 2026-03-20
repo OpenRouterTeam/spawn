@@ -1,9 +1,9 @@
 // shared/ssh-keys.ts — SSH key discovery, selection, and generation
 
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
-import { getSshDir } from "./paths";
+import { getSshDir } from "./paths.js";
 import { isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
-import { logInfo, logStep } from "./ui";
+import { logInfo, logStep } from "./ui.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

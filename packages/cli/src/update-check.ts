@@ -9,11 +9,11 @@ import { getErrorMessage, hasStatus } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, SPAWN_CDN, VERSION_URL } from "./manifest.js";
-import { PkgVersionSchema, parseJsonWith } from "./shared/parse";
-import { getUpdateCheckedPath, getUpdateFailedPath } from "./shared/paths";
-import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result";
-import { getInstallCmd, getInstallScriptUrl, getWhichCommand, isWindows } from "./shared/shell";
-import { logDebug, logWarn } from "./shared/ui";
+import { PkgVersionSchema, parseJsonWith } from "./shared/parse.js";
+import { getUpdateCheckedPath, getUpdateFailedPath } from "./shared/paths.js";
+import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf, unwrapOr } from "./shared/result.js";
+import { getInstallCmd, getInstallScriptUrl, getWhichCommand, isWindows } from "./shared/shell.js";
+import { logDebug, logWarn } from "./shared/ui.js";
 
 const VERSION = pkg.version;
 

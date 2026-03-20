@@ -2,15 +2,15 @@
 // Downloads a nightly tarball from GitHub Releases and extracts it on the remote VM.
 // Falls back gracefully (returns false) on any failure so the caller can use live install.
 
-import type { CloudRunner } from "./agent-setup";
+import type { CloudRunner } from "./agent-setup.js";
 
 import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { asyncTryCatch, tryCatch } from "./result";
-import { logDebug, logInfo, logStep, logWarn } from "./ui";
+import { asyncTryCatch, tryCatch } from "./result.js";
+import { logDebug, logInfo, logStep, logWarn } from "./ui.js";
 
 const REPO = "OpenRouterTeam/spawn";
 

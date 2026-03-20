@@ -1,17 +1,17 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
 import type { CloudInstance, VMConnection } from "../history.js";
-import type { CloudInitTier } from "../shared/agents";
+import type { CloudInitTier } from "../shared/agents.js";
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
-import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
-import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { generateCsrfState, OAUTH_CSS } from "../shared/oauth";
-import { parseJsonObj } from "../shared/parse";
-import { getSpawnCloudConfigPath } from "../shared/paths";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
+import { generateCsrfState, OAUTH_CSS } from "../shared/oauth.js";
+import { parseJsonObj } from "../shared/parse.js";
+import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import {
   asyncTryCatch,
   asyncTryCatchIf,
@@ -29,8 +29,8 @@ import {
   sleep,
   spawnInteractive,
   waitForSshSnapshotBoot,
-} from "../shared/ssh";
-import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
+} from "../shared/ssh.js";
+import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys.js";
 import {
   defaultSpawnName,
   getServerNameFromEnv,
@@ -50,8 +50,8 @@ import {
   toKebabCase,
   validateRegionName,
   validateServerName,
-} from "../shared/ui";
-import { digitaloceanBilling } from "./billing";
+} from "../shared/ui.js";
+import { digitaloceanBilling } from "./billing.js";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";

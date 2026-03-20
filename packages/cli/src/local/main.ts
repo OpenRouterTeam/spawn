@@ -2,12 +2,12 @@
 
 // local/main.ts — Orchestrator: deploys an agent on the local machine
 
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate";
-import { agents, resolveAgent } from "./agents";
-import { downloadFile, interactiveSession, runLocal, uploadFile } from "./local";
+import { runOrchestration } from "../shared/orchestrate.js";
+import { agents, resolveAgent } from "./agents.js";
+import { downloadFile, interactiveSession, runLocal, uploadFile } from "./local.js";
 
 async function main() {
   const agentName = process.argv[2];

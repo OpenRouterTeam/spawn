@@ -1,14 +1,14 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
 import type { CloudInstance, VMConnection } from "../history.js";
-import type { CloudInitTier } from "../shared/agents";
+import type { CloudInitTier } from "../shared/agents.js";
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { isString, toObjectArray } from "@openrouter/spawn-shared";
-import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
-import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { getUserHome } from "../shared/paths";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
+import { getUserHome } from "../shared/paths.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import {
   killWithTimeout,
@@ -17,8 +17,8 @@ import {
   waitForSsh as sharedWaitForSsh,
   sleep,
   spawnInteractive,
-} from "../shared/ssh";
-import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
+} from "../shared/ssh.js";
+import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import {
   getServerNameFromEnv,
   logError,
@@ -34,8 +34,8 @@ import {
   sanitizeTermValue,
   selectFromList,
   shellQuote,
-} from "../shared/ui";
-import { gcpBilling } from "./billing";
+} from "../shared/ui.js";
+import { gcpBilling } from "./billing.js";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 

@@ -2,11 +2,11 @@
 
 // gcp/main.ts — Orchestrator: deploys an agent on GCP Compute Engine
 
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate";
-import { agents, resolveAgent } from "./agents";
+import { runOrchestration } from "../shared/orchestrate.js";
+import { agents, resolveAgent } from "./agents.js";
 import {
   authenticate,
   checkBillingEnabled,
@@ -24,7 +24,7 @@ import {
   uploadFile,
   waitForCloudInit,
   waitForSshOnly,
-} from "./gcp";
+} from "./gcp.js";
 
 async function main() {
   const agentName = process.argv[2];

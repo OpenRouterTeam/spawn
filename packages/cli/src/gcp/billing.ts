@@ -1,4 +1,4 @@
-import type { BillingConfig } from "../shared/billing-guidance";
+import type { BillingConfig } from "../shared/billing-guidance.js";
 
 export const gcpBilling: BillingConfig = {
   billingUrl: "https://console.cloud.google.com/billing",

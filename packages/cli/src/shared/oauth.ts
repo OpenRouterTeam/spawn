@@ -4,11 +4,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { getErrorMessage, isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { OAUTH_CODE_REGEX } from "./oauth-constants";
-import { parseJsonObj, parseJsonWith } from "./parse";
-import { getSpawnCloudConfigPath } from "./paths";
+import { OAUTH_CODE_REGEX } from "./oauth-constants.js";
+import { parseJsonObj, parseJsonWith } from "./parse.js";
+import { getSpawnCloudConfigPath } from "./paths.js";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch } from "./result.js";
-import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt, retryOrQuit } from "./ui";
+import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt, retryOrQuit } from "./ui.js";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 

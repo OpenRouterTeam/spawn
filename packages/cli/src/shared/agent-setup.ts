@@ -1,15 +1,15 @@
 // shared/agent-setup.ts — Shared agent helpers + definitions for SSH-based clouds
 // Cloud-agnostic: receives runServer/uploadFile via CloudRunner interface.
 
-import type { AgentConfig } from "./agents";
-import type { Result } from "./ui";
+import type { AgentConfig } from "./agents.js";
+import type { Result } from "./ui.js";
 
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { getTmpDir } from "./paths";
+import { getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
-import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui";
+import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui.js";
 
 /**
  * Wrap an SSH-based async operation into a Result for use with withRetry.

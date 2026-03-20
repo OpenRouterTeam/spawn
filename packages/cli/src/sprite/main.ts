@@ -2,11 +2,11 @@
 
 // sprite/main.ts — Orchestrator: deploys an agent on Sprite
 
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate";
-import { agents, resolveAgent } from "./agents";
+import { runOrchestration } from "../shared/orchestrate.js";
+import { agents, resolveAgent } from "./agents.js";
 import {
   createSprite,
   downloadFileSprite,
@@ -21,7 +21,7 @@ import {
   setupShellEnvironment,
   uploadFileSprite,
   verifySpriteConnectivity,
-} from "./sprite";
+} from "./sprite.js";
 
 async function main() {
   const agentName = process.argv[2];

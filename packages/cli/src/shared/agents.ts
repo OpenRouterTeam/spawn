@@ -1,6 +1,6 @@
 // shared/agents.ts — AgentConfig interface + shared helpers (cloud-agnostic)
 
-import { logError, shellQuote } from "./ui";
+import { logError, shellQuote } from "./ui.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

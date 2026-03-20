@@ -1,6 +1,6 @@
 // shared/cloud-init.ts — Tier-based cloud-init package selection
 
-import type { CloudInitTier } from "./agents";
+import type { CloudInitTier } from "./agents.js";
 
 const MINIMAL = [
   "curl",

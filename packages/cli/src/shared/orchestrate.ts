@@ -2,23 +2,23 @@
 // Each cloud implements CloudOrchestrator and calls runOrchestration().
 
 import type { VMConnection } from "../history.js";
-import type { CloudRunner } from "./agent-setup";
-import type { AgentConfig } from "./agents";
-import type { SshTunnelHandle } from "./ssh";
+import type { CloudRunner } from "./agent-setup.js";
+import type { AgentConfig } from "./agents.js";
+import type { SshTunnelHandle } from "./ssh.js";
 
 import { readFileSync } from "node:fs";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
-import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup";
-import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball";
-import { generateEnvConfig } from "./agents";
-import { getOrPromptApiKey } from "./oauth";
-import { getSpawnPreferencesPath } from "./paths";
+import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
+import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball.js";
+import { generateEnvConfig } from "./agents.js";
+import { getOrPromptApiKey } from "./oauth.js";
+import { getSpawnPreferencesPath } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
-import { isWindows } from "./shell";
-import { sleep, startSshTunnel } from "./ssh";
-import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
+import { isWindows } from "./shell.js";
+import { sleep, startSshTunnel } from "./ssh.js";
+import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys.js";
 import {
   logDebug,
   logError,
@@ -32,7 +32,7 @@ import {
   shellQuote,
   validateModelId,
   withRetry,
-} from "./ui";
+} from "./ui.js";
 
 export interface CloudOrchestrator {
   cloudName: string;

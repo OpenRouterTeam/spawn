@@ -1,4 +1,4 @@
-import type { BillingConfig } from "../shared/billing-guidance";
+import type { BillingConfig } from "../shared/billing-guidance.js";
 
 export const hetznerBilling: BillingConfig = {
   billingUrl: "https://console.hetzner.cloud/",

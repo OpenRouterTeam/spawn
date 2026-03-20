@@ -2,12 +2,12 @@
 
 // digitalocean/main.ts — Orchestrator: deploys an agent on DigitalOcean
 
-import type { CloudOrchestrator } from "../shared/orchestrate";
+import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate";
-import { logInfo } from "../shared/ui";
-import { agents, resolveAgent } from "./agents";
+import { runOrchestration } from "../shared/orchestrate.js";
+import { logInfo } from "../shared/ui.js";
+import { agents, resolveAgent } from "./agents.js";
 import {
   checkAccountStatus,
   createServer as createDroplet,
@@ -24,7 +24,7 @@ import {
   uploadFile,
   waitForCloudInit,
   waitForSshOnly,
-} from "./digitalocean";
+} from "./digitalocean.js";
 
 /** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
 const AGENT_MIN_SIZE: Record<string, string> = {

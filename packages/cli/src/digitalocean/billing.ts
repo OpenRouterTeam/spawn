@@ -1,4 +1,4 @@
-import type { BillingConfig } from "../shared/billing-guidance";
+import type { BillingConfig } from "../shared/billing-guidance.js";
 
 export const digitaloceanBilling: BillingConfig = {
   billingUrl: "https://cloud.digitalocean.com/account/billing",

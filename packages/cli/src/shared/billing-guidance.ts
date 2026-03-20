@@ -1,7 +1,7 @@
 // shared/billing-guidance.ts — Billing error detection, guidance, and browser-based retry flow
 
 import { asyncTryCatch, unwrapOr } from "./result.js";
-import { logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
+import { logInfo, logStep, logWarn, openBrowser, prompt } from "./ui.js";
 
 // ─── BillingConfig interface ────────────────────────────────────────────────
 

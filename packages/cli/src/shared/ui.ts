@@ -4,8 +4,8 @@
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
-import { parseJsonObj } from "./parse";
-import { getSpawnCloudConfigPath } from "./paths";
+import { parseJsonObj } from "./parse.js";
+import { getSpawnCloudConfigPath } from "./paths.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "./result.js";
 
 const RED = "\x1b[0;31m";
@@ -218,9 +218,9 @@ export async function retryOrQuit(message: string): Promise<void> {
 
 // ─── Result-based retry ────────────────────────────────────────────────
 
-import type { Result } from "./result";
+import type { Result } from "./result.js";
 
-export { Err, Ok, type Result } from "./result";
+export { Err, Ok, type Result } from "./result.js";
 
 /**
  * Phase-aware retry helper using the Result monad.

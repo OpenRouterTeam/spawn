@@ -1,17 +1,17 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
 import type { CloudInstance, VMConnection } from "../history.js";
-import type { CloudInitTier } from "../shared/agents";
+import type { CloudInitTier } from "../shared/agents.js";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
-import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { parseJsonWith } from "../shared/parse";
-import { getSpawnCloudConfigPath } from "../shared/paths";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
+import { parseJsonWith } from "../shared/parse.js";
+import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
@@ -20,8 +20,8 @@ import {
   waitForSsh as sharedWaitForSsh,
   sleep,
   spawnInteractive,
-} from "../shared/ssh";
-import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
+} from "../shared/ssh.js";
+import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import {
   getServerNameFromEnv,
   jsonEscape,
@@ -38,8 +38,8 @@ import {
   selectFromList,
   shellQuote,
   validateRegionName,
-} from "../shared/ui";
-import { awsBilling } from "./billing";
+} from "../shared/ui.js";
+import { awsBilling } from "./billing.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 

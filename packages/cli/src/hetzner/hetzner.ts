@@ -1,15 +1,15 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
 import type { CloudInstance, VMConnection } from "../history.js";
-import type { CloudInitTier } from "../shared/agents";
+import type { CloudInitTier } from "../shared/agents.js";
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, normalize } from "node:path";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
-import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
-import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init";
-import { parseJsonObj } from "../shared/parse";
-import { getSpawnCloudConfigPath } from "../shared/paths";
+import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
+import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
+import { parseJsonObj } from "../shared/parse.js";
+import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, unwrapOr } from "../shared/result.js";
 import {
   killWithTimeout,
@@ -19,8 +19,8 @@ import {
   sleep,
   spawnInteractive,
   waitForSshSnapshotBoot,
-} from "../shared/ssh";
-import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
+} from "../shared/ssh.js";
+import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys.js";
 import {
   getServerNameFromEnv,
   jsonEscape,
@@ -38,8 +38,8 @@ import {
   selectFromList,
   shellQuote,
   validateRegionName,
-} from "../shared/ui";
-import { hetznerBilling } from "./billing";
+} from "../shared/ui.js";
+import { hetznerBilling } from "./billing.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";

@@ -5,9 +5,9 @@ import type { VMConnection } from "../history.js";
 import { existsSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { getUserHome } from "../shared/paths";
+import { getUserHome } from "../shared/paths.js";
 import { asyncTryCatch } from "../shared/result.js";
-import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
+import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh.js";
 import {
   getServerNameFromEnv,
   logError,
@@ -17,7 +17,7 @@ import {
   logStepInline,
   logWarn,
   promptSpawnNameShared,
-} from "../shared/ui";
+} from "../shared/ui.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 

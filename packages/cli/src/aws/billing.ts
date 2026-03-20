@@ -1,4 +1,4 @@
-import type { BillingConfig } from "../shared/billing-guidance";
+import type { BillingConfig } from "../shared/billing-guidance.js";
 
 export const awsBilling: BillingConfig = {
   billingUrl: "https://lightsail.aws.amazon.com/",

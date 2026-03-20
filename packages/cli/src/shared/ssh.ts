@@ -3,7 +3,7 @@
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
 import { asyncTryCatch, tryCatch } from "./result.js";
-import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui";
+import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
 

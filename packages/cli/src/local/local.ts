@@ -2,9 +2,9 @@
 
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { getUserHome } from "../shared/paths";
-import { getLocalShell } from "../shared/shell";
-import { spawnInteractive } from "../shared/ssh";
+import { getUserHome } from "../shared/paths.js";
+import { getLocalShell } from "../shared/shell.js";
+import { spawnInteractive } from "../shared/ssh.js";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
