@@ -1,8 +1,9 @@
 /**
  * agent-setup-cov.test.ts — Coverage tests for shared/agent-setup.ts
  *
- * Covers: wrapSshCall, createCloudAgents, offerGithubAuth, installAgent,
+ * Covers: createCloudAgents, offerGithubAuth, installAgent,
  * uploadConfigFile, validateRemotePath, setupAutoUpdate
+ * (wrapSshCall is covered in with-retry-result.test.ts)
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
@@ -14,8 +15,7 @@ const clackMocks = mockClackPrompts({
 });
 
 // Must import after mock.module for @clack/prompts
-const { wrapSshCall, offerGithubAuth, createCloudAgents, setupAutoUpdate } = await import("../shared/agent-setup.js");
-const { Ok, Err } = await import("../shared/ui.js");
+const { offerGithubAuth, createCloudAgents, setupAutoUpdate } = await import("../shared/agent-setup.js");
 
 let stderrSpy: ReturnType<typeof spyOn>;
 
@@ -27,36 +27,6 @@ beforeEach(() => {
 
 afterEach(() => {
   stderrSpy.mockRestore();
-});
-
-// ── wrapSshCall ────────────────────────────────────────────────────────
-
-describe("wrapSshCall", () => {
-  it("returns Ok on successful promise", async () => {
-    const result = await wrapSshCall(Promise.resolve());
-    expect(result.ok).toBe(true);
-  });
-
-  it("returns Err for connection reset (retryable)", async () => {
-    const result = await wrapSshCall(Promise.reject(new Error("connection reset by peer")));
-    expect(result.ok).toBe(false);
-  });
-
-  it("throws for timeout errors (non-retryable)", async () => {
-    await expect(wrapSshCall(Promise.reject(new Error("command timed out")))).rejects.toThrow("timed out");
-  });
-
-  it("throws for 'timeout' in message (non-retryable)", async () => {
-    await expect(wrapSshCall(Promise.reject(new Error("SSH timeout reached")))).rejects.toThrow("timeout");
-  });
-
-  it("wraps non-Error rejects into Err", async () => {
-    const result = await wrapSshCall(Promise.reject("string-error"));
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toBe("string-error");
-    }
-  });
 });
 
 // ── offerGithubAuth ────────────────────────────────────────────────────

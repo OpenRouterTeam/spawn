@@ -1,9 +1,10 @@
 /**
  * cmd-list-cov.test.ts — Coverage tests for commands/list.ts
  *
- * Focuses on uncovered paths: formatRelativeTime edge cases, buildRecordLabel,
- * buildRecordSubtitle, resolveListFilters, showEmptyListMessage, cmdListClear,
- * cmdList non-interactive path, cmdLast with no history, handleRecordAction branches.
+ * Focuses on uncovered paths: buildRecordLabel, buildRecordSubtitle,
+ * resolveListFilters, showEmptyListMessage, cmdListClear, cmdList
+ * non-interactive path, cmdLast with no history, handleRecordAction branches.
+ * (formatRelativeTime is covered in commands-exported-utils.test.ts)
  */
 
 import type { SpawnRecord } from "../history.js";
@@ -16,9 +17,7 @@ import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks 
 
 const clack = mockClackPrompts();
 
-const { formatRelativeTime, buildRecordLabel, buildRecordSubtitle, cmdList, cmdListClear, cmdLast } = await import(
-  "../commands/index.js"
-);
+const { buildRecordLabel, buildRecordSubtitle, cmdList, cmdListClear, cmdLast } = await import("../commands/index.js");
 const { resolveListFilters, handleRecordAction, RecordActionOutcome } = await import("../commands/list.js");
 
 const mockManifest = createMockManifest();
@@ -53,56 +52,6 @@ describe("commands/list.ts coverage", () => {
       });
     }
     restoreMocks(consoleMocks.log, consoleMocks.error);
-  });
-
-  // ── formatRelativeTime ────────────────────────────────────────────────
-
-  describe("formatRelativeTime", () => {
-    it("returns 'just now' for timestamps less than 60 seconds ago", () => {
-      const now = new Date();
-      expect(formatRelativeTime(now.toISOString())).toBe("just now");
-    });
-
-    it("returns 'just now' for future timestamps", () => {
-      const future = new Date(Date.now() + 60000);
-      expect(formatRelativeTime(future.toISOString())).toBe("just now");
-    });
-
-    it("returns 'X min ago' for recent timestamps", () => {
-      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-      expect(formatRelativeTime(fiveMinAgo.toISOString())).toBe("5 min ago");
-    });
-
-    it("returns 'Xh ago' for hour-old timestamps", () => {
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      expect(formatRelativeTime(twoHoursAgo.toISOString())).toBe("2h ago");
-    });
-
-    it("returns 'yesterday' for 1-day-old timestamps", () => {
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(yesterday.toISOString())).toBe("yesterday");
-    });
-
-    it("returns 'Xd ago' for multi-day timestamps", () => {
-      const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
-      expect(formatRelativeTime(fiveDaysAgo.toISOString())).toBe("5d ago");
-    });
-
-    it("returns formatted date for old timestamps (>30 days)", () => {
-      const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-      const result = formatRelativeTime(old.toISOString());
-      // Should be like "Jan 17" or similar
-      expect(result).not.toContain("ago");
-      expect(result).not.toBe("just now");
-    });
-
-    it("returns raw string for invalid date", () => {
-      expect(formatRelativeTime("not-a-date")).toBe("not-a-date");
-    });
-
-    it("returns raw string for empty string", () => {
-      expect(formatRelativeTime("")).toBe("");
-    });
   });
 
   // ── buildRecordLabel ──────────────────────────────────────────────────
