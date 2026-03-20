@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -63,7 +64,7 @@ const VMConnectionSchema = v.object({
 });
 
 const SpawnRecordSchema = v.object({
-  id: v.optional(v.string()),
+  id: v.optional(v.string()), // optional for backwards compat with pre-migration records on disk
   agent: v.string(),
   cloud: v.string(),
   timestamp: v.string(),
@@ -89,6 +90,84 @@ export function generateSpawnId(): string {
   return randomUUID();
 }
 
+// ── File locking ─────────────────────────────────────────────────────────
+//
+// Uses mkdir-based advisory lock: mkdir is atomic on all POSIX systems and
+// Windows. The lock directory doubles as a signal — if it exists, another
+// process holds the lock. Stale locks (older than 30s) are force-removed
+// to prevent deadlocks from crashed processes.
+
+const LOCK_TIMEOUT_MS = 5000; // Max time to wait for lock
+const LOCK_STALE_MS = 30_000; // Force-remove locks older than this
+const LOCK_POLL_MS = 50; // Poll interval when waiting
+
+function getLockPath(): string {
+  return `${getHistoryPath()}.lock`;
+}
+
+function acquireLock(): boolean {
+  const lockPath = getLockPath();
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const mkdirResult = tryCatch(() => {
+      mkdirSync(lockPath);
+    });
+    if (mkdirResult.ok) {
+      // Write PID + timestamp for stale detection
+      tryCatch(() => writeFileSync(join(lockPath, "pid"), `${process.pid}\n${Date.now()}`));
+      return true;
+    }
+
+    // Lock exists — check if stale
+    const staleResult = tryCatch(() => {
+      const pidFile = join(lockPath, "pid");
+      if (existsSync(pidFile)) {
+        const content = readFileSync(pidFile, "utf-8");
+        const lines = content.split("\n");
+        const lockTime = Number(lines[1]);
+        if (lockTime && Date.now() - lockTime > LOCK_STALE_MS) {
+          // Stale lock — force remove
+          tryCatch(() => unlinkSync(join(lockPath, "pid")));
+          tryCatch(() => rmdirSync(lockPath));
+          return true; // Retry on next iteration
+        }
+      }
+      return false;
+    });
+
+    if (staleResult.ok && staleResult.data) {
+      continue; // Stale lock removed, retry immediately
+    }
+
+    // Wait and retry
+    Bun.sleepSync(LOCK_POLL_MS);
+  }
+
+  logWarn("Could not acquire history lock — proceeding without lock");
+  return false;
+}
+
+function releaseLock(): void {
+  const lockPath = getLockPath();
+  tryCatch(() => unlinkSync(join(lockPath, "pid")));
+  tryCatch(() => rmdirSync(lockPath));
+}
+
+/** Run a function while holding the history file lock.
+ *  Ensures only one process modifies history.json at a time. */
+function withHistoryLock<T>(fn: () => T): T {
+  const locked = acquireLock();
+  const result = tryCatch(fn);
+  if (locked) {
+    releaseLock();
+  }
+  if (!result.ok) {
+    throw result.error;
+  }
+  return result.data;
+}
+
 /** Atomically write a JSON file: write to a process-unique .tmp, then rename into place.
  * The unique suffix prevents races when multiple concurrent spawn processes write history. */
 function atomicWriteJson(filePath: string, data: unknown): void {
@@ -108,33 +187,35 @@ function writeHistory(records: SpawnRecord[]): void {
 }
 
 /** Save launch command to a history record's connection.
- *  Matches by spawnId when provided; falls back to most recent record with a connection. */
+ *  Requires spawnId to target the correct record. */
 export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
   const result = tryCatchIf(isFileError, () => {
-    const history = loadHistory();
-    let found = false;
+    withHistoryLock(() => {
+      const history = loadHistory();
+      let found = false;
 
-    if (spawnId) {
-      const idx = history.findIndex((r) => r.id === spawnId);
-      if (idx >= 0 && history[idx].connection) {
-        history[idx].connection.launch_cmd = launchCmd;
-        found = true;
-      }
-    } else {
-      // Fallback: most recent record with a connection
-      for (let i = history.length - 1; i >= 0; i--) {
-        const conn = history[i].connection;
-        if (conn) {
-          conn.launch_cmd = launchCmd;
+      if (spawnId) {
+        const idx = history.findIndex((r) => r.id === spawnId);
+        if (idx >= 0 && history[idx].connection) {
+          history[idx].connection.launch_cmd = launchCmd;
           found = true;
-          break;
+        }
+      } else {
+        // Fallback: most recent record with a connection
+        for (let i = history.length - 1; i >= 0; i--) {
+          const conn = history[i].connection;
+          if (conn) {
+            conn.launch_cmd = launchCmd;
+            found = true;
+            break;
+          }
         }
       }
-    }
 
-    if (found) {
-      writeHistory(history);
-    }
+      if (found) {
+        writeHistory(history);
+      }
+    });
   });
   if (!result.ok) {
     logWarn("Could not save launch command");
@@ -143,39 +224,41 @@ export function saveLaunchCmd(launchCmd: string, spawnId?: string): void {
 }
 
 /** Merge metadata key-value pairs into a history record's connection.
- *  Matches by spawnId when provided; falls back to most recent record with a connection. */
+ *  Requires spawnId to target the correct record. */
 export function saveMetadata(entries: Record<string, string>, spawnId?: string): void {
   const result = tryCatchIf(isFileError, () => {
-    const history = loadHistory();
-    let found = false;
+    withHistoryLock(() => {
+      const history = loadHistory();
+      let found = false;
 
-    if (spawnId) {
-      const idx = history.findIndex((r) => r.id === spawnId);
-      if (idx >= 0 && history[idx].connection) {
-        const conn = history[idx].connection;
-        conn.metadata = {
-          ...conn.metadata,
-          ...entries,
-        };
-        found = true;
-      }
-    } else {
-      for (let i = history.length - 1; i >= 0; i--) {
-        const conn = history[i].connection;
-        if (conn) {
+      if (spawnId) {
+        const idx = history.findIndex((r) => r.id === spawnId);
+        if (idx >= 0 && history[idx].connection) {
+          const conn = history[idx].connection;
           conn.metadata = {
             ...conn.metadata,
             ...entries,
           };
           found = true;
-          break;
+        }
+      } else {
+        for (let i = history.length - 1; i >= 0; i--) {
+          const conn = history[i].connection;
+          if (conn) {
+            conn.metadata = {
+              ...conn.metadata,
+              ...entries,
+            };
+            found = true;
+            break;
+          }
         }
       }
-    }
 
-    if (found) {
-      writeHistory(history);
-    }
+      if (found) {
+        writeHistory(history);
+      }
+    });
   });
   if (!result.ok) {
     logWarn("Could not save metadata");
@@ -212,14 +295,16 @@ function parseArchiveFile(dir: string, file: string): SpawnRecord[] | null {
 }
 
 /** Attempt to recover records from archive files (history-*.json).
- *  Uses tryCatch (catch-all) because archive recovery is best-effort — any failure returns []. */
+ *  Uses tryCatch (catch-all) because archive recovery is best-effort — any failure returns [].
+ *  Only checks the 30 most recent archives to avoid startup slowdowns. */
 function recoverFromArchives(): SpawnRecord[] {
   const result = tryCatch(() => {
     const dir = getSpawnDir();
     const files = readdirSync(dir)
       .filter((f) => /^history-\d{4}-\d{2}-\d{2}\.json$/.test(f))
       .sort()
-      .reverse();
+      .reverse()
+      .slice(0, 30);
     for (const file of files) {
       const records = parseArchiveFile(dir, file);
       if (records) {
@@ -232,29 +317,50 @@ function recoverFromArchives(): SpawnRecord[] {
   return result.ok ? result.data : [];
 }
 
+/** Backfill missing `id` field on parsed records (pre-migration records lack it). */
+function backfillRecordIds(records: v.InferOutput<typeof SpawnRecordSchema>[]): SpawnRecord[] {
+  return records.map((r) => ({
+    ...r,
+    id: r.id ?? generateSpawnId(),
+  }));
+}
+
 /** Parse raw JSON into SpawnRecord[], handling all format versions. */
 function parseHistoryData(raw: unknown): SpawnRecord[] | null {
   // v1 format: { version: 1, records: [...] } — strict check
   const v1 = v.safeParse(HistoryFileV1Schema, raw);
   if (v1.success) {
-    return v1.output.records;
+    return backfillRecordIds(v1.output.records);
   }
 
   // Loose v1: version=1 but some individual records are malformed
   const v1Loose = v.safeParse(HistoryFileV1LooseSchema, raw);
   if (v1Loose.success) {
     const allRecords = v1Loose.output.records;
-    const valid = allRecords.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    const valid: v.InferOutput<typeof SpawnRecordSchema>[] = [];
+    for (const el of allRecords) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        valid.push(result.output);
+      }
+    }
     const dropped = allRecords.length - valid.length;
     if (dropped > 0) {
       console.error(`Warning: Dropped ${dropped} malformed record(s) from history.`);
     }
-    return valid;
+    return backfillRecordIds(valid);
   }
 
   // v0 format: bare array (pre-versioning; migrated to v1 on next write)
   if (Array.isArray(raw)) {
-    return raw.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
+    const valid: v.InferOutput<typeof SpawnRecordSchema>[] = [];
+    for (const el of raw) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        valid.push(result.output);
+      }
+    }
+    return backfillRecordIds(valid);
   }
 
   // Unrecognized format
@@ -286,6 +392,12 @@ export function loadHistory(): SpawnRecord[] {
 
   const records = parseHistoryData(parseResult.data);
   if (records !== null) {
+    // Backfill IDs on legacy records that don't have one
+    for (const r of records) {
+      if (!r.id) {
+        r.id = generateSpawnId();
+      }
+    }
     return records;
   }
 
@@ -303,7 +415,7 @@ function readExistingArchive(archivePath: string): SpawnRecord[] {
   }
   const result = tryCatch((): unknown => JSON.parse(readFileSync(archivePath, "utf-8")));
   if (result.ok && Array.isArray(result.data)) {
-    return result.data;
+    return result.data.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
   }
   // Corrupted archive — overwrite
   return [];
@@ -336,38 +448,41 @@ export function saveSpawnRecord(record: SpawnRecord): void {
       mode: 0o700,
     });
   }
-  // Ensure every record has an id
+  // Every record must have an id
   if (!record.id) {
     record.id = generateSpawnId();
   }
-  let history = loadHistory();
-  history.push(record);
-  // Smart trim: evict deleted records first, then oldest, and archive evicted
-  if (history.length > MAX_HISTORY_ENTRIES) {
-    const nonDeleted: SpawnRecord[] = [];
-    const deleted: SpawnRecord[] = [];
-    for (const r of history) {
-      if (r.connection?.deleted) {
-        deleted.push(r);
+
+  withHistoryLock(() => {
+    let history = loadHistory();
+    history.push(record);
+    // Smart trim: evict deleted records first, then oldest, and archive evicted
+    if (history.length > MAX_HISTORY_ENTRIES) {
+      const nonDeleted: SpawnRecord[] = [];
+      const deleted: SpawnRecord[] = [];
+      for (const r of history) {
+        if (r.connection?.deleted) {
+          deleted.push(r);
+        } else {
+          nonDeleted.push(r);
+        }
+      }
+      if (nonDeleted.length <= MAX_HISTORY_ENTRIES) {
+        // Removing deleted records is enough
+        history = nonDeleted;
+        archiveRecords(deleted);
       } else {
-        nonDeleted.push(r);
+        // Still over limit — trim oldest non-deleted records too
+        const overflow = nonDeleted.slice(0, nonDeleted.length - MAX_HISTORY_ENTRIES);
+        history = nonDeleted.slice(nonDeleted.length - MAX_HISTORY_ENTRIES);
+        archiveRecords([
+          ...deleted,
+          ...overflow,
+        ]);
       }
     }
-    if (nonDeleted.length <= MAX_HISTORY_ENTRIES) {
-      // Removing deleted records is enough
-      history = nonDeleted;
-      archiveRecords(deleted);
-    } else {
-      // Still over limit — trim oldest non-deleted records too
-      const overflow = nonDeleted.slice(0, nonDeleted.length - MAX_HISTORY_ENTRIES);
-      history = nonDeleted.slice(nonDeleted.length - MAX_HISTORY_ENTRIES);
-      archiveRecords([
-        ...deleted,
-        ...overflow,
-      ]);
-    }
-  }
-  writeHistory(history);
+    writeHistory(history);
+  });
 }
 
 export function clearHistory(): number {
@@ -399,46 +514,52 @@ function findRecordIndex(history: SpawnRecord[], record: SpawnRecord): number {
 
 /** Remove a record from history entirely (soft delete — no cloud API call). */
 export function removeRecord(record: SpawnRecord): boolean {
-  const history = loadHistory();
-  const index = findRecordIndex(history, record);
-  if (index < 0) {
-    return false;
-  }
-  history.splice(index, 1);
-  writeHistory(history);
-  return true;
+  return withHistoryLock(() => {
+    const history = loadHistory();
+    const index = findRecordIndex(history, record);
+    if (index < 0) {
+      return false;
+    }
+    history.splice(index, 1);
+    writeHistory(history);
+    return true;
+  });
 }
 
 export function markRecordDeleted(record: SpawnRecord): boolean {
-  const history = loadHistory();
-  const index = findRecordIndex(history, record);
-  if (index < 0) {
-    return false;
-  }
-  const found = history[index];
-  if (!found.connection) {
-    return false;
-  }
-  found.connection.deleted = true;
-  found.connection.deleted_at = new Date().toISOString();
-  writeHistory(history);
-  return true;
+  return withHistoryLock(() => {
+    const history = loadHistory();
+    const index = findRecordIndex(history, record);
+    if (index < 0) {
+      return false;
+    }
+    const found = history[index];
+    if (!found.connection) {
+      return false;
+    }
+    found.connection.deleted = true;
+    found.connection.deleted_at = new Date().toISOString();
+    writeHistory(history);
+    return true;
+  });
 }
 
 /** Update the IP address on a history record's connection. Returns true if the record was found and updated. */
 export function updateRecordIp(record: SpawnRecord, newIp: string): boolean {
-  const history = loadHistory();
-  const index = findRecordIndex(history, record);
-  if (index < 0) {
-    return false;
-  }
-  const found = history[index];
-  if (!found.connection) {
-    return false;
-  }
-  found.connection.ip = newIp;
-  writeHistory(history);
-  return true;
+  return withHistoryLock(() => {
+    const history = loadHistory();
+    const index = findRecordIndex(history, record);
+    if (index < 0) {
+      return false;
+    }
+    const found = history[index];
+    if (!found.connection) {
+      return false;
+    }
+    found.connection.ip = newIp;
+    writeHistory(history);
+    return true;
+  });
 }
 
 /** Update connection fields (ip, server_id, server_name) on a history record. Used for remapping to a different instance. */
@@ -450,26 +571,28 @@ export function updateRecordConnection(
     server_name?: string;
   },
 ): boolean {
-  const history = loadHistory();
-  const index = findRecordIndex(history, record);
-  if (index < 0) {
-    return false;
-  }
-  const found = history[index];
-  if (!found.connection) {
-    return false;
-  }
-  if (updates.ip !== undefined) {
-    found.connection.ip = updates.ip;
-  }
-  if (updates.server_id !== undefined) {
-    found.connection.server_id = updates.server_id;
-  }
-  if (updates.server_name !== undefined) {
-    found.connection.server_name = updates.server_name;
-  }
-  writeHistory(history);
-  return true;
+  return withHistoryLock(() => {
+    const history = loadHistory();
+    const index = findRecordIndex(history, record);
+    if (index < 0) {
+      return false;
+    }
+    const found = history[index];
+    if (!found.connection) {
+      return false;
+    }
+    if (updates.ip !== undefined) {
+      found.connection.ip = updates.ip;
+    }
+    if (updates.server_id !== undefined) {
+      found.connection.server_id = updates.server_id;
+    }
+    if (updates.server_name !== undefined) {
+      found.connection.server_name = updates.server_name;
+    }
+    writeHistory(history);
+    return true;
+  });
 }
 
 export function getActiveServers(): SpawnRecord[] {

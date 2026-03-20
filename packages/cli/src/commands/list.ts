@@ -585,7 +585,7 @@ export async function handleRecordAction(
   }
 
   if (action === "enter") {
-    const enterResult = await asyncTryCatch(() => cmdEnterAgent(selected.connection, selected.agent, manifest));
+    const enterResult = await asyncTryCatch(() => cmdEnterAgent(conn, selected.agent, manifest));
     if (!enterResult.ok) {
       p.log.error(`Connection failed: ${getErrorMessage(enterResult.error)}`);
 
@@ -597,7 +597,7 @@ export async function handleRecordAction(
   }
 
   if (action === "dashboard") {
-    const dashResult = await asyncTryCatch(() => cmdOpenDashboard(selected.connection));
+    const dashResult = await asyncTryCatch(() => cmdOpenDashboard(conn));
     if (!dashResult.ok) {
       p.log.error(`Dashboard failed: ${getErrorMessage(dashResult.error)}`);
     }
@@ -605,7 +605,7 @@ export async function handleRecordAction(
   }
 
   if (action === "reconnect") {
-    const reconnectResult = await asyncTryCatch(() => cmdConnect(selected.connection));
+    const reconnectResult = await asyncTryCatch(() => cmdConnect(conn));
     if (!reconnectResult.ok) {
       p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);
 

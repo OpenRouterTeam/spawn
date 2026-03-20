@@ -653,10 +653,11 @@ async function tryDoOAuth(): Promise<string | null> {
 
   // Exchange code for token
   logStep("Exchanging authorization code for access token...");
+  const code = oauthCode; // capture for closure (TS can't narrow `let` across async boundaries)
   const exchangeResult = await asyncTryCatch(async () => {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
-      code: oauthCode,
+      code,
       client_id: DO_CLIENT_ID,
       client_secret: DO_CLIENT_SECRET,
       redirect_uri: redirectUri,
@@ -1069,8 +1070,9 @@ export async function createServer(
         logStep("Retrying droplet creation...");
         const retryText = await doApi("POST", "/droplets", body);
         const retryData = parseJsonObj(retryText);
-        if (retryData?.droplet?.id) {
-          _state.dropletId = String(retryData.droplet.id);
+        const retryDroplet = toRecord(retryData?.droplet);
+        if (retryDroplet?.id) {
+          _state.dropletId = String(retryDroplet.id);
           logInfo(`Droplet created: ID=${_state.dropletId}`);
           await waitForDropletActive(_state.dropletId);
           return {
@@ -1099,8 +1101,9 @@ export async function createServer(
   }
 
   const createData = parseJsonObj(createApiResult.data);
+  const createdDroplet = toRecord(createData?.droplet);
 
-  if (!createData?.droplet?.id) {
+  if (!createdDroplet?.id) {
     logError("Failed to create DigitalOcean droplet: unexpected API response");
     showNonBillingError(digitaloceanBilling, [
       "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
@@ -1109,7 +1112,7 @@ export async function createServer(
     throw new Error("Droplet creation failed");
   }
 
-  _state.dropletId = String(createData.droplet.id);
+  _state.dropletId = String(createdDroplet.id);
   logInfo(`Droplet created: ID=${_state.dropletId}`);
 
   // Wait for droplet to become active and get IP
@@ -1142,10 +1145,12 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
       throw r.error;
     }
     const data = parseJsonObj(r.data);
-    const status = data?.droplet?.status;
+    const droplet = toRecord(data?.droplet);
+    const status = droplet?.status;
 
     if (status === "active") {
-      const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
+      const networks = toRecord(droplet?.networks);
+      const v4Networks = toObjectArray(networks?.v4);
       const publicNet = v4Networks.find((n) => n.type === "public");
       if (publicNet?.ip_address) {
         _state.serverIp = isString(publicNet.ip_address) ? publicNet.ip_address : "";
@@ -1527,7 +1532,9 @@ export async function getServerIp(dropletId: string): Promise<string | null> {
     throw r.error;
   }
   const data = parseJsonObj(r.data);
-  const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
+  const droplet = toRecord(data?.droplet);
+  const networks = toRecord(droplet?.networks);
+  const v4Networks = toObjectArray(networks?.v4);
   const publicNet = v4Networks.find((n) => n.type === "public");
   return publicNet?.ip_address && isString(publicNet.ip_address) ? publicNet.ip_address : null;
 }
@@ -1537,7 +1544,8 @@ export async function listServers(): Promise<CloudInstance[]> {
   const droplets = await doGetAll("/droplets", "droplets");
   const results: CloudInstance[] = [];
   for (const d of droplets) {
-    const v4Networks = toObjectArray(d?.networks?.v4);
+    const networks = toRecord(d.networks);
+    const v4Networks = toObjectArray(networks?.v4);
     const publicNet = v4Networks.find((n) => n.type === "public");
     const ip = publicNet?.ip_address && isString(publicNet.ip_address) ? publicNet.ip_address : "";
     results.push({
