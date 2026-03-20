@@ -1,7 +1,14 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-const { validateServerName, validateRegionName, validateModelId, toKebabCase, sanitizeTermValue, jsonEscape } =
-  await import("../shared/ui.js");
+const {
+  validateServerName,
+  validateRegionName,
+  validateModelId,
+  toKebabCase,
+  sanitizeTermValue,
+  jsonEscape,
+  retryOrQuit,
+} = await import("../shared/ui.js");
 
 // ── validateServerName ──────────────────────────────────────────────
 
@@ -202,5 +209,28 @@ describe("jsonEscape", () => {
 
   it("escapes backslashes", () => {
     expect(jsonEscape("path\\to\\file")).toBe('"path\\\\to\\\\file"');
+  });
+});
+
+// ── retryOrQuit ──────────────────────────────────────────────────────────
+
+describe("retryOrQuit", () => {
+  let savedNonInteractive: string | undefined;
+
+  beforeEach(() => {
+    savedNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
+  });
+
+  afterEach(() => {
+    if (savedNonInteractive !== undefined) {
+      process.env.SPAWN_NON_INTERACTIVE = savedNonInteractive;
+    } else {
+      delete process.env.SPAWN_NON_INTERACTIVE;
+    }
+  });
+
+  it("throws immediately in non-interactive mode", async () => {
+    process.env.SPAWN_NON_INTERACTIVE = "1";
+    await expect(retryOrQuit("Retry?")).rejects.toThrow("Non-interactive mode: cannot retry");
   });
 });
