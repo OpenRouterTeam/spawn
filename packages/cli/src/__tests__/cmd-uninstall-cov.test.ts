@@ -39,6 +39,18 @@ describe("cmdUninstall", () => {
 
   afterEach(() => {
     processExitSpy.mockRestore();
+    // Re-create sandbox directories that uninstall tests may have deleted
+    for (const dir of [
+      ".spawn",
+      ".cache",
+      ".config",
+      ".ssh",
+      ".claude",
+    ]) {
+      fs.mkdirSync(join(home, dir), {
+        recursive: true,
+      });
+    }
   });
 
   it("shows nothing to uninstall when nothing exists", async () => {
