@@ -21,7 +21,7 @@ INPUT_TEST_MARKER="SPAWN_E2E_OK"
 _validate_base64() {
   local val="$1"
   # Use printf + grep to avoid bash regex portability issues (bash 3.x on macOS)
-  if ! printf '%s' "${val}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
+  if [ -z "${val}" ] || ! printf '%s' "${val}" | grep -qE '^[A-Za-z0-9+/=]*$'; then
     log_err "SECURITY: encoded_prompt contains non-base64 characters — aborting"
     return 1
   fi
@@ -31,26 +31,16 @@ _validate_base64() {
 # _stage_prompt_remotely APP ENCODED_PROMPT
 #
 # Writes the base64-encoded prompt to a temp file on the remote host.
-# This isolates prompt data from the complex agent command strings:
-#   - The encoded prompt is never interpolated into the command string
-#   - Instead, it is injected via printf format substitution into a
-#     remote command that uses a shell variable (_EP), so the value
-#     never appears literally in the command passed to cloud_exec
-#   - The main agent commands read from /tmp/.e2e-prompt and never
-#     have prompt data interpolated into them
+# Uses stdin piping so the encoded prompt is never interpolated into a
+# command string — eliminating command injection risk entirely.
 # ---------------------------------------------------------------------------
 _stage_prompt_remotely() {
   local app="$1"
   local encoded_prompt="$2"
-  # Build the remote command via printf so encoded_prompt is never
-  # interpolated into the command string directly. The %s substitution
-  # places the value into a single-quoted shell variable assignment on the
-  # remote side. Single quotes prevent all shell expansion; base64 charset
-  # [A-Za-z0-9+/=] cannot contain single quotes, so the quoting is safe by
-  # construction (validated by _validate_base64 as defense-in-depth).
-  local remote_cmd
-  remote_cmd=$(printf "_EP='%s'; printf '%%s' \"\$_EP\" > /tmp/.e2e-prompt" "${encoded_prompt}")
-  cloud_exec "${app}" "${remote_cmd}"
+  # Pipe the encoded prompt via stdin to cloud_exec, which writes it to a
+  # temp file on the remote side. The prompt data never appears in the
+  # command string, so there is zero injection surface.
+  printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "cat > /tmp/.e2e-prompt"
 }
 
 # ---------------------------------------------------------------------------
