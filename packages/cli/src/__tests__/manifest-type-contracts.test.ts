@@ -112,15 +112,19 @@ describe("Agent optional field types (when present)", () => {
     }
   });
 
-  it("config_files should be an object with string keys for all agents that have it", () => {
+  it("config_files should be an object with path-like string keys and object values for all agents that have it", () => {
     const agentsWithConfigFiles = allAgents.filter(([, agent]) => agent.config_files !== undefined);
     expect(agentsWithConfigFiles.length).toBeGreaterThan(0);
     for (const [, agent] of agentsWithConfigFiles) {
       expect(typeof agent.config_files).toBe("object");
       expect(agent.config_files).not.toBeNull();
-      for (const filePath of Object.keys(agent.config_files!)) {
+      for (const [filePath, content] of Object.entries(agent.config_files!)) {
         expect(typeof filePath).toBe("string");
         expect(filePath.length).toBeGreaterThan(0);
+        // File paths should contain / or ~ or . indicating a real path
+        expect(filePath).toMatch(/[/~.]/);
+        expect(typeof content).toBe("object");
+        expect(content).not.toBeNull();
       }
     }
   });
@@ -372,23 +376,6 @@ describe("Agent metadata field types", () => {
       for (const tag of agent.tags!) {
         expect(typeof tag, `agent "${key}" tag "${tag}"`).toBe("string");
         expect(tag.length, `agent "${key}" tag "${tag}" length`).toBeGreaterThan(0);
-      }
-    }
-  });
-});
-
-// ── Config files structure ────────────────────────────────────────────────
-
-describe("Config files structure", () => {
-  it("config file paths should look like file paths and values should be objects", () => {
-    const agentsWithConfigFiles = allAgents.filter(([, agent]) => agent.config_files !== undefined);
-    expect(agentsWithConfigFiles.length).toBeGreaterThan(0);
-    for (const [, agent] of agentsWithConfigFiles) {
-      for (const [filePath, content] of Object.entries(agent.config_files!)) {
-        // Should contain / or ~ or . indicating a path
-        expect(filePath).toMatch(/[/~.]/);
-        expect(typeof content).toBe("object");
-        expect(content).not.toBeNull();
       }
     }
   });
