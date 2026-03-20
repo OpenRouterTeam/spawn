@@ -19,8 +19,8 @@ SPAWN_REASON="${SPAWN_REASON:-manual}"
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 
 # Validate SPAWN_ISSUE is a positive integer to prevent command injection
-if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: SPAWN_ISSUE must be a positive integer, got: '${SPAWN_ISSUE}'" >&2
+if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: SPAWN_ISSUE must be a positive integer (1 or greater), got: '${SPAWN_ISSUE}'" >&2
     exit 1
 fi
 
