@@ -43,6 +43,7 @@ import {
   logWarn,
   openBrowser,
   prompt,
+  retryOrQuit,
   sanitizeTermValue,
   selectFromList,
   shellQuote,
@@ -765,28 +766,30 @@ export async function ensureDoToken(): Promise<boolean> {
     _state.token = "";
   }
 
-  // 4. Manual entry (fallback)
-  logStep("DigitalOcean API Token Required");
-  logWarn("Get a token from: https://cloud.digitalocean.com/account/api/tokens");
+  // 4. Manual entry (retry loop — never exits unless user says no)
+  for (;;) {
+    logStep("DigitalOcean API Token Required");
+    logWarn("Get a token from: https://cloud.digitalocean.com/account/api/tokens");
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const token = await prompt("Enter your DigitalOcean API token: ");
-    if (!token) {
-      logError("Token cannot be empty");
-      continue;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const token = await prompt("Enter your DigitalOcean API token: ");
+      if (!token) {
+        logError("Token cannot be empty");
+        continue;
+      }
+      _state.token = token.trim();
+      if (await testDoToken()) {
+        await saveTokenToConfig(_state.token);
+        logInfo("DigitalOcean API token validated and saved");
+        return false;
+      }
+      logError("Token is invalid");
+      _state.token = "";
     }
-    _state.token = token.trim();
-    if (await testDoToken()) {
-      await saveTokenToConfig(_state.token);
-      logInfo("DigitalOcean API token validated and saved");
-      return false;
-    }
-    logError("Token is invalid");
-    _state.token = "";
+
+    logError("No valid token after 3 attempts");
+    await retryOrQuit("Try DigitalOcean authentication again?");
   }
-
-  logError("No valid token after 3 attempts");
-  throw new Error("DigitalOcean authentication failed");
 }
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────

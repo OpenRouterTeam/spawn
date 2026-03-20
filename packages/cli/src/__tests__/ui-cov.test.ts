@@ -1,0 +1,441 @@
+/**
+ * ui-cov.test.ts — Coverage tests for shared/ui.ts
+ *
+ * NOTE: do-payment-warning.test.ts uses mock.module("../shared/ui") which
+ * contaminates any file that does `await import("../shared/ui.js")`.
+ * To work around this, we import statically (which captures real functions)
+ * and exercise logging via direct calls, checking they don't throw.
+ * For functions that need @clack/prompts, we mock that first.
+ */
+
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { mockClackPrompts } from "./test-helpers";
+
+const clackMocks = mockClackPrompts({
+  text: mock(() => Promise.resolve("user-input")),
+  select: mock(() => Promise.resolve("selected-id")),
+});
+
+// Static imports capture the REAL functions before mock.module can interfere.
+import {
+  defaultSpawnName,
+  Err,
+  getServerNameFromEnv,
+  jsonEscape,
+  loadApiToken,
+  logDebug,
+  logError,
+  logInfo,
+  logStep,
+  logStepDone,
+  logStepInline,
+  logWarn,
+  Ok,
+  openBrowser,
+  prepareStdinForHandoff,
+  prompt,
+  promptSpawnNameShared,
+  sanitizeTermValue,
+  selectFromList,
+  shellQuote,
+  toKebabCase,
+  validateModelId,
+  validateRegionName,
+  validateServerName,
+  withRetry,
+} from "../shared/ui";
+
+// ── Setup / Teardown ────────────────────────────────────────────────────
+
+let stderrSpy: ReturnType<typeof spyOn>;
+let stderrOutput: string[];
+
+beforeEach(() => {
+  stderrOutput = [];
+  stderrSpy = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    stderrOutput.push(String(chunk));
+    return true;
+  });
+});
+
+afterEach(() => {
+  stderrSpy.mockRestore();
+  delete process.env.SPAWN_DEBUG;
+  delete process.env.SPAWN_NON_INTERACTIVE;
+  delete process.env.SPAWN_NAME;
+  delete process.env.SPAWN_NAME_KEBAB;
+  delete process.env.SPAWN_NAME_DISPLAY;
+});
+
+// ── Logging functions ──────────────────────────────────────────────
+
+describe("logging functions", () => {
+  it("logInfo writes green text to stderr", () => {
+    logInfo("test info");
+    expect(stderrOutput.join("")).toContain("test info");
+  });
+
+  it("logWarn writes yellow text to stderr", () => {
+    logWarn("test warn");
+    expect(stderrOutput.join("")).toContain("test warn");
+  });
+
+  it("logError writes red text to stderr", () => {
+    logError("test error");
+    expect(stderrOutput.join("")).toContain("test error");
+  });
+
+  it("logStep writes cyan text to stderr", () => {
+    logStep("test step");
+    expect(stderrOutput.join("")).toContain("test step");
+  });
+
+  it("logStepInline writes without newline", () => {
+    logStepInline("inline msg");
+    const output = stderrOutput.join("");
+    expect(output).toContain("inline msg");
+    expect(output).not.toEndWith("\n");
+  });
+
+  it("logStepDone clears the line", () => {
+    logStepDone();
+    const output = stderrOutput.join("");
+    expect(output).toContain("\r");
+  });
+
+  it("logDebug only outputs when SPAWN_DEBUG=1", () => {
+    logDebug("invisible");
+    expect(stderrOutput.join("")).toBe("");
+    process.env.SPAWN_DEBUG = "1";
+    logDebug("visible");
+    expect(stderrOutput.join("")).toContain("visible");
+  });
+});
+
+// ── prompt ──────────────────────────────────────────────────────────
+
+describe("prompt", () => {
+  it("throws when SPAWN_NON_INTERACTIVE is set", async () => {
+    process.env.SPAWN_NON_INTERACTIVE = "1";
+    await expect(prompt("question")).rejects.toThrow("Cannot prompt");
+  });
+
+  it("returns trimmed text input from clack", async () => {
+    const result = await prompt("Enter value:");
+    expect(result).toBe("user-input");
+  });
+});
+
+// ── selectFromList ─────────────────────────────────────────────────
+
+describe("selectFromList", () => {
+  it("returns default for empty items", async () => {
+    const result = await selectFromList([], "Pick one", "fallback");
+    expect(result).toBe("fallback");
+  });
+
+  it("returns the only item when single item provided", async () => {
+    const result = await selectFromList(
+      [
+        "only-one|Only One",
+      ],
+      "Pick",
+      "",
+    );
+    expect(result).toBe("only-one");
+  });
+
+  it("parses pipe-separated items for selection", async () => {
+    const result = await selectFromList(
+      [
+        "a|Alpha",
+        "b|Beta",
+      ],
+      "Pick",
+      "a",
+    );
+    expect(typeof result).toBe("string");
+  });
+});
+
+// ── openBrowser ────────────────────────────────────────────────────
+
+describe("openBrowser", () => {
+  it("shows URL in stderr output on linux", () => {
+    // biome-ignore lint: test mock — spawnSync return type needs assertion
+    const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
+      exitCode: 1,
+      stdout: Buffer.from(""),
+      stderr: Buffer.from(""),
+      success: false,
+    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+    openBrowser("https://example.com");
+    spawnSyncSpy.mockRestore();
+    expect(stderrOutput.join("")).toContain("https://example.com");
+  });
+
+  it("shows different message when browser opens successfully", () => {
+    // biome-ignore lint: test mock — spawnSync return type needs assertion
+    const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
+      exitCode: 0,
+      stdout: Buffer.from(""),
+      stderr: Buffer.from(""),
+      success: true,
+    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+    openBrowser("https://example.com");
+    spawnSyncSpy.mockRestore();
+    expect(stderrOutput.join("")).toContain("https://example.com");
+  });
+
+  it("handles exception from Bun.spawnSync gracefully", () => {
+    const spawnSyncSpy = spyOn(Bun, "spawnSync").mockImplementation(() => {
+      throw new Error("no browser");
+    });
+    openBrowser("https://example.com");
+    spawnSyncSpy.mockRestore();
+    expect(stderrOutput.join("")).toContain("https://example.com");
+  });
+});
+
+// ── loadApiToken ───────────────────────────────────────────────────
+
+describe("loadApiToken", () => {
+  it("returns token from api_key field", () => {
+    const configPath = join(process.env.HOME ?? "/tmp", ".config", "spawn");
+    mkdirSync(configPath, {
+      recursive: true,
+    });
+    writeFileSync(
+      join(configPath, "hetzner.json"),
+      JSON.stringify({
+        api_key: "test-hetzner-token",
+      }),
+    );
+    const token = loadApiToken("hetzner");
+    expect(token).toBe("test-hetzner-token");
+  });
+
+  it("returns token from token field when api_key is missing", () => {
+    const configPath = join(process.env.HOME ?? "/tmp", ".config", "spawn");
+    mkdirSync(configPath, {
+      recursive: true,
+    });
+    writeFileSync(
+      join(configPath, "digitalocean.json"),
+      JSON.stringify({
+        token: "do-tok",
+      }),
+    );
+    const token = loadApiToken("digitalocean");
+    expect(token).toBe("do-tok");
+  });
+
+  it("returns null when no config file exists", () => {
+    const token = loadApiToken("nonexistent");
+    expect(token).toBeNull();
+  });
+
+  it("returns null when config is malformed", () => {
+    const configPath = join(process.env.HOME ?? "/tmp", ".config", "spawn");
+    mkdirSync(configPath, {
+      recursive: true,
+    });
+    writeFileSync(join(configPath, "bad.json"), "not json");
+    const token = loadApiToken("bad");
+    expect(token).toBeNull();
+  });
+});
+
+// ── shellQuote ─────────────────────────────────────────────────────
+
+describe("shellQuote", () => {
+  it("wraps simple string in single quotes", () => {
+    expect(shellQuote("hello")).toBe("'hello'");
+  });
+
+  it("escapes single quotes within string", () => {
+    const result = shellQuote("it's");
+    expect(result).toContain("it");
+    expect(result).toContain("s");
+  });
+
+  it("handles empty string", () => {
+    expect(shellQuote("")).toBe("''");
+  });
+
+  it("throws on null bytes", () => {
+    expect(() => shellQuote("a\x00b")).toThrow("null bytes");
+  });
+});
+
+// ── jsonEscape ─────────────────────────────────────────────────────
+
+describe("jsonEscape", () => {
+  it("escapes special JSON characters", () => {
+    const result = jsonEscape('a"b\\c');
+    expect(result).toContain('\\"');
+    expect(result).toContain("\\\\");
+  });
+});
+
+// ── validators ─────────────────────────────────────────────────────
+
+describe("validators", () => {
+  it("validateServerName accepts valid names", () => {
+    expect(validateServerName("my-server-123")).toBe(true);
+  });
+
+  it("validateServerName rejects invalid names", () => {
+    expect(validateServerName("bad name!")).toBe(false);
+  });
+
+  it("validateRegionName accepts valid regions", () => {
+    expect(validateRegionName("us-east-1")).toBe(true);
+  });
+
+  it("validateRegionName rejects invalid regions", () => {
+    expect(validateRegionName("bad region!")).toBe(false);
+  });
+
+  it("validateModelId accepts valid model IDs", () => {
+    expect(validateModelId("anthropic/claude-3.5-sonnet")).toBe(true);
+  });
+
+  it("validateModelId rejects invalid model IDs", () => {
+    expect(validateModelId("bad model ID!")).toBe(false);
+  });
+});
+
+// ── toKebabCase ────────────────────────────────────────────────────
+
+describe("toKebabCase", () => {
+  it("converts spaces to hyphens", () => {
+    expect(toKebabCase("Hello World")).toBe("hello-world");
+  });
+
+  it("lowercases everything", () => {
+    expect(toKebabCase("MyServer")).toBe("myserver");
+  });
+});
+
+// ── sanitizeTermValue ──────────────────────────────────────────────
+
+describe("sanitizeTermValue", () => {
+  it("strips non-printable characters", () => {
+    const result = sanitizeTermValue("xterm\x00\x1b[31m-256color");
+    expect(result).not.toContain("\x00");
+  });
+
+  it("passes through clean values", () => {
+    expect(sanitizeTermValue("xterm-256color")).toBe("xterm-256color");
+  });
+});
+
+// ── defaultSpawnName ───────────────────────────────────────────────
+
+describe("defaultSpawnName", () => {
+  it("generates a name with spawn- prefix", () => {
+    const name = defaultSpawnName();
+    expect(name).toMatch(/^spawn-[a-z0-9]+$/);
+  });
+});
+
+// ── getServerNameFromEnv ───────────────────────────────────────────
+
+describe("getServerNameFromEnv", () => {
+  it("returns cloud-specific env var when set", () => {
+    process.env.MY_CLOUD_NAME = "my-server";
+    const name = getServerNameFromEnv("MY_CLOUD_NAME");
+    delete process.env.MY_CLOUD_NAME;
+    expect(name).toBe("my-server");
+  });
+
+  it("falls back to SPAWN_NAME_KEBAB or default", () => {
+    delete process.env.NONEXISTENT_VAR;
+    process.env.SPAWN_NAME_KEBAB = "kebab-name";
+    const name = getServerNameFromEnv("NONEXISTENT_VAR");
+    delete process.env.SPAWN_NAME_KEBAB;
+    expect(name).toBe("kebab-name");
+  });
+});
+
+// ── promptSpawnNameShared ──────────────────────────────────────────
+
+describe("promptSpawnNameShared", () => {
+  it("skips when SPAWN_NAME_KEBAB already set", async () => {
+    process.env.SPAWN_NAME_KEBAB = "already-set";
+    await promptSpawnNameShared("Test Cloud");
+    // Should return immediately without prompting
+    expect(process.env.SPAWN_NAME_KEBAB).toBe("already-set");
+  });
+
+  it("uses user input from prompt in interactive mode", async () => {
+    delete process.env.SPAWN_NAME;
+    delete process.env.SPAWN_NAME_KEBAB;
+    delete process.env.SPAWN_NAME_DISPLAY;
+    delete process.env.SPAWN_NON_INTERACTIVE;
+    await promptSpawnNameShared("Test Cloud");
+    // Should have set SPAWN_NAME_KEBAB via prompt
+    expect(process.env.SPAWN_NAME_KEBAB).toBeTruthy();
+  });
+
+  it("uses default name in non-interactive mode", async () => {
+    delete process.env.SPAWN_NAME;
+    delete process.env.SPAWN_NAME_KEBAB;
+    process.env.SPAWN_NON_INTERACTIVE = "1";
+    await promptSpawnNameShared("Test Cloud");
+    expect(process.env.SPAWN_NAME_KEBAB).toMatch(/^spawn-/);
+  });
+});
+
+// ── withRetry ──────────────────────────────────────────────────────
+
+describe("withRetry", () => {
+  it("returns data on first success", async () => {
+    const result = await withRetry("test", async () => Ok("done"), 3, 0);
+    expect(result).toBe("done");
+  });
+
+  it("retries on Err and throws last error after max attempts", async () => {
+    let attempt = 0;
+    await expect(
+      withRetry(
+        "test",
+        async () => {
+          attempt++;
+          return Err(new Error(`fail ${attempt}`));
+        },
+        2,
+        0,
+      ),
+    ).rejects.toThrow("fail 2");
+    expect(attempt).toBe(2);
+  });
+
+  it("succeeds after initial Err results", async () => {
+    let attempt = 0;
+    const result = await withRetry(
+      "test",
+      async () => {
+        attempt++;
+        if (attempt < 3) {
+          return Err(new Error("not yet"));
+        }
+        return Ok("success");
+      },
+      3,
+      0,
+    );
+    expect(result).toBe("success");
+  });
+});
+
+// ── prepareStdinForHandoff ─────────────────────────────────────────
+
+describe("prepareStdinForHandoff", () => {
+  it("does not throw", () => {
+    expect(() => prepareStdinForHandoff()).not.toThrow();
+  });
+});

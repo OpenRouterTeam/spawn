@@ -1,2 +1,5 @@
 [test]
 preload = ["./src/__tests__/preload.ts"]
+
+[test.coverage]
+threshold = { line = 80, function = 90 }

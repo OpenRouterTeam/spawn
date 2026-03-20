@@ -31,6 +31,7 @@ source "${SCRIPT_DIR}/lib/provision.sh"
 source "${SCRIPT_DIR}/lib/verify.sh"
 source "${SCRIPT_DIR}/lib/teardown.sh"
 source "${SCRIPT_DIR}/lib/soak.sh"
+source "${SCRIPT_DIR}/lib/interactive.sh"
 
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
@@ -47,6 +48,7 @@ SKIP_CLEANUP=0
 SKIP_INPUT_TEST="${SKIP_INPUT_TEST:-0}"
 SEQUENTIAL_MODE=0
 SOAK_MODE=0
+INTERACTIVE_MODE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -108,6 +110,10 @@ while [ $# -gt 0 ]; do
       SOAK_MODE=1
       shift
       ;;
+    --interactive)
+      INTERACTIVE_MODE=1
+      shift
+      ;;
     --help|-h)
       printf "Usage: %s --cloud CLOUD [--cloud CLOUD2 ...] [agents...] [options]\n\n" "$0"
       printf "Clouds: %s\n" "${ALL_CLOUDS}"
@@ -120,6 +126,7 @@ while [ $# -gt 0 ]; do
       printf "  --skip-cleanup      Skip stale e2e-* instance cleanup\n"
       printf "  --skip-input-test   Skip live input tests\n"
       printf "  --soak              Run Telegram soak test (OpenClaw on Sprite)\n"
+      printf "  --interactive       AI-driven interactive test (requires ANTHROPIC_API_KEY)\n"
       printf "  --help              Show this help\n"
       exit 0
       ;;
@@ -211,10 +218,20 @@ run_single_agent() {
   # Run core logic in a subshell so we can kill it on timeout
   (
     local _inner_status="fail"
-    if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
-      if verify_agent "${agent}" "${app_name}"; then
+    if [ "${INTERACTIVE_MODE}" -eq 1 ]; then
+      # AI-driven interactive mode: provision + verify in one step
+      if interactive_provision "${agent}" "${app_name}" "${LOG_DIR}"; then
         if run_input_test "${agent}" "${app_name}"; then
           _inner_status="pass"
+        fi
+      fi
+    else
+      # Standard headless mode
+      if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
+        if verify_agent "${agent}" "${app_name}"; then
+          if run_input_test "${agent}" "${app_name}"; then
+            _inner_status="pass"
+          fi
         fi
       fi
     fi

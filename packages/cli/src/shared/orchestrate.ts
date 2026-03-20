@@ -21,12 +21,14 @@ import { sleep, startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import {
   logDebug,
+  logError,
   logInfo,
   logStep,
   logWarn,
   openBrowser,
   prepareStdinForHandoff,
   prompt,
+  retryOrQuit,
   shellQuote,
   validateModelId,
   withRetry,
@@ -38,6 +40,8 @@ export interface CloudOrchestrator {
   runner: CloudRunner;
   /** When true, skip tarball + agent install (e.g. booting from a pre-baked snapshot). */
   skipAgentInstall?: boolean;
+  /** When true, skip cloud-init wait — just wait for SSH (e.g. minimal-tier agent with tarball). */
+  skipCloudInit?: boolean;
   authenticate(): Promise<void>;
   checkAccountReady?(): Promise<void>;
   promptSize(): Promise<void>;
@@ -121,6 +125,18 @@ export async function runOrchestration(
   const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
   const useTarball = fastMode || betaFeatures.has("tarball");
 
+  // Skip cloud-init for minimal-tier agents when using tarballs or snapshots.
+  // Ubuntu 24.04 base images already have curl + git, so minimal agents (claude,
+  // opencode, zeroclaw, hermes) don't need the cloud-init package install step.
+  // This saves ~30-60s by just waiting for SSH instead of polling for cloud-init completion.
+  if (
+    cloud.cloudName !== "local" &&
+    (useTarball || cloud.skipAgentInstall) &&
+    (agent.cloudInitTier === "minimal" || !agent.cloudInitTier)
+  ) {
+    cloud.skipCloudInit = true;
+  }
+
   // 1b. Size/bundle selection (must happen before createServer)
   await cloud.promptSize();
 
@@ -171,9 +187,27 @@ export async function runOrchestration(
       !cloud.skipAgentInstall && !agent.skipTarball ? downloadTarballLocally(agentName) : Promise.resolve(null),
     ]);
 
-    // Server boot must succeed
+    // Server boot must succeed — retry if it failed
     if (bootResult.status === "rejected") {
-      throw bootResult.reason;
+      logError(getErrorMessage(bootResult.reason));
+      await retryOrQuit("Retry server creation?");
+      // User chose to retry — fall through to sequential path which has full retry loops
+      // (Re-running the concurrent path would re-prompt for API key, etc.)
+      const connection = await cloud.createServer(serverName);
+      const spawnName2 = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+      saveSpawnRecord({
+        id: spawnId,
+        agent: agentName,
+        cloud: cloud.cloudName,
+        timestamp: new Date().toISOString(),
+        ...(spawnName2
+          ? {
+              name: spawnName2,
+            }
+          : {}),
+        connection,
+      });
+      await cloud.waitForReady();
     }
 
     // API key must succeed
@@ -211,7 +245,14 @@ export async function runOrchestration(
         installed = await tarball(cloud.runner, agentName);
       }
       if (!installed) {
-        await agent.install();
+        for (;;) {
+          const r = await asyncTryCatch(() => agent.install());
+          if (r.ok) {
+            break;
+          }
+          logError(getErrorMessage(r.error));
+          await retryOrQuit("Retry agent install?");
+        }
       }
     }
 
@@ -250,8 +291,17 @@ export async function runOrchestration(
       logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
     }
 
-    // 5. Provision server
-    const connection = await cloud.createServer(serverName);
+    // 5. Provision server (retry loop)
+    let connection: VMConnection;
+    for (;;) {
+      const r = await asyncTryCatch(() => cloud.createServer(serverName));
+      if (r.ok) {
+        connection = r.data;
+        break;
+      }
+      logError(getErrorMessage(r.error));
+      await retryOrQuit("Retry server creation?");
+    }
     const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
     saveSpawnRecord({
       id: spawnId,
@@ -266,8 +316,15 @@ export async function runOrchestration(
       connection,
     });
 
-    // 6. Wait for readiness
-    await cloud.waitForReady();
+    // 6. Wait for readiness (retry loop)
+    for (;;) {
+      const r = await asyncTryCatch(() => cloud.waitForReady());
+      if (r.ok) {
+        break;
+      }
+      logError(getErrorMessage(r.error));
+      await retryOrQuit("Server may still be starting. Keep waiting?");
+    }
 
     // 7. Env config
     const envPairs = agent.envVars(apiKey);
@@ -286,7 +343,14 @@ export async function runOrchestration(
         installedFromTarball = await tarball(cloud.runner, agentName);
       }
       if (!installedFromTarball) {
-        await agent.install();
+        for (;;) {
+          const r = await asyncTryCatch(() => agent.install());
+          if (r.ok) {
+            break;
+          }
+          logError(getErrorMessage(r.error));
+          await retryOrQuit("Retry agent install?");
+        }
       }
     }
 
@@ -362,9 +426,16 @@ async function postInstall(
     await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
   }
 
-  // Pre-launch hooks
+  // Pre-launch hooks (retry loop)
   if (agent.preLaunch) {
-    await agent.preLaunch();
+    for (;;) {
+      const r = await asyncTryCatch(() => agent.preLaunch!());
+      if (r.ok) {
+        break;
+      }
+      logError(getErrorMessage(r.error));
+      await retryOrQuit("Retry pre-launch setup?");
+    }
   }
 
   // SSH tunnel for web dashboard

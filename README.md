@@ -119,18 +119,35 @@ Available steps vary by agent:
 | `telegram` | openclaw | Telegram bot (set `TELEGRAM_BOT_TOKEN` for non-interactive) |
 | `whatsapp` | openclaw | WhatsApp linking (interactive QR scan, skipped in headless) |
 
-#### Beta Features
+#### Fast Mode
 
-Experimental features can be enabled with `--beta <feature>`. The flag is repeatable:
+Use `--fast` for significantly faster deploys. Enables all speed optimizations:
 
 ```bash
-spawn claude gcp --beta tarball
+spawn claude hetzner --fast
+```
+
+What `--fast` does:
+- **Parallel boot**: server creation runs concurrently with API key prompt and account checks
+- **Tarballs**: installs agents from pre-built tarballs instead of live install
+- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, ZeroClaw, Hermes), skips the package install wait since the base OS already has what's needed
+- **Snapshots**: uses pre-built cloud images when available (Hetzner, DigitalOcean)
+
+#### Beta Features
+
+Individual optimizations can be enabled separately with `--beta <feature>`. The flag is repeatable:
+
+```bash
+spawn claude gcp --beta tarball --beta parallel
 ```
 
 | Feature | Description |
 |---------|-------------|
 | `tarball` | Use pre-built tarball for agent install (faster, skips live install) |
-| `images` | Use pre-built DigitalOcean marketplace images (faster boot, skips cloud-init) |
+| `images` | Use pre-built cloud images/snapshots (faster boot) |
+| `parallel` | Parallelize server boot with setup prompts |
+
+`--fast` enables all three.
 
 ### Without the CLI
 

@@ -4,65 +4,27 @@
  * Verifies that ensureDoToken() shows a proactive payment method reminder to
  * first-time DigitalOcean users who have no saved config and no env token.
  *
- * Design note: we spread the real ../shared/ui implementations so other tests
- * that run in the same worker (e.g. ui-utils.test.ts, billing-guidance.test.ts)
- * still get real validation functions. We only override what we need to control.
+ * Uses spyOn on the real ui module to avoid mock.module contamination.
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import * as ui from "../shared/ui";
+import { mockClackPrompts } from "./test-helpers";
 
-// ── Import the real ui module so we can spread its implementations ────────────
-// This prevents contaminating ui-utils.test.ts which tests real validation logic.
-
-import * as realUI from "../shared/ui";
-
-// ── Controlled overrides ──────────────────────────────────────────────────────
-
-const mockLoadApiToken = mock((_cloud: string): string | null => null);
-const warnMessages: string[] = [];
-const mockLogWarn = mock((msg: string) => {
-  warnMessages.push(msg);
-});
-const mockPrompt = mock(() => Promise.resolve(""));
-const mockLogStep = mock(() => {});
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-
-// Spread real implementations so other test files still get working functions.
-// Only override the handful of functions we need to control for this test.
-mock.module("../shared/ui", () => ({
-  ...realUI,
-  loadApiToken: mockLoadApiToken,
-  logWarn: mockLogWarn,
-  prompt: mockPrompt,
-  logStep: mockLogStep,
-  logError: mockLogError,
-  logInfo: mockLogInfo,
-  logStepDone: mock(() => {}),
-  logStepInline: mock(() => {}),
-  openBrowser: mock(() => {}),
-}));
-
-// ── Import unit under test ────────────────────────────────────────────────────
+// Mock @clack/prompts (required for DO module)
+mockClackPrompts();
 
 const { ensureDoToken } = await import("../digitalocean/digitalocean");
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("ensureDoToken — payment method warning for first-time users", () => {
   const savedEnv: Record<string, string | undefined> = {};
   const originalFetch = globalThis.fetch;
   let stderrSpy: ReturnType<typeof spyOn>;
+  let loadApiTokenSpy: ReturnType<typeof spyOn>;
+  let promptSpy: ReturnType<typeof spyOn>;
+  let warnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    mockLogWarn.mockClear();
-    mockLogError.mockClear();
-    mockLogInfo.mockClear();
-    mockLogStep.mockClear();
-    mockPrompt.mockClear();
-    mockLoadApiToken.mockClear();
-    warnMessages.length = 0;
-
     // Save and clear DO_API_TOKEN
     savedEnv["DO_API_TOKEN"] = process.env.DO_API_TOKEN;
     delete process.env.DO_API_TOKEN;
@@ -72,11 +34,19 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
 
     // Suppress stderr noise
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    // Control ui functions via spyOn
+    loadApiTokenSpy = spyOn(ui, "loadApiToken").mockReturnValue(null);
+    promptSpy = spyOn(ui, "prompt").mockImplementation(async () => "");
+    warnSpy = spyOn(ui, "logWarn");
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     stderrSpy.mockRestore();
+    loadApiTokenSpy.mockRestore();
+    promptSpy.mockRestore();
+    warnSpy.mockRestore();
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) {
         delete process.env[key];
@@ -87,43 +57,36 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
   });
 
   it("shows payment method warning for first-time users (no saved token, no env var)", async () => {
-    mockLoadApiToken.mockImplementation(() => null);
-    // Empty prompt responses → manual entry fails × 3 → throws
-    mockPrompt.mockImplementation(() => Promise.resolve(""));
+    await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
 
-    await expect(ensureDoToken()).rejects.toThrow("DigitalOcean authentication failed");
-
-    expect(warnMessages.some((msg) => msg.includes("payment method"))).toBe(true);
-    expect(warnMessages.some((msg) => msg.includes("cloud.digitalocean.com/account/billing"))).toBe(true);
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(true);
+    expect(warnMessages.some((msg: string) => msg.includes("cloud.digitalocean.com/account/billing"))).toBe(true);
   });
 
   it("does NOT show payment warning when a saved token exists (returning user)", async () => {
-    // Saved token exists but is invalid (fetch rejects so testDoToken fails)
-    mockLoadApiToken.mockImplementation((cloud) => (cloud === "digitalocean" ? "dop_v1_invalid" : null));
-    mockPrompt.mockImplementation(() => Promise.resolve(""));
+    loadApiTokenSpy.mockImplementation((cloud: string) => (cloud === "digitalocean" ? "dop_v1_invalid" : null));
 
     await expect(ensureDoToken()).rejects.toThrow();
 
-    expect(warnMessages.some((msg) => msg.includes("payment method"))).toBe(false);
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
   });
 
   it("does NOT show payment warning when DO_API_TOKEN env var is set", async () => {
     process.env.DO_API_TOKEN = "dop_v1_invalid_env_token";
-    mockLoadApiToken.mockImplementation(() => null);
-    mockPrompt.mockImplementation(() => Promise.resolve(""));
 
     await expect(ensureDoToken()).rejects.toThrow();
 
-    expect(warnMessages.some((msg) => msg.includes("payment method"))).toBe(false);
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
   });
 
   it("billing URL in warning points to the DigitalOcean billing page", async () => {
-    mockLoadApiToken.mockImplementation(() => null);
-    mockPrompt.mockImplementation(() => Promise.resolve(""));
+    await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
 
-    await expect(ensureDoToken()).rejects.toThrow("DigitalOcean authentication failed");
-
-    const billingWarning = warnMessages.find((msg) => msg.includes("billing"));
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    const billingWarning = warnMessages.find((msg: string) => msg.includes("billing"));
     expect(billingWarning).toBeDefined();
     expect(billingWarning).toContain("https://cloud.digitalocean.com/account/billing");
   });

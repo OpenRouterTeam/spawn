@@ -8,7 +8,7 @@ import { OAUTH_CODE_REGEX } from "./oauth-constants";
 import { parseJsonObj, parseJsonWith } from "./parse";
 import { getSpawnCloudConfigPath } from "./paths";
 import { asyncTryCatchIf, isFileError, isNetworkError, tryCatch } from "./result.js";
-import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt } from "./ui";
+import { logDebug, logError, logInfo, logStep, logWarn, openBrowser, prompt, retryOrQuit } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -353,30 +353,32 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
     }
   }
 
-  // 3. Try OAuth + manual fallback (3 attempts)
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    // Try OAuth first
-    const key = await tryOauthFlow(5180, agentSlug, cloudSlug);
-    if (key && (await verifyOpenrouterKey(key))) {
-      process.env.OPENROUTER_API_KEY = key;
-      await saveOpenRouterKey(key);
-      return key;
+  // 3. Try OAuth + manual fallback (retry loop — never exits unless user says no)
+  for (;;) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      // Try OAuth first
+      const key = await tryOauthFlow(5180, agentSlug, cloudSlug);
+      if (key && (await verifyOpenrouterKey(key))) {
+        process.env.OPENROUTER_API_KEY = key;
+        await saveOpenRouterKey(key);
+        return key;
+      }
+
+      // OAuth failed — fall through to manual entry
+      process.stderr.write("\n");
+      logWarn("Browser-based login was not completed.");
+      logInfo("Get your API key from: https://openrouter.ai/settings/keys");
+      process.stderr.write("\n");
+
+      const manualKey = await promptAndValidateApiKey();
+      if (manualKey && (await verifyOpenrouterKey(manualKey))) {
+        process.env.OPENROUTER_API_KEY = manualKey;
+        await saveOpenRouterKey(manualKey);
+        return manualKey;
+      }
     }
 
-    // OAuth failed — fall through to manual entry
-    process.stderr.write("\n");
-    logWarn("Browser-based login was not completed.");
-    logInfo("Get your API key from: https://openrouter.ai/settings/keys");
-    process.stderr.write("\n");
-
-    const manualKey = await promptAndValidateApiKey();
-    if (manualKey && (await verifyOpenrouterKey(manualKey))) {
-      process.env.OPENROUTER_API_KEY = manualKey;
-      await saveOpenRouterKey(manualKey);
-      return manualKey;
-    }
+    logError("No valid API key after 3 attempts");
+    await retryOrQuit("Try getting an API key again?");
   }
-
-  logError("No valid API key after 3 attempts");
-  throw new Error("API key acquisition failed");
 }

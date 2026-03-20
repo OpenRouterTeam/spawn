@@ -196,6 +196,26 @@ export function openBrowser(url: string): void {
   }
 }
 
+// ─── Retry-or-quit ─────────────────────────────────────────────────────
+
+/**
+ * Prompt the user to retry or quit after a failure.
+ * - Enter / "y" / anything else → returns (caller retries)
+ * - "n" / "N" / Ctrl+C (empty) → throws (caller exits)
+ *
+ * In non-interactive mode, always throws immediately.
+ */
+export async function retryOrQuit(message: string): Promise<void> {
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    throw new Error("Non-interactive mode: cannot retry");
+  }
+  process.stderr.write("\n");
+  const answer = await prompt(`${message} (Y/n): `);
+  if (!answer || /^[Nn]/.test(answer)) {
+    throw new Error("User chose to exit");
+  }
+}
+
 // ─── Result-based retry ────────────────────────────────────────────────
 
 import type { Result } from "./result";
