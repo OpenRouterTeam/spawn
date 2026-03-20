@@ -447,7 +447,7 @@ const server = Bun.serve({
 
       const batchId = randomUUID();
       const exp = now + day;
-      const providers: ProviderRequest[] = requested.map((k) => {
+      const providerRequests: ProviderRequest[] = requested.map((k) => {
         const info = clouds.get(k);
         return {
           provider: k,
@@ -462,7 +462,7 @@ const server = Bun.serve({
 
       const batch: KeyBatch = {
         batchId,
-        providers,
+        providers: providerRequests,
         emailedAt: now,
         expiresAt: exp,
       };
