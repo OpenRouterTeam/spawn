@@ -189,23 +189,25 @@ fi
 
 # Delete merged security-related remote branches (team-building/*, review-pr-*)
 MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -E 'origin/(team-building/|review-pr-)' | sed 's|origin/||' | tr -d ' ') || true
-for branch in $MERGED_BRANCHES; do
+while IFS= read -r branch; do
+    [[ -z "${branch}" ]] && continue
     if is_safe_branch_name "$branch"; then
         git push origin --delete -- "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
     else
         log "WARNING: Skipping branch with unsafe name: ${branch}"
     fi
-done
+done <<< "${MERGED_BRANCHES}"
 
 # Delete stale local security-related branches
 LOCAL_BRANCHES=$(git branch --list 'team-building/*' --list 'review-pr-*' | tr -d ' *') || true
-for branch in $LOCAL_BRANCHES; do
+while IFS= read -r branch; do
+    [[ -z "${branch}" ]] && continue
     if is_safe_branch_name "$branch"; then
         git branch -D -- "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log "WARNING: Skipping local branch with unsafe name: ${branch}"
     fi
-done
+done <<< "${LOCAL_BRANCHES}"
 
 log "Pre-cycle cleanup done."
 
