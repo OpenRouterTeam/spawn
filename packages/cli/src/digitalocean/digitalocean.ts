@@ -51,6 +51,7 @@ import {
   validateRegionName,
   validateServerName,
 } from "../shared/ui";
+import { digitaloceanBilling } from "./billing";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
@@ -414,7 +415,7 @@ export async function checkAccountStatus(): Promise<void> {
         // Re-check with new account
         return;
       }
-      const shouldRetry = await handleBillingError("digitalocean");
+      const shouldRetry = await handleBillingError(digitaloceanBilling);
       if (!shouldRetry) {
         throw new Error("DigitalOcean account is locked");
       }
@@ -1056,14 +1057,14 @@ export async function createServer(
     const errMsg = createApiResult.error.message;
     logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
 
-    if (isBillingError("digitalocean", errMsg)) {
+    if (isBillingError(digitaloceanBilling, errMsg)) {
       // Offer account switch before billing guidance
       const switched = await promptSwitchAccount();
       if (switched) {
         logStep("Retrying droplet creation with new account...");
         return createServer(name, tier, dropletSize, region, imageOverride);
       }
-      const shouldRetry = await handleBillingError("digitalocean");
+      const shouldRetry = await handleBillingError(digitaloceanBilling);
       if (shouldRetry) {
         logStep("Retrying droplet creation...");
         const retryText = await doApi("POST", "/droplets", body);
@@ -1083,7 +1084,7 @@ export async function createServer(
         logError(`Retry failed: ${String(retryData?.message || "Unknown error")}`);
       }
     } else {
-      showNonBillingError("digitalocean", [
+      showNonBillingError(digitaloceanBilling, [
         "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
         "Droplet limit reached (check account limits)",
       ]);
@@ -1101,7 +1102,7 @@ export async function createServer(
 
   if (!createData?.droplet?.id) {
     logError("Failed to create DigitalOcean droplet: unexpected API response");
-    showNonBillingError("digitalocean", [
+    showNonBillingError(digitaloceanBilling, [
       "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
       "Droplet limit reached (check account limits)",
     ]);

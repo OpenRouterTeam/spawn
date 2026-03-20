@@ -1,6 +1,10 @@
 import type { BillingGuidanceDeps } from "../shared/billing-guidance";
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { awsBilling } from "../aws/billing";
+import { digitaloceanBilling } from "../digitalocean/billing";
+import { gcpBilling } from "../gcp/billing";
+import { hetznerBilling } from "../hetzner/billing";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
 
 // ── Mock deps (injected via DI, not mock.module) ──────────────────────────
@@ -21,34 +25,34 @@ function createMockDeps(): BillingGuidanceDeps {
 describe("isBillingError", () => {
   describe("hetzner", () => {
     it("matches insufficient_funds", () => {
-      expect(isBillingError("hetzner", "insufficient funds")).toBe(true);
-      expect(isBillingError("hetzner", "insufficient_funds")).toBe(true);
+      expect(isBillingError(hetznerBilling, "insufficient funds")).toBe(true);
+      expect(isBillingError(hetznerBilling, "insufficient_funds")).toBe(true);
     });
 
     it("matches payment method required", () => {
-      expect(isBillingError("hetzner", "payment method required")).toBe(true);
+      expect(isBillingError(hetznerBilling, "payment method required")).toBe(true);
     });
 
     it("matches account locked/blocked", () => {
-      expect(isBillingError("hetzner", "account is locked")).toBe(true);
-      expect(isBillingError("hetzner", "account blocked")).toBe(true);
+      expect(isBillingError(hetznerBilling, "account is locked")).toBe(true);
+      expect(isBillingError(hetznerBilling, "account blocked")).toBe(true);
     });
 
     it("returns false for non-billing errors", () => {
-      expect(isBillingError("hetzner", "server limit reached")).toBe(false);
-      expect(isBillingError("hetzner", "server type unavailable")).toBe(false);
+      expect(isBillingError(hetznerBilling, "server limit reached")).toBe(false);
+      expect(isBillingError(hetznerBilling, "server type unavailable")).toBe(false);
     });
   });
 
   describe("digitalocean", () => {
     it("matches billing-related errors", () => {
-      expect(isBillingError("digitalocean", "insufficient funds")).toBe(true);
-      expect(isBillingError("digitalocean", "payment required")).toBe(true);
+      expect(isBillingError(digitaloceanBilling, "insufficient funds")).toBe(true);
+      expect(isBillingError(digitaloceanBilling, "payment required")).toBe(true);
     });
 
     it("returns false for non-billing errors", () => {
-      expect(isBillingError("digitalocean", "droplet limit reached")).toBe(false);
-      expect(isBillingError("digitalocean", "region unavailable")).toBe(false);
+      expect(isBillingError(digitaloceanBilling, "droplet limit reached")).toBe(false);
+      expect(isBillingError(digitaloceanBilling, "region unavailable")).toBe(false);
     });
 
     it("matches billing error embedded in doApi thrown error message (regression #2395)", () => {
@@ -56,52 +60,57 @@ describe("isBillingError", () => {
       // The response body contains the billing message — isBillingError must detect it.
       const apiErr =
         'DigitalOcean API error 403 for POST /droplets: {"id":"forbidden","message":"A payment on file is required to create resources."}';
-      expect(isBillingError("digitalocean", apiErr)).toBe(true);
+      expect(isBillingError(digitaloceanBilling, apiErr)).toBe(true);
     });
 
     it("returns false for non-billing 403 in doApi error format", () => {
       const apiErr =
         'DigitalOcean API error 403 for POST /droplets: {"id":"forbidden","message":"Droplet limit exceeded for this account."}';
-      expect(isBillingError("digitalocean", apiErr)).toBe(false);
+      expect(isBillingError(digitaloceanBilling, apiErr)).toBe(false);
     });
   });
 
   describe("aws", () => {
     it("matches activation/billing errors", () => {
-      expect(isBillingError("aws", "account not activated")).toBe(true);
-      expect(isBillingError("aws", "subscription required")).toBe(true);
-      expect(isBillingError("aws", "not been enabled")).toBe(true);
+      expect(isBillingError(awsBilling, "account not activated")).toBe(true);
+      expect(isBillingError(awsBilling, "subscription required")).toBe(true);
+      expect(isBillingError(awsBilling, "not been enabled")).toBe(true);
     });
 
     it("returns false for non-billing errors", () => {
-      expect(isBillingError("aws", "instance limit reached")).toBe(false);
-      expect(isBillingError("aws", "bundle unavailable")).toBe(false);
+      expect(isBillingError(awsBilling, "instance limit reached")).toBe(false);
+      expect(isBillingError(awsBilling, "bundle unavailable")).toBe(false);
     });
   });
 
   describe("gcp", () => {
     it("matches BILLING_DISABLED", () => {
-      expect(isBillingError("gcp", "BILLING_DISABLED")).toBe(true);
+      expect(isBillingError(gcpBilling, "BILLING_DISABLED")).toBe(true);
     });
 
     it("matches billing not enabled", () => {
-      expect(isBillingError("gcp", "billing is not enabled")).toBe(true);
-      expect(isBillingError("gcp", "billing disabled")).toBe(true);
+      expect(isBillingError(gcpBilling, "billing is not enabled")).toBe(true);
+      expect(isBillingError(gcpBilling, "billing disabled")).toBe(true);
     });
 
     it("matches billing account errors", () => {
-      expect(isBillingError("gcp", "no billing account linked")).toBe(true);
+      expect(isBillingError(gcpBilling, "no billing account linked")).toBe(true);
     });
 
     it("returns false for non-billing errors", () => {
-      expect(isBillingError("gcp", "quota exceeded")).toBe(false);
-      expect(isBillingError("gcp", "machine type unavailable")).toBe(false);
+      expect(isBillingError(gcpBilling, "quota exceeded")).toBe(false);
+      expect(isBillingError(gcpBilling, "machine type unavailable")).toBe(false);
     });
   });
 
-  describe("unknown cloud", () => {
-    it("returns false for unknown clouds", () => {
-      expect(isBillingError("unknown", "billing error")).toBe(false);
+  describe("empty config", () => {
+    it("returns false for config with no error patterns", () => {
+      const emptyConfig = {
+        billingUrl: "",
+        setupSteps: [],
+        errorPatterns: [],
+      };
+      expect(isBillingError(emptyConfig, "billing error")).toBe(false);
     });
   });
 });
@@ -122,21 +131,26 @@ describe("handleBillingError", () => {
   it("opens billing URL and returns true when user presses Enter", async () => {
     mockPrompt.mockImplementation(() => Promise.resolve(""));
     const deps = createMockDeps();
-    const result = await handleBillingError("hetzner", deps);
+    const result = await handleBillingError(hetznerBilling, deps);
     expect(result).toBe(true);
     expect(deps.openBrowser).toHaveBeenCalledWith("https://console.hetzner.cloud/");
   });
 
   it("returns false when prompt throws (Ctrl+C)", async () => {
     mockPrompt.mockImplementation(() => Promise.reject(new Error("cancelled")));
-    const result = await handleBillingError("digitalocean", createMockDeps());
+    const result = await handleBillingError(digitaloceanBilling, createMockDeps());
     expect(result).toBe(false);
   });
 
-  it("works for clouds without billing URL", async () => {
+  it("works for config without billing URL", async () => {
     mockPrompt.mockImplementation(() => Promise.resolve(""));
     const deps = createMockDeps();
-    const result = await handleBillingError("unknown", deps);
+    const emptyConfig = {
+      billingUrl: "",
+      setupSteps: [],
+      errorPatterns: [],
+    };
+    const result = await handleBillingError(emptyConfig, deps);
     expect(result).toBe(true);
     expect(deps.openBrowser).not.toHaveBeenCalled();
   });
@@ -157,7 +171,7 @@ describe("showNonBillingError", () => {
     const deps = createMockDeps();
     expect(() => {
       showNonBillingError(
-        "hetzner",
+        hetznerBilling,
         [
           "Server limit reached for your account",
         ],

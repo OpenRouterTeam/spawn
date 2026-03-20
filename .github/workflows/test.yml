@@ -24,7 +24,7 @@ jobs:
         run: bun install
 
       - name: Run mock tests
-        run: bun test
+        run: bun test --coverage
 
   unit-tests:
     name: Unit Tests
