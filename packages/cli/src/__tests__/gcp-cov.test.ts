@@ -19,6 +19,40 @@ function mockSpawnSync(exitCode: number, stdout = "", stderr = "") {
   } satisfies ReturnType<typeof Bun.spawnSync>);
 }
 
+/** Mock result for `which gcloud` (exitCode 0 = found). */
+const WHICH_GCLOUD_OK = {
+  exitCode: 0,
+  stdout: new TextEncoder().encode("gcloud"),
+  stderr: new TextEncoder().encode(""),
+  success: true,
+  signalCode: null,
+  resourceUsage: undefined,
+  pid: 1,
+} satisfies ReturnType<typeof Bun.spawnSync>;
+
+/**
+ * Mock spawnSync so that the first call (which gcloud) succeeds,
+ * then the second call returns the given test data.
+ */
+function mockSpawnSyncWithGcloud(exitCode: number, stdout = "", stderr = "") {
+  return spyOn(Bun, "spawnSync")
+    .mockReturnValueOnce(WHICH_GCLOUD_OK)
+    .mockReturnValueOnce({
+      exitCode,
+      stdout: new TextEncoder().encode(stdout),
+      stderr: new TextEncoder().encode(stderr),
+      success: exitCode === 0,
+      signalCode: null,
+      resourceUsage: undefined,
+      pid: 1234,
+    } satisfies ReturnType<typeof Bun.spawnSync>);
+}
+
+/** Mock spawnSync to only satisfy the `which gcloud` check (for tests that mock Bun.spawn separately). */
+function mockWhichGcloud() {
+  return spyOn(Bun, "spawnSync").mockReturnValue(WHICH_GCLOUD_OK);
+}
+
 function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
   const mockProc = {
     pid: 1234,
@@ -175,17 +209,11 @@ describe("gcp/authenticate", () => {
   });
 
   it("launches login when no active account and login succeeds", async () => {
-    // First: auth list returns no active account
+    // 1st call: `which gcloud` for gcloudSync -> requireGcloudCmd
+    // 2nd call: `gcloud auth list` returns no active account
+    // 3rd call: `which gcloud` for gcloudInteractive -> requireGcloudCmd
     const spawnSyncSpy = spyOn(Bun, "spawnSync")
-      .mockReturnValueOnce({
-        exitCode: 0,
-        stdout: new TextEncoder().encode("/usr/bin/gcloud"),
-        stderr: new TextEncoder().encode(""),
-        success: true,
-        signalCode: null,
-        resourceUsage: undefined,
-        pid: 1,
-      } satisfies ReturnType<typeof Bun.spawnSync>)
+      .mockReturnValueOnce(WHICH_GCLOUD_OK)
       .mockReturnValueOnce({
         exitCode: 0,
         stdout: new TextEncoder().encode(""),
@@ -194,7 +222,8 @@ describe("gcp/authenticate", () => {
         signalCode: null,
         resourceUsage: undefined,
         pid: 2,
-      } satisfies ReturnType<typeof Bun.spawnSync>);
+      } satisfies ReturnType<typeof Bun.spawnSync>)
+      .mockReturnValueOnce(WHICH_GCLOUD_OK);
 
     // gcloudInteractive (login) returns 0
     const spawnSpy = mockBunSpawn(0);
@@ -359,7 +388,7 @@ describe("gcp/interactiveSession", () => {
 
 describe("gcp/getServerIp", () => {
   it("returns null when instance not found", async () => {
-    const spy = mockSpawnSync(
+    const spy = mockSpawnSyncWithGcloud(
       1,
       "",
       "ERROR: (gcloud.compute.instances.describe) Could not fetch resource: - The resource was not found",
@@ -371,7 +400,7 @@ describe("gcp/getServerIp", () => {
   });
 
   it("returns IP when instance exists", async () => {
-    const spy = mockSpawnSync(0, "10.20.30.40");
+    const spy = mockSpawnSyncWithGcloud(0, "10.20.30.40");
     const { getServerIp } = await import("../gcp/gcp");
     const ip = await getServerIp("my-instance", "us-central1-a", "my-project");
     expect(ip).toBe("10.20.30.40");
@@ -379,7 +408,7 @@ describe("gcp/getServerIp", () => {
   });
 
   it("returns null when IP is empty", async () => {
-    const spy = mockSpawnSync(0, "");
+    const spy = mockSpawnSyncWithGcloud(0, "");
     const { getServerIp } = await import("../gcp/gcp");
     const ip = await getServerIp("my-instance", "us-central1-a", "my-project");
     expect(ip).toBeNull();
@@ -387,7 +416,7 @@ describe("gcp/getServerIp", () => {
   });
 
   it("throws on non-404 errors", async () => {
-    const spy = mockSpawnSync(1, "", "Permission denied");
+    const spy = mockSpawnSyncWithGcloud(1, "", "Permission denied");
     const { getServerIp } = await import("../gcp/gcp");
     await expect(getServerIp("my-instance", "us-central1-a", "my-project")).rejects.toThrow("GCP API error");
     spy.mockRestore();
@@ -398,11 +427,13 @@ describe("gcp/getServerIp", () => {
 
 describe("gcp/listServers", () => {
   it("returns empty array on failure", async () => {
+    const whichSpy = mockWhichGcloud();
     const spy = mockBunSpawn(1);
     const { listServers } = await import("../gcp/gcp");
     const result = await listServers("us-central1-a", "my-project");
     expect(result).toEqual([]);
     spy.mockRestore();
+    whichSpy.mockRestore();
   });
 
   it("parses instance list correctly", async () => {
@@ -432,6 +463,7 @@ describe("gcp/listServers", () => {
         ],
       },
     ];
+    const whichSpy = mockWhichGcloud();
     const spy = mockBunSpawn(0, JSON.stringify(data));
     const { listServers } = await import("../gcp/gcp");
     const result = await listServers("us-central1-a", "my-project");
@@ -440,14 +472,17 @@ describe("gcp/listServers", () => {
     expect(result[0].ip).toBe("1.2.3.4");
     expect(result[1].ip).toBe("");
     spy.mockRestore();
+    whichSpy.mockRestore();
   });
 
   it("returns empty array for non-array JSON", async () => {
+    const whichSpy = mockWhichGcloud();
     const spy = mockBunSpawn(0, '{"not": "array"}');
     const { listServers } = await import("../gcp/gcp");
     const result = await listServers("us-central1-a", "my-project");
     expect(result).toEqual([]);
     spy.mockRestore();
+    whichSpy.mockRestore();
   });
 });
 
