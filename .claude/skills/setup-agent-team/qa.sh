@@ -77,6 +77,8 @@ safe_substitute() {
     # Escape backslashes first, then &, then the delimiter |
     local escaped
     escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    # Escape literal newlines for sed replacement (backslash + newline)
+    escaped="${escaped//$'\n'/\\$'\n'}"
     sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
     rm -f "${file}.bak"
 }
