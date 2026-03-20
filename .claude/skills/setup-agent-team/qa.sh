@@ -33,6 +33,11 @@ elif [[ "${SPAWN_REASON}" == "e2e" ]]; then
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-e2e"
     TEAM_NAME="spawn-qa-e2e"
     CYCLE_TIMEOUT=1200  # 20 min for E2E tests + investigation
+elif [[ "${SPAWN_REASON}" == "e2e-interactive" ]]; then
+    RUN_MODE="e2e-interactive"
+    WORKTREE_BASE="/tmp/spawn-worktrees/qa-e2e-interactive"
+    TEAM_NAME="spawn-qa-e2e-interactive"
+    CYCLE_TIMEOUT=1800  # 30 min for interactive AI-driven E2E (slower than headless)
 elif [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
     RUN_MODE="issue"
     ISSUE_NUM="${SPAWN_ISSUE}"
@@ -203,7 +208,7 @@ if [[ "${RUN_MODE}" == "quality" ]]; then
 fi
 
 # --- Load cloud credentials (quality + fixtures + e2e modes) ---
-if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]] || [[ "${RUN_MODE}" == "soak" ]]; then
+if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]] || [[ "${RUN_MODE}" == "e2e" ]] || [[ "${RUN_MODE}" == "e2e-interactive" ]] || [[ "${RUN_MODE}" == "soak" ]]; then
     if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
         source "${REPO_ROOT}/sh/shared/key-request.sh"
         load_cloud_keys_from_config
@@ -428,6 +433,43 @@ if [[ "${RUN_MODE}" == "soak" ]]; then
         log "Soak test completed successfully"
     else
         log "Soak test failed (exit_code=${CLAUDE_EXIT})"
+    fi
+
+# --- Interactive E2E mode: run e2e.sh --interactive directly (no Claude Code needed) ---
+elif [[ "${RUN_MODE}" == "e2e-interactive" ]]; then
+    log "Running interactive E2E test (AI-driven via Claude Haiku)..."
+
+    # ANTHROPIC_API_KEY is needed for the AI driver (Claude Haiku deciding what to type).
+    # On QA VMs this is typically set in the environment or /etc/spawn-qa-auth.env.
+    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        # Try loading from auth env file
+        if [[ -f /etc/spawn-qa-auth.env ]]; then
+            while IFS='=' read -r _ekey _eval || [[ -n "${_ekey}" ]]; do
+                _ekey="${_ekey#"${_ekey%%[! ]*}"}"
+                case "${_ekey}" in
+                    ANTHROPIC_API_KEY) export ANTHROPIC_API_KEY="${_eval}" ;;
+                esac
+            done < /etc/spawn-qa-auth.env
+        fi
+    fi
+
+    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        log "ERROR: ANTHROPIC_API_KEY not set — required for interactive E2E"
+        exit 1
+    fi
+
+    cd "${REPO_ROOT}"
+    # Run on hetzner (cheapest) with claude agent by default.
+    # Can be overridden via E2E_INTERACTIVE_CLOUD and E2E_INTERACTIVE_AGENT env vars.
+    _int_cloud="${E2E_INTERACTIVE_CLOUD:-hetzner}"
+    _int_agent="${E2E_INTERACTIVE_AGENT:-claude}"
+    bash sh/e2e/e2e.sh --cloud "${_int_cloud}" "${_int_agent}" --interactive 2>&1 | tee -a "${LOG_FILE}"
+    CLAUDE_EXIT=$?
+
+    if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+        log "Interactive E2E test passed"
+    else
+        log "Interactive E2E test failed (exit_code=${CLAUDE_EXIT})"
     fi
 
 # --- Quality mode: retry up to 3 times, then file issue ---
