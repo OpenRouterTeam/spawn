@@ -200,7 +200,6 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   remaining = r3;
   const [nameFlag, r4] = extractFlag(remaining, [
     "--name",
-    "-n",
   ]);
   remaining = r4;
 
