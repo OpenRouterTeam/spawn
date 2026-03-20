@@ -39,6 +39,7 @@ import {
   shellQuote,
   validateRegionName,
 } from "../shared/ui";
+import { hetznerBilling } from "./billing";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -606,8 +607,8 @@ export async function createServer(
 
       logError(`Failed to create Hetzner server: ${errMsg}`);
 
-      if (isBillingError("hetzner", errMsg)) {
-        const shouldRetry = await handleBillingError("hetzner");
+      if (isBillingError(hetznerBilling, errMsg)) {
+        const shouldRetry = await handleBillingError(hetznerBilling);
         if (shouldRetry) {
           logStep("Retrying server creation...");
           const retryResp = await hetznerApi("POST", "/servers", body);
@@ -633,7 +634,7 @@ export async function createServer(
           logError(`Retry failed: ${retryErr}`);
         }
       } else {
-        showNonBillingError("hetzner", [
+        showNonBillingError(hetznerBilling, [
           "Server type or location unavailable",
           "Server limit reached for your account",
         ]);
