@@ -39,6 +39,7 @@ import {
   shellQuote,
   validateRegionName,
 } from "../shared/ui";
+import { awsBilling } from "./billing";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -963,8 +964,8 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
     const errMsg = getErrorMessage(createResult.error);
     logError(`Failed to create Lightsail instance: ${errMsg}`);
 
-    if (isBillingError("aws", errMsg)) {
-      const shouldRetry = await handleBillingError("aws");
+    if (isBillingError(awsBilling, errMsg)) {
+      const shouldRetry = await handleBillingError(awsBilling);
       if (shouldRetry) {
         logStep("Retrying instance creation...");
         await lightsailCreateInstances(createParams);
@@ -984,7 +985,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
           return await waitForInstance();
         }
       }
-      showNonBillingError("aws", [
+      showNonBillingError(awsBilling, [
         "Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate",
         "Instance limit reached for your account",
         "Bundle unavailable in region",

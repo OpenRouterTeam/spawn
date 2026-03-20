@@ -35,6 +35,7 @@ import {
   selectFromList,
   shellQuote,
 } from "../shared/ui";
+import { gcpBilling } from "./billing";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -567,7 +568,7 @@ export async function checkBillingEnabled(): Promise<void> {
     const output = result.stdout.trim().toLowerCase();
     if (output === "false") {
       logWarn(`Billing is not enabled for project '${_state.project}'.`);
-      const shouldRetry = await handleBillingError("gcp");
+      const shouldRetry = await handleBillingError(gcpBilling);
       if (!shouldRetry) {
         throw new Error("GCP billing not enabled");
       }
@@ -794,8 +795,8 @@ export async function createInstance(
         logError(`gcloud error: ${result.stderr}`);
       }
 
-      if (isBillingError("gcp", errMsg)) {
-        const shouldRetry = await handleBillingError("gcp");
+      if (isBillingError(gcpBilling, errMsg)) {
+        const shouldRetry = await handleBillingError(gcpBilling);
         if (shouldRetry) {
           logStep("Retrying instance creation...");
           const retryResult = await gcloud(args);
@@ -841,7 +842,7 @@ export async function createInstance(
           throw new Error("Instance creation failed");
         }
       } else {
-        showNonBillingError("gcp", [
+        showNonBillingError(gcpBilling, [
           "Instance quota exceeded (try different GCP_ZONE)",
           "Machine type unavailable (try different GCP_MACHINE_TYPE or GCP_ZONE)",
         ]);
