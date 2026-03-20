@@ -17,7 +17,7 @@ import { getOrPromptApiKey } from "./oauth";
 import { getSpawnPreferencesPath } from "./paths";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell";
-import { startSshTunnel } from "./ssh";
+import { sleep, startSshTunnel } from "./ssh";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys";
 import {
   logDebug,
@@ -530,7 +530,33 @@ async function postInstall(
   saveLaunchCmd(launchCmd, spawnId);
 
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
-  const exitCode = await cloud.interactiveSession(sessionCmd);
+
+  // Auto-reconnect on SSH drops (exit 255). Ctrl+C (exit 0 or 130) exits immediately.
+  // Only applies to remote clouds — local sessions don't have SSH drops.
+  const maxReconnects = cloud.cloudName === "local" ? 0 : 5;
+  let exitCode = 0;
+
+  for (let attempt = 0; attempt <= maxReconnects; attempt++) {
+    if (attempt > 0) {
+      process.stderr.write("\n");
+      logWarn(`Connection lost. Reconnecting... (${attempt}/${maxReconnects})`);
+      await sleep(3000);
+      prepareStdinForHandoff();
+    }
+    exitCode = await cloud.interactiveSession(sessionCmd);
+
+    // SSH exit 255 = connection dropped/timed out — retry
+    // Everything else (0 = clean exit, 130 = Ctrl+C, other = agent crash) — stop
+    if (exitCode !== 255) {
+      break;
+    }
+  }
+
+  if (exitCode === 255) {
+    process.stderr.write("\n");
+    logWarn("Could not reconnect. Server is still running.");
+    logInfo("Reconnect manually: spawn connect");
+  }
 
   if (tunnelHandle) {
     tunnelHandle.stop();
