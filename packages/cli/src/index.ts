@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import type { Manifest } from "./manifest.js";
+
 import { getErrorMessage, isString, toRecord } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -148,23 +150,7 @@ function checkUnknownFlags(args: string[]): void {
 }
 
 /** Show info for a name that could be an agent or cloud, or show an error with suggestions */
-function showUnknownCommandError(
-  name: string,
-  manifest: {
-    agents: Record<
-      string,
-      {
-        name: string;
-      }
-    >;
-    clouds: Record<
-      string,
-      {
-        name: string;
-      }
-    >;
-  },
-): never {
+function showUnknownCommandError(name: string, manifest: Manifest): never {
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 

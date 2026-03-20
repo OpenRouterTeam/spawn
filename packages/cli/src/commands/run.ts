@@ -114,7 +114,7 @@ function buildCloudLines(cloudInfo: {
   name: string;
   price: string;
   description: string;
-  defaults?: Record<string, string>;
+  defaults?: Record<string, unknown>;
 }): string[] {
   const lines = [
     `  Name:        ${cloudInfo.name}`,
@@ -123,8 +123,8 @@ function buildCloudLines(cloudInfo: {
   ];
   if (cloudInfo.defaults) {
     lines.push("  Defaults:");
-    for (const [k, v] of Object.entries(cloudInfo.defaults)) {
-      lines.push(`    ${k}: ${v}`);
+    for (const [k, val] of Object.entries(cloudInfo.defaults)) {
+      lines.push(`    ${k}: ${String(val)}`);
     }
   }
   return lines;

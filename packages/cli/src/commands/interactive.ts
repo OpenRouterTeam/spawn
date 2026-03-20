@@ -196,7 +196,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
       message: "Model ID",
       placeholder: "provider/model-name",
       validate: (val) => {
-        if (!val.trim()) {
+        if (!val?.trim()) {
           return "Model ID is required";
         }
         if (!validateModelId(val.trim())) {
