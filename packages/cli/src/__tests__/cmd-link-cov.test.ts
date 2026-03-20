@@ -209,7 +209,7 @@ describe("cmdLink (additional coverage)", () => {
         "sprite",
         "-u",
         "ubuntu",
-        "-n",
+        "--name",
         "my-box",
       ],
       {
