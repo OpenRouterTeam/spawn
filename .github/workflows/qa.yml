@@ -2,7 +2,7 @@ name: QA
 on:
   schedule:
     - cron: '0 */4 * * *'   # Every 4 hours — quality sweep
-    - cron: '0 3 * * 1'     # Every Monday 3am UTC — Telegram soak test (OpenClaw on DigitalOcean)
+    - cron: '30 1 * * 1'    # Every Monday 1:30am UTC — Telegram soak test (offset from */4 to avoid dedup)
     - cron: '0 6 * * *'     # Daily 6am UTC — Interactive E2E (1 agent, 1 cloud)
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 3 * * 1" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "30 1 * * 1" ]; then
             REASON="soak"
           elif [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 6 * * *" ]; then
             REASON="e2e-interactive"
