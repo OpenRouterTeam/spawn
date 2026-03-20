@@ -273,4 +273,91 @@ describe("cmdLink (additional coverage)", () => {
     expect(processExitSpy).toHaveBeenCalledWith(1);
     expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("not reachable"));
   });
+
+  it("exits with error when no IP provided", async () => {
+    const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+    await asyncTryCatch(() =>
+      cmdLink(
+        [
+          "link",
+        ],
+        {
+          tcpCheck: TCP_REACHABLE,
+          sshCommand: SSH_NO_DETECT,
+        },
+      ),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("exits with error for invalid IP address", async () => {
+    const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+    await asyncTryCatch(() =>
+      cmdLink(
+        [
+          "link",
+          "not-an-ip!@#",
+        ],
+        {
+          tcpCheck: TCP_REACHABLE,
+          sshCommand: SSH_NO_DETECT,
+        },
+      ),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("runs detection spinner when cloud not provided", async () => {
+    await cmdLink(
+      [
+        "link",
+        "1.2.3.4",
+        "--agent",
+        "claude",
+        "--user",
+        "root",
+      ],
+      {
+        tcpCheck: TCP_REACHABLE,
+        sshCommand: SSH_DETECT_CLOUD_HETZNER,
+      },
+    );
+
+    const spinnerCalls = clack.spinnerStart.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(spinnerCalls.some((msg: string) => msg.includes("Auto-detecting"))).toBe(true);
+  });
+
+  it("generates default name from agent and IP when no --name flag", async () => {
+    const { loadHistory } = await import("../history.js");
+
+    await cmdLink(
+      [
+        "link",
+        "10.0.0.1",
+        "--agent",
+        "claude",
+        "--cloud",
+        "hetzner",
+        "--user",
+        "root",
+      ],
+      {
+        tcpCheck: TCP_REACHABLE,
+        sshCommand: SSH_NO_DETECT,
+      },
+    );
+
+    const records = loadHistory();
+    const rec = records.find(
+      (r: {
+        connection?: {
+          ip?: string;
+        };
+      }) => r.connection?.ip === "10.0.0.1",
+    );
+    expect(rec).toBeDefined();
+    expect(rec?.name).toBe("claude-10-0-0-1");
+  });
 });

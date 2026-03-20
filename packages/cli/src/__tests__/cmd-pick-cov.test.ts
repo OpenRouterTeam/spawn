@@ -118,4 +118,32 @@ describe("cmdPick", () => {
       ]),
     ).rejects.toThrow("process.exit(1)");
   });
+
+  it("ignores --default without a following value", async () => {
+    await expect(
+      cmdPick([
+        "--default",
+      ]),
+    ).rejects.toThrow("process.exit(1)");
+  });
+
+  it("ignores --prompt without a following value", async () => {
+    await expect(
+      cmdPick([
+        "--prompt",
+      ]),
+    ).rejects.toThrow("process.exit(1)");
+  });
+
+  it("handles multiple flags together", async () => {
+    await expect(
+      cmdPick([
+        "--prompt",
+        "Choose",
+        "--default",
+        "val1",
+        "--unknown-flag",
+      ]),
+    ).rejects.toThrow("process.exit(1)");
+  });
 });

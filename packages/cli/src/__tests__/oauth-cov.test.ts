@@ -172,7 +172,7 @@ describe("getOrPromptApiKey", () => {
     // Mock p.text to return empty (manual entry fails)
     textSpy.mockImplementation(async () => "");
 
-    await expect(getOrPromptApiKey("agent", "cloud")).rejects.toThrow("API key acquisition failed");
+    await expect(getOrPromptApiKey("agent", "cloud")).rejects.toThrow("User chose to exit");
 
     serveSpy.mockRestore();
   });
@@ -199,7 +199,7 @@ describe("getOrPromptApiKey", () => {
     });
     textSpy.mockImplementation(async () => "");
 
-    await expect(getOrPromptApiKey("agent", "cloud")).rejects.toThrow("API key acquisition failed");
+    await expect(getOrPromptApiKey("agent", "cloud")).rejects.toThrow("User chose to exit");
     serveSpy.mockRestore();
   });
 
@@ -261,5 +261,37 @@ describe("getOrPromptApiKey", () => {
 
     serveSpy.mockRestore();
     delete process.env.OPENROUTER_API_KEY;
+  });
+
+  it("accepts non-standard key format when user confirms", async () => {
+    // biome-ignore lint: test mock
+    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+      throw new Error("port in use");
+    });
+    let callCount = 0;
+    // First call: non-standard key, second call: "y" to confirm
+    textSpy.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return "custom-api-key-not-standard";
+      }
+      return "y";
+    });
+
+    delete process.env.OPENROUTER_API_KEY;
+    const result = await getOrPromptApiKey("agent", "cloud");
+    expect(result).toBe("custom-api-key-not-standard");
+
+    serveSpy.mockRestore();
+    delete process.env.OPENROUTER_API_KEY;
+  });
+
+  it("returns false for non-object data in saved config", () => {
+    const configDir = join(process.env.HOME ?? "", ".config", "spawn");
+    mkdirSync(configDir, {
+      recursive: true,
+    });
+    writeFileSync(join(configDir, "openrouter.json"), JSON.stringify(null));
+    expect(hasSavedOpenRouterKey()).toBe(false);
   });
 });

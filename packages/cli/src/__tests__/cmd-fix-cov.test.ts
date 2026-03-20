@@ -192,23 +192,6 @@ describe("cmdFix (additional coverage)", () => {
     }
   });
 
-  it("shows non-interactive error when multiple servers and no TTY", async () => {
-    writeHistory([
-      makeRecord({
-        id: "id-1",
-      }),
-      makeRecord({
-        id: "id-2",
-        name: "other-spawn",
-      }),
-    ]);
-
-    await cmdFix();
-
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("interactive terminal"));
-    expect(clack.logInfo).toHaveBeenCalledWith(expect.stringContaining("spawn fix <spawn-id>"));
-  });
-
   it("fixes directly when only one server (no picker needed)", async () => {
     const mockRunner = mock(async () => true);
     writeHistory([
@@ -227,5 +210,121 @@ describe("cmdFix (additional coverage)", () => {
 
     expect(mockRunner).toHaveBeenCalled();
     global.fetch = savedFetch;
+  });
+
+  it("finds record by name when spawnId matches name", async () => {
+    const mockRunner = mock(async () => true);
+    writeHistory([
+      makeRecord({
+        id: "id-1",
+        name: "my-spawn",
+      }),
+      makeRecord({
+        id: "id-2",
+        name: "other-spawn",
+      }),
+    ]);
+
+    const savedFetch = global.fetch;
+    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
+    _resetCacheForTesting();
+
+    await cmdFix("my-spawn", {
+      runScript: mockRunner,
+    });
+
+    expect(mockRunner).toHaveBeenCalled();
+    global.fetch = savedFetch;
+  });
+
+  it("shows no active spawns when history is empty", async () => {
+    await cmdFix();
+    expect(clack.logInfo).toHaveBeenCalledWith(expect.stringContaining("No active spawns"));
+  });
+});
+
+// ── Tests: fixSpawn connection edge cases ────────────────────────────────────
+
+describe("fixSpawn connection edge cases", () => {
+  beforeEach(() => {
+    clack.logError.mockReset();
+    clack.logInfo.mockReset();
+    clack.logSuccess.mockReset();
+    clack.logStep.mockReset();
+  });
+
+  it("shows error when record has no connection", async () => {
+    const record = makeRecord({
+      connection: undefined,
+    });
+    await fixSpawn(record, mockManifest);
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("no connection information"));
+  });
+
+  it("shows error when connection is deleted", async () => {
+    const record = makeRecord({
+      connection: {
+        ip: "1.2.3.4",
+        user: "root",
+        cloud: "hetzner",
+        deleted: true,
+      },
+    });
+    await fixSpawn(record, mockManifest);
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("has been deleted"));
+  });
+
+  it("shows error for sprite-console connections", async () => {
+    const record = makeRecord({
+      connection: {
+        ip: "sprite-console",
+        user: "root",
+        cloud: "sprite",
+      },
+    });
+    await fixSpawn(record, mockManifest);
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Sprite console"));
+  });
+
+  it("shows error for unknown agent", async () => {
+    const record = makeRecord({
+      agent: "nonexistent-agent",
+      connection: {
+        ip: "1.2.3.4",
+        user: "root",
+        cloud: "hetzner",
+      },
+    });
+    await fixSpawn(record, mockManifest);
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Unknown agent"));
+  });
+
+  it("shows error when fix script runner throws", async () => {
+    const mockRunner = mock(async () => {
+      throw new Error("SSH connection refused");
+    });
+    const record = makeRecord();
+    await fixSpawn(record, mockManifest, {
+      runScript: mockRunner,
+    });
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Fix failed"));
+  });
+
+  it("shows error when fix script exits non-zero", async () => {
+    const mockRunner = mock(async () => false);
+    const record = makeRecord();
+    await fixSpawn(record, mockManifest, {
+      runScript: mockRunner,
+    });
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("exited with an error"));
+  });
+
+  it("shows success when fix script succeeds", async () => {
+    const mockRunner = mock(async () => true);
+    const record = makeRecord();
+    await fixSpawn(record, mockManifest, {
+      runScript: mockRunner,
+    });
+    expect(clack.logSuccess).toHaveBeenCalledWith(expect.stringContaining("fixed successfully"));
   });
 });

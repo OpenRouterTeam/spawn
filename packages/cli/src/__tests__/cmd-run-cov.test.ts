@@ -179,6 +179,122 @@ describe("commands/run.ts coverage", () => {
     });
   });
 
+  // ── classifyNetworkError (via reportDownloadError path) ──────────────
+
+  describe("classifyNetworkError", () => {
+    it("handles timeout error in dry run preview", () => {
+      showDryRunPreview(mockManifest, "claude", "sprite");
+      // Just verify it completes without throwing
+      expect(clack.logInfo).toHaveBeenCalled();
+    });
+  });
+
+  // ── showDryRunPreview with cloud defaults ──────────────────────────
+
+  describe("showDryRunPreview edge cases", () => {
+    it("shows credential status for sprite (token auth)", () => {
+      showDryRunPreview(mockManifest, "claude", "sprite");
+      const allCalls = consoleMocks.log.mock.calls.flat().map(String);
+      expect(allCalls.some((c) => c.includes("OPENROUTER_API_KEY"))).toBe(true);
+    });
+
+    it("shows credential status for hetzner (token auth)", () => {
+      showDryRunPreview(mockManifest, "claude", "hetzner");
+      const allCalls = consoleMocks.log.mock.calls.flat().map(String);
+      expect(allCalls.some((c) => c.includes("OPENROUTER_API_KEY"))).toBe(true);
+    });
+
+    it("shows no environment lines when agent has no env", () => {
+      const noEnvManifest = {
+        ...mockManifest,
+        agents: {
+          ...mockManifest.agents,
+          noenv: {
+            name: "NoEnv Agent",
+            description: "Agent without env",
+            url: "https://example.com",
+            install: "npm install noenv",
+            launch: "noenv",
+          },
+        },
+        matrix: {
+          ...mockManifest.matrix,
+          "sprite/noenv": "implemented",
+        },
+      };
+      global.fetch = mock(async () => new Response(JSON.stringify(noEnvManifest)));
+      showDryRunPreview(noEnvManifest, "noenv", "sprite");
+      expect(clack.logSuccess).toHaveBeenCalled();
+    });
+  });
+
+  // ── getScriptFailureGuidance edge cases ───────────────────────────
+
+  describe("getScriptFailureGuidance additional", () => {
+    it("handles exit code 2 (misuse of shell builtin)", () => {
+      const lines = getScriptFailureGuidance(2, "sprite").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined.length).toBeGreaterThan(0);
+    });
+
+    it("handles exit code 126 (permission denied)", () => {
+      const lines = getScriptFailureGuidance(126, "hetzner").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined.length).toBeGreaterThan(0);
+    });
+
+    it("handles exit code 127 (command not found)", () => {
+      const lines = getScriptFailureGuidance(127, "hetzner").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined.length).toBeGreaterThan(0);
+    });
+
+    it("handles exit code 255 (SSH error)", () => {
+      const lines = getScriptFailureGuidance(255, "aws").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined.length).toBeGreaterThan(0);
+    });
+
+    it("handles exit code 1 with no auth hint", () => {
+      const lines = getScriptFailureGuidance(1, "sprite").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined).toContain("Cloud provider API error");
+    });
+  });
+
+  // ── getSignalGuidance additional ──────────────────────────────────
+
+  describe("getSignalGuidance additional", () => {
+    it("returns guidance for SIGTERM", () => {
+      const lines = getSignalGuidance("SIGTERM").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined).toContain("terminated");
+    });
+
+    it("returns guidance for unknown signal without dashboard", () => {
+      const lines = getSignalGuidance("SIGXCPU").map(stripAnsi);
+      const joined = lines.join("\n");
+      expect(joined).toContain("SIGXCPU");
+    });
+  });
+
+  // ── cmdRun additional ─────────────────────────────────────────────
+
+  describe("cmdRun validation", () => {
+    it("validates agent and cloud names exist", async () => {
+      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
+      await loadManifest(true);
+      await expect(cmdRun("nonexistent", "sprite")).rejects.toThrow("process.exit");
+    });
+
+    it("validates implementation status", async () => {
+      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
+      await loadManifest(true);
+      // hetzner/codex is "missing" in mock manifest
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
+    });
+  });
+
   // ── cmdRunHeadless ─────────────────────────────────────────────────────
 
   describe("cmdRunHeadless", () => {

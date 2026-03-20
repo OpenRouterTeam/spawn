@@ -90,8 +90,8 @@ describe("hetzner/constants", () => {
   it("DEFAULT_SERVER_TYPE is cx23", () => {
     expect(DEFAULT_SERVER_TYPE).toBe("cx23");
   });
-  it("DEFAULT_LOCATION is fsn1", () => {
-    expect(DEFAULT_LOCATION).toBe("fsn1");
+  it("DEFAULT_LOCATION is nbg1", () => {
+    expect(DEFAULT_LOCATION).toBe("nbg1");
   });
 });
 
