@@ -39,7 +39,7 @@ describe("history", () => {
     });
 
     it("loads valid history from file", () => {
-      const records: SpawnRecord[] = [
+      const records = [
         {
           agent: "claude",
           cloud: "sprite",
@@ -47,7 +47,12 @@ describe("history", () => {
         },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-      expect(loadHistory()).toEqual(records);
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("claude");
+      expect(loaded[0].cloud).toBe("sprite");
+      // Legacy records without id get one backfilled on load
+      expect(typeof loaded[0].id).toBe("string");
     });
 
     it("returns empty array for invalid JSON", () => {
@@ -81,7 +86,7 @@ describe("history", () => {
     });
 
     it("loads multiple records preserving order", () => {
-      const records: SpawnRecord[] = [
+      const records = [
         {
           agent: "claude",
           cloud: "sprite",
@@ -99,7 +104,12 @@ describe("history", () => {
         },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-      expect(loadHistory()).toEqual(records);
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(3);
+      expect(loaded[0].agent).toBe("claude");
+      expect(loaded[1].agent).toBe("codex");
+      expect(loaded[2].agent).toBe("claude");
+      expect(loaded[2].cloud).toBe("hetzner");
     });
 
     it("loads records that include optional prompt field", () => {
@@ -123,7 +133,7 @@ describe("history", () => {
     });
 
     it("loads v1 format: { version: 1, records: [...] }", () => {
-      const records: SpawnRecord[] = [
+      const records = [
         {
           agent: "claude",
           cloud: "sprite",
@@ -137,7 +147,10 @@ describe("history", () => {
           records,
         }),
       );
-      expect(loadHistory()).toEqual(records);
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("claude");
+      expect(typeof loaded[0].id).toBe("string");
     });
 
     it("returns empty array for v1 format with unknown version", () => {
@@ -160,7 +173,7 @@ describe("history", () => {
     });
 
     it("loads v0 format: bare array (backward compatibility)", () => {
-      const records: SpawnRecord[] = [
+      const records = [
         {
           agent: "claude",
           cloud: "sprite",
@@ -168,7 +181,11 @@ describe("history", () => {
         },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-      expect(loadHistory()).toEqual(records);
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("claude");
+      // v0 records get id backfilled
+      expect(typeof loaded[0].id).toBe("string");
     });
   });
 
