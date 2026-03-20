@@ -4,7 +4,7 @@ import type { CloudInstance, VMConnection } from "../history.js";
 import type { CloudInitTier } from "../shared/agents.js";
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, normalize } from "node:path";
+import { dirname } from "node:path";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
@@ -18,6 +18,7 @@ import {
   waitForSsh as sharedWaitForSsh,
   sleep,
   spawnInteractive,
+  validateRemotePath,
   waitForSshSnapshotBoot,
 } from "../shared/ssh.js";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys.js";
@@ -777,15 +778,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    logError(`Invalid remote path: ${remotePath}`);
-    throw new Error("Invalid remote path");
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~-]+$/);
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
@@ -818,15 +811,7 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 
 export async function downloadFile(remotePath: string, localPath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    logError(`Invalid remote path: ${remotePath}`);
-    throw new Error("Invalid remote path");
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");

@@ -3,11 +3,11 @@
 import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
-import { join, normalize } from "node:path";
+import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getUserHome } from "../shared/paths.js";
 import { asyncTryCatch } from "../shared/result.js";
-import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh.js";
+import { killWithTimeout, sleep, spawnInteractive, validateRemotePath } from "../shared/ssh.js";
 import {
   getServerNameFromEnv,
   logError,
@@ -506,15 +506,7 @@ async function runSpriteSilent(cmd: string): Promise<void> {
  * The -file flag format is "localpath:remotepath".
  */
 export async function uploadFileSprite(localPath: string, remotePath: string): Promise<void> {
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    logError(`Invalid remote path: ${remotePath}`);
-    throw new Error("Invalid remote path");
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~-]+$/);
 
   const spriteCmd = getSpriteCmd()!;
   // Generate a random temp path on remote to prevent symlink attacks
@@ -556,15 +548,7 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 
 /** Download a file from the remote sprite by catting it to stdout. */
 export async function downloadFileSprite(remotePath: string, localPath: string): Promise<void> {
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    logError(`Invalid remote path: ${remotePath}`);
-    throw new Error("Invalid remote path");
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
 
   const spriteCmd = getSpriteCmd()!;
   const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
