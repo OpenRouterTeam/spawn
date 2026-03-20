@@ -406,40 +406,6 @@ export function loadHistory(): SpawnRecord[] {
   return recoverFromArchives();
 }
 
-const MAX_HISTORY_ENTRIES = 100;
-
-/** Read existing records from an archive file, returning [] if missing or corrupted. */
-function readExistingArchive(archivePath: string): SpawnRecord[] {
-  if (!existsSync(archivePath)) {
-    return [];
-  }
-  const result = tryCatch((): unknown => JSON.parse(readFileSync(archivePath, "utf-8")));
-  if (result.ok && Array.isArray(result.data)) {
-    return result.data.filter((el) => v.safeParse(SpawnRecordSchema, el).success);
-  }
-  // Corrupted archive — overwrite
-  return [];
-}
-
-/** Archive evicted records to a dated backup file so nothing is permanently lost. */
-function archiveRecords(records: SpawnRecord[]): void {
-  if (records.length === 0) {
-    return;
-  }
-  // Non-fatal — archive failure should not block saving
-  tryCatchIf(isFileError, () => {
-    const dir = getSpawnDir();
-    const date = new Date().toISOString().slice(0, 10);
-    const archivePath = join(dir, `history-${date}.json`);
-    const existing = readExistingArchive(archivePath);
-    const merged = [
-      ...existing,
-      ...records,
-    ];
-    atomicWriteJson(archivePath, merged);
-  });
-}
-
 export function saveSpawnRecord(record: SpawnRecord): void {
   const dir = getSpawnDir();
   if (!existsSync(dir)) {
@@ -454,33 +420,8 @@ export function saveSpawnRecord(record: SpawnRecord): void {
   }
 
   withHistoryLock(() => {
-    let history = loadHistory();
+    const history = loadHistory();
     history.push(record);
-    // Smart trim: evict deleted records first, then oldest, and archive evicted
-    if (history.length > MAX_HISTORY_ENTRIES) {
-      const nonDeleted: SpawnRecord[] = [];
-      const deleted: SpawnRecord[] = [];
-      for (const r of history) {
-        if (r.connection?.deleted) {
-          deleted.push(r);
-        } else {
-          nonDeleted.push(r);
-        }
-      }
-      if (nonDeleted.length <= MAX_HISTORY_ENTRIES) {
-        // Removing deleted records is enough
-        history = nonDeleted;
-        archiveRecords(deleted);
-      } else {
-        // Still over limit — trim oldest non-deleted records too
-        const overflow = nonDeleted.slice(0, nonDeleted.length - MAX_HISTORY_ENTRIES);
-        history = nonDeleted.slice(nonDeleted.length - MAX_HISTORY_ENTRIES);
-        archiveRecords([
-          ...deleted,
-          ...overflow,
-        ]);
-      }
-    }
     writeHistory(history);
   });
 }

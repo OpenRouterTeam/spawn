@@ -3,7 +3,7 @@
  *
  * Focuses on uncovered paths: saveLaunchCmd, saveMetadata,
  * markRecordDeleted, updateRecordIp, updateRecordConnection, getActiveServers,
- * removeRecord, archiving, trimming edge cases, and v1 loose schema handling.
+ * removeRecord, no-cap behavior, and v1 loose schema handling.
  * (generateSpawnId is covered in history-spawn-id.test.ts)
  * (clearHistory is covered in clear-history.test.ts)
  */
@@ -11,7 +11,7 @@
 import type { SpawnRecord } from "../history.js";
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   filterHistory,
@@ -662,13 +662,13 @@ describe("history.ts coverage", () => {
     });
   });
 
-  // ── Trimming with archiving ───────────────────────────────────────────
+  // ── No trimming — all records retained ───────────────────────────────
 
-  describe("trimming and archiving", () => {
-    it("archives deleted records first when over limit", () => {
-      // Create 99 non-deleted + 2 deleted = 101 total, should archive the 2 deleted
+  describe("no history cap", () => {
+    it("retains all records when over 100 entries", () => {
+      // Create 100 non-deleted + 1 deleted = 101 total, all should be kept
       const records: SpawnRecord[] = [];
-      for (let i = 0; i < 99; i++) {
+      for (let i = 0; i < 100; i++) {
         records.push({
           id: `r-${i}`,
           agent: "claude",
@@ -695,7 +695,7 @@ describe("history.ts coverage", () => {
         }),
       );
 
-      // Save one more to trigger trimming
+      // Save one more — no trimming should occur
       saveSpawnRecord({
         id: "new-1",
         agent: "codex",
@@ -704,15 +704,11 @@ describe("history.ts coverage", () => {
       });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      // Should have 100 records (99 non-deleted + 1 new)
-      expect(data.records.length).toBeLessThanOrEqual(100);
-      // Deleted record should be removed
+      // All 102 records should be retained (101 existing + 1 new)
+      expect(data.records).toHaveLength(102);
+      // Deleted record should still be present
       const hasDeleted = data.records.some((r: SpawnRecord) => r.connection?.deleted);
-      expect(hasDeleted).toBe(false);
-
-      // Archive file should exist
-      const archiveFiles = readdirSync(testDir).filter((f) => f.startsWith("history-"));
-      expect(archiveFiles.length).toBeGreaterThan(0);
+      expect(hasDeleted).toBe(true);
     });
   });
 });

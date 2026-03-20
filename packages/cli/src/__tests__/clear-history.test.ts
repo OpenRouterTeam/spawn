@@ -226,7 +226,7 @@ describe("clearHistory", () => {
       expect(filterHistory(undefined, "sprite")).toHaveLength(0);
     });
 
-    it("should return correct count for exactly MAX_HISTORY_ENTRIES records", () => {
+    it("should return correct count for 100 records", () => {
       const records: SpawnRecord[] = [];
       for (let i = 0; i < 100; i++) {
         records.push({
