@@ -35,6 +35,7 @@ export const KNOWN_FLAGS = new Set([
   "-m",
   "--config",
   "--steps",
+  "--fast",
   "--user",
   "-u",
 ]);
