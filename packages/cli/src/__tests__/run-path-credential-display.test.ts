@@ -8,7 +8,7 @@ import { mockClackPrompts } from "./test-helpers";
  *
  * - prioritizeCloudsByCredentials: sorts clouds by credential availability,
  *   builds hint overrides, counts clouds with credentials
- * - isRetryableExitCode: identifies exit codes that warrant a retry suggestion
+ * (isRetryableExitCode is covered in cmd-run-cov.test.ts)
  */
 
 // ── Test manifest ───────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ mockClackPrompts({
 });
 
 // Import after mocks are set up
-const { prioritizeCloudsByCredentials, isRetryableExitCode } = await import("../commands/index.js");
+const { prioritizeCloudsByCredentials } = await import("../commands/index.js");
 
 // ── prioritizeCloudsByCredentials ────────────────────────────────────────
 
@@ -349,17 +349,5 @@ describe("prioritizeCloudsByCredentials", () => {
     // sprite and localcloud should be at the end
     expect(result.sortedClouds.slice(3)).toContain("sprite");
     expect(result.sortedClouds.slice(3)).toContain("localcloud");
-  });
-});
-
-// ── isRetryableExitCode ──────────────────────────────────────────────────
-
-describe("isRetryableExitCode", () => {
-  it("should identify retryable SSH exit code 255", () => {
-    expect(isRetryableExitCode("Script exited with code 255")).toBe(true);
-  });
-
-  it("should return false for non-retryable exit code 1", () => {
-    expect(isRetryableExitCode("Script exited with code 1")).toBe(false);
   });
 });

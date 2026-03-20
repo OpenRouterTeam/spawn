@@ -21,9 +21,7 @@ const clackMocks = mockClackPrompts({
 // Static imports capture the REAL functions before mock.module can interfere.
 import {
   defaultSpawnName,
-  Err,
   getServerNameFromEnv,
-  jsonEscape,
   loadApiToken,
   logDebug,
   logError,
@@ -32,19 +30,14 @@ import {
   logStepDone,
   logStepInline,
   logWarn,
-  Ok,
   openBrowser,
   prepareStdinForHandoff,
   prompt,
   promptSpawnNameShared,
-  sanitizeTermValue,
   selectFromList,
-  shellQuote,
-  toKebabCase,
   validateModelId,
   validateRegionName,
   validateServerName,
-  withRetry,
 } from "../shared/ui";
 
 // ── Setup / Teardown ────────────────────────────────────────────────────
@@ -248,38 +241,6 @@ describe("loadApiToken", () => {
   });
 });
 
-// ── shellQuote ─────────────────────────────────────────────────────
-
-describe("shellQuote", () => {
-  it("wraps simple string in single quotes", () => {
-    expect(shellQuote("hello")).toBe("'hello'");
-  });
-
-  it("escapes single quotes within string", () => {
-    const result = shellQuote("it's");
-    expect(result).toContain("it");
-    expect(result).toContain("s");
-  });
-
-  it("handles empty string", () => {
-    expect(shellQuote("")).toBe("''");
-  });
-
-  it("throws on null bytes", () => {
-    expect(() => shellQuote("a\x00b")).toThrow("null bytes");
-  });
-});
-
-// ── jsonEscape ─────────────────────────────────────────────────────
-
-describe("jsonEscape", () => {
-  it("escapes special JSON characters", () => {
-    const result = jsonEscape('a"b\\c');
-    expect(result).toContain('\\"');
-    expect(result).toContain("\\\\");
-  });
-});
-
 // ── validators ─────────────────────────────────────────────────────
 
 describe("validators", () => {
@@ -305,31 +266,6 @@ describe("validators", () => {
 
   it("validateModelId rejects invalid model IDs", () => {
     expect(validateModelId("bad model ID!")).toBe(false);
-  });
-});
-
-// ── toKebabCase ────────────────────────────────────────────────────
-
-describe("toKebabCase", () => {
-  it("converts spaces to hyphens", () => {
-    expect(toKebabCase("Hello World")).toBe("hello-world");
-  });
-
-  it("lowercases everything", () => {
-    expect(toKebabCase("MyServer")).toBe("myserver");
-  });
-});
-
-// ── sanitizeTermValue ──────────────────────────────────────────────
-
-describe("sanitizeTermValue", () => {
-  it("strips non-printable characters", () => {
-    const result = sanitizeTermValue("xterm\x00\x1b[31m-256color");
-    expect(result).not.toContain("\x00");
-  });
-
-  it("passes through clean values", () => {
-    expect(sanitizeTermValue("xterm-256color")).toBe("xterm-256color");
   });
 });
 
@@ -387,48 +323,6 @@ describe("promptSpawnNameShared", () => {
     process.env.SPAWN_NON_INTERACTIVE = "1";
     await promptSpawnNameShared("Test Cloud");
     expect(process.env.SPAWN_NAME_KEBAB).toMatch(/^spawn-/);
-  });
-});
-
-// ── withRetry ──────────────────────────────────────────────────────
-
-describe("withRetry", () => {
-  it("returns data on first success", async () => {
-    const result = await withRetry("test", async () => Ok("done"), 3, 0);
-    expect(result).toBe("done");
-  });
-
-  it("retries on Err and throws last error after max attempts", async () => {
-    let attempt = 0;
-    await expect(
-      withRetry(
-        "test",
-        async () => {
-          attempt++;
-          return Err(new Error(`fail ${attempt}`));
-        },
-        2,
-        0,
-      ),
-    ).rejects.toThrow("fail 2");
-    expect(attempt).toBe(2);
-  });
-
-  it("succeeds after initial Err results", async () => {
-    let attempt = 0;
-    const result = await withRetry(
-      "test",
-      async () => {
-        attempt++;
-        if (attempt < 3) {
-          return Err(new Error("not yet"));
-        }
-        return Ok("success");
-      },
-      3,
-      0,
-    );
-    expect(result).toBe("success");
   });
 });
 

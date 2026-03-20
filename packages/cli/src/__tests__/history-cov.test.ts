@@ -1,9 +1,11 @@
 /**
  * history-cov.test.ts — Coverage tests for history.ts
  *
- * Focuses on uncovered paths: generateSpawnId, saveLaunchCmd, saveMetadata,
+ * Focuses on uncovered paths: saveLaunchCmd, saveMetadata,
  * markRecordDeleted, updateRecordIp, updateRecordConnection, getActiveServers,
  * removeRecord, archiving, trimming edge cases, and v1 loose schema handling.
+ * (generateSpawnId is covered in history-spawn-id.test.ts)
+ * (clearHistory is covered in clear-history.test.ts)
  */
 
 import type { SpawnRecord } from "../history.js";
@@ -12,9 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  clearHistory,
   filterHistory,
-  generateSpawnId,
   getActiveServers,
   loadHistory,
   markRecordDeleted,
@@ -49,25 +49,6 @@ describe("history.ts coverage", () => {
         force: true,
       });
     }
-  });
-
-  // ── generateSpawnId ───────────────────────────────────────────────────
-
-  describe("generateSpawnId", () => {
-    it("returns a UUID string", () => {
-      const id = generateSpawnId();
-      expect(typeof id).toBe("string");
-      expect(id.length).toBeGreaterThan(0);
-      expect(id).toMatch(/^[0-9a-f-]+$/);
-    });
-
-    it("returns unique IDs", () => {
-      const ids = new Set<string>();
-      for (let i = 0; i < 100; i++) {
-        ids.add(generateSpawnId());
-      }
-      expect(ids.size).toBe(100);
-    });
   });
 
   // ── saveLaunchCmd ─────────────────────────────────────────────────────
@@ -607,42 +588,6 @@ describe("history.ts coverage", () => {
         timestamp: "x",
       });
       expect(result).toBe(false);
-    });
-  });
-
-  // ── clearHistory ──────────────────────────────────────────────────────
-
-  describe("clearHistory", () => {
-    it("returns 0 when no history file", () => {
-      expect(clearHistory()).toBe(0);
-    });
-
-    it("returns count and removes file", () => {
-      const records: SpawnRecord[] = [
-        {
-          id: "1",
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T00:00:00Z",
-        },
-        {
-          id: "2",
-          agent: "codex",
-          cloud: "hetzner",
-          timestamp: "2026-01-02T00:00:00Z",
-        },
-      ];
-      writeFileSync(
-        join(testDir, "history.json"),
-        JSON.stringify({
-          version: 1,
-          records,
-        }),
-      );
-
-      const count = clearHistory();
-      expect(count).toBe(2);
-      expect(existsSync(join(testDir, "history.json"))).toBe(false);
     });
   });
 
