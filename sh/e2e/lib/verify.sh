@@ -535,7 +535,7 @@ verify_codex() {
 
   # Binary check
   log_step "Checking codex binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v codex" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH command -v codex" >/dev/null 2>&1; then
     log_ok "codex binary found"
   else
     log_err "codex binary not found"
@@ -594,7 +594,7 @@ verify_kilocode() {
 
   # Binary check
   log_step "Checking kilocode binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v kilocode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH command -v kilocode" >/dev/null 2>&1; then
     log_ok "kilocode binary found"
   else
     log_err "kilocode binary not found"
