@@ -2,6 +2,7 @@
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
+import { normalize } from "node:path";
 import { asyncTryCatch, tryCatch } from "./result.js";
 import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
 
@@ -68,6 +69,48 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "AddressFamily=inet",
   "-t",
 ];
+
+// ─── Remote Path Validation ─────────────────────────────────────────────────
+
+/**
+ * Validate a remote file path for use with scp/ssh file operations.
+ *
+ * Rejects path traversal (.. segments), argument injection (leading dashes),
+ * and characters outside a safe allowlist. The `..` check is performed on the
+ * RAW input before normalize() so that crafted paths like `/tmp/../../etc/passwd`
+ * (which normalize to `/etc/passwd`) are still caught.
+ *
+ * @param remotePath - The raw remote path to validate
+ * @param allowedCharsPattern - Optional regex for allowed characters
+ *   (default: alphanumerics, `/`, `.`, `_`, `~`, `$`, `{`, `}`, `:`, `-`)
+ * @returns The normalized path if valid
+ * @throws Error if the path is unsafe
+ */
+export function validateRemotePath(remotePath: string, allowedCharsPattern: RegExp = /^[\w/.~${}:-]+$/): string {
+  // 1. Check for ".." traversal in the RAW input BEFORE normalize() strips it
+  if (remotePath.includes("..")) {
+    throw new Error(`Invalid remote path: path traversal detected ("..") in: ${remotePath}`);
+  }
+  // 2. Reject empty paths
+  if (!remotePath) {
+    throw new Error("Invalid remote path: path must not be empty");
+  }
+  // 3. Normalize (resolve . segments, collapse slashes)
+  const normalized = normalize(remotePath);
+  // 4. Double-check normalized result for ".." (defense in depth)
+  if (normalized.includes("..")) {
+    throw new Error(`Invalid remote path: path traversal detected ("..") in normalized: ${normalized}`);
+  }
+  // 5. Character allowlist
+  if (!allowedCharsPattern.test(normalized)) {
+    throw new Error(`Invalid remote path: contains unsafe characters: ${remotePath}`);
+  }
+  // 6. Reject argument injection (segments starting with -)
+  if (normalized.split("/").some((s) => s.startsWith("-"))) {
+    throw new Error(`Invalid remote path: segments must not start with "-": ${remotePath}`);
+  }
+  return normalized;
+}
 
 // ─── Interactive Spawn ───────────────────────────────────────────────────────
 

@@ -5,10 +5,11 @@ import type { AgentConfig } from "./agents.js";
 import type { Result } from "./ui.js";
 
 import { unlinkSync, writeFileSync } from "node:fs";
-import { join, normalize } from "node:path";
+import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
+import { validateRemotePath } from "./ssh.js";
 import { Err, jsonEscape, logError, logInfo, logStep, logWarn, Ok, prompt, shellQuote, withRetry } from "./ui.js";
 
 /**
@@ -57,26 +58,6 @@ async function installAgent(
     throw new Error(`${agentName} install failed`);
   }
   logInfo(`${agentName} installation completed`);
-}
-
-/**
- * Validate that a remote path contains only safe characters.
- * Allows shell variable references ($HOME, ${HOME}) but rejects anything
- * that could break out of double-quoted shell interpolation.
- */
-function validateRemotePath(remotePath: string): string {
-  // Allow alphanumerics, forward slashes, dots, underscores, tildes, hyphens,
-  // and shell variable syntax ($, {, }).  Reject everything else — especially
-  // backticks, semicolons, pipes, quotes, newlines, and null bytes.
-  const normalizedRemote = normalize(remotePath);
-  if (!/^[\w/.~${}:-]+$/.test(normalizedRemote)) {
-    throw new Error(`uploadConfigFile: remotePath contains unsafe characters: ${remotePath}`);
-  }
-  // Block path traversal (normalize resolves . segments first)
-  if (normalizedRemote.includes("..")) {
-    throw new Error(`uploadConfigFile: remotePath must not contain "..": ${remotePath}`);
-  }
-  return normalizedRemote;
 }
 
 /**

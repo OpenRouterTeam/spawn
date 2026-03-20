@@ -5,7 +5,7 @@ import type { CloudInitTier } from "../shared/agents.js";
 
 import { createHash, createHmac } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, normalize } from "node:path";
+import { dirname } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
@@ -20,6 +20,7 @@ import {
   waitForSsh as sharedWaitForSsh,
   sleep,
   spawnInteractive,
+  validateRemotePath,
 } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import {
@@ -1147,14 +1148,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    throw new Error(`Invalid remote path: ${remotePath}`);
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~-]+$/);
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
@@ -1184,14 +1178,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 }
 
 export async function downloadFile(remotePath: string, localPath: string): Promise<void> {
-  const normalizedRemote = normalize(remotePath);
-  if (
-    !/^[a-zA-Z0-9/_.~$-]+$/.test(normalizedRemote) ||
-    normalizedRemote.includes("..") ||
-    normalizedRemote.split("/").some((s) => s.startsWith("-"))
-  ) {
-    throw new Error(`Invalid remote path: ${remotePath}`);
-  }
+  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const proc = Bun.spawn(
