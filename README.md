@@ -64,6 +64,9 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn list --clear` | Clear all spawn history |
 | `spawn fix` | Re-run agent setup on an existing VM (re-inject credentials, reinstall) |
 | `spawn fix <spawn-id>` | Fix a specific spawn by name or ID |
+| `spawn link <ip>` | Register an existing VM by IP |
+| `spawn link <ip> --agent <agent>` | Specify the agent running on the VM |
+| `spawn link <ip> --cloud <cloud>` | Specify the cloud provider |
 | `spawn last` | Instantly rerun the most recent spawn |
 | `spawn agents` | List all agents with descriptions |
 | `spawn clouds` | List all cloud providers |
