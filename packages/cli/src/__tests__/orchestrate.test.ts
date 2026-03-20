@@ -802,4 +802,75 @@ describe("runOrchestration", () => {
       exitSpy.mockRestore();
     });
   });
+
+  // ── skipCloudInit auto-detection ────────────────────────────────────────
+
+  describe("skipCloudInit auto-detection", () => {
+    it("sets skipCloudInit=true for minimal-tier agent with tarball on non-local cloud", async () => {
+      process.env.SPAWN_FAST = "1";
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      const agent = createMockAgent({
+        cloudInitTier: "minimal",
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      expect(cloud.skipCloudInit).toBe(true);
+      delete process.env.SPAWN_FAST;
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("sets skipCloudInit=true for agent with no cloudInitTier (defaults to minimal)", async () => {
+      process.env.SPAWN_FAST = "1";
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      // No cloudInitTier set — should behave like minimal
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      expect(cloud.skipCloudInit).toBe(true);
+      delete process.env.SPAWN_FAST;
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("does NOT set skipCloudInit for full-tier agent even with tarball", async () => {
+      process.env.SPAWN_FAST = "1";
+      const cloud = createMockCloud({
+        cloudName: "hetzner",
+      });
+      const agent = createMockAgent({
+        cloudInitTier: "full",
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      expect(cloud.skipCloudInit).toBeUndefined();
+      delete process.env.SPAWN_FAST;
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("does NOT set skipCloudInit for local cloud even with minimal-tier agent", async () => {
+      process.env.SPAWN_FAST = "1";
+      const cloud = createMockCloud({
+        cloudName: "local",
+      });
+      const agent = createMockAgent({
+        cloudInitTier: "minimal",
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      expect(cloud.skipCloudInit).toBeUndefined();
+      delete process.env.SPAWN_FAST;
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+  });
 });
