@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run mock tests
+      - name: Run tests with coverage
         run: bun test --coverage
 
   unit-tests:
