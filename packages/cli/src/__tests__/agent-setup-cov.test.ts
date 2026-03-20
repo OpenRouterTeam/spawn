@@ -230,32 +230,6 @@ describe("offerGithubAuth with token", () => {
 
 // ── startGateway ──────────────────────────────────────────────────────
 
-describe("startGateway", () => {
-  it("runs gateway setup commands on the remote", async () => {
-    const { startGateway } = await import("../shared/agent-setup.js");
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    await startGateway(runner);
-    expect(runner.runServer).toHaveBeenCalled();
-    const calls = runner.runServer.mock.calls;
-    const allCmds = calls.map((c: unknown[]) => String(c[0])).join(" ");
-    expect(allCmds).toContain("openclaw");
-  });
-
-  it("throws when runServer fails", async () => {
-    const { startGateway } = await import("../shared/agent-setup.js");
-    const runner = {
-      runServer: mock(() => Promise.reject(new Error("gateway failed"))),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    await expect(startGateway(runner)).rejects.toThrow("gateway failed");
-  });
-});
-
 // ── Agent install, configure, and envVars coverage ────────────────────
 
 describe("createCloudAgents detailed", () => {

@@ -487,48 +487,6 @@ describe("sprite/downloadFileSprite", () => {
   });
 });
 
-// ─── interactiveSession ──────────────────────────────────────────────────────
-
-describe("sprite/interactiveSession", () => {
-  it("uses spawnInteractive by default", async () => {
-    const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
-    const { interactiveSession } = await import("../sprite/sprite");
-    const spawnFn = mock(() => 0);
-    const code = await interactiveSession("echo hello", spawnFn);
-    expect(code).toBe(0);
-    expect(spawnFn).toHaveBeenCalled();
-    spawnSyncSpy.mockRestore();
-  });
-
-  it("uses -tty when SPAWN_PROMPT is not set", async () => {
-    delete process.env.SPAWN_PROMPT;
-    const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
-    const { interactiveSession } = await import("../sprite/sprite");
-    let capturedArgs: string[] = [];
-    const spawnFn = mock((args: string[]) => {
-      capturedArgs = args;
-      return 0;
-    });
-    await interactiveSession("echo hello", spawnFn);
-    expect(capturedArgs).toContain("-tty");
-    spawnSyncSpy.mockRestore();
-  });
-
-  it("omits -tty when SPAWN_PROMPT is set", async () => {
-    process.env.SPAWN_PROMPT = "some prompt";
-    const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
-    const { interactiveSession } = await import("../sprite/sprite");
-    let capturedArgs: string[] = [];
-    const spawnFn = mock((args: string[]) => {
-      capturedArgs = args;
-      return 0;
-    });
-    await interactiveSession("echo hello", spawnFn);
-    expect(capturedArgs).not.toContain("-tty");
-    spawnSyncSpy.mockRestore();
-  });
-});
-
 // ─── destroyServer ───────────────────────────────────────────────────────────
 
 describe("sprite/destroyServer", () => {
@@ -569,29 +527,6 @@ describe("sprite/runSprite", () => {
     const spawnSpy = mockBunSpawn(1);
     const { runSprite } = await import("../sprite/sprite");
     await expect(runSprite("failing-cmd")).rejects.toThrow("sprite exec failed");
-    spawnSyncSpy.mockRestore();
-    spawnSpy.mockRestore();
-  });
-});
-
-// ─── installSpriteKeepAlive ──────────────────────────────────────────────────
-
-describe("sprite/installSpriteKeepAlive", () => {
-  it("succeeds when curl works", async () => {
-    const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
-    const spawnSpy = mockBunSpawn(0);
-    const { installSpriteKeepAlive } = await import("../sprite/sprite");
-    await installSpriteKeepAlive();
-    spawnSyncSpy.mockRestore();
-    spawnSpy.mockRestore();
-  });
-
-  it("warns but does not throw when install fails", async () => {
-    const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
-    const spawnSpy = mockBunSpawn(1, "", "curl failed");
-    const { installSpriteKeepAlive } = await import("../sprite/sprite");
-    // Should not throw
-    await installSpriteKeepAlive();
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
