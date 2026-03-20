@@ -100,6 +100,7 @@ const VALID_REASONS = new Set([
   "hygiene",
   "fixtures",
   "e2e",
+  "e2e-interactive",
   "soak",
 ]);
 
