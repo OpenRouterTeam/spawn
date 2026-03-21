@@ -5,9 +5,8 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { logInfo, logStep } from "../shared/log.js";
 import { runOrchestration } from "../shared/orchestrate.js";
-import { shellQuote } from "../shared/ui.js";
+import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
   authenticate,
