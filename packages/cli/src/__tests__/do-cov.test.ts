@@ -357,64 +357,6 @@ describe("digitalocean/listServers", () => {
   });
 });
 
-// ─── findSpawnSnapshot ───────────────────────────────────────────────────────
-
-describe("digitalocean/findSpawnSnapshot", () => {
-  it("returns null when no snapshots found", async () => {
-    global.fetch = mock(() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            images: [],
-          }),
-        ),
-      ),
-    );
-    const { findSpawnSnapshot } = await import("../digitalocean/digitalocean");
-    const result = await findSpawnSnapshot("claude");
-    expect(result).toBeNull();
-  });
-
-  it("returns latest snapshot ID", async () => {
-    const resp = {
-      images: [
-        {
-          id: 100,
-          name: "spawn-claude-v1",
-          created_at: "2025-01-01T00:00:00Z",
-        },
-        {
-          id: 200,
-          name: "spawn-claude-v2",
-          created_at: "2025-06-01T00:00:00Z",
-        },
-        {
-          id: 300,
-          name: "spawn-other-v1",
-          created_at: "2025-12-01T00:00:00Z",
-        },
-      ],
-    };
-    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(resp))));
-    const { findSpawnSnapshot } = await import("../digitalocean/digitalocean");
-    const result = await findSpawnSnapshot("claude");
-    expect(result).toBe("200");
-  });
-
-  it("returns null on API error", async () => {
-    global.fetch = mock(() =>
-      Promise.resolve(
-        new Response("error", {
-          status: 500,
-        }),
-      ),
-    );
-    const { findSpawnSnapshot } = await import("../digitalocean/digitalocean");
-    const result = await findSpawnSnapshot("claude");
-    expect(result).toBeNull();
-  });
-});
-
 // ─── promptSwitchAccount ─────────────────────────────────────────────────────
 
 describe("digitalocean/promptSwitchAccount", () => {

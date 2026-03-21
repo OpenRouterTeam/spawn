@@ -2,8 +2,9 @@
  * agent-setup-cov.test.ts — Coverage tests for shared/agent-setup.ts
  *
  * Covers: createCloudAgents, offerGithubAuth, installAgent,
- * uploadConfigFile, validateRemotePath, setupAutoUpdate
+ * uploadConfigFile, validateRemotePath
  * (wrapSshCall is covered in with-retry-result.test.ts)
+ * (setupAutoUpdate is covered in auto-update.test.ts)
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
@@ -15,7 +16,7 @@ const clackMocks = mockClackPrompts({
 });
 
 // Must import after mock.module for @clack/prompts
-const { offerGithubAuth, createCloudAgents, setupAutoUpdate } = await import("../shared/agent-setup.js");
+const { offerGithubAuth, createCloudAgents } = await import("../shared/agent-setup.js");
 
 let stderrSpy: ReturnType<typeof spyOn>;
 
@@ -81,34 +82,6 @@ describe("offerGithubAuth", () => {
     };
     // Should not throw
     await offerGithubAuth(runner, true);
-  });
-});
-
-// ── setupAutoUpdate ────────────────────────────────────────────────────
-
-describe("setupAutoUpdate", () => {
-  it("runs update setup commands on the remote", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    await setupAutoUpdate(runner, "claude", "npm update -g @anthropic-ai/claude-code");
-    expect(runner.runServer).toHaveBeenCalled();
-    // Should have been called with a command containing the update cmd
-    const calls = runner.runServer.mock.calls;
-    const allCmds = calls.map((c: unknown[]) => String(c[0])).join(" ");
-    expect(allCmds).toContain("systemd");
-  });
-
-  it("handles failure gracefully", async () => {
-    const runner = {
-      runServer: mock(() => Promise.reject(new Error("failed"))),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    // Should not throw
-    await setupAutoUpdate(runner, "agent", "update-cmd");
   });
 });
 
