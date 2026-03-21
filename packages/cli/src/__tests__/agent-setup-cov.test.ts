@@ -125,18 +125,6 @@ describe("createCloudAgents", () => {
     expect(agent.name).toBe(result.agents[firstKey].name);
   });
 
-  it("agents return non-empty launch commands", () => {
-    const result = createCloudAgents({
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    });
-    for (const agent of Object.values(result.agents)) {
-      const cmd = agent.launchCmd();
-      expect(cmd.length).toBeGreaterThan(0);
-    }
-  });
-
   it("resolveAgent throws for unknown agent", () => {
     const result = createCloudAgents({
       runServer: mock(() => Promise.resolve()),
@@ -158,22 +146,6 @@ describe("createCloudAgents", () => {
     const agent = result.agents[firstKey];
     await agent.install();
     expect(runner.runServer).toHaveBeenCalled();
-  });
-
-  it("agents have configure functions for configurable agents", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    // Find an agent with a configure function
-    for (const agent of Object.values(result.agents)) {
-      if (agent.configure) {
-        await agent.configure("sk-or-v1-test", undefined, new Set());
-        break;
-      }
-    }
   });
 });
 

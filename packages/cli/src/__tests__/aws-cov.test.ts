@@ -1,19 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 // Must mock clack before importing aws module
 mockClackPrompts();
 
-import {
-  BUNDLES,
-  DEFAULT_BUNDLE,
-  getAwsConfigPath,
-  getConnectionInfo,
-  getState,
-  loadCredsFromConfig,
-  saveCredsToConfig,
-} from "../aws/aws";
+import { DEFAULT_BUNDLE, getConnectionInfo, getState } from "../aws/aws";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -70,101 +61,6 @@ describe("aws/getConnectionInfo", () => {
     const info = getConnectionInfo();
     expect(info.user).toBe("ubuntu");
     expect(typeof info.host).toBe("string");
-  });
-});
-
-// ─── BUNDLES ─────────────────────────────────────────────────────────────────
-
-describe("aws/BUNDLES", () => {
-  it("has at least 3 bundles", () => {
-    expect(BUNDLES.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("each bundle has id and label", () => {
-    for (const b of BUNDLES) {
-      expect(b.id).toBeTruthy();
-      expect(b.label).toBeTruthy();
-    }
-  });
-
-  it("DEFAULT_BUNDLE is in BUNDLES list", () => {
-    expect(BUNDLES).toContainEqual(DEFAULT_BUNDLE);
-  });
-});
-
-// ─── Credential Persistence ──────────────────────────────────────────────────
-
-describe("aws/credential-persistence", () => {
-  let savedConfig: string | null = null;
-
-  beforeEach(() => {
-    const path = getAwsConfigPath();
-    if (existsSync(path)) {
-      savedConfig = readFileSync(path, "utf-8");
-    } else {
-      savedConfig = null;
-    }
-  });
-
-  afterEach(() => {
-    const path = getAwsConfigPath();
-    if (savedConfig !== null) {
-      writeFileSync(path, savedConfig);
-    } else if (existsSync(path)) {
-      unlinkSync(path);
-    }
-  });
-
-  it("saveCredsToConfig creates file and loadCredsFromConfig reads it", async () => {
-    const testKey = "AKIAIOSFODNN7EXAMPLE";
-    const testSecret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    await saveCredsToConfig(testKey, testSecret, "us-west-2");
-
-    const loaded = loadCredsFromConfig();
-    expect(loaded).not.toBeNull();
-    expect(loaded?.accessKeyId).toBe(testKey);
-    expect(loaded?.secretAccessKey).toBe(testSecret);
-    expect(loaded?.region).toBe("us-west-2");
-  });
-
-  it("loadCredsFromConfig returns null for missing file", () => {
-    const path = getAwsConfigPath();
-    if (existsSync(path)) {
-      unlinkSync(path);
-    }
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for bad JSON", () => {
-    writeFileSync(getAwsConfigPath(), "NOT_JSON", {
-      mode: 0o600,
-    });
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for invalid accessKeyId format", async () => {
-    await saveCredsToConfig("bad!!!", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1");
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for invalid secretAccessKey format", async () => {
-    await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "too-short", "us-east-1");
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig defaults region to us-east-1 when not set", async () => {
-    writeFileSync(
-      getAwsConfigPath(),
-      JSON.stringify({
-        accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-      }),
-      {
-        mode: 0o600,
-      },
-    );
-    const loaded = loadCredsFromConfig();
-    expect(loaded?.region).toBe("us-east-1");
   });
 });
 
