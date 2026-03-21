@@ -127,6 +127,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
+    console.error(`    ${pc.cyan("--beta docker")}       Use Docker CE app image on Hetzner/GCP (faster boot)`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -860,7 +861,7 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
       console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
       console.error(`  ${pc.cyan("parallel")}  Parallelize server boot with setup prompts`);
-      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner (faster boot)`);
+      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner/GCP (faster boot)`);
       process.exit(1);
     }
   }
