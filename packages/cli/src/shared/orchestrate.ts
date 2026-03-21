@@ -148,6 +148,12 @@ export async function runOrchestration(
     // ── Fast mode: server boot + setup prompts run concurrently ─────────
     // Start server creation, then do API key prompt, pre-provision, tarball
     // download, and account check in parallel with server boot.
+    //
+    // Keep a dummy timer on the event loop so Bun doesn't exit prematurely.
+    // When all concurrent promises settle (especially after Bun.serve.stop()
+    // in the OAuth flow removes its handle), the event loop can appear empty
+    // before the continuation starts new I/O — causing a silent exit(0).
+    const keepAlive = setInterval(() => {}, 60_000);
 
     const serverBootPromise = (async () => {
       const conn = await cloud.createServer(serverName);
@@ -257,6 +263,7 @@ export async function runOrchestration(
     }
 
     // Inject env + continue with shared post-install flow
+    clearInterval(keepAlive);
     await injectEnvVars(cloud, envContent);
     await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
   } else {
