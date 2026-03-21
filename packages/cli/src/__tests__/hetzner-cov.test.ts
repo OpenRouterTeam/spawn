@@ -181,7 +181,7 @@ describe("hetzner/runServer", () => {
     await runServer("echo hello", 10, "1.2.3.4");
     const args = spy.mock.calls[0][0];
     const sshCmd = args[args.length - 1];
-    expect(sshCmd).toMatch(/^bash -c '/);
+    expect(sshCmd).toContain("bash -c 'echo hello'");
     spy.mockRestore();
   });
 
