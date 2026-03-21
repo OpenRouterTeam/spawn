@@ -11,6 +11,23 @@ INPUT_TEST_PROMPT="Reply with exactly the text SPAWN_E2E_OK and nothing else."
 INPUT_TEST_MARKER="SPAWN_E2E_OK"
 
 # ---------------------------------------------------------------------------
+# _validate_timeout
+#
+# Defense-in-depth: ensures INPUT_TEST_TIMEOUT contains only digits before it
+# is interpolated into any remote command string. This prevents command
+# injection even if common.sh's validation is bypassed or the variable is
+# modified after sourcing.
+# ---------------------------------------------------------------------------
+_validate_timeout() {
+  case "${INPUT_TEST_TIMEOUT:-}" in
+    ''|*[!0-9]*)
+      log_err "SECURITY: INPUT_TEST_TIMEOUT contains non-numeric characters — aborting"
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
 # _validate_base64 VALUE
 #
 # Validates that VALUE contains only base64-safe characters ([A-Za-z0-9+/=]).
@@ -56,6 +73,8 @@ _stage_prompt_remotely() {
 input_test_claude() {
   local app="$1"
 
+  _validate_timeout || return 1
+
   log_step "Running input test for claude..."
   # Base64-encode the prompt and stage it to a remote temp file.
   # This avoids interpolating prompt data into the agent command string.
@@ -70,9 +89,10 @@ input_test_claude() {
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    printf '%s' \"\$PROMPT\" | timeout ${INPUT_TEST_TIMEOUT} claude -p" 2>&1) || true
+    printf '%s' \"\$PROMPT\" | timeout \"\$_TIMEOUT\" claude -p" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -88,6 +108,8 @@ input_test_claude() {
 input_test_codex() {
   local app="$1"
 
+  _validate_timeout || return 1
+
   log_step "Running input test for codex..."
   # Base64-encode the prompt and stage it to a remote temp file.
   local encoded_prompt
@@ -100,9 +122,10 @@ input_test_codex() {
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    timeout ${INPUT_TEST_TIMEOUT} codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
+    timeout \"\$_TIMEOUT\" codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
@@ -168,6 +191,8 @@ input_test_openclaw() {
   local max_attempts=2
   local attempt=0
 
+  _validate_timeout || return 1
+
   log_step "Running input test for openclaw..."
 
   # Base64-encode the prompt and stage it to a remote temp file.
@@ -192,9 +217,10 @@ input_test_openclaw() {
     output=$(cloud_exec "${app}" "\
       source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
+      _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-      timeout ${INPUT_TEST_TIMEOUT} openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
+      timeout \"\$_TIMEOUT\" openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
@@ -218,6 +244,8 @@ input_test_openclaw() {
 input_test_zeroclaw() {
   local app="$1"
 
+  _validate_timeout || return 1
+
   log_step "Running input test for zeroclaw..."
   # Base64-encode the prompt and stage it to a remote temp file.
   # Use -m/--message for non-interactive single-message mode (not -p which is --provider).
@@ -230,9 +258,10 @@ input_test_zeroclaw() {
   # The prompt is read from the staged temp file — no interpolation in this command.
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
+    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    timeout ${INPUT_TEST_TIMEOUT} zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
+    timeout \"\$_TIMEOUT\" zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
