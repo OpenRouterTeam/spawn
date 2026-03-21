@@ -34,6 +34,11 @@ import {
   withRetry,
 } from "./ui.js";
 
+/** Docker container name used by --beta docker deployments. */
+export const DOCKER_CONTAINER_NAME = "spawn-agent";
+/** Docker registry hosting spawn agent images. */
+export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
+
 export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;

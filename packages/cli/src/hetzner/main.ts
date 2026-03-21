@@ -5,7 +5,7 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -25,9 +25,6 @@ import {
   waitForCloudInit,
   waitForSshOnly,
 } from "./hetzner.js";
-
-const DOCKER_CONTAINER_NAME = "spawn-agent";
-const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
 
 async function main() {
   const agentName = process.argv[2];
