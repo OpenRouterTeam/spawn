@@ -1343,7 +1343,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `root@${serverIp}`,
-      fullCmd,
+      `bash -c ${shellQuote(fullCmd)}`,
     ],
     {
       stdio: [
