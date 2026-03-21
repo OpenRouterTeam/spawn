@@ -528,11 +528,12 @@ export async function createServer(
   location?: string,
   tier?: CloudInitTier,
   snapshotId?: string,
+  dockerImage?: string,
 ): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   let loc = location || process.env.HETZNER_LOCATION || DEFAULT_LOCATION;
-  const image = snapshotId ? Number(snapshotId) : "ubuntu-24.04";
-  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : "ubuntu-24.04";
+  const image: string | number = snapshotId ? Number(snapshotId) : (dockerImage ?? "ubuntu-24.04");
+  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : (dockerImage ?? "ubuntu-24.04");
 
   if (!validateRegionName(loc)) {
     logError("Invalid HETZNER_LOCATION");

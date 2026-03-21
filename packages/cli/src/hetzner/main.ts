@@ -5,6 +5,7 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import { logInfo } from "../shared/log.js";
 import { runOrchestration } from "../shared/orchestrate.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -38,6 +39,7 @@ async function main() {
   let serverType = "";
   let location = "";
   let snapshotId: string | null = null;
+  let dockerImage: string | undefined;
 
   const cloud: CloudOrchestrator = {
     cloudName: "hetzner",
@@ -63,7 +65,22 @@ async function main() {
       if (snapshotId) {
         cloud.skipAgentInstall = true;
       }
-      return await createHetznerServer(name, serverType, location, agent.cloudInitTier, snapshotId ?? undefined);
+      // Use Docker CE app image when --beta docker is active (and no snapshot found)
+      if (!snapshotId) {
+        const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+        if (betaFeatures.includes("docker")) {
+          dockerImage = "docker-ce";
+          logInfo("Using Hetzner Docker CE app image");
+        }
+      }
+      return await createHetznerServer(
+        name,
+        serverType,
+        location,
+        agent.cloudInitTier,
+        snapshotId ?? undefined,
+        dockerImage,
+      );
     },
     getServerName,
     async waitForReady() {

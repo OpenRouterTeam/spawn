@@ -850,6 +850,7 @@ async function main(): Promise<void> {
     "tarball",
     "images",
     "parallel",
+    "docker",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
@@ -859,12 +860,13 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
       console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
       console.error(`  ${pc.cyan("parallel")}  Parallelize server boot with setup prompts`);
+      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner (faster boot)`);
       process.exit(1);
     }
   }
   // --fast implies all beta features
   if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel");
+    betaFeatures.push("tarball", "images", "parallel", "docker");
   }
   if (betaFeatures.length > 0) {
     process.env.SPAWN_BETA = [
