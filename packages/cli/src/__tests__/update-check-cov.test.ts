@@ -70,31 +70,34 @@ describe("update-check.ts coverage", () => {
   describe("checkForUpdates skip conditions", () => {
     it("skips in test environment (NODE_ENV=test)", async () => {
       process.env.NODE_ENV = "test";
+      global.fetch = mock(async () => new Response("1.0.0"));
       const { checkForUpdates } = await import("../update-check");
       await checkForUpdates();
-      // Should return without any fetch
-      expect(true).toBe(true);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("skips when SPAWN_NO_UPDATE_CHECK=1", async () => {
       process.env.SPAWN_NO_UPDATE_CHECK = "1";
+      global.fetch = mock(async () => new Response("1.0.0"));
       const { checkForUpdates } = await import("../update-check");
       await checkForUpdates();
-      expect(true).toBe(true);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("skips when recently backed off", async () => {
       writeUpdateFailed(Date.now()); // failed just now
+      global.fetch = mock(async () => new Response("1.0.0"));
       const { checkForUpdates } = await import("../update-check");
       await checkForUpdates();
-      expect(true).toBe(true);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("skips when recently checked successfully", async () => {
       writeUpdateChecked(Date.now()); // checked just now
+      global.fetch = mock(async () => new Response("1.0.0"));
       const { checkForUpdates } = await import("../update-check");
       await checkForUpdates();
-      expect(true).toBe(true);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
@@ -119,30 +122,19 @@ describe("update-check.ts coverage", () => {
   describe("checkForUpdates fetch failure", () => {
     it("handles fetch returning null version gracefully", async () => {
       const { checkForUpdates } = await import("../update-check");
-
       global.fetch = mock(async () => new Response("not-a-version"));
-      await checkForUpdates();
-      // Should not throw, just return
-      expect(true).toBe(true);
+      // Should not throw — verify by confirming fetch was called and function completed
+      await expect(checkForUpdates()).resolves.toBeUndefined();
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it("handles fetch network error gracefully", async () => {
       const { checkForUpdates } = await import("../update-check");
-
       global.fetch = mock(async () => {
         throw new TypeError("fetch failed");
       });
-      await checkForUpdates();
-      expect(true).toBe(true);
-    });
-  });
-
-  // ── findUpdatedBinary (via executor) ──────────────────────────────────
-
-  describe("executor-based findUpdatedBinary", () => {
-    it("executor.execFileSync is accessible", async () => {
-      const { executor } = await import("../update-check");
-      expect(typeof executor.execFileSync).toBe("function");
+      // Should not throw — verify by confirming function completes without rejection
+      await expect(checkForUpdates()).resolves.toBeUndefined();
     });
   });
 
@@ -156,8 +148,8 @@ describe("update-check.ts coverage", () => {
       const pkg = await import("../../package.json");
       global.fetch = mock(async () => new Response(pkg.version));
       await checkForUpdates();
-      // Should proceed with check (not backed off)
-      expect(true).toBe(true);
+      // Should proceed with check (not backed off) — fetch was called
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it("does not skip when checked timestamp is old (>1h)", async () => {
@@ -167,7 +159,8 @@ describe("update-check.ts coverage", () => {
       const pkg = await import("../../package.json");
       global.fetch = mock(async () => new Response(pkg.version));
       await checkForUpdates();
-      expect(true).toBe(true);
+      // Should proceed with network check — fetch was called
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it("handles NaN in .update-failed file", async () => {
@@ -181,7 +174,8 @@ describe("update-check.ts coverage", () => {
       const pkg = await import("../../package.json");
       global.fetch = mock(async () => new Response(pkg.version));
       await checkForUpdates();
-      expect(true).toBe(true);
+      // NaN timestamp is not treated as recent failure — fetch proceeds
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it("handles NaN in .update-checked file", async () => {
@@ -195,7 +189,8 @@ describe("update-check.ts coverage", () => {
       const pkg = await import("../../package.json");
       global.fetch = mock(async () => new Response(pkg.version));
       await checkForUpdates();
-      expect(true).toBe(true);
+      // NaN timestamp is not treated as recent check — fetch proceeds
+      expect(global.fetch).toHaveBeenCalled();
     });
   });
 });
