@@ -482,8 +482,11 @@ describe("gcp/checkBillingEnabled", () => {
   it("returns immediately when no project set", async () => {
     // Force no project
     delete process.env.GCP_PROJECT;
+    // Mock spawnSync to handle case where _state.project was set by prior tests
+    // (module-level state persists across tests due to import caching)
+    const spy = mockSpawnSyncWithGcloud(0, "true");
     const { checkBillingEnabled } = await import("../gcp/gcp");
-    // If _state.project is empty it returns immediately
     await checkBillingEnabled();
+    spy.mockRestore();
   });
 });
