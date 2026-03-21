@@ -727,6 +727,8 @@ export async function createInstance(
   zone: string,
   machineType: string,
   tier?: CloudInitTier,
+  imageFamily?: string,
+  imageProject?: string,
 ): Promise<VMConnection> {
   const username = resolveUsername();
   assertSafeUsername(username);
@@ -737,13 +739,20 @@ export async function createInstance(
     .map((k) => `${username}:${k}`)
     .join("\n");
 
-  logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone})...`);
+  const family = imageFamily ?? "ubuntu-2404-lts-amd64";
+  const project = imageProject ?? "ubuntu-os-cloud";
+  logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone}, image: ${family})...`);
 
-  // Write startup script to a temp file (random suffix prevents collisions and predictable paths)
-  const tmpFile = `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
-  writeFileSync(tmpFile, getStartupScript(tier), {
-    mode: 0o600,
-  });
+  // Skip startup script for Container-Optimized OS (read-only filesystem, no apt-get)
+  const skipStartupScript = imageProject === "cos-cloud";
+  const tmpFile = skipStartupScript
+    ? undefined
+    : `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
+  if (tmpFile) {
+    writeFileSync(tmpFile, getStartupScript(tier), {
+      mode: 0o600,
+    });
+  }
 
   const args = [
     "compute",
@@ -752,11 +761,15 @@ export async function createInstance(
     name,
     `--zone=${zone}`,
     `--machine-type=${machineType}`,
-    "--image-family=ubuntu-2404-lts-amd64",
-    "--image-project=ubuntu-os-cloud",
+    `--image-family=${family}`,
+    `--image-project=${project}`,
     `--network=${process.env.GCP_NETWORK ?? "default"}`,
     `--subnet=${process.env.GCP_SUBNET ?? "default"}`,
-    `--metadata-from-file=startup-script=${tmpFile}`,
+    ...(tmpFile
+      ? [
+          `--metadata-from-file=startup-script=${tmpFile}`,
+        ]
+      : []),
     `--metadata=ssh-keys=${sshKeysMetadata}`,
     `--project=${_state.project}`,
     "--quiet",
@@ -852,13 +865,15 @@ export async function createInstance(
     }
   });
   // Clean up temp file after all retry paths have completed
-  tryCatch(() =>
-    Bun.spawnSync([
-      "rm",
-      "-f",
-      tmpFile,
-    ]),
-  );
+  if (tmpFile) {
+    tryCatch(() =>
+      Bun.spawnSync([
+        "rm",
+        "-f",
+        tmpFile,
+      ]),
+    );
+  }
   if (!createResult.ok) {
     throw createResult.error;
   }
