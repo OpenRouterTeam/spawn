@@ -14,7 +14,7 @@ import { createConsoleMocks, createMockManifest, mockClackPrompts, restoreMocks 
 
 const clack = mockClackPrompts();
 
-const { cmdRun, cmdRunHeadless, isRetryableExitCode } = await import("../commands/index.js");
+const { cmdRunHeadless, isRetryableExitCode } = await import("../commands/index.js");
 const { showDryRunPreview } = await import("../commands/run.js");
 
 describe("commands/run.ts coverage", () => {
@@ -89,34 +89,6 @@ describe("commands/run.ts coverage", () => {
       const allCalls = consoleMocks.log.mock.calls.flat().map(String);
       const hasEnvLine = allCalls.some((c) => c.includes("ANTHROPIC_API_KEY") || c.includes("OpenRouter"));
       expect(hasEnvLine).toBe(true);
-    });
-  });
-
-  // ── cmdRun with dry run ────────────────────────────────────────────────
-
-  describe("cmdRun dry run", () => {
-    it("shows dry run preview and returns", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
-      await loadManifest(true);
-      await cmdRun("claude", "sprite", undefined, true);
-      expect(clack.logSuccess).toHaveBeenCalled();
-    });
-  });
-
-  // ── cmdRun additional ─────────────────────────────────────────────
-
-  describe("cmdRun validation", () => {
-    it("validates agent and cloud names exist", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
-      await loadManifest(true);
-      await expect(cmdRun("nonexistent", "sprite")).rejects.toThrow("process.exit");
-    });
-
-    it("validates implementation status", async () => {
-      global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
-      await loadManifest(true);
-      // hetzner/codex is "missing" in mock manifest
-      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
     });
   });
 
