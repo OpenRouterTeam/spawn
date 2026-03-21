@@ -161,6 +161,16 @@ describe("digitalocean/runServer", () => {
     spy.mockRestore();
   });
 
+  it("wraps command with bash -c and shellQuote to prevent injection", async () => {
+    const spy = mockBunSpawn(0);
+    const { runServer } = await import("../digitalocean/digitalocean");
+    await runServer("echo hello", 10, "1.2.3.4");
+    const args = spy.mock.calls[0][0];
+    const sshCmd = args[args.length - 1];
+    expect(sshCmd).toMatch(/^bash -c '/);
+    spy.mockRestore();
+  });
+
   it("throws on non-zero exit", async () => {
     const spy = mockBunSpawn(1);
     const { runServer } = await import("../digitalocean/digitalocean");

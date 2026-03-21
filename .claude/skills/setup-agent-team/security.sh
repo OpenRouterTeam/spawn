@@ -124,6 +124,16 @@ safe_rm_worktree() {
     rm -rf "${target}" 2>/dev/null || true
 }
 
+# --- Safe cleanup of test directories under HOME (defense-in-depth) ---
+# Validates HOME is set, exists, and is not root before running find + rm -rf.
+safe_cleanup_test_dirs() {
+    if [[ -z "${HOME:-}" ]] || [[ ! -d "${HOME}" ]] || [[ "${HOME}" == "/" ]]; then
+        log "WARNING: Invalid HOME ('${HOME:-}'), skipping test directory cleanup"
+        return 1
+    fi
+    find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' "$@"
+}
+
 # Cleanup function — runs on normal exit, SIGTERM, and SIGINT
 cleanup() {
     # Guard against re-entry (SIGTERM trap calls exit, which fires EXIT trap again)
@@ -140,10 +150,10 @@ cleanup() {
     safe_rm_worktree "${WORKTREE_BASE}"
 
     # Clean up test directories from CLI integration tests
-    TEST_DIR_COUNT=$(find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' 2>/dev/null | wc -l)
+    TEST_DIR_COUNT=$(safe_cleanup_test_dirs 2>/dev/null | wc -l)
     if [[ "${TEST_DIR_COUNT}" -gt 0 ]]; then
         log "Post-cycle cleanup: removing ${TEST_DIR_COUNT} test directories..."
-        find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' -exec rm -rf {} + 2>/dev/null || true
+        safe_cleanup_test_dirs -exec rm -rf {} + 2>/dev/null || true
     fi
 
     # Clean up prompt file and kill claude if still running
@@ -180,10 +190,10 @@ if [[ -d "${WORKTREE_BASE}" ]]; then
 fi
 
 # Clean up test directories from CLI integration tests
-TEST_DIR_COUNT=$(find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' 2>/dev/null | wc -l)
+TEST_DIR_COUNT=$(safe_cleanup_test_dirs 2>/dev/null | wc -l)
 if [[ "${TEST_DIR_COUNT}" -gt 0 ]]; then
     log "Cleaning up ${TEST_DIR_COUNT} stale test directories..."
-    find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' -exec rm -rf {} + 2>&1 | tee -a "${LOG_FILE}" || true
+    safe_cleanup_test_dirs -exec rm -rf {} + 2>&1 | tee -a "${LOG_FILE}" || true
     log "Test directory cleanup complete"
 fi
 
