@@ -3,9 +3,10 @@
  *
  * Focuses on uncovered paths: saveLaunchCmd, saveMetadata,
  * markRecordDeleted, updateRecordIp, updateRecordConnection, getActiveServers,
- * removeRecord, no-cap behavior, and v1 loose schema handling.
+ * removeRecord, and v1 loose schema handling.
  * (generateSpawnId is covered in history-spawn-id.test.ts)
  * (clearHistory is covered in clear-history.test.ts)
+ * (filterHistory ordering and no-cap behavior covered in history-trimming.test.ts)
  */
 
 import type { SpawnRecord } from "../history.js";
@@ -14,14 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  filterHistory,
   getActiveServers,
   loadHistory,
   markRecordDeleted,
   removeRecord,
   saveLaunchCmd,
   saveMetadata,
-  saveSpawnRecord,
   updateRecordConnection,
   updateRecordIp,
 } from "../history.js";
@@ -591,46 +590,6 @@ describe("history.ts coverage", () => {
     });
   });
 
-  // ── filterHistory reverse chronological ───────────────────────────────
-
-  describe("filterHistory ordering", () => {
-    it("returns results in reverse chronological order", () => {
-      const records: SpawnRecord[] = [
-        {
-          id: "1",
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T00:00:00Z",
-        },
-        {
-          id: "2",
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-03T00:00:00Z",
-        },
-        {
-          id: "3",
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-02T00:00:00Z",
-        },
-      ];
-      writeFileSync(
-        join(testDir, "history.json"),
-        JSON.stringify({
-          version: 1,
-          records,
-        }),
-      );
-
-      const result = filterHistory();
-      // Reverse of storage order (newest first via array reverse)
-      expect(result[0].id).toBe("3");
-      expect(result[1].id).toBe("2");
-      expect(result[2].id).toBe("1");
-    });
-  });
-
   // ── v1 loose schema ───────────────────────────────────────────────────
 
   describe("v1 loose schema handling", () => {
@@ -659,56 +618,6 @@ describe("history.ts coverage", () => {
       const records = loadHistory();
       expect(records).toHaveLength(2);
       logSpy.mockRestore();
-    });
-  });
-
-  // ── No trimming — all records retained ───────────────────────────────
-
-  describe("no history cap", () => {
-    it("retains all records when over 100 entries", () => {
-      // Create 100 non-deleted + 1 deleted = 101 total, all should be kept
-      const records: SpawnRecord[] = [];
-      for (let i = 0; i < 100; i++) {
-        records.push({
-          id: `r-${i}`,
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: `2026-01-01T00:${String(i).padStart(2, "0")}:00Z`,
-        });
-      }
-      records.push({
-        id: "del-1",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-02-01T00:00:00Z",
-        connection: {
-          ip: "1.1.1.1",
-          user: "root",
-          deleted: true,
-        },
-      });
-      writeFileSync(
-        join(testDir, "history.json"),
-        JSON.stringify({
-          version: 1,
-          records,
-        }),
-      );
-
-      // Save one more — no trimming should occur
-      saveSpawnRecord({
-        id: "new-1",
-        agent: "codex",
-        cloud: "hetzner",
-        timestamp: "2026-03-01T00:00:00Z",
-      });
-
-      const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
-      // All 102 records should be retained (101 existing + 1 new)
-      expect(data.records).toHaveLength(102);
-      // Deleted record should still be present
-      const hasDeleted = data.records.some((r: SpawnRecord) => r.connection?.deleted);
-      expect(hasDeleted).toBe(true);
     });
   });
 });
