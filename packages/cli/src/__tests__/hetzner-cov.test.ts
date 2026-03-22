@@ -117,8 +117,7 @@ describe("hetzner/getServerName", () => {
 describe("hetzner/ensureHcloudToken", () => {
   it("uses HCLOUD_TOKEN from env when valid", async () => {
     process.env.HCLOUD_TOKEN = "test-hcloud-token";
-    // Mock fetch to return valid server list (token validation)
-    global.fetch = mock(() =>
+    const fetchMock = mock(() =>
       Promise.resolve(
         new Response(
           JSON.stringify({
@@ -127,8 +126,11 @@ describe("hetzner/ensureHcloudToken", () => {
         ),
       ),
     );
+    global.fetch = fetchMock;
     const { ensureHcloudToken } = await import("../hetzner/hetzner");
     await ensureHcloudToken();
+    // fetch called to validate the token against Hetzner API
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("warns when HCLOUD_TOKEN is invalid", async () => {
@@ -270,27 +272,14 @@ describe("hetzner/destroyServer", () => {
   });
 
   it("succeeds when API returns action", async () => {
-    global.fetch = mock(() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            action: {
-              id: 1,
-              status: "running",
-            },
-          }),
-        ),
-      ),
-    );
     // Need to set token first
     process.env.HCLOUD_TOKEN = "test-token";
     const tokenResp = JSON.stringify({
       servers: [],
     });
-    const origMock = global.fetch;
     // First call = token validation, then destroy
     let callCount = 0;
-    global.fetch = mock(() => {
+    const fetchMock = mock(() => {
       callCount++;
       if (callCount <= 1) {
         return Promise.resolve(new Response(tokenResp));
@@ -306,9 +295,12 @@ describe("hetzner/destroyServer", () => {
         ),
       );
     });
+    global.fetch = fetchMock;
     const { ensureHcloudToken, destroyServer } = await import("../hetzner/hetzner");
     await ensureHcloudToken();
     await destroyServer("12345");
+    // fetch called at least twice: once for token validation, once for delete
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("throws when API returns error", async () => {

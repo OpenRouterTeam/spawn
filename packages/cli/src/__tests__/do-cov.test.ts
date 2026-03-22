@@ -119,7 +119,8 @@ describe("digitalocean/promptSpawnName", () => {
     process.env.SPAWN_NAME_KEBAB = "existing-name";
     const { promptSpawnName } = await import("../digitalocean/digitalocean");
     await promptSpawnName();
-    // Should not throw or change env
+    // Existing value preserved — early return did not overwrite it
+    expect(process.env.SPAWN_NAME_KEBAB).toBe("existing-name");
   });
 
   it("uses DO_DROPLET_NAME when valid", async () => {
@@ -372,8 +373,11 @@ describe("digitalocean/promptSwitchAccount", () => {
 
 describe("digitalocean/checkAccountStatus", () => {
   it("returns immediately when no token", async () => {
+    const fetchMock = mock(() => Promise.resolve(new Response("{}")));
+    global.fetch = fetchMock;
     const { checkAccountStatus } = await import("../digitalocean/digitalocean");
-    // _state.token is empty by default
+    // _state.token is empty by default — should return early without calling fetch
     await checkAccountStatus();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
