@@ -1,7 +1,7 @@
 /**
  * ssh-cov.test.ts — Coverage tests for shared/ssh.ts
  *
- * Covers: spawnInteractive, sleep, killWithTimeout, startSshTunnel,
+ * Covers: spawnInteractive, sleep, startSshTunnel,
  * waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS
  */
 
@@ -13,8 +13,9 @@ import * as net from "node:net";
 // Suppress stderr during tests — restored in afterAll to avoid contamination
 let stderrSpy: ReturnType<typeof spyOn>;
 
-const { spawnInteractive, sleep, killWithTimeout, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } =
-  await import("../shared/ssh.js");
+const { spawnInteractive, sleep, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } = await import(
+  "../shared/ssh.js"
+);
 
 /** Create a fake socket (EventEmitter) that satisfies net.Socket interface for testing. */
 function createFakeSocket(): net.Socket {
@@ -155,38 +156,6 @@ describe("sleep", () => {
   it("resolves with undefined", async () => {
     const result = await sleep(1);
     expect(result).toBeUndefined();
-  });
-});
-
-// ── killWithTimeout (additional coverage) ──────────────────────────────
-
-describe("killWithTimeout additional", () => {
-  it("sends SIGTERM immediately then SIGKILL after grace period", async () => {
-    const signals: (number | undefined)[] = [];
-    const proc = {
-      kill(signal?: number) {
-        signals.push(signal);
-      },
-    };
-    killWithTimeout(proc, 50);
-    expect(signals).toEqual([
-      undefined,
-    ]); // SIGTERM sent immediately
-    await sleep(100);
-    expect(signals).toEqual([
-      undefined,
-      9,
-    ]); // SIGKILL sent after grace
-  });
-
-  it("does nothing when first kill throws (process already dead)", () => {
-    const proc = {
-      kill() {
-        throw new Error("No such process");
-      },
-    };
-    // Should not throw
-    killWithTimeout(proc, 50);
   });
 });
 
