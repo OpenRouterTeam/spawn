@@ -5,9 +5,61 @@
 # non-fatal issues that binary pass/fail checks miss: silent 404s, degraded
 # installs, swallowed warnings, connection instability, etc.
 #
+# Diff-aware: includes the git diff since the last successful E2E run so the
+# AI can do causal analysis ("this 404 started after commit X which removed Y").
+#
 # Requires: OPENROUTER_API_KEY (reuses the same key used for E2E provisioning)
 # Skips gracefully if the key is missing or the API call fails.
 set -eo pipefail
+
+# ---------------------------------------------------------------------------
+# _get_diff_since_last_green
+#
+# Returns the git diff summary since the last known-good E2E run.
+# Uses a git tag (e2e-last-green) to track the last successful commit.
+# Falls back to last 24h of commits if tag doesn't exist.
+# ---------------------------------------------------------------------------
+_get_diff_since_last_green() {
+  local repo_root
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+
+  local base_ref=""
+
+  # Try the e2e-last-green tag first
+  if git -C "${repo_root}" rev-parse "e2e-last-green" >/dev/null 2>&1; then
+    base_ref="e2e-last-green"
+  else
+    # Fallback: commits from the last 24 hours
+    base_ref=$(git -C "${repo_root}" log --since="24 hours ago" --format="%H" --reverse 2>/dev/null | head -1)
+  fi
+
+  if [ -z "${base_ref}" ]; then
+    return 0
+  fi
+
+  # Get a compact diff summary: changed files + key hunks (truncated)
+  {
+    printf "=== CHANGED FILES since %s ===\n" "${base_ref}"
+    git -C "${repo_root}" diff --stat "${base_ref}"..HEAD 2>/dev/null | tail -30
+    printf "\n=== KEY CHANGES (truncated) ===\n"
+    # Focus on files likely to cause E2E issues
+    git -C "${repo_root}" diff "${base_ref}"..HEAD \
+      -- 'packages/cli/src/**' 'sh/**' 'packer/**' 'manifest.json' \
+      2>/dev/null | head -150
+  } 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# mark_e2e_green
+#
+# Call after a fully successful E2E run to update the e2e-last-green tag.
+# This advances the baseline for diff-aware reviews.
+# ---------------------------------------------------------------------------
+mark_e2e_green() {
+  local repo_root
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+  git -C "${repo_root}" tag -f "e2e-last-green" HEAD 2>/dev/null || true
+}
 
 # ---------------------------------------------------------------------------
 # ai_review_logs AGENT APP_NAME LOG_DIR
@@ -46,6 +98,10 @@ $(tail -200 "${stdout_file}" 2>/dev/null || true)
     return 0
   fi
 
+  # Get diff context for causal analysis
+  local diff_context
+  diff_context=$(_get_diff_since_last_green 2>/dev/null || true)
+
   log_step "AI reviewing ${agent} logs..."
 
   # Build the prompt
@@ -59,6 +115,11 @@ Your job: find issues that passed the binary tests but indicate degraded or brok
 - Security warnings (exposed credentials, insecure connections)
 - Package deprecation warnings that could break future builds
 
+You are also given the git diff since the last successful E2E run. Use this for CAUSAL ANALYSIS:
+- If you see an error, check if a recent commit could have caused it (file moved/deleted, URL changed, config altered)
+- Correlate log errors with specific commits when possible
+- Flag if a changed file is referenced by a URL or path that now 404s
+
 Do NOT flag:
 - Normal npm deprecation warnings for transient dependencies (these are upstream)
 - Successful retries (only flag if all retries failed)
@@ -67,6 +128,8 @@ Do NOT flag:
 
 Output format: If you find issues, output one line per issue:
 ISSUE: <severity:low|medium|high> <brief description>
+
+If a commit likely caused the issue, append: (likely caused by <short-hash> <first line of commit msg>)
 
 If no issues found, output exactly: NO_ISSUES
 
@@ -82,15 +145,21 @@ Be concise. Max 5 issues.'
   cat > "${ts_file}" << 'TS_EOF'
 const system = process.env._AI_SYSTEM ?? "";
 const logs = process.env._AI_LOGS ?? "";
+const diff = process.env._AI_DIFF ?? "";
 const agent = process.env._AI_AGENT ?? "";
 const outFile = process.env._AI_OUT ?? "";
+
+let userContent = `Agent: ${agent}\n\nDeployment logs:\n\n${logs}`;
+if (diff) {
+  userContent += `\n\nGit changes since last green run:\n\n${diff}`;
+}
 
 const body = {
   model: "google/gemini-flash-lite-2.0",
   max_tokens: 512,
   messages: [
     { role: "system", content: system },
-    { role: "user", content: `Agent: ${agent}\n\nDeployment logs:\n\n${logs}` },
+    { role: "user", content: userContent },
   ],
 };
 
@@ -99,6 +168,7 @@ TS_EOF
 
   _AI_SYSTEM="${system_prompt}" \
   _AI_LOGS="${log_content}" \
+  _AI_DIFF="${diff_context}" \
   _AI_AGENT="${agent}" \
   _AI_OUT="${req_file}" \
     bun run "${ts_file}" 2>/dev/null

@@ -1,0 +1,125 @@
+name: Reference Check
+
+on:
+  pull_request:
+    paths:
+      - 'sh/**'
+      - 'packages/cli/src/**'
+      - 'packer/**'
+      - 'manifest.json'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    name: Verify file references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CDN URL references against repo files
+        id: check
+        run: |
+          ISSUES=""
+          ISSUE_COUNT=0
+
+          # ── 1. CDN URLs referencing sh/ files ──────────────────────────
+          # Pattern: openrouter.ai/labs/spawn/{path} maps to sh/{path}
+          while IFS= read -r match; do
+            [ -z "${match}" ] && continue
+            file=$(printf '%s' "${match}" | cut -d: -f1)
+            line=$(printf '%s' "${match}" | cut -d: -f2)
+            url_path=$(printf '%s' "${match}" | sed -n "s|.*openrouter\.ai/labs/spawn/\([^'\"[:space:]]*\).*|\1|p")
+            [ -z "${url_path}" ] && continue
+            local_path="sh/${url_path}"
+            if [ ! -f "${local_path}" ]; then
+              ISSUES="${ISSUES}
+          - **Broken CDN URL** in \`${file}:${line}\` — \`${url_path}\` → expected \`${local_path}\` does not exist"
+              ISSUE_COUNT=$((ISSUE_COUNT + 1))
+            fi
+          done < <(
+            grep -rn 'openrouter\.ai/labs/spawn/' \
+              --include='*.ts' --include='*.sh' --include='*.yml' \
+              packages/ sh/ packer/ .github/ 2>/dev/null || true
+          )
+
+          # ── 2. Raw GitHub URLs referencing repo files ──────────────────
+          while IFS= read -r match; do
+            [ -z "${match}" ] && continue
+            file=$(printf '%s' "${match}" | cut -d: -f1)
+            line=$(printf '%s' "${match}" | cut -d: -f2)
+            raw_path=$(printf '%s' "${match}" | sed -n "s|.*raw\.githubusercontent\.com/OpenRouterTeam/spawn/main/\([^'\"[:space:]]*\).*|\1|p")
+            [ -z "${raw_path}" ] && continue
+            if [ ! -f "${raw_path}" ]; then
+              ISSUES="${ISSUES}
+          - **Broken GitHub raw URL** in \`${file}:${line}\` — \`${raw_path}\` does not exist"
+              ISSUE_COUNT=$((ISSUE_COUNT + 1))
+            fi
+          done < <(
+            grep -rn 'raw\.githubusercontent\.com/OpenRouterTeam/spawn/main/' \
+              --include='*.ts' --include='*.sh' --include='*.yml' \
+              packages/ sh/ packer/ .github/ 2>/dev/null || true
+          )
+
+          # ── 3. Packer template references ──────────────────────────────
+          for hcl_file in packer/*.pkr.hcl; do
+            [ -f "${hcl_file}" ] || continue
+            while IFS= read -r script_path; do
+              [ -z "${script_path}" ] && continue
+              if [ ! -f "${script_path}" ]; then
+                ISSUES="${ISSUES}
+          - **Broken Packer script** in \`${hcl_file}\` — \`${script_path}\` does not exist"
+                ISSUE_COUNT=$((ISSUE_COUNT + 1))
+              fi
+            done < <(grep -oP 'script\s*=\s*"\K[^"]+' "${hcl_file}" 2>/dev/null || true)
+          done
+
+          # ── 4. Manifest implemented entries vs sh/ scripts ─────────────
+          if [ -f manifest.json ]; then
+            while IFS= read -r combo; do
+              [ -z "${combo}" ] && continue
+              cloud=$(printf '%s' "${combo}" | cut -d/ -f1)
+              agent=$(printf '%s' "${combo}" | cut -d/ -f2)
+              script="sh/${cloud}/${agent}.sh"
+              if [ ! -f "${script}" ]; then
+                ISSUES="${ISSUES}
+          - **Missing agent script** for implemented matrix entry \`${cloud}/${agent}\` — expected \`${script}\`"
+                ISSUE_COUNT=$((ISSUE_COUNT + 1))
+              fi
+            done < <(
+              jq -r '.matrix | to_entries[] | .key as $combo | .value | select(. == "implemented") | $combo' manifest.json 2>/dev/null || true
+            )
+          fi
+
+          # ── Report ─────────────────────────────────────────────────────
+          if [ "${ISSUE_COUNT}" -eq 0 ]; then
+            echo "✅ All file references verified"
+            echo "issues_found=false" >> "$GITHUB_OUTPUT"
+          else
+            printf "Found %d broken reference(s):\n%s\n" "${ISSUE_COUNT}" "${ISSUES}"
+            echo "issues_found=true" >> "$GITHUB_OUTPUT"
+            {
+              printf "## 🔗 Reference Check\n\n"
+              printf "Found **%d** broken file reference(s) in this PR:\n" "${ISSUE_COUNT}"
+              printf "%s\n\n" "${ISSUES}"
+              printf "These references point to files that don't exist in the repo. "
+              printf "If merged, they will cause runtime errors (404s, missing scripts, etc.).\n"
+            } > /tmp/ref-check-comment.md
+          fi
+
+      - name: Comment on PR
+        if: steps.check.outputs.issues_found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/ref-check-comment.md
+
+      - name: Fail if broken references found
+        if: steps.check.outputs.issues_found == 'true'
+        run: exit 1

@@ -775,4 +775,7 @@ if [ "${total_fail}" -gt 0 ]; then
   exit 1
 fi
 
+# All tests passed — advance the e2e-last-green tag for diff-aware reviews
+mark_e2e_green
+
 exit 0
