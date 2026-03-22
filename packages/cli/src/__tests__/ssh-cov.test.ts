@@ -291,6 +291,9 @@ describe("waitForSsh", () => {
       maxAttempts: 5,
     });
 
+    // TCP connect retried until open, then SSH handshake attempted
+    expect(connectSpy).toHaveBeenCalled();
+    expect(bunSpawnSpy).toHaveBeenCalled();
     bunSpawnSpy.mockRestore();
     connectSpy.mockRestore();
   });
