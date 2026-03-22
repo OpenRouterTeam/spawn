@@ -32,6 +32,7 @@ source "${SCRIPT_DIR}/lib/verify.sh"
 source "${SCRIPT_DIR}/lib/teardown.sh"
 source "${SCRIPT_DIR}/lib/soak.sh"
 source "${SCRIPT_DIR}/lib/interactive.sh"
+source "${SCRIPT_DIR}/lib/ai-review.sh"
 
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
@@ -228,6 +229,8 @@ run_single_agent() {
     else
       # Standard headless mode
       if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
+        # AI review of provision logs — advisory only, runs regardless of verify result
+        ai_review_logs "${agent}" "${app_name}" "${LOG_DIR}" || true
         if verify_agent "${agent}" "${app_name}"; then
           if run_input_test "${agent}" "${app_name}"; then
             _inner_status="pass"
