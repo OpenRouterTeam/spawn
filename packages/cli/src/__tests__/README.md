@@ -30,10 +30,22 @@ bun test src/__tests__/manifest.test.ts
 - `cmdlist-integration.test.ts` — `cmdList` with real history records
 - `commands-display.test.ts` — `cmdAgentInfo` (happy path), `cmdHelp`
 - `commands-cloud-info.test.ts` — `cmdCloudInfo` display
-- `commands-update-download.test.ts` — `cmdUpdate`, script download and execution
+- `cmd-update-cov.test.ts` — `cmdUpdate`, script download and execution
 - `cmd-feedback.test.ts` — `spawn feedback` command: empty message rejection, URL construction
 - `cmd-fix.test.ts` — `spawn fix` command: SSH connection repair via DI-injected runScript
 - `cmd-link.test.ts` — `spawn link` command: TCP reachability check, SSH agent detection via DI
+
+### Commands: coverage tests
+- `cmd-connect-cov.test.ts` — `cmdConnect`, `cmdEnterAgent`, `cmdOpenDashboard` coverage
+- `cmd-delete-cov.test.ts` — `cmdDelete` coverage
+- `cmd-fix-cov.test.ts` — `cmdFix`, `fixSpawn` coverage
+- `cmd-interactive-cov.test.ts` — `cmdInteractive`, `cmdAgentInteractive` coverage
+- `cmd-link-cov.test.ts` — `cmdLink` coverage
+- `cmd-list-cov.test.ts` — `cmdList` coverage
+- `cmd-pick-cov.test.ts` — `cmdPick` coverage
+- `cmd-run-cov.test.ts` — `cmdRun`, `cmdRunHeadless` coverage
+- `cmd-status-cov.test.ts` — `cmdStatus` coverage
+- `cmd-uninstall-cov.test.ts` — `cmdUninstall` coverage
 
 ### Commands: error paths
 - `commands-error-paths.test.ts` — Validation failures, unknown agents/clouds, prompt rejection
@@ -55,6 +67,21 @@ bun test src/__tests__/manifest.test.ts
 - `security-connection-validation.test.ts` — `validateConnectionIP`, `validateUsername`, `validateServerIdentifier`, `validateLaunchCmd`
 - `prompt-file-security.test.ts` — `validatePromptFilePath`, `validatePromptFileStats`
 
+### Infrastructure: coverage tests
+- `agent-setup-cov.test.ts` — `setupAgent`, `wrapSshCall`, agent setup orchestration coverage
+- `aws-cov.test.ts` — AWS module coverage
+- `do-cov.test.ts` — DigitalOcean module coverage
+- `gcp-cov.test.ts` — GCP module coverage
+- `hetzner-cov.test.ts` — Hetzner module coverage
+- `history-cov.test.ts` — History module coverage
+- `oauth-cov.test.ts` — OAuth module coverage
+- `orchestrate-cov.test.ts` — `runOrchestration` coverage
+- `sprite-cov.test.ts` — Sprite module coverage
+- `ssh-cov.test.ts` — SSH helpers coverage
+- `ssh-keys-cov.test.ts` — SSH key management coverage
+- `ui-cov.test.ts` — UI helpers coverage
+- `update-check-cov.test.ts` — Update check coverage
+
 ### Infrastructure
 - `history.test.ts` — History read/write
 - `history-trimming.test.ts` — History trimming at size limits
@@ -72,7 +99,7 @@ bun test src/__tests__/manifest.test.ts
 
 ### Parsing and type utilities
 - `parse.test.ts` — `parseJsonWith`
-- `picker.test.ts` — `parsePickerInput`: tab-separated picker input parsing
+- `picker-cov.test.ts` — `parsePickerInput`: tab-separated picker input parsing, `pickFallback`, `pickToTTY`, `pickToTTYWithActions`
 - `fuzzy-key-matching.test.ts` — `findClosestKeyByNameOrKey`, `levenshtein`, `findClosestMatch`, `resolveAgentKey`, `resolveCloudKey`
 - `unknown-flags.test.ts` — Unknown flag detection, `KNOWN_FLAGS`, `expandEqualsFlags`
 - `custom-flag.test.ts` — `--custom` flag for AWS, GCP, Hetzner, DigitalOcean
