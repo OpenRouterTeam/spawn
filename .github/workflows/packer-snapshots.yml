@@ -149,26 +149,6 @@ jobs:
         env:
           DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
 
-      - name: Destroy orphaned Hetzner builder servers
-        if: cancelled() && matrix.cloud == 'hetzner'
-        run: |
-          SERVER_IDS=$(curl -s -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-            "https://api.hetzner.cloud/v1/servers?per_page=50" \
-            | jq -r '.servers[] | select(.name | startswith("packer-")) | .id')
-
-          if [ -z "$SERVER_IDS" ]; then
-            echo "No orphaned packer builder servers found"
-            exit 0
-          fi
-
-          for ID in $SERVER_IDS; do
-            echo "Destroying orphaned builder server: ${ID}"
-            curl -s -X DELETE -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-              "https://api.hetzner.cloud/v1/servers/${ID}" || true
-          done
-        env:
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-
       - name: Cleanup old DO snapshots
         if: success() && matrix.cloud == 'digitalocean'
         run: |
