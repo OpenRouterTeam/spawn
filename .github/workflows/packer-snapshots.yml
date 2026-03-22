@@ -27,7 +27,7 @@ jobs:
           SINGLE_AGENT="${SINGLE_AGENT_INPUT}"
 
           if [ -n "$SINGLE_AGENT" ]; then
-            AGENTS="[\"${SINGLE_AGENT}\"]"
+            AGENTS=$(jq -nc --arg agent "$SINGLE_AGENT" '[$agent]')
           else
             AGENTS=$(jq -c 'keys' packer/agents.json)
           fi
@@ -95,9 +95,10 @@ jobs:
       - name: Destroy orphaned builder droplets
         if: cancelled()
         run: |
+          # Filter by spawn-packer tag to avoid destroying builder droplets from other workflows
           DROPLET_IDS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
-            "https://api.digitalocean.com/v2/droplets?per_page=200" \
-            | jq -r '.droplets[] | select(.name | startswith("packer-")) | .id')
+            "https://api.digitalocean.com/v2/droplets?per_page=200&tag_name=spawn-packer" \
+            | jq -r '.droplets[].id')
 
           if [ -z "$DROPLET_IDS" ]; then
             echo "No orphaned packer builder droplets found"

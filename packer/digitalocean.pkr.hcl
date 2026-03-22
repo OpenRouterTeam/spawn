@@ -40,6 +40,9 @@ source "digitalocean" "spawn" {
   size         = "s-2vcpu-2gb"
   ssh_username = "root"
 
+  # Tag the temporary builder droplet so cancel-cleanup can target only our builds
+  tags = ["spawn-packer"]
+
   snapshot_name = local.image_name
   snapshot_regions = [
     "nyc1", "nyc3", "sfo3", "tor1", "ams3",
