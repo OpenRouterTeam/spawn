@@ -19,6 +19,8 @@ import {
   promptSpawnName,
   runSprite,
   setupShellEnvironment,
+  startLocalKeepAlive,
+  stopLocalKeepAlive,
   uploadFileSprite,
   verifySpriteConnectivity,
 } from "./sprite.js";
@@ -50,13 +52,20 @@ async function main() {
     async createServer(name: string) {
       await createSprite(name);
       await verifySpriteConnectivity();
+      // Start pinging the sprite URL locally to prevent idle shutdown
+      // during long operations (agent install, config). Stopped when
+      // the interactive session starts (remote keep-alive takes over).
+      startLocalKeepAlive();
       await setupShellEnvironment();
       await installSpriteKeepAlive();
       return getVmConnection();
     },
     getServerName,
     async waitForReady() {},
-    interactiveSession,
+    async interactiveSession(cmd: string, spawnFn?: (args: string[]) => number) {
+      stopLocalKeepAlive();
+      return interactiveSession(cmd, spawnFn);
+    },
   };
 
   await runOrchestration(cloud, agent, agentName);
