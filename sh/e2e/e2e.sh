@@ -35,6 +35,23 @@ source "${SCRIPT_DIR}/lib/interactive.sh"
 source "${SCRIPT_DIR}/lib/ai-review.sh"
 
 # ---------------------------------------------------------------------------
+# Auto-load Resend email credentials when not already set.
+# Sources /etc/spawn-key-server-auth.env (QA VM) or ~/.config/spawn/resend.env
+# (local dev) to populate RESEND_API_KEY and KEY_REQUEST_EMAIL.
+# This ensures send_matrix_email fires on manual runs, not just QA-cycle runs.
+# ---------------------------------------------------------------------------
+if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${KEY_REQUEST_EMAIL:-}" ]; then
+  for _cred_file in /etc/spawn-key-server-auth.env "${HOME}/.config/spawn/resend.env"; do
+    if [ -f "${_cred_file}" ]; then
+      # shellcheck source=/dev/null  # path is dynamic
+      set -a; source "${_cred_file}" 2>/dev/null; set +a
+      break
+    fi
+  done
+  unset _cred_file
+fi
+
+# ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
 # ---------------------------------------------------------------------------
 ALL_CLOUDS="aws hetzner digitalocean gcp sprite"
