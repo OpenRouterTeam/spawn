@@ -80,8 +80,9 @@ describe("offerGithubAuth", () => {
       uploadFile: mock(() => Promise.resolve()),
       downloadFile: mock(() => Promise.resolve()),
     };
-    // Should not throw
     await offerGithubAuth(runner, true);
+    // runServer was attempted — error swallowed, not rethrown
+    expect(runner.runServer).toHaveBeenCalled();
   });
 });
 

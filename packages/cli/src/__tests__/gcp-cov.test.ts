@@ -157,6 +157,8 @@ describe("gcp/authenticate", () => {
     const spy = mockSpawnSync(0, "user@example.com\n");
     const { authenticate } = await import("../gcp/gcp");
     await authenticate();
+    // spawnSync called to locate gcloud and run auth list
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
 
@@ -182,6 +184,8 @@ describe("gcp/authenticate", () => {
 
     const { authenticate } = await import("../gcp/gcp");
     await authenticate();
+    // interactive login was triggered (Bun.spawn called for gcloud auth login)
+    expect(spawnSpy).toHaveBeenCalled();
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -195,6 +199,8 @@ describe("gcp/resolveProject", () => {
     const spy = mockSpawnSync(0, "/usr/bin/gcloud");
     const { resolveProject } = await import("../gcp/gcp");
     await resolveProject();
+    // GCP_PROJECT env var consumed — spawnSync not called for config lookup
+    expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 
@@ -451,6 +457,8 @@ describe("gcp/destroyInstance", () => {
     const mockSync = mockSpawnSync(0, "/usr/bin/gcloud");
     const { destroyInstance } = await import("../gcp/gcp");
     await destroyInstance("test-vm");
+    // Bun.spawn called to run gcloud instances delete
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
     mockSync.mockRestore();
   });
@@ -472,6 +480,8 @@ describe("gcp/ensureGcloudCli", () => {
     const spy = mockSpawnSync(0, "/usr/bin/gcloud");
     const { ensureGcloudCli } = await import("../gcp/gcp");
     await ensureGcloudCli();
+    // spawnSync called once to locate gcloud — no install triggered
+    expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
 });
@@ -485,8 +495,12 @@ describe("gcp/checkBillingEnabled", () => {
     // Mock spawnSync to handle case where _state.project was set by prior tests
     // (module-level state persists across tests due to import caching)
     const spy = mockSpawnSyncWithGcloud(0, "true");
+    const fetchMock = mock(() => Promise.resolve(new Response("{}")));
+    global.fetch = fetchMock;
     const { checkBillingEnabled } = await import("../gcp/gcp");
     await checkBillingEnabled();
+    // fetch not called — billing check skipped when no project
+    expect(fetchMock).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 });

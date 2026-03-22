@@ -71,6 +71,8 @@ describe("aws/ensureAwsCli", () => {
     const spy = mockSpawnSync(0, "/usr/local/bin/aws");
     const { ensureAwsCli } = await import("../aws/aws");
     await ensureAwsCli();
+    // spawnSync called once for `which aws` — no install triggered
+    expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
 
@@ -79,6 +81,8 @@ describe("aws/ensureAwsCli", () => {
     process.env.SPAWN_NON_INTERACTIVE = "1";
     const { ensureAwsCli } = await import("../aws/aws");
     await ensureAwsCli();
+    // spawnSync called once for `which aws` — install skipped in non-interactive mode
+    expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
 });
@@ -155,16 +159,17 @@ describe("aws/authenticate", () => {
 describe("aws/promptRegion", () => {
   it("uses AWS_DEFAULT_REGION from env", async () => {
     process.env.AWS_DEFAULT_REGION = "eu-west-1";
-    const { promptRegion } = await import("../aws/aws");
+    const { promptRegion, getState } = await import("../aws/aws");
     await promptRegion();
-    // Should not throw
+    expect(getState().awsRegion).toBe("eu-west-1");
   });
 
   it("uses LIGHTSAIL_REGION from env", async () => {
     delete process.env.AWS_DEFAULT_REGION;
     process.env.LIGHTSAIL_REGION = "ap-northeast-1";
-    const { promptRegion } = await import("../aws/aws");
+    const { promptRegion, getState } = await import("../aws/aws");
     await promptRegion();
+    expect(getState().awsRegion).toBe("ap-northeast-1");
   });
 
   it("throws on invalid region in env", async () => {
@@ -177,8 +182,11 @@ describe("aws/promptRegion", () => {
     delete process.env.AWS_DEFAULT_REGION;
     delete process.env.LIGHTSAIL_REGION;
     delete process.env.SPAWN_CUSTOM;
+    const regionBefore = process.env.AWS_DEFAULT_REGION;
     const { promptRegion } = await import("../aws/aws");
-    await promptRegion(); // no-op
+    await promptRegion();
+    // No region was set — env var unchanged
+    expect(process.env.AWS_DEFAULT_REGION).toBe(regionBefore);
   });
 });
 
@@ -326,14 +334,14 @@ describe("aws/destroyServer", () => {
   });
 
   it("succeeds via REST when name is given", async () => {
-    // Mock fetch for REST path
-    global.fetch = mock(() =>
+    const fetchMock = mock(() =>
       Promise.resolve(
         new Response("{}", {
           status: 200,
         }),
       ),
     );
+    global.fetch = fetchMock;
     // Set up state for REST mode by assigning env vars
     const spy = mockSpawnSync(1); // no aws cli
     process.env.AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
@@ -341,6 +349,8 @@ describe("aws/destroyServer", () => {
     const { authenticate, destroyServer } = await import("../aws/aws");
     await authenticate();
     await destroyServer("test-instance");
+    // fetch called for the Lightsail delete-instance REST request
+    expect(fetchMock).toHaveBeenCalled();
     spy.mockRestore();
   });
 });
