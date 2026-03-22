@@ -484,7 +484,7 @@ export async function findSpawnSnapshot(agentName: string): Promise<string | nul
     const text = await hetznerApi("GET", "/images?type=snapshot&per_page=100", undefined, 1);
     const data = parseJsonObj(text);
     const allImages = toObjectArray(data?.images);
-    // Hetzner Packer sets snapshot_name → description field in the API
+    // Snapshots are named `spawn-{agent}-*` and stored in the description field
     const images = allImages.filter((img) => isString(img.description) && img.description.startsWith(prefix));
     if (images.length === 0) {
       return null;
