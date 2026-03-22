@@ -144,6 +144,10 @@ const ZONES: ZoneOption[] = [
 
 export const DEFAULT_ZONE = "us-central1-a";
 
+// ─── Disk Size ───────────────────────────────────────────────────────────────
+
+export const DEFAULT_DISK_SIZE_GB = 40;
+
 // ─── State ──────────────────────────────────────────────────────────────────
 
 interface GcpState {
@@ -763,6 +767,7 @@ export async function createInstance(
     `--machine-type=${machineType}`,
     `--image-family=${family}`,
     `--image-project=${project}`,
+    `--boot-disk-size=${process.env.GCP_DISK_SIZE ?? String(DEFAULT_DISK_SIZE_GB)}GB`,
     `--network=${process.env.GCP_NETWORK ?? "default"}`,
     `--subnet=${process.env.GCP_SUBNET ?? "default"}`,
     ...(tmpFile

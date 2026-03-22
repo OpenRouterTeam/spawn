@@ -62,6 +62,19 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/claude.sh)
 ```
 
+## Custom Disk Size
+
+By default, instances are created with a **40 GB** boot disk. Override with `GCP_DISK_SIZE` (in GB):
+
+| Variable | Default | Description |
+|---|---|---|
+| `GCP_DISK_SIZE` | `40` | Boot disk size in GB |
+
+```bash
+GCP_DISK_SIZE=80 \
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/claude.sh)
+```
+
 ## Custom VPC / Subnet
 
 If your GCP project's default VPC uses **custom subnet mode** (common in enterprise or org-managed projects), set these env vars to override the default network/subnet:
