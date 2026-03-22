@@ -112,7 +112,12 @@ provision_agent() {
 $(cloud_headless_env "${app_name}" "${agent}")
 CLOUD_ENV
 
-    bun run "${cli_entry}" "${agent}" "${ACTIVE_CLOUD}" --headless --output json \
+    # Build CLI args — add --fast when E2E_FAST_MODE is enabled
+    _cli_args="${agent} ${ACTIVE_CLOUD} --headless --output json"
+    if [ "${E2E_FAST_MODE:-0}" = "1" ]; then
+      _cli_args="${_cli_args} --fast"
+    fi
+    bun run "${cli_entry}" ${_cli_args} \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
   ) &
