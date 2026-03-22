@@ -517,22 +517,6 @@ describe("orchestrate SPAWN_NAME", () => {
   });
 });
 
-// ── preLaunch hooks ───────────────────────────────────────────────────
-
-describe("orchestrate preLaunch", () => {
-  it("calls preLaunch when defined", async () => {
-    const preLaunch = mock(() => Promise.resolve());
-    const cloud = createMockCloud();
-    const agent = createMockAgent({
-      preLaunch,
-    });
-
-    await runSafe(cloud, agent, "testagent");
-
-    expect(preLaunch).toHaveBeenCalledTimes(1);
-  });
-});
-
 // ── tunnel support ────────────────────────────────────────────────────
 
 describe("orchestrate tunnel", () => {

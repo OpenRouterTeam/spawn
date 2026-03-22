@@ -1117,7 +1117,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   if (!cmd || /\0/.test(cmd)) {
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && bash -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
@@ -1125,7 +1125,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `${SSH_USER}@${_state.instanceIp}`,
-      `bash -c ${shellQuote(fullCmd)}`,
+      fullCmd,
     ],
     {
       stdio: [

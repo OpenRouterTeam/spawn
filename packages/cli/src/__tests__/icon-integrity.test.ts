@@ -49,28 +49,18 @@ function isPng(filePath: string): boolean {
 
 describe("Icon Integrity", () => {
   describe("Agent icons", () => {
-    for (const id of Object.keys(manifest.agents)) {
-      const pngPath = join(AGENT_ASSETS, `${id}.png`);
-
-      it(`${id}.png exists`, () => {
-        expect(existsSync(pngPath)).toBe(true);
-      });
-
-      it(`${id}.png is actual PNG data`, () => {
-        expect(isPng(pngPath)).toBe(true);
-      });
-
-      it(`${id} manifest icon URL ends with .png`, () => {
+    it("all agent icons exist, are valid PNGs, and are correctly referenced", () => {
+      for (const id of Object.keys(manifest.agents)) {
+        const pngPath = join(AGENT_ASSETS, `${id}.png`);
+        expect(existsSync(pngPath), `${id}.png must exist`).toBe(true);
+        expect(isPng(pngPath), `${id}.png must contain PNG magic bytes`).toBe(true);
         const parsed = v.parse(IconEntry, manifest.agents[id]);
-        expect(parsed.icon).toEndWith(`${id}.png`);
-      });
-
-      it(`${id} .sources.json ext is "png"`, () => {
-        expect(id in AGENT_SOURCES).toBe(true);
-        const parsed = v.parse(SourceEntry, AGENT_SOURCES[id]);
-        expect(parsed.ext).toBe("png");
-      });
-    }
+        expect(parsed.icon, `${id} manifest icon URL must end with .png`).toEndWith(`${id}.png`);
+        expect(id in AGENT_SOURCES, `${id} must have a .sources.json entry`).toBe(true);
+        const src = v.parse(SourceEntry, AGENT_SOURCES[id]);
+        expect(src.ext, `${id} .sources.json ext must be "png"`).toBe("png");
+      }
+    });
 
     it("no .jpg files in assets/agents/", () => {
       const files = readdirSync(AGENT_ASSETS);
@@ -80,32 +70,21 @@ describe("Icon Integrity", () => {
   });
 
   describe("Cloud icons", () => {
-    for (const id of Object.keys(manifest.clouds)) {
-      const parsed = v.safeParse(IconEntry, manifest.clouds[id]);
-      if (!parsed.success) {
-        continue;
-      }
-
-      const pngPath = join(CLOUD_ASSETS, `${id}.png`);
-
-      it(`${id}.png exists`, () => {
-        expect(existsSync(pngPath)).toBe(true);
-      });
-
-      it(`${id}.png is actual PNG data`, () => {
-        expect(isPng(pngPath)).toBe(true);
-      });
-
-      it(`${id} manifest icon URL ends with .png`, () => {
-        expect(parsed.output.icon).toEndWith(`${id}.png`);
-      });
-
-      it(`${id} .sources.json ext is "png"`, () => {
-        expect(id in CLOUD_SOURCES).toBe(true);
+    it("all cloud icons exist, are valid PNGs, and are correctly referenced", () => {
+      for (const id of Object.keys(manifest.clouds)) {
+        const parsed = v.safeParse(IconEntry, manifest.clouds[id]);
+        if (!parsed.success) {
+          continue;
+        }
+        const pngPath = join(CLOUD_ASSETS, `${id}.png`);
+        expect(existsSync(pngPath), `${id}.png must exist`).toBe(true);
+        expect(isPng(pngPath), `${id}.png must contain PNG magic bytes`).toBe(true);
+        expect(parsed.output.icon, `${id} manifest icon URL must end with .png`).toEndWith(`${id}.png`);
+        expect(id in CLOUD_SOURCES, `${id} must have a .sources.json entry`).toBe(true);
         const src = v.parse(SourceEntry, CLOUD_SOURCES[id]);
-        expect(src.ext).toBe("png");
-      });
-    }
+        expect(src.ext, `${id} .sources.json ext must be "png"`).toBe("png");
+      }
+    });
 
     it("no .jpg files in assets/clouds/", () => {
       const files = readdirSync(CLOUD_ASSETS);

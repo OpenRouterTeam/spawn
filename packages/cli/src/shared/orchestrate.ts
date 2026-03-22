@@ -34,6 +34,11 @@ import {
   withRetry,
 } from "./ui.js";
 
+/** Docker container name used by --beta docker deployments. */
+export const DOCKER_CONTAINER_NAME = "spawn-agent";
+/** Docker registry hosting spawn agent images. */
+export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
+
 export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;
@@ -540,9 +545,11 @@ async function postInstall(
 
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
 
-  // Auto-reconnect on SSH drops (exit 255). Ctrl+C (exit 0 or 130) exits immediately.
-  // Only applies to remote clouds — local sessions don't have SSH drops.
+  // Auto-reconnect on connection drops. Ctrl+C (exit 0 or 130) exits immediately.
+  // Only applies to remote clouds — local sessions don't have connection drops.
+  // SSH exits 255 on connection loss; Sprite CLI exits 1 on "connection closed".
   const maxReconnects = cloud.cloudName === "local" ? 0 : 5;
+  const isConnectionDrop = (code: number): boolean => code === 255 || (cloud.cloudName === "sprite" && code === 1);
   let exitCode = 0;
 
   for (let attempt = 0; attempt <= maxReconnects; attempt++) {
@@ -554,14 +561,12 @@ async function postInstall(
     }
     exitCode = await cloud.interactiveSession(sessionCmd);
 
-    // SSH exit 255 = connection dropped/timed out — retry
-    // Everything else (0 = clean exit, 130 = Ctrl+C, other = agent crash) — stop
-    if (exitCode !== 255) {
+    if (!isConnectionDrop(exitCode)) {
       break;
     }
   }
 
-  if (exitCode === 255) {
+  if (isConnectionDrop(exitCode)) {
     process.stderr.write("\n");
     logWarn("Could not reconnect. Server is still running.");
     logInfo("Reconnect manually: spawn connect");

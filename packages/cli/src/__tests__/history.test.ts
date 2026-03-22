@@ -60,29 +60,19 @@ describe("history", () => {
       expect(loadHistory()).toEqual([]);
     });
 
-    it("returns empty array when file contains a non-array JSON value", () => {
-      writeFileSync(
-        join(testDir, "history.json"),
+    it("returns empty array when file contains an unrecognized JSON value", () => {
+      // All non-array, non-v1 JSON values hit the same "Unrecognized format" branch
+      for (const content of [
         JSON.stringify({
           not: "array",
         }),
-      );
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains a JSON string", () => {
-      writeFileSync(join(testDir, "history.json"), JSON.stringify("just a string"));
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains JSON null", () => {
-      writeFileSync(join(testDir, "history.json"), "null");
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains JSON number", () => {
-      writeFileSync(join(testDir, "history.json"), "42");
-      expect(loadHistory()).toEqual([]);
+        JSON.stringify("just a string"),
+        "null",
+        "42",
+      ]) {
+        writeFileSync(join(testDir, "history.json"), content);
+        expect(loadHistory()).toEqual([]);
+      }
     });
 
     it("loads multiple records preserving order", () => {
