@@ -127,6 +127,48 @@ jobs:
       - name: Build snapshot
         run: packer build -var-file=packer/auto.pkrvars.json packer/${{ matrix.cloud }}.pkr.hcl
 
+      # When a workflow is cancelled, Packer is killed before it can destroy
+      # the temporary builder droplet/server — leaving orphaned instances.
+      - name: Destroy orphaned DO builder droplets
+        if: cancelled() && matrix.cloud == 'digitalocean'
+        run: |
+          DROPLET_IDS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            "https://api.digitalocean.com/v2/droplets?per_page=200" \
+            | jq -r '.droplets[] | select(.name | startswith("packer-")) | .id')
+
+          if [ -z "$DROPLET_IDS" ]; then
+            echo "No orphaned packer builder droplets found"
+            exit 0
+          fi
+
+          for ID in $DROPLET_IDS; do
+            echo "Destroying orphaned builder droplet: ${ID}"
+            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+              "https://api.digitalocean.com/v2/droplets/${ID}" || true
+          done
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+
+      - name: Destroy orphaned Hetzner builder servers
+        if: cancelled() && matrix.cloud == 'hetzner'
+        run: |
+          SERVER_IDS=$(curl -s -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+            "https://api.hetzner.cloud/v1/servers?per_page=50" \
+            | jq -r '.servers[] | select(.name | startswith("packer-")) | .id')
+
+          if [ -z "$SERVER_IDS" ]; then
+            echo "No orphaned packer builder servers found"
+            exit 0
+          fi
+
+          for ID in $SERVER_IDS; do
+            echo "Destroying orphaned builder server: ${ID}"
+            curl -s -X DELETE -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+              "https://api.hetzner.cloud/v1/servers/${ID}" || true
+          done
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+
       - name: Cleanup old DO snapshots
         if: success() && matrix.cloud == 'digitalocean'
         run: |
