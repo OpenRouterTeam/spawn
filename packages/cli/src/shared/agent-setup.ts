@@ -830,7 +830,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     junie: {
       name: "Junie",
       cloudInitTier: "node",
-      modelEnvVar: "JUNIE_MODEL",
+      // No modelEnvVar: Junie CLI does not accept OpenRouter model IDs via env var.
+      // It only supports its own model aliases (gpt, sonnet, gemini-pro, etc.)
+      // and handles model selection natively via its own UI.
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
