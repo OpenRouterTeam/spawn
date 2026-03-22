@@ -96,7 +96,7 @@ input_test_claude() {
     _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    printf '%s' \"\$PROMPT\" | timeout \"\$_TIMEOUT\" claude -p --dangerously-skip-permissions --no-session-persistence" 2>&1) || true
+    timeout \"\$_TIMEOUT\" claude -p --dangerously-skip-permissions --no-session-persistence \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -122,9 +122,7 @@ input_test_codex() {
   _stage_prompt_remotely "${app}" "${encoded_prompt}"
 
   local output
-  # @openai/codex removed the `exec` subcommand; the new interface is:
-  # -q / --quiet: non-interactive headless mode
-  # -a full-auto / --approval-mode full-auto: auto-approve all operations
+  # codex exec --full-auto: non-interactive subcommand for v0.116.0+
   # The prompt is read from the staged temp file — no interpolation in this command.
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
@@ -132,7 +130,7 @@ input_test_codex() {
     _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    timeout \"\$_TIMEOUT\" codex -q -a full-auto \"\$PROMPT\"" 2>&1) || true
+    timeout \"\$_TIMEOUT\" codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
