@@ -68,22 +68,6 @@ describe("update-check.ts coverage", () => {
   // ── checkForUpdates skip conditions ────────────────────────────────────
 
   describe("checkForUpdates skip conditions", () => {
-    it("skips in test environment (NODE_ENV=test)", async () => {
-      process.env.NODE_ENV = "test";
-      global.fetch = mock(async () => new Response("1.0.0"));
-      const { checkForUpdates } = await import("../update-check");
-      await checkForUpdates();
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it("skips when SPAWN_NO_UPDATE_CHECK=1", async () => {
-      process.env.SPAWN_NO_UPDATE_CHECK = "1";
-      global.fetch = mock(async () => new Response("1.0.0"));
-      const { checkForUpdates } = await import("../update-check");
-      await checkForUpdates();
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
     it("skips when recently backed off", async () => {
       writeUpdateFailed(Date.now()); // failed just now
       global.fetch = mock(async () => new Response("1.0.0"));

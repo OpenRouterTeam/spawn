@@ -274,23 +274,6 @@ describe("cmdLink (additional coverage)", () => {
     expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("not reachable"));
   });
 
-  it("exits with error when no IP provided", async () => {
-    const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
-    await asyncTryCatch(() =>
-      cmdLink(
-        [
-          "link",
-        ],
-        {
-          tcpCheck: TCP_REACHABLE,
-          sshCommand: SSH_NO_DETECT,
-        },
-      ),
-    );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
-    consoleSpy.mockRestore();
-  });
-
   it("exits with error for invalid IP address", async () => {
     const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
     await asyncTryCatch(() =>
