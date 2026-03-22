@@ -84,7 +84,7 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
     }
 
     // Only retry on transient network errors
-    if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
+    if (/TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout/i.test(msg)) {
       logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
       await sleep(3000);
       continue;
@@ -384,6 +384,52 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
   logError(`Sprite '${_state.name}' failed to respond after ${maxAttempts} attempts`);
   logError("Try: sprite list, sprite logs, or recreate the sprite");
   throw new Error("Sprite connectivity timeout");
+}
+
+// ─── Local Keep-Alive ────────────────────────────────────────────────────────
+
+/**
+ * Background keep-alive that pings the sprite's public URL every 30s from the
+ * local machine. Prevents the sprite from going idle during long operations
+ * like agent installation (where the remote keep-alive script isn't running yet).
+ */
+let _keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startLocalKeepAlive(): void {
+  if (_keepAliveTimer) {
+    return;
+  }
+
+  const cmd = getSpriteCmd();
+  if (!cmd || !_state.name) {
+    return;
+  }
+
+  // Get the sprite's public URL
+  const urlResult = spawnSync([
+    cmd,
+    ...orgFlags(),
+    "url",
+    "-s",
+    _state.name,
+  ]);
+  const urlMatch = urlResult.stdout.match(/https:\/\/\S+/);
+  if (!urlMatch) {
+    return;
+  }
+
+  const spriteUrl = urlMatch[0];
+  _keepAliveTimer = setInterval(() => {
+    // Fire-and-forget fetch to keep the sprite alive
+    fetch(spriteUrl).catch(() => {});
+  }, 30_000);
+}
+
+export function stopLocalKeepAlive(): void {
+  if (_keepAliveTimer) {
+    clearInterval(_keepAliveTimer);
+    _keepAliveTimer = null;
+  }
 }
 
 // ─── Shell Environment Setup ─────────────────────────────────────────────────
