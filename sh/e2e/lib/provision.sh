@@ -292,11 +292,13 @@ CLOUD_ENV
     return 1
   fi
 
-  # SECURITY: env_b64 is piped via stdin — it is NOT interpolated into the
-  # remote command string. The command argument to cloud_exec is a fixed
-  # string with no variable substitution from user-controlled data.
+  # SECURITY: env_b64 is embedded directly in the command string. This is safe
+  # because env_b64 is validated above to contain only [A-Za-z0-9+/=] — the
+  # standard base64 alphabet — which cannot break out of single quotes or
+  # cause shell injection. Piping via stdin is NOT used because Sprite's exec
+  # driver replaces stdin with the command pipe, causing piped data to be lost.
   # The \$ escapes below are for remote shell variables, not local ones.
-  if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
+  if cloud_exec "${app_name}" "printf '%s' '${env_b64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
     for _rc in ~/.bashrc ~/.profile ~/.bash_profile; do \
     grep -q 'source ~/.spawnrc' \"\$_rc\" 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> \"\$_rc\"; done" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
