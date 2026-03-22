@@ -32,6 +32,7 @@ source "${SCRIPT_DIR}/lib/verify.sh"
 source "${SCRIPT_DIR}/lib/teardown.sh"
 source "${SCRIPT_DIR}/lib/soak.sh"
 source "${SCRIPT_DIR}/lib/interactive.sh"
+source "${SCRIPT_DIR}/lib/ai-review.sh"
 
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
@@ -49,6 +50,7 @@ SKIP_INPUT_TEST="${SKIP_INPUT_TEST:-0}"
 SEQUENTIAL_MODE=0
 SOAK_MODE=0
 INTERACTIVE_MODE=0
+FAST_MODE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -114,6 +116,10 @@ while [ $# -gt 0 ]; do
       INTERACTIVE_MODE=1
       shift
       ;;
+    --fast)
+      FAST_MODE=1
+      shift
+      ;;
     --help|-h)
       printf "Usage: %s --cloud CLOUD [--cloud CLOUD2 ...] [agents...] [options]\n\n" "$0"
       printf "Clouds: %s\n" "${ALL_CLOUDS}"
@@ -125,6 +131,7 @@ while [ $# -gt 0 ]; do
       printf "  --sequential        Force sequential agent execution\n"
       printf "  --skip-cleanup      Skip stale e2e-* instance cleanup\n"
       printf "  --skip-input-test   Skip live input tests\n"
+      printf "  --fast              Provision with --fast flag (images + tarballs + parallel)\n"
       printf "  --soak              Run Telegram soak test (OpenClaw on Sprite)\n"
       printf "  --interactive       AI-driven interactive test (requires ANTHROPIC_API_KEY)\n"
       printf "  --help              Show this help\n"
@@ -228,6 +235,8 @@ run_single_agent() {
     else
       # Standard headless mode
       if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
+        # AI review of provision logs — advisory only, runs regardless of verify result
+        ai_review_logs "${agent}" "${app_name}" "${LOG_DIR}" || true
         if verify_agent "${agent}" "${app_name}"; then
           if run_input_test "${agent}" "${app_name}"; then
             _inner_status="pass"
@@ -639,6 +648,12 @@ fi
 if [ "${SKIP_INPUT_TEST}" -eq 1 ]; then
   log_info "Input tests: SKIPPED"
 fi
+if [ "${FAST_MODE}" -eq 1 ]; then
+  log_info "Fast mode: ENABLED (--fast passed to spawn)"
+fi
+
+# Export FAST_MODE so provision.sh can read it
+export E2E_FAST_MODE="${FAST_MODE}"
 
 # Create temp log directory
 LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/spawn-e2e.XXXXXX")

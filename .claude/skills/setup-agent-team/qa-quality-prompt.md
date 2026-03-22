@@ -129,9 +129,12 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    ```bash
    cd REPO_ROOT_PLACEHOLDER
    chmod +x sh/e2e/e2e.sh
+   # Normal mode — standard provisioning
    ./sh/e2e/e2e.sh --cloud all --parallel 6 --skip-input-test
+   # Fast mode — tests --fast flag (images + tarballs + parallel boot)
+   ./sh/e2e/e2e.sh --cloud sprite --fast --parallel 4 --skip-input-test
    ```
-2. Capture the full output. Note which clouds ran, which agents passed, which failed, and which clouds were skipped (no credentials).
+2. Capture the full output from BOTH runs. Note which clouds ran, which agents passed, which failed, and which clouds were skipped (no credentials).
 3. If all configured clouds pass (or only skipped clouds): report results and you're done. No PR needed.
 4. If any agent fails on a configured cloud, investigate the root cause. Failure categories:
 
