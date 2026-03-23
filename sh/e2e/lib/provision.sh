@@ -102,8 +102,11 @@ provision_agent() {
           continue
           ;;
       esac
-      # Validate value against a safe character whitelist BEFORE export
-      if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
+      # Validate value: only allow characters that appear in cloud resource names
+      # (server names, regions, sizes). This strict whitelist rejects all shell
+      # metacharacters ($, `, ', ", ;, |, &, etc.) preventing command injection
+      # even if the cloud_headless_env function is compromised.
+      if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9._/-]'; then
         log_err "Invalid characters in env value for ${_env_name}"
         continue
       fi

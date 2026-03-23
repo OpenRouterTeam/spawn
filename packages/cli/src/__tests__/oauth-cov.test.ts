@@ -1,8 +1,11 @@
 /**
  * oauth-cov.test.ts — Coverage tests for shared/oauth.ts
  *
- * Covers: generateCsrfState, generateCodeVerifier, generateCodeChallenge,
- * hasSavedOpenRouterKey, getOrPromptApiKey (env path, saved key path, manual entry)
+ * Covers: generateCsrfState, OAUTH_CSS, hasSavedOpenRouterKey, getOrPromptApiKey
+ * (env path, saved key path, manual entry).
+ *
+ * Note: generateCodeVerifier and generateCodeChallenge are fully covered by
+ * oauth-pkce.test.ts (including RFC 7636 test vectors) — not repeated here.
  */
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
@@ -12,14 +15,7 @@ import { join } from "node:path";
 // (which would replace the global mock and disconnect other test files' spies).
 import * as p from "@clack/prompts";
 
-const {
-  generateCodeVerifier,
-  generateCodeChallenge,
-  generateCsrfState,
-  hasSavedOpenRouterKey,
-  getOrPromptApiKey,
-  OAUTH_CSS,
-} = await import("../shared/oauth.js");
+const { generateCsrfState, hasSavedOpenRouterKey, getOrPromptApiKey, OAUTH_CSS } = await import("../shared/oauth.js");
 
 let stderrSpy: ReturnType<typeof spyOn>;
 let origFetch: typeof global.fetch;
@@ -57,27 +53,6 @@ describe("generateCsrfState", () => {
     const a = generateCsrfState();
     const b = generateCsrfState();
     expect(a).not.toBe(b);
-  });
-});
-
-// ── generateCodeVerifier ───────────────────────────────────────────────
-
-describe("generateCodeVerifier", () => {
-  it("returns a 43-char base64url string", () => {
-    const v = generateCodeVerifier();
-    expect(v).toHaveLength(43);
-    expect(v).toMatch(/^[A-Za-z0-9_-]+$/);
-  });
-});
-
-// ── generateCodeChallenge ──────────────────────────────────────────────
-
-describe("generateCodeChallenge", () => {
-  it("generates deterministic challenge for same verifier", async () => {
-    const v = "test-verifier-for-challenge-test1234567890";
-    const c1 = await generateCodeChallenge(v);
-    const c2 = await generateCodeChallenge(v);
-    expect(c1).toBe(c2);
   });
 });
 
