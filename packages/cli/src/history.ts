@@ -115,7 +115,12 @@ function acquireLock(): boolean {
     });
     if (mkdirResult.ok) {
       // Write PID + timestamp for stale detection
-      tryCatch(() => writeFileSync(join(lockPath, "pid"), `${process.pid}\n${Date.now()}`));
+      const pidWriteResult = tryCatch(() => writeFileSync(join(lockPath, "pid"), `${process.pid}\n${Date.now()}`));
+      if (!pidWriteResult.ok) {
+        // PID write failed — clean up and retry so we don't leave an undetectable lock
+        tryCatch(() => rmdirSync(lockPath));
+        continue;
+      }
       return true;
     }
 
@@ -132,6 +137,10 @@ function acquireLock(): boolean {
           tryCatch(() => rmdirSync(lockPath));
           return true; // Retry on next iteration
         }
+      } else {
+        // Lock dir exists but no PID file — broken lock, force remove
+        tryCatch(() => rmdirSync(lockPath));
+        return true;
       }
       return false;
     });
