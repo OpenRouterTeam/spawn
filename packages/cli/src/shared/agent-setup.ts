@@ -637,7 +637,10 @@ const NPM_PREFIX_SETUP =
   'if ! [ -w "$(npm prefix -g 2>/dev/null || echo /usr/local)" ] || ' +
   '! printf "%s" ":${PATH}:" | grep -qF ":${_npm_gbin}:"; then ' +
   'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
-  'export PATH="$HOME/.npm-global/bin:$PATH"';
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
+  // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
+  'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -675,8 +678,9 @@ const KILOCODE_BINARY_VERIFY =
   '[ -d "$_kc_pkg" ] || _kc_pkg="$HOME/.npm-global/lib/node_modules/@kilocode/cli"; ' +
   'if [ -d "$_kc_pkg" ]; then ' +
   // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
   'echo "==> kilocode binary not found, re-running postinstall..."; ' +
-  'cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'cd ~ && cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "if command -v kilocode >/dev/null 2>&1 && kilocode --version >/dev/null 2>&1; then exit 0; fi; " +
   // Postinstall re-run didn't help — search for native binary in the package
@@ -694,6 +698,39 @@ const KILOCODE_BINARY_VERIFY =
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "command -v kilocode >/dev/null 2>&1 || " +
   '{ echo "WARNING: kilocode binary still not found after recovery attempts"; }; ' +
+  "}";
+
+/**
+ * Shell snippet that verifies the junie binary is actually available after
+ * npm install. @jetbrains/junie-cli uses a postinstall script that downloads a
+ * native binary. On some clouds (notably Sprite with flaky IPv6 routing), the
+ * postinstall can fail, leaving bin/index.js present but the native binary absent.
+ *
+ * This snippet:
+ * 1. Checks if `junie` is already working
+ * 2. If not, finds the npm package dir and re-runs the postinstall
+ * 3. Warns if still not found after recovery
+ */
+const JUNIE_BINARY_VERIFY =
+  "{ " +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  // Quick check: if junie already works, nothing to do
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  // Find the npm package directory
+  '_jn_pkg="$(npm prefix -g 2>/dev/null)/lib/node_modules/@jetbrains/junie-cli"; ' +
+  '[ -d "$_jn_pkg" ] || _jn_pkg="$HOME/.npm-global/lib/node_modules/@jetbrains/junie-cli"; ' +
+  'if [ -d "$_jn_pkg" ]; then ' +
+  // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
+  'echo "==> junie binary not found, re-running postinstall..."; ' +
+  'cd ~ && cd "$_jn_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  "fi; " +
+  // Final check
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "command -v junie >/dev/null 2>&1 || " +
+  '{ echo "WARNING: junie binary still not found after recovery attempts"; }; ' +
   "}";
 
 // ─── Auto-Update Service ─────────────────────────────────────────────────────
@@ -1024,7 +1061,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Junie",
-          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST}`,
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST} && ${JUNIE_BINARY_VERIFY}`,
         ),
       envVars: (apiKey) => [
         `JUNIE_OPENROUTER_API_KEY=${apiKey}`,
