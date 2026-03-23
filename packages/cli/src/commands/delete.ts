@@ -43,14 +43,19 @@ async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
     case "gcp": {
       const zone = conn.metadata?.zone || "us-central1-a";
       const project = conn.metadata?.project || "";
+      if (!project) {
+        throw new Error(
+          "Cannot determine GCP project for this instance.\n\n" +
+            "The history entry is missing project metadata. Without it, deletion\n" +
+            "could target the wrong project.\n\n" +
+            "To fix: delete the instance manually from the GCP Console:\n" +
+            "  https://console.cloud.google.com/compute/instances",
+        );
+      }
       validateMetadataValue(zone, "GCP zone");
-      if (project) {
-        validateMetadataValue(project, "GCP project");
-      }
+      validateMetadataValue(project, "GCP project");
       process.env.GCP_ZONE = zone;
-      if (project) {
-        process.env.GCP_PROJECT = project;
-      }
+      process.env.GCP_PROJECT = project;
       await gcpEnsureGcloudCli();
       await gcpAuthenticate();
       break;
@@ -125,27 +130,25 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
     case "gcp": {
       const zone = conn.metadata?.zone || "us-central1-a";
       const project = conn.metadata?.project || "";
+      if (!project) {
+        throw new Error(
+          "Cannot determine GCP project for this instance.\n\n" +
+            "The history entry is missing project metadata. Without it, deletion\n" +
+            "could target the wrong project.\n\n" +
+            "To fix: delete the instance manually from the GCP Console:\n" +
+            "  https://console.cloud.google.com/compute/instances",
+        );
+      }
       // SECURITY: Validate metadata values to prevent injection via tampered history
       validateMetadataValue(zone, "GCP zone");
-      if (project) {
-        validateMetadataValue(project, "GCP project");
-      }
+      validateMetadataValue(project, "GCP project");
       return tryDelete(async () => {
         process.env.GCP_ZONE = zone;
-        if (project) {
-          process.env.GCP_PROJECT = project;
-        }
+        process.env.GCP_PROJECT = project;
         await gcpEnsureGcloudCli();
         await gcpAuthenticate();
-        // Deletion runs under a spinner — suppress interactive prompts
-        const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
-        process.env.SPAWN_NON_INTERACTIVE = "1";
+        // resolveProject reads GCP_PROJECT directly — no fallback needed
         const resolveResult = await asyncTryCatch(() => gcpResolveProject());
-        if (prevNonInteractive === undefined) {
-          delete process.env.SPAWN_NON_INTERACTIVE;
-        } else {
-          process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
-        }
         if (!resolveResult.ok) {
           throw resolveResult.error;
         }
