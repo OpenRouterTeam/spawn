@@ -482,4 +482,51 @@ describe("history", () => {
       expect(loaded[0].timestamp).toBe("not-a-date");
     });
   });
+
+  // ── Lock recovery ───────────────────────────────────────────────────────
+
+  describe("lock recovery", () => {
+    it("recovers from a broken lock directory with no PID file", () => {
+      // Simulate a crashed process that left a lock dir without a PID file
+      const lockPath = join(testDir, "history.json.lock");
+      mkdirSync(lockPath, {
+        recursive: true,
+      });
+      // No pid file inside — this is the broken state
+
+      // saveSpawnRecord uses withLock internally — should clean up the broken lock and succeed
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: new Date().toISOString(),
+      });
+
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("claude");
+      // Lock dir should be cleaned up
+      expect(existsSync(lockPath)).toBe(false);
+    });
+
+    it("recovers from a stale lock with expired PID file", () => {
+      // Simulate a lock left by a process that died long ago
+      const lockPath = join(testDir, "history.json.lock");
+      mkdirSync(lockPath, {
+        recursive: true,
+      });
+      // Write a PID file with a timestamp far in the past (> 30s stale threshold)
+      writeFileSync(join(lockPath, "pid"), `99999\n${Date.now() - 60_000}`);
+
+      saveSpawnRecord({
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+      });
+
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("codex");
+      expect(existsSync(lockPath)).toBe(false);
+    });
+  });
 });
