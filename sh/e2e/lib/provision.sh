@@ -152,7 +152,7 @@ CLOUD_ENV
       # Escape regex metacharacters in app_name before using in pkill -f
       # pattern to prevent unintended process termination (#2409, #2911)
       local escaped_name
-      escaped_name=$(printf '%s' "${app_name}" | sed 's/[.^$*+?(){}|[\]/\\&/g')
+      escaped_name=$(printf '%s' "${app_name}" | sed 's/[].^$*+?(){}|[\\]/\\&/g')
       pkill -f "sprite exec.*${escaped_name}" 2>/dev/null || true
     fi
     sleep 1
