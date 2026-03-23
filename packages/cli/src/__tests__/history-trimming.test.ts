@@ -3,13 +3,11 @@ import type { SpawnRecord } from "../history.js";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { filterHistory, loadHistory, saveSpawnRecord } from "../history.js";
+import { filterHistory } from "../history.js";
 
 /**
- * Tests for filterHistory ordering and saveSpawnRecord behavior.
- *
- * History has no entry cap — all records are kept indefinitely.
- * These tests verify ordering guarantees and basic save/load behavior.
+ * Tests for filterHistory ordering guarantees.
+ * (saveSpawnRecord tests are in history.test.ts)
  */
 
 describe("History Ordering and Save Behavior", () => {
@@ -35,39 +33,6 @@ describe("History Ordering and Save Behavior", () => {
         force: true,
       });
     }
-  });
-
-  // ── saveSpawnRecord ──────────────────────────────────────────────────────
-
-  describe("saveSpawnRecord", () => {
-    it("should keep all entries with no cap", () => {
-      // Save 200 records — all should be retained
-      for (let i = 0; i < 200; i++) {
-        saveSpawnRecord({
-          id: `id-${i}`,
-          agent: `agent-${i}`,
-          cloud: "hetzner",
-          timestamp: `2026-01-01T${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}:00.000Z`,
-        });
-      }
-      const loaded = loadHistory();
-      expect(loaded).toHaveLength(200);
-      expect(loaded[0].agent).toBe("agent-0");
-      expect(loaded[199].agent).toBe("agent-199");
-    });
-
-    it("should assign id when missing", () => {
-      saveSpawnRecord({
-        id: "",
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00.000Z",
-      });
-      const loaded = loadHistory();
-      expect(loaded).toHaveLength(1);
-      expect(typeof loaded[0].id).toBe("string");
-      expect(loaded[0].id.length).toBeGreaterThan(0);
-    });
   });
 
   // ── filterHistory ordering guarantees ────────────────────────────────────
