@@ -102,7 +102,7 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
 
   const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin";
   const pathSetup = `for rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`;
-  const finalize = `claude install --force 2>/dev/null || true; ${pathSetup}`;
+  const finalize = `claude install --force >/dev/null 2>&1 || true; ${pathSetup}`;
 
   const script = [
     `export PATH="${claudePath}:$PATH"`,
@@ -125,7 +125,7 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     logError("Claude Code installation failed");
     throw new Error("Claude Code install failed");
   }
-  logInfo("Claude Code installed");
+  logInfo("Claude Code agent installed successfully");
 }
 
 async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {
