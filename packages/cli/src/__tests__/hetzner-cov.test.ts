@@ -3,7 +3,13 @@ import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 mockClackPrompts();
 
-import { DEFAULT_LOCATION, DEFAULT_SERVER_TYPE, getConnectionInfo } from "../hetzner/hetzner";
+import {
+  cleanupOrphanedPrimaryIps,
+  DEFAULT_LOCATION,
+  DEFAULT_SERVER_TYPE,
+  getConnectionInfo,
+  isResourceLimitError,
+} from "../hetzner/hetzner";
 
 let origFetch: typeof global.fetch;
 let origEnv: NodeJS.ProcessEnv;
@@ -576,5 +582,280 @@ describe("hetzner/createServer", () => {
     const { ensureHcloudToken, createServer } = await import("../hetzner/hetzner");
     await ensureHcloudToken();
     await expect(createServer("test-server", "cx23", "fsn1")).rejects.toThrow("No server IP");
+  });
+
+  it("cleans up orphaned primary IPs on resource_limit_exceeded and retries", async () => {
+    process.env.HCLOUD_TOKEN = "test-token";
+    const serverResp = {
+      server: {
+        id: 99,
+        public_net: {
+          ipv4: {
+            ip: "10.0.0.5",
+          },
+        },
+      },
+    };
+    let callCount = 0;
+    global.fetch = mock(() => {
+      callCount++;
+      if (callCount <= 1) {
+        // Token validation
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              servers: [],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 2) {
+        // SSH keys
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              ssh_keys: [],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 3) {
+        // First create attempt — resource_limit_exceeded (HTTP 403)
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "resource_limit_exceeded",
+                message: "primary_ip_limit",
+              },
+            }),
+            {
+              status: 403,
+            },
+          ),
+        );
+      }
+      if (callCount <= 4) {
+        // List primary IPs for cleanup
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              primary_ips: [
+                {
+                  id: 100,
+                  ip: "1.2.3.4",
+                  assignee_id: 0,
+                },
+                {
+                  id: 200,
+                  ip: "5.6.7.8",
+                  assignee_id: 42,
+                },
+              ],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 5) {
+        // Delete orphaned IP 100
+        return Promise.resolve(
+          new Response("", {
+            status: 204,
+          }),
+        );
+      }
+      // Retry create — success
+      return Promise.resolve(new Response(JSON.stringify(serverResp)));
+    });
+    const { ensureHcloudToken, createServer } = await import("../hetzner/hetzner");
+    await ensureHcloudToken();
+    const conn = await createServer("test-retry", "cx23", "fsn1");
+    expect(conn.ip).toBe("10.0.0.5");
+    // Should have called: token(1), ssh_keys(2), create-fail(3), list-ips(4), delete-ip(5), create-ok(6)
+    expect(callCount).toBeGreaterThanOrEqual(6);
+  });
+
+  it("throws with guidance when resource limit hit and no orphaned IPs to clean", async () => {
+    process.env.HCLOUD_TOKEN = "test-token";
+    let callCount = 0;
+    global.fetch = mock(() => {
+      callCount++;
+      if (callCount <= 1) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              servers: [],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 2) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              ssh_keys: [],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 3) {
+        // Create fails with resource_limit_exceeded
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "resource_limit_exceeded",
+                message: "primary_ip_limit",
+              },
+            }),
+            {
+              status: 403,
+            },
+          ),
+        );
+      }
+      // List primary IPs — all attached (none orphaned)
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            primary_ips: [
+              {
+                id: 100,
+                ip: "1.2.3.4",
+                assignee_id: 42,
+              },
+            ],
+          }),
+        ),
+      );
+    });
+    const { ensureHcloudToken, createServer } = await import("../hetzner/hetzner");
+    await ensureHcloudToken();
+    await expect(createServer("test-noclean", "cx23", "fsn1")).rejects.toThrow("resource_limit_exceeded");
+    // Verify guidance was printed
+    const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("Primary IP limit");
+    expect(output).toContain("quota increase");
+  });
+});
+
+// ─── isResourceLimitError ─────────────────────────────────────────────────
+
+describe("hetzner/isResourceLimitError", () => {
+  it("detects resource_limit_exceeded", () => {
+    expect(isResourceLimitError("resource_limit_exceeded")).toBe(true);
+  });
+  it("detects primary_ip_limit", () => {
+    expect(isResourceLimitError("primary_ip_limit")).toBe(true);
+  });
+  it("detects mixed-case and substring", () => {
+    expect(isResourceLimitError("Error: Resource_Limit_Exceeded for account")).toBe(true);
+  });
+  it("returns false for unrelated errors", () => {
+    expect(isResourceLimitError("server not found")).toBe(false);
+    expect(isResourceLimitError("insufficient funds")).toBe(false);
+  });
+});
+
+// ─── cleanupOrphanedPrimaryIps ──────────────────────────────────────────────
+
+describe("hetzner/cleanupOrphanedPrimaryIps", () => {
+  it("deletes only unattached primary IPs", async () => {
+    process.env.HCLOUD_TOKEN = "test-token";
+    let callCount = 0;
+    const deletedIds: string[] = [];
+    global.fetch = mock((url: string, opts?: RequestInit) => {
+      callCount++;
+      if (callCount <= 1) {
+        // Token validation
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              servers: [],
+            }),
+          ),
+        );
+      }
+      if (callCount <= 2) {
+        // List primary IPs
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              primary_ips: [
+                {
+                  id: 10,
+                  ip: "1.1.1.1",
+                  assignee_id: 0,
+                },
+                {
+                  id: 20,
+                  ip: "2.2.2.2",
+                  assignee_id: 5,
+                },
+                {
+                  id: 30,
+                  ip: "3.3.3.3",
+                  assignee_id: 0,
+                },
+              ],
+            }),
+          ),
+        );
+      }
+      // DELETE calls
+      if (opts?.method === "DELETE") {
+        const idMatch = String(url).match(/primary_ips\/(\d+)/);
+        if (idMatch) {
+          deletedIds.push(idMatch[1]);
+        }
+        return Promise.resolve(
+          new Response("", {
+            status: 204,
+          }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+    const { ensureHcloudToken } = await import("../hetzner/hetzner");
+    await ensureHcloudToken();
+    const count = await cleanupOrphanedPrimaryIps();
+    expect(count).toBe(2);
+    expect(deletedIds).toContain("10");
+    expect(deletedIds).toContain("30");
+    expect(deletedIds).not.toContain("20");
+  });
+
+  it("returns 0 when no orphaned IPs exist", async () => {
+    process.env.HCLOUD_TOKEN = "test-token";
+    let callCount = 0;
+    global.fetch = mock(() => {
+      callCount++;
+      if (callCount <= 1) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              servers: [],
+            }),
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            primary_ips: [
+              {
+                id: 10,
+                ip: "1.1.1.1",
+                assignee_id: 5,
+              },
+            ],
+          }),
+        ),
+      );
+    });
+    const { ensureHcloudToken } = await import("../hetzner/hetzner");
+    await ensureHcloudToken();
+    const count = await cleanupOrphanedPrimaryIps();
+    expect(count).toBe(0);
   });
 });
