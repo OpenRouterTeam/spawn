@@ -33,6 +33,12 @@ const AGENT_MIN_SIZE: Record<string, string> = {
   openclaw: "s-2vcpu-4gb",
 };
 
+/** Extract RAM in GB from a DO slug like "s-2vcpu-4gb" or "s-2vcpu-4gb-intel". Returns 0 if unparseable. */
+function slugRamGb(slug: string): number {
+  const match = slug.match(/-(\d+)gb/);
+  return match ? Number(match[1]) : 0;
+}
+
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
   claude: "openrouter-spawnclaude",
@@ -80,7 +86,7 @@ async function main() {
       dropletSize = await promptDropletSize();
       // Enforce minimum size for agents that need more RAM (e.g. openclaw-plugins OOMs on 2GB)
       const minSize = AGENT_MIN_SIZE[agentName];
-      if (minSize && (!dropletSize || dropletSize === "s-2vcpu-2gb")) {
+      if (minSize && (!dropletSize || slugRamGb(dropletSize) < slugRamGb(minSize))) {
         dropletSize = minSize;
         logInfo(`Using ${minSize} (minimum for ${agentName})`);
       }
