@@ -61,6 +61,19 @@ _stage_prompt_remotely() {
 }
 
 # ---------------------------------------------------------------------------
+# _stage_timeout_remotely APP TIMEOUT
+#
+# Writes the validated timeout value to a temp file on the remote host.
+# Like _stage_prompt_remotely, this avoids interpolating the value into
+# any remote command string — eliminating injection surface entirely.
+# ---------------------------------------------------------------------------
+_stage_timeout_remotely() {
+  local app="$1"
+  local timeout_val="$2"
+  printf '%s' "${timeout_val}" | cloud_exec "${app}" "cat > /tmp/.e2e-timeout"
+}
+
+# ---------------------------------------------------------------------------
 # Per-agent input test functions
 #
 # Each function:
@@ -82,6 +95,7 @@ input_test_claude() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
   _stage_prompt_remotely "${app}" "${encoded_prompt}"
+  _stage_timeout_remotely "${app}" "${INPUT_TEST_TIMEOUT}"
 
   local output
   # claude -p (--print) reads the prompt from stdin.
@@ -89,11 +103,11 @@ input_test_claude() {
   #   (newer Claude Code requires per-directory trust; /tmp/e2e-test is not
   #   in the ~/.claude.json trusted projects list written during install)
   # --no-session-persistence: don't write session files to disk during tests
-  # The prompt is read from the staged temp file — no interpolation in this command.
+  # The prompt and timeout are read from staged temp files — no interpolation in this command.
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
+    _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     timeout \"\$_TIMEOUT\" claude -p --dangerously-skip-permissions --no-session-persistence \"\$PROMPT\"" 2>&1) || true
@@ -120,14 +134,15 @@ input_test_codex() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
   _stage_prompt_remotely "${app}" "${encoded_prompt}"
+  _stage_timeout_remotely "${app}" "${INPUT_TEST_TIMEOUT}"
 
   local output
   # codex exec --full-auto: non-interactive subcommand for v0.116.0+
-  # The prompt is read from the staged temp file — no interpolation in this command.
+  # The prompt and timeout are read from staged temp files — no interpolation in this command.
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
-    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
+    _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     timeout \"\$_TIMEOUT\" codex exec --full-auto \"\$PROMPT\"" 2>&1) || true
@@ -205,6 +220,7 @@ input_test_openclaw() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
   _stage_prompt_remotely "${app}" "${encoded_prompt}"
+  _stage_timeout_remotely "${app}" "${INPUT_TEST_TIMEOUT}"
 
   while [ "${attempt}" -lt "${max_attempts}" ]; do
     attempt=$((attempt + 1))
@@ -217,15 +233,19 @@ input_test_openclaw() {
       _openclaw_restart_gateway "${app}"
     fi
 
+    # Stage the attempt number to a remote temp file for safe use in --session-id
+    printf '%s' "${attempt}" | cloud_exec "${app}" "cat > /tmp/.e2e-attempt"
+
     local output
-    # The prompt is read from the staged temp file — no interpolation in this command.
+    # The prompt, timeout, and attempt are read from staged temp files — no interpolation in this command.
     output=$(cloud_exec "${app}" "\
       source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
-      _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
+      _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
+      _ATTEMPT=\$(cat /tmp/.e2e-attempt); \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-      timeout \"\$_TIMEOUT\" openclaw agent --message \"\$PROMPT\" --session-id e2e-test-${attempt} --json --timeout 60" 2>&1) || true
+      timeout \"\$_TIMEOUT\" openclaw agent --message \"\$PROMPT\" --session-id \"e2e-test-\$_ATTEMPT\" --json --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"
@@ -258,12 +278,13 @@ input_test_zeroclaw() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
   _validate_base64 "${encoded_prompt}" || return 1
   _stage_prompt_remotely "${app}" "${encoded_prompt}"
+  _stage_timeout_remotely "${app}" "${INPUT_TEST_TIMEOUT}"
 
   local output
-  # The prompt is read from the staged temp file — no interpolation in this command.
+  # The prompt and timeout are read from staged temp files — no interpolation in this command.
   output=$(cloud_exec "${app}" "\
     source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
-    _TIMEOUT='${INPUT_TEST_TIMEOUT}'; \
+    _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
     timeout \"\$_TIMEOUT\" zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
