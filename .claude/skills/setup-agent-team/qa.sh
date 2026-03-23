@@ -460,6 +460,8 @@ elif [[ "${RUN_MODE}" == "e2e-interactive" ]]; then
                 _ekey="${_ekey#"${_ekey%%[! ]*}"}"
                 case "${_ekey}" in
                     ANTHROPIC_API_KEY) export ANTHROPIC_API_KEY="${_eval}" ;;
+                    # QA VMs store this as ANTHROPIC_AUTH_TOKEN — accept either
+                    ANTHROPIC_AUTH_TOKEN) export ANTHROPIC_API_KEY="${_eval}" ;;
                 esac
             done < /etc/spawn-qa-auth.env
         fi

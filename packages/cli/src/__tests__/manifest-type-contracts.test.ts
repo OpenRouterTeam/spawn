@@ -42,15 +42,15 @@ describe("Agent required field types", () => {
     "launch",
   ] as const;
 
-  for (const field of nonEmptyStringFields) {
-    it(`${field} should be a non-empty string for all agents`, () => {
+  it("name, description, install, launch should be non-empty strings for all agents", () => {
+    for (const field of nonEmptyStringFields) {
       for (const [key, agent] of allAgents) {
         const val = agent[field];
         expect(typeof val, `agent "${key}" ${field}`).toBe("string");
         expect(String(val).length, `agent "${key}" ${field} length`).toBeGreaterThan(0);
       }
-    });
-  }
+    }
+  });
 
   it("url should be a valid URL string for all agents", () => {
     for (const [key, agent] of allAgents) {
@@ -153,16 +153,16 @@ describe("Cloud required field types", () => {
     "interactive_method",
   ] as const;
 
-  for (const field of nonEmptyStringFields) {
-    it(`${field} should be a non-empty string for all clouds`, () => {
+  it("name, description, price, type, auth, provision_method, exec_method, interactive_method should be non-empty strings for all clouds", () => {
+    for (const field of nonEmptyStringFields) {
       for (const [key, cloud] of allClouds) {
         const val = cloud[field];
         expect(typeof val, `cloud "${key}" ${field}`).toBe("string");
         // auth can be "none" but must be present
         expect(String(val).length, `cloud "${key}" ${field} length`).toBeGreaterThan(0);
       }
-    });
-  }
+    }
+  });
 
   it("url should be a valid URL string for all clouds", () => {
     for (const [key, cloud] of allClouds) {
@@ -310,15 +310,15 @@ describe("Agent metadata field types", () => {
     "tagline",
   ] as const;
 
-  for (const field of nonEmptyStringFields) {
-    it(`${field} should be a non-empty string for all agents`, () => {
+  it("creator, license, language, runtime, tagline should be non-empty strings for all agents", () => {
+    for (const field of nonEmptyStringFields) {
       for (const [key, agent] of allAgents) {
         const val = agent[field];
         expect(typeof val, `agent "${key}" ${field}`).toBe("string");
         expect(String(val).length, `agent "${key}" ${field} length`).toBeGreaterThan(0);
       }
-    });
-  }
+    }
+  });
 
   it("repo should match owner/repo format for all agents", () => {
     for (const [key, agent] of allAgents) {
@@ -327,19 +327,17 @@ describe("Agent metadata field types", () => {
     }
   });
 
-  const dateMonthFields = [
-    "created",
-    "added",
-  ] as const;
-
-  for (const field of dateMonthFields) {
-    it(`${field} should be YYYY-MM format for all agents`, () => {
+  it("created and added should be YYYY-MM format for all agents", () => {
+    for (const field of [
+      "created",
+      "added",
+    ] as const) {
       for (const [key, agent] of allAgents) {
         expect(typeof agent[field], `agent "${key}" ${field}`).toBe("string");
         expect(agent[field], `agent "${key}" ${field} format`).toMatch(/^\d{4}-\d{2}$/);
       }
-    });
-  }
+    }
+  });
 
   it("github_stars should be a non-negative integer for all agents", () => {
     for (const [key, agent] of allAgents) {

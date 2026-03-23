@@ -1,11 +1,11 @@
 import type { Manifest } from "../manifest";
 
-import { afterEach, beforeEach, describe, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { preflightCredentialCheck } from "../commands/index.js";
 import { mockClackPrompts } from "./test-helpers";
 
 // Must be called before dynamic imports that use @clack/prompts
-mockClackPrompts();
+const clack = mockClackPrompts();
 
 function makeManifest(cloudAuth: string): Manifest {
   return {
@@ -29,8 +29,6 @@ function makeManifest(cloudAuth: string): Manifest {
 
 describe("preflightCredentialCheck", () => {
   const savedEnv: Record<string, string | undefined> = {};
-  let stderrSpy: ReturnType<typeof spyOn>;
-  let stderrOutput: string[];
 
   function setEnv(key: string, value: string) {
     if (!(key in savedEnv)) {
@@ -47,20 +45,10 @@ describe("preflightCredentialCheck", () => {
   }
 
   beforeEach(() => {
-    stderrOutput = [];
-    // Capture all stderr output — clack log functions eventually write here
-    stderrSpy = spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      stderrOutput.push(String(chunk));
-      return true;
-    });
-    // Also capture console.warn/log which clack might use
-    spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
-      stderrOutput.push(args.map(String).join(" "));
-    });
+    clack.logWarn.mockClear();
   });
 
   afterEach(() => {
-    stderrSpy.mockRestore();
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) {
         delete process.env[key];
@@ -73,44 +61,58 @@ describe("preflightCredentialCheck", () => {
     }
   });
 
-  it("should pass when all credentials are present", async () => {
+  it("emits no warnings when all credentials are present", async () => {
     setEnv("OPENROUTER_API_KEY", "sk-or-test");
     setEnv("HCLOUD_TOKEN", "test-token");
     await preflightCredentialCheck(makeManifest("HCLOUD_TOKEN"), "testcloud");
-    // No crash = pass
+    expect(clack.logWarn.mock.calls.length).toBe(0);
   });
 
-  it("should warn when cloud-specific credential is missing", async () => {
+  it("warns with cloud credential name when cloud token is missing", async () => {
     setEnv("OPENROUTER_API_KEY", "sk-or-test");
     clearEnv("HCLOUD_TOKEN");
-    // Should not throw
     await preflightCredentialCheck(makeManifest("HCLOUD_TOKEN"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBeGreaterThan(0);
+    const warnText = String(clack.logWarn.mock.calls[0]?.[0] ?? "");
+    expect(warnText).toContain("HCLOUD_TOKEN");
   });
 
-  it("should warn when OPENROUTER_API_KEY is missing", async () => {
+  it("warns with OPENROUTER_API_KEY name when API key is missing", async () => {
     clearEnv("OPENROUTER_API_KEY");
     setEnv("HCLOUD_TOKEN", "test-token");
     await preflightCredentialCheck(makeManifest("HCLOUD_TOKEN"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBeGreaterThan(0);
+    const warnText = String(clack.logWarn.mock.calls[0]?.[0] ?? "");
+    expect(warnText).toContain("OPENROUTER_API_KEY");
   });
 
-  it("should warn about multiple missing credentials", async () => {
+  it("warns about all missing credentials when both are absent", async () => {
     clearEnv("OPENROUTER_API_KEY");
     clearEnv("HCLOUD_TOKEN");
     await preflightCredentialCheck(makeManifest("HCLOUD_TOKEN"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBeGreaterThan(0);
+    const warnText = String(clack.logWarn.mock.calls[0]?.[0] ?? "");
+    expect(warnText).toContain("OPENROUTER_API_KEY");
+    expect(warnText).toContain("HCLOUD_TOKEN");
   });
 
-  it("should not warn when auth is cli and OPENROUTER_API_KEY is present", async () => {
+  it("emits no warnings for cli auth when OPENROUTER_API_KEY is present", async () => {
     setEnv("OPENROUTER_API_KEY", "sk-or-test");
     await preflightCredentialCheck(makeManifest("cli"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBe(0);
   });
 
-  it("should warn for CLI-based auth when OPENROUTER_API_KEY is missing", async () => {
+  it("warns about OPENROUTER_API_KEY for cli auth when key is missing", async () => {
     clearEnv("OPENROUTER_API_KEY");
     await preflightCredentialCheck(makeManifest("cli"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBeGreaterThan(0);
+    const warnText = String(clack.logWarn.mock.calls[0]?.[0] ?? "");
+    expect(warnText).toContain("OPENROUTER_API_KEY");
   });
 
-  it("should handle auth=none without warnings", async () => {
+  it("emits no warnings for auth=none even when all credentials are missing", async () => {
     clearEnv("OPENROUTER_API_KEY");
     await preflightCredentialCheck(makeManifest("none"), "testcloud");
+    expect(clack.logWarn.mock.calls.length).toBe(0);
   });
 });

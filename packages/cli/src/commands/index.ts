@@ -17,7 +17,6 @@ export {
   cmdClouds,
   cmdMatrix,
   getMissingClouds,
-  getTerminalWidth,
 } from "./info.js";
 // interactive.ts — cmdInteractive, cmdAgentInteractive
 export { cmdAgentInteractive, cmdInteractive } from "./interactive.js";

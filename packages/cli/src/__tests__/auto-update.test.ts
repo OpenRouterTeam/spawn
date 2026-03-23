@@ -241,6 +241,8 @@ describe("auto-update service", () => {
       };
 
       await setupAutoUpdate(runner, "claude", "npm install -g @anthropic-ai/claude-code@latest");
+      // runServer was attempted — failure is swallowed as non-fatal
+      expect(runServer).toHaveBeenCalled();
     });
   });
 

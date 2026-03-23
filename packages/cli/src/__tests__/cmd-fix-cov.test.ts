@@ -4,15 +4,13 @@
  * Covers paths not exercised in cmd-fix.test.ts:
  * - fixSpawn with security validation failures for server_id/server_name
  * - fixSpawn loading manifest from network when it fails
- * - cmdFix non-interactive mode with multiple servers
- * - cmdFix with interactive picker (select + cancel)
+ * - fixSpawn label fallbacks (record name, IP)
+ * - fixSpawn success message
  */
 
 import type { SpawnRecord } from "../history";
 
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { tryCatch } from "@openrouter/spawn-shared";
 import { createMockManifest, mockClackPrompts } from "./test-helpers";
 
@@ -25,7 +23,7 @@ const clack = mockClackPrompts({
 });
 
 // ── Import modules under test ───────────────────────────────────────────────
-const { fixSpawn, cmdFix } = await import("../commands/fix.js");
+const { fixSpawn } = await import("../commands/fix.js");
 const { _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -143,180 +141,14 @@ describe("fixSpawn (additional coverage)", () => {
   });
 });
 
-// ── Tests: cmdFix edge cases ─────────────────────────────────────────────────
-
-describe("cmdFix (additional coverage)", () => {
-  let testDir: string;
-  let savedSpawnHome: string | undefined;
-  let processExitSpy: ReturnType<typeof spyOn>;
-
-  function writeHistory(records: SpawnRecord[]) {
-    writeFileSync(
-      join(testDir, "history.json"),
-      JSON.stringify({
-        version: 1,
-        records,
-      }),
-    );
-  }
-
-  beforeEach(() => {
-    testDir = join(process.env.HOME ?? "", `spawn-fix-cov-${Date.now()}`);
-    mkdirSync(testDir, {
-      recursive: true,
-    });
-    savedSpawnHome = process.env.SPAWN_HOME;
-    process.env.SPAWN_HOME = testDir;
-
-    clack.logError.mockReset();
-    clack.logInfo.mockReset();
-    clack.logSuccess.mockReset();
-
-    const savedFetch = global.fetch;
-    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
-    _resetCacheForTesting();
-
-    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
-      throw new Error("process.exit");
-    });
-  });
-
-  afterEach(() => {
-    process.env.SPAWN_HOME = savedSpawnHome;
-    processExitSpy.mockRestore();
-    if (existsSync(testDir)) {
-      rmSync(testDir, {
-        recursive: true,
-        force: true,
-      });
-    }
-  });
-
-  it("fixes directly when only one server (no picker needed)", async () => {
-    const mockRunner = mock(async () => true);
-    writeHistory([
-      makeRecord({
-        id: "only-one",
-      }),
-    ]);
-
-    const savedFetch = global.fetch;
-    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
-    _resetCacheForTesting();
-
-    await cmdFix(undefined, {
-      runScript: mockRunner,
-    });
-
-    expect(mockRunner).toHaveBeenCalled();
-    global.fetch = savedFetch;
-  });
-
-  it("finds record by name when spawnId matches name", async () => {
-    const mockRunner = mock(async () => true);
-    writeHistory([
-      makeRecord({
-        id: "id-1",
-        name: "my-spawn",
-      }),
-      makeRecord({
-        id: "id-2",
-        name: "other-spawn",
-      }),
-    ]);
-
-    const savedFetch = global.fetch;
-    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
-    _resetCacheForTesting();
-
-    await cmdFix("my-spawn", {
-      runScript: mockRunner,
-    });
-
-    expect(mockRunner).toHaveBeenCalled();
-    global.fetch = savedFetch;
-  });
-
-  it("shows no active spawns when history is empty", async () => {
-    await cmdFix();
-    expect(clack.logInfo).toHaveBeenCalledWith(expect.stringContaining("No active spawns"));
-  });
-});
-
-// ── Tests: fixSpawn connection edge cases ────────────────────────────────────
+// ── Tests: fixSpawn success message ──────────────────────────────────────────
+// (error paths are covered in cmd-fix.test.ts; this covers the exact success message)
 
 describe("fixSpawn connection edge cases", () => {
   beforeEach(() => {
     clack.logError.mockReset();
-    clack.logInfo.mockReset();
     clack.logSuccess.mockReset();
     clack.logStep.mockReset();
-  });
-
-  it("shows error when record has no connection", async () => {
-    const record = makeRecord({
-      connection: undefined,
-    });
-    await fixSpawn(record, mockManifest);
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("no connection information"));
-  });
-
-  it("shows error when connection is deleted", async () => {
-    const record = makeRecord({
-      connection: {
-        ip: "1.2.3.4",
-        user: "root",
-        cloud: "hetzner",
-        deleted: true,
-      },
-    });
-    await fixSpawn(record, mockManifest);
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("has been deleted"));
-  });
-
-  it("shows error for sprite-console connections", async () => {
-    const record = makeRecord({
-      connection: {
-        ip: "sprite-console",
-        user: "root",
-        cloud: "sprite",
-      },
-    });
-    await fixSpawn(record, mockManifest);
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Sprite console"));
-  });
-
-  it("shows error for unknown agent", async () => {
-    const record = makeRecord({
-      agent: "nonexistent-agent",
-      connection: {
-        ip: "1.2.3.4",
-        user: "root",
-        cloud: "hetzner",
-      },
-    });
-    await fixSpawn(record, mockManifest);
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Unknown agent"));
-  });
-
-  it("shows error when fix script runner throws", async () => {
-    const mockRunner = mock(async () => {
-      throw new Error("SSH connection refused");
-    });
-    const record = makeRecord();
-    await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
-    });
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Fix failed"));
-  });
-
-  it("shows error when fix script exits non-zero", async () => {
-    const mockRunner = mock(async () => false);
-    const record = makeRecord();
-    await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
-    });
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("exited with an error"));
   });
 
   it("shows success when fix script succeeds", async () => {

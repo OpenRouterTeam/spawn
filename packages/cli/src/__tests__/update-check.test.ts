@@ -1,3 +1,5 @@
+import type { ExecFileSyncOptions } from "node:child_process";
+
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
@@ -206,6 +208,75 @@ describe("update-check", () => {
       expect(processExitSpy).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
+    });
+
+    it("should redirect install script stdout to stderr when jsonOutput=true", async () => {
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+        options?: ExecFileSyncOptions;
+      }[] = [];
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(
+        (file: string, args: string[], options?: ExecFileSyncOptions) => {
+          execFileSyncCalls.push({
+            file,
+            args,
+            options,
+          });
+        },
+      );
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates(true); // jsonOutput = true
+
+      // bash call (install script) should have stdio redirected to stderr (not inherit)
+      const bashCall = execFileSyncCalls.find((c) => c.file === "bash");
+      expect(bashCall).toBeDefined();
+      // stdio should be an array (not "inherit") to avoid stdout pollution
+      expect(Array.isArray(bashCall?.options?.stdio)).toBe(true);
+
+      // re-exec should set SPAWN_CLI_UPDATED=1
+      const reexecCall = execFileSyncCalls[execFileSyncCalls.length - 1];
+      expect(reexecCall?.options?.env?.SPAWN_CLI_UPDATED).toBe("1");
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+
+    it("should use inherit stdio for install script when jsonOutput=false", async () => {
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+        options?: ExecFileSyncOptions;
+      }[] = [];
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(
+        (file: string, args: string[], options?: ExecFileSyncOptions) => {
+          execFileSyncCalls.push({
+            file,
+            args,
+            options,
+          });
+        },
+      );
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates(false); // jsonOutput = false (default)
+
+      // bash call (install script) should use "inherit" when not in JSON mode
+      const bashCall = execFileSyncCalls.find((c) => c.file === "bash");
+      expect(bashCall).toBeDefined();
+      expect(bashCall?.options?.stdio).toBe("inherit");
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
     });
 
     it("should re-exec with original args after successful update", async () => {

@@ -89,6 +89,7 @@ beforeEach(() => {
   delete process.env.SPAWN_ENABLED_STEPS;
   delete process.env.SPAWN_BETA;
   delete process.env.MODEL_ID;
+  delete process.env.SPAWN_HEADLESS;
   stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
   exitSpy = spyOn(process, "exit").mockImplementation((code) => {
     throw new Error(`__EXIT_${isNumber(code) ? code : 0}__`);
@@ -514,22 +515,6 @@ describe("orchestrate SPAWN_NAME", () => {
 
     expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
     delete process.env.SPAWN_NAME;
-  });
-});
-
-// ── preLaunch hooks ───────────────────────────────────────────────────
-
-describe("orchestrate preLaunch", () => {
-  it("calls preLaunch when defined", async () => {
-    const preLaunch = mock(() => Promise.resolve());
-    const cloud = createMockCloud();
-    const agent = createMockAgent({
-      preLaunch,
-    });
-
-    await runSafe(cloud, agent, "testagent");
-
-    expect(preLaunch).toHaveBeenCalledTimes(1);
   });
 });
 

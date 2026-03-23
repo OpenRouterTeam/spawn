@@ -11,10 +11,10 @@
 //   OPENROUTER_API_KEY  — Injected into spawn for the agent
 //   Cloud credentials   — HCLOUD_TOKEN, DO_API_TOKEN, AWS_ACCESS_KEY_ID, etc.
 //
-// Outputs JSON to stdout: { success: boolean, duration: number, transcript: string }
+// Outputs JSON to stdout: { success: boolean, duration: number, transcript: string, uxIssues?: UxIssue[] }
 
 const IDLE_MS = 2000; // Wait 2s of silence before asking AI
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute overall timeout
+const SESSION_TIMEOUT_MS = 20 * 60 * 1000; // 20 minute overall timeout (provision takes 3-4 min + onboarding)
 const AI_MODEL = "claude-haiku-4-5-20251001";
 
 // ─── Args & validation ──────────────────────────────────────────────────
@@ -131,6 +131,107 @@ async function askClaude(
     (b: Record<string, unknown>) => b.type === "text",
   );
   return typeof textBlock?.text === "string" ? textBlock.text.trim() : "";
+}
+
+// ─── UX review ──────────────────────────────────────────────────────────
+
+interface UxIssue {
+  issue: string;
+  example: string;
+  suggestion: string;
+}
+
+const UX_REVIEW_SYSTEM = `You are a senior UX reviewer for a CLI tool called "spawn" that provisions cloud VMs with AI agents. \
+A user ran "spawn <agent> <cloud>" and the full terminal session was captured.
+
+Your job is to find the WORST UX problems only — the kind that would make a real user confused, frustrated, \
+or lose trust. Most sessions will be fine. Return an empty array unless something is genuinely bad.
+
+Only flag if ALL of these are true:
+1. It would confuse or frustrate a non-technical user (not just a developer)
+2. You can quote a specific verbatim example from the transcript
+3. You have a concrete fix, not just "make it clearer"
+
+Strong signals (worth flagging):
+- Exact same message repeated 3+ times with no new information
+- Raw stack traces, JSON blobs, or internal paths shown to the user
+- An error with no hint of what to do next
+- A spinner or wait that lasts 60+ seconds with zero feedback
+
+Weak signals (do NOT flag):
+- Slightly long messages that are still readable
+- Technical terms that developers expect
+- Minor formatting preferences
+- Anything that "could be better" but isn't actively harmful
+
+Be conservative. A run with 0 findings is a GOOD outcome, not a failure.
+
+Return ONLY a JSON array of objects with these fields:
+  "issue"      — one-sentence description of the UX problem
+  "example"    — verbatim excerpt from the transcript that demonstrates it (≤120 chars)
+  "suggestion" — concrete fix in one sentence
+
+If nothing is genuinely bad, return: []
+No markdown, no explanation — just the JSON array.`;
+
+async function reviewTranscriptForUX(transcript: string): Promise<UxIssue[]> {
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (!orKey) return [];
+
+  process.stderr.write("[harness] Reviewing transcript for UX issues...\n");
+
+  try {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${orKey}`,
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-haiku-4-5",
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: UX_REVIEW_SYSTEM },
+          { role: "user", content: `Terminal session transcript:\n\n${transcript.slice(-8000)}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!resp.ok) {
+      process.stderr.write(`[harness] UX review skipped (HTTP ${resp.status})\n`);
+      return [];
+    }
+
+    const data = await resp.json() as Record<string, unknown>;
+    const choices = Array.isArray(data?.choices) ? data.choices : [];
+    const content = (choices[0] as Record<string, unknown>)?.message;
+    const text = typeof (content as Record<string, unknown>)?.content === "string"
+      ? ((content as Record<string, unknown>).content as string).trim()
+      : "";
+
+    if (!text) return [];
+
+    // Strip markdown code fences if present
+    const json = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const issues = parsed.filter(
+      (item): item is UxIssue =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as Record<string, unknown>).issue === "string" &&
+        typeof (item as Record<string, unknown>).example === "string" &&
+        typeof (item as Record<string, unknown>).suggestion === "string",
+    );
+
+    process.stderr.write(`[harness] UX review: ${issues.length} issue(s) found\n`);
+    return issues;
+  } catch (err) {
+    process.stderr.write(`[harness] UX review error: ${err}\n`);
+    return [];
+  }
 }
 
 // ─── Input parsing ──────────────────────────────────────────────────────
@@ -272,8 +373,11 @@ async function main(): Promise<void> {
 
     const stripped = stripAnsi(buffer);
 
-    // Check for success markers in output
-    if (/is ready|Starting agent|setup completed successfully/i.test(stripped)) {
+    // Check for success markers in output.
+    // "Starting agent..." = orchestrate.ts line 539 — provisioning+install done, SSH session starting.
+    // "setup completed successfully" = orchestrate.ts line 537 — same stage.
+    // Deliberately avoid "is ready" alone — too broad (matches "SSH is ready" ~30s in).
+    if (/Starting agent\.\.\.|setup completed successfully/i.test(stripped)) {
       success = true;
       break;
     }
@@ -339,13 +443,19 @@ async function main(): Promise<void> {
 
   const duration = Math.round((Date.now() - startTime) / 1000);
 
+  const cleanTranscript = redactSecrets(stripAnsi(transcript));
+
+  // Run UX review on successful provisions (skip on timeout/failure — transcript may be incomplete)
+  const uxIssues = success ? await reviewTranscriptForUX(cleanTranscript) : [];
+
   // Output result as JSON to stdout
   const result = {
     success,
     duration,
     turns: turnCount,
     failReason: failReason || undefined,
-    transcript: redactSecrets(stripAnsi(transcript)).slice(-5000), // Last 5KB
+    transcript: cleanTranscript.slice(-5000), // Last 5KB
+    uxIssues: uxIssues.length > 0 ? uxIssues : undefined,
   };
 
   process.stdout.write(JSON.stringify(result) + "\n");

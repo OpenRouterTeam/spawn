@@ -102,8 +102,11 @@ provision_agent() {
           continue
           ;;
       esac
-      # Validate value against a safe character whitelist BEFORE export
-      if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
+      # Validate value: only allow characters that appear in cloud resource names
+      # (server names, regions, sizes). This strict whitelist rejects all shell
+      # metacharacters ($, `, ', ", ;, |, &, etc.) preventing command injection
+      # even if the cloud_headless_env function is compromised.
+      if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9._/-]'; then
         log_err "Invalid characters in env value for ${_env_name}"
         continue
       fi
@@ -112,7 +115,12 @@ provision_agent() {
 $(cloud_headless_env "${app_name}" "${agent}")
 CLOUD_ENV
 
-    bun run "${cli_entry}" "${agent}" "${ACTIVE_CLOUD}" --headless --output json \
+    # Build CLI args — add --fast when E2E_FAST_MODE is enabled
+    _cli_args="${agent} ${ACTIVE_CLOUD} --headless --output json"
+    if [ "${E2E_FAST_MODE:-0}" = "1" ]; then
+      _cli_args="${_cli_args} --fast"
+    fi
+    bun run "${cli_entry}" ${_cli_args} \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
   ) &
@@ -142,9 +150,9 @@ CLOUD_ENV
     # prevent overly broad pkill -f patterns from killing unrelated processes.
     if [ -n "${app_name}" ] && printf '%s' "${app_name}" | grep -qE '^[A-Za-z0-9._-]+$'; then
       # Escape regex metacharacters in app_name before using in pkill -f
-      # pattern to prevent unintended process termination (#2409)
+      # pattern to prevent unintended process termination (#2409, #2911)
       local escaped_name
-      escaped_name=$(printf '%s' "${app_name}" | sed 's/[.[\*^$]/\\&/g')
+      escaped_name=$(printf '%s' "${app_name}" | sed 's/[].^$*+?(){}|[\\]/\\&/g')
       pkill -f "sprite exec.*${escaped_name}" 2>/dev/null || true
     fi
     sleep 1
@@ -292,16 +300,38 @@ CLOUD_ENV
     return 1
   fi
 
-  # SECURITY: env_b64 is piped via stdin — it is NOT interpolated into the
-  # remote command string. The command argument to cloud_exec is a fixed
-  # string with no variable substitution from user-controlled data.
-  # The \$ escapes below are for remote shell variables, not local ones.
-  if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
+  # SECURITY: Split into two cloud_exec calls to separate data from commands.
+  # Step 1 writes the validated base64 payload to a remote temp file.
+  # Step 2 decodes from that file and sets up .spawnrc + shell rc sourcing.
+  # This avoids embedding variable data in a shell command string that contains
+  # control flow (for loops, conditionals), eliminating command injection risk
+  # even if the base64 validation were ever bypassed.
+  # Piping via stdin is NOT used because Sprite's exec driver replaces stdin
+  # with the command pipe, causing piped data to be lost.
+
+  # Step 1: Create a temp file and write base64 data to it on the remote host.
+  # env_b64 is validated above to contain only [A-Za-z0-9+/=] (base64 alphabet),
+  # which cannot break out of single quotes or cause shell injection.
+  local b64_tmp
+  b64_tmp=$(cloud_exec "${app_name}" "mktemp -t spawnrc.b64.XXXXXX" 2>/dev/null | tr -d '[:space:]')
+  if [ -z "${b64_tmp}" ]; then
+    log_err "Failed to create remote temp file for .spawnrc payload"
+    return 1
+  fi
+  if ! cloud_exec "${app_name}" "printf '%s' '${env_b64}' > '${b64_tmp}'" >/dev/null 2>&1; then
+    log_err "Failed to write .spawnrc payload to remote temp file"
+    return 1
+  fi
+
+  # Step 2: Decode from the temp file and set up shell rc sourcing.
+  # The only interpolated variable is b64_tmp (a mktemp path, safe characters only).
+  if cloud_exec "${app_name}" "base64 -d < '${b64_tmp}' > ~/.spawnrc && chmod 600 ~/.spawnrc && rm -f '${b64_tmp}' && \
     for _rc in ~/.bashrc ~/.profile ~/.bash_profile; do \
     grep -q 'source ~/.spawnrc' \"\$_rc\" 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> \"\$_rc\"; done" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
   else
     log_err "Failed to create manual .spawnrc"
+    return 1
   fi
   return 0
 }

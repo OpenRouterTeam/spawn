@@ -183,51 +183,55 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
  * and sprite-cov test files. Centralised here to avoid repetition.
  */
 export function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
-  const mockProc = {
-    pid: 1234,
-    exitCode: Promise.resolve(exitCode),
-    exited: Promise.resolve(exitCode),
-    stdout: new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(stdout));
-        c.close();
-      },
-    }),
-    stderr: new ReadableStream({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(stderr));
-        c.close();
-      },
-    }),
-    kill: mock(() => {}),
-    ref: () => {},
-    unref: () => {},
-    stdin: new WritableStream(),
-    resourceUsage: () =>
-      ({
-        cpuTime: {
-          system: 0,
-          user: 0,
-          total: 0,
+  function createMockProc(): ReturnType<typeof Bun.spawn> {
+    return {
+      pid: 1234,
+      exitCode: Promise.resolve(exitCode),
+      exited: Promise.resolve(exitCode),
+      stdout: new ReadableStream({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(stdout));
+          c.close();
         },
-        maxRSS: 0,
-        sharedMemorySize: 0,
-        unsharedDataSize: 0,
-        unsharedStackSize: 0,
-        minorPageFaults: 0,
-        majorPageFaults: 0,
-        swapCount: 0,
-        inBlock: 0,
-        outBlock: 0,
-        ipcMessagesSent: 0,
-        ipcMessagesReceived: 0,
-        signalsReceived: 0,
-        voluntaryContextSwitches: 0,
-        involuntaryContextSwitches: 0,
-      }) satisfies ReturnType<ReturnType<typeof Bun.spawn>["resourceUsage"]>,
-  };
-  // biome-ignore lint: test mock
-  return spyOn(Bun, "spawn").mockReturnValue(mockProc as ReturnType<typeof Bun.spawn>);
+      }),
+      stderr: new ReadableStream({
+        start(c) {
+          c.enqueue(new TextEncoder().encode(stderr));
+          c.close();
+        },
+      }),
+      kill: mock(() => {}),
+      killed: false,
+      ref: () => {},
+      unref: () => {},
+      stdin: new WritableStream(),
+      signalCode: null,
+      resourceUsage: () =>
+        ({
+          cpuTime: {
+            system: 0,
+            user: 0,
+            total: 0,
+          },
+          maxRSS: 0,
+          sharedMemorySize: 0,
+          unsharedDataSize: 0,
+          unsharedStackSize: 0,
+          minorPageFaults: 0,
+          majorPageFaults: 0,
+          swapCount: 0,
+          inBlock: 0,
+          outBlock: 0,
+          ipcMessagesSent: 0,
+          ipcMessagesReceived: 0,
+          signalsReceived: 0,
+          voluntaryContextSwitches: 0,
+          involuntaryContextSwitches: 0,
+        }) satisfies ReturnType<ReturnType<typeof Bun.spawn>["resourceUsage"]>,
+    };
+  }
+  // Return a fresh mock proc per call so ReadableStreams are not reused
+  return spyOn(Bun, "spawn").mockImplementation(() => createMockProc());
 }
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────

@@ -160,7 +160,7 @@ export async function tryTarballInstall(
 
 // ─── Parallel tarball: local download + SCP upload ──────────────────────────
 
-export interface LocalTarball {
+interface LocalTarball {
   localPath: string;
   cleanup: () => void;
 }

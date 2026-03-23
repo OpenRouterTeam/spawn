@@ -10,14 +10,6 @@ on:
         description: "Single agent to build (leave empty for all)"
         required: false
         type: string
-      cloud:
-        description: "Cloud to build for (leave empty for all)"
-        required: false
-        type: choice
-        options:
-          - ""
-          - digitalocean
-          - hetzner
 
 permissions:
   contents: read
@@ -33,30 +25,22 @@ jobs:
       - id: set
         run: |
           SINGLE_AGENT="${SINGLE_AGENT_INPUT}"
-          SINGLE_CLOUD="${SINGLE_CLOUD_INPUT}"
 
           if [ -n "$SINGLE_AGENT" ]; then
-            AGENTS="[\"${SINGLE_AGENT}\"]"
+            AGENTS=$(jq -nc --arg agent "$SINGLE_AGENT" '[$agent]')
           else
             AGENTS=$(jq -c 'keys' packer/agents.json)
           fi
 
-          if [ -n "$SINGLE_CLOUD" ]; then
-            CLOUDS="[\"${SINGLE_CLOUD}\"]"
-          else
-            CLOUDS='["digitalocean","hetzner"]'
-          fi
-
           # Build a flat include array: [{agent, cloud}, ...]
-          INCLUDE=$(jq -nc --argjson agents "$AGENTS" --argjson clouds "$CLOUDS" \
-            '[$agents[] as $a | $clouds[] as $c | {agent: $a, cloud: $c}]')
+          INCLUDE=$(jq -nc --argjson agents "$AGENTS" \
+            '[$agents[] as $a | {agent: $a, cloud: "digitalocean"}]')
           echo "include=${INCLUDE}" >> "$GITHUB_OUTPUT"
         env:
           SINGLE_AGENT_INPUT: ${{ inputs.agent }}
-          SINGLE_CLOUD_INPUT: ${{ inputs.cloud }}
 
   build:
-    name: "${{ matrix.cloud }}/${{ matrix.agent }}"
+    name: "digitalocean/${{ matrix.agent }}"
     needs: matrix
     runs-on: ubuntu-latest
     strategy:
@@ -82,10 +66,9 @@ jobs:
           version: latest
 
       - name: Init Packer plugins
-        run: packer init packer/${{ matrix.cloud }}.pkr.hcl
+        run: packer init packer/digitalocean.pkr.hcl
 
-      - name: Generate variables file (DigitalOcean)
-        if: matrix.cloud == 'digitalocean'
+      - name: Generate variables file
         run: |
           jq -n \
             --arg token "$DO_API_TOKEN" \
@@ -104,31 +87,34 @@ jobs:
           TIER: ${{ steps.config.outputs.tier }}
           INSTALL_COMMANDS: ${{ steps.config.outputs.install }}
 
-      - name: Generate variables file (Hetzner)
-        if: matrix.cloud == 'hetzner'
-        run: |
-          jq -n \
-            --arg token "$HCLOUD_TOKEN" \
-            --arg agent "$AGENT_NAME" \
-            --arg tier "$TIER" \
-            --argjson install "$INSTALL_COMMANDS" \
-            '{
-              hcloud_token: $token,
-              agent_name: $agent,
-              cloud_init_tier: $tier,
-              install_commands: $install
-            }' > packer/auto.pkrvars.json
-        env:
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-          AGENT_NAME: ${{ matrix.agent }}
-          TIER: ${{ steps.config.outputs.tier }}
-          INSTALL_COMMANDS: ${{ steps.config.outputs.install }}
-
       - name: Build snapshot
-        run: packer build -var-file=packer/auto.pkrvars.json packer/${{ matrix.cloud }}.pkr.hcl
+        run: packer build -var-file=packer/auto.pkrvars.json packer/digitalocean.pkr.hcl
 
-      - name: Cleanup old DO snapshots
-        if: success() && matrix.cloud == 'digitalocean'
+      # When a workflow is cancelled, Packer is killed before it can destroy
+      # the temporary builder droplet — leaving orphaned instances.
+      - name: Destroy orphaned builder droplets
+        if: cancelled()
+        run: |
+          # Filter by spawn-packer tag to avoid destroying builder droplets from other workflows
+          DROPLET_IDS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            "https://api.digitalocean.com/v2/droplets?per_page=200&tag_name=spawn-packer" \
+            | jq -r '.droplets[].id')
+
+          if [ -z "$DROPLET_IDS" ]; then
+            echo "No orphaned packer builder droplets found"
+            exit 0
+          fi
+
+          for ID in $DROPLET_IDS; do
+            echo "Destroying orphaned builder droplet: ${ID}"
+            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+              "https://api.digitalocean.com/v2/droplets/${ID}" || true
+          done
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+
+      - name: Cleanup old snapshots
+        if: success()
         run: |
           PREFIX="spawn-${AGENT_NAME}-"
           SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
@@ -145,27 +131,8 @@ jobs:
           DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
           AGENT_NAME: ${{ matrix.agent }}
 
-      - name: Cleanup old Hetzner snapshots
-        if: success() && matrix.cloud == 'hetzner'
-        run: |
-          PREFIX="spawn-${AGENT_NAME}-"
-          # Hetzner Packer sets snapshot_name → description field in the API
-          SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-            "https://api.hetzner.cloud/v1/images?type=snapshot&per_page=100" \
-            | jq -r --arg prefix "$PREFIX" \
-              '[.images[] | select(.description | startswith($prefix))] | sort_by(.created) | reverse | .[1:] | .[].id')
-
-          for ID in $SNAPSHOTS; do
-            echo "Deleting old snapshot: ${ID}"
-            curl -s -X DELETE -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
-              "https://api.hetzner.cloud/v1/images/${ID}" || true
-          done
-        env:
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-          AGENT_NAME: ${{ matrix.agent }}
-
       - name: Submit to DO Marketplace
-        if: success() && matrix.cloud == 'digitalocean'
+        if: success()
         run: |
           # Skip if no marketplace app IDs configured
           if [ -z "$MARKETPLACE_APP_IDS" ]; then
