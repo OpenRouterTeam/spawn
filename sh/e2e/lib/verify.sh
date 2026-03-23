@@ -121,6 +121,10 @@ input_test_claude() {
     _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
+    echo \"[debug] PATH=\$PATH\"; \
+    echo \"[debug] which claude: \$(which claude 2>/dev/null || echo NOT_FOUND)\"; \
+    echo \"[debug] HOME=\$HOME\"; \
+    ls \$HOME/.claude/local/bin/ 2>/dev/null || echo \"[debug] no .claude/local/bin\"; \
     timeout \"\$_TIMEOUT\" claude -p --dangerously-skip-permissions --no-session-persistence \"\$PROMPT\"" 2>&1) || true
 
   if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
