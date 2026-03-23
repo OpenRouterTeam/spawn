@@ -704,6 +704,9 @@ export async function installSpriteKeepAlive(): Promise<void> {
  * /v1/tasks API for the duration of the session.
  */
 export async function interactiveSession(cmd: string, spawnFn?: (args: string[]) => number): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
 
   // Encode the session command to handle multi-line restart loop scripts safely
