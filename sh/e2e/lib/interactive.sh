@@ -86,9 +86,6 @@ interactive_provision() {
 
     if [ "${harness_success}" = "true" ]; then
       log_ok "Interactive provision succeeded (${harness_duration}s, ${harness_turns} AI turns)"
-      # Always save transcript for debugging (last 5KB of terminal output captured by harness)
-      local persist_json="/tmp/spawn-interactive-harness-last.json"
-      cp "${result_file}" "${persist_json}" 2>/dev/null || true
 
       # Now verify the instance exists via cloud driver so teardown works
       if cloud_provision_verify "${app_name}" "${log_dir}"; then
