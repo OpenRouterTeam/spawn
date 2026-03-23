@@ -13,9 +13,8 @@ import * as net from "node:net";
 // Suppress stderr during tests — restored in afterAll to avoid contamination
 let stderrSpy: ReturnType<typeof spyOn>;
 
-const { spawnInteractive, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } = await import(
-  "../shared/ssh.js"
-);
+const { spawnInteractive, startSshTunnel, waitForSsh, validateRemotePath, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } =
+  await import("../shared/ssh.js");
 
 /** Create a fake socket (EventEmitter) that satisfies net.Socket interface for testing. */
 function createFakeSocket(): net.Socket {
@@ -271,6 +270,40 @@ describe("waitForSsh", () => {
     expect(bunSpawnSpy).toHaveBeenCalled();
     bunSpawnSpy.mockRestore();
     connectSpy.mockRestore();
+  });
+});
+
+// ── validateRemotePath ───────────────────────────────────────────────
+
+describe("validateRemotePath", () => {
+  it("accepts valid Linux paths with forward slashes", () => {
+    expect(validateRemotePath("/home/user/config.json")).toBe("/home/user/config.json");
+    expect(validateRemotePath("/root/.spawn-tarball")).toBe("/root/.spawn-tarball");
+    expect(validateRemotePath("$HOME/.config/spawn")).toBe("$HOME/.config/spawn");
+  });
+
+  it("normalizes using POSIX rules (no backslashes)", () => {
+    // normalize should collapse double slashes but never introduce backslashes
+    const result = validateRemotePath("/home//user///file.txt");
+    expect(result).toBe("/home/user/file.txt");
+    expect(result).not.toContain("\\");
+  });
+
+  it("rejects path traversal", () => {
+    expect(() => validateRemotePath("/home/../etc/passwd")).toThrow("path traversal");
+    expect(() => validateRemotePath("../etc/shadow")).toThrow("path traversal");
+  });
+
+  it("rejects empty path", () => {
+    expect(() => validateRemotePath("")).toThrow("must not be empty");
+  });
+
+  it("rejects argument injection", () => {
+    expect(() => validateRemotePath("/-evil")).toThrow('must not start with "-"');
+  });
+
+  it("rejects unsafe characters", () => {
+    expect(() => validateRemotePath("/home/user;rm -rf")).toThrow("unsafe characters");
   });
 });
 
