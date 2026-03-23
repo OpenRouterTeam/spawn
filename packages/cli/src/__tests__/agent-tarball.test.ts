@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 
 // Suppress stderr (logStep/logWarn) with a spy in beforeEach.
 
-const { tryTarballInstall } = await import("../shared/agent-tarball");
+const { tryTarballInstall, uploadAndExtractTarball } = await import("../shared/agent-tarball");
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -268,6 +268,23 @@ describe("tryTarballInstall", () => {
       }
     });
 
+    it("uses sudo for cp and chown in mirror commands", () => {
+      // sudo is needed because non-root users can't read /root/ or chown root-owned files
+      const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+      // cp from /root/ needs sudo
+      expect(mirrorCmd).toContain(`${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`);
+      // cp marker file needs sudo
+      expect(mirrorCmd).toContain(`${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`);
+      // chown needs sudo
+      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`);
+      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`);
+    });
+
+    it("does not suppress errors with 2>/dev/null || true", () => {
+      // Errors must propagate so failures are visible, not silently swallowed
+      expect(mirrorCmd).not.toContain("2>/dev/null || true");
+    });
+
     it("returns true even when mirror step fails (non-fatal)", async () => {
       const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
       const runner = createMockRunner();
@@ -277,5 +294,41 @@ describe("tryTarballInstall", () => {
 
       expect(result).toBe(true);
     });
+  });
+});
+
+describe("uploadAndExtractTarball", () => {
+  let stderrSpy: ReturnType<typeof spyOn>;
+
+  beforeEach(() => {
+    stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  it("mirror step uses sudo for cp and chown", async () => {
+    const runner = createMockRunner();
+
+    await uploadAndExtractTarball(runner, "/tmp/fake.tar.gz");
+
+    // 2 calls: extract, then mirror
+    expect(runner.runServer).toHaveBeenCalledTimes(2);
+    const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+    const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+    expect(mirrorCmd).toContain(`${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`);
+    expect(mirrorCmd).toContain(`${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`);
+    expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`);
+    expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`);
+  });
+
+  it("mirror step does not suppress errors", async () => {
+    const runner = createMockRunner();
+
+    await uploadAndExtractTarball(runner, "/tmp/fake.tar.gz");
+
+    const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
+    expect(mirrorCmd).not.toContain("2>/dev/null || true");
   });
 });
