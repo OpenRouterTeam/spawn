@@ -250,9 +250,13 @@ export async function ensureSshKey(): Promise<void> {
 
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
+    if (!fingerprint) {
+      logWarn(`Could not determine fingerprint for SSH key '${key.name}'`);
+      continue;
+    }
     const pubKey = readFileSync(key.pubPath, "utf-8").trim();
 
-    const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
+    const alreadyRegistered = sshKeys.some((k) => k.fingerprint === fingerprint);
 
     if (alreadyRegistered) {
       logInfo(`SSH key '${key.name}' already registered with Hetzner`);
