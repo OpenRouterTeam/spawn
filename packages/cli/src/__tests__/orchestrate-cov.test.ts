@@ -89,6 +89,7 @@ beforeEach(() => {
   delete process.env.SPAWN_ENABLED_STEPS;
   delete process.env.SPAWN_BETA;
   delete process.env.MODEL_ID;
+  delete process.env.SPAWN_HEADLESS;
   stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
   exitSpy = spyOn(process, "exit").mockImplementation((code) => {
     throw new Error(`__EXIT_${isNumber(code) ? code : 0}__`);

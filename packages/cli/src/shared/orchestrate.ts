@@ -531,17 +531,29 @@ async function postInstall(
     logInfo(`Tip: ${agent.preLaunchMsg}`);
   }
 
-  // Launch interactive session
+  // Launch agent
   logInfo(`${agent.name} is ready`);
   process.stderr.write("\n");
   logInfo(`${cloud.cloudLabel} setup completed successfully!`);
   process.stderr.write("\n");
-  logStep("Starting agent...");
-
-  prepareStdinForHandoff();
 
   const launchCmd = agent.launchCmd();
   saveLaunchCmd(launchCmd, spawnId);
+
+  // In headless mode, provisioning is done — skip the interactive session.
+  // The VM is healthy and the agent is installed; callers can SSH in or use `spawn connect`.
+  const isHeadless = process.env.SPAWN_HEADLESS === "1";
+  if (isHeadless) {
+    logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    if (tunnelHandle) {
+      tunnelHandle.stop();
+    }
+    process.exit(0);
+  }
+
+  logStep("Starting agent...");
+
+  prepareStdinForHandoff();
 
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
 
