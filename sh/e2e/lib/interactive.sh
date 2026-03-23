@@ -98,6 +98,9 @@ interactive_provision() {
           printf '    %s\n' "${line}"
         done
       fi
+      # Even on failure, try to write the .meta file so teardown can clean up
+      # any VM that was partially created (e.g. on timeout mid-provision).
+      cloud_provision_verify "${app_name}" "${log_dir}" 2>/dev/null || true
       return 1
     fi
   else
