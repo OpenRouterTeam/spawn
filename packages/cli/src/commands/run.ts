@@ -764,6 +764,7 @@ interface SpawnResult {
   ssh_user?: string;
   error_message?: string;
   error_code?: string;
+  cli_updated?: boolean;
 }
 
 function headlessOutput(result: SpawnResult, outputFormat?: string): void {
@@ -1147,6 +1148,11 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
                 server_name: record.connection.server_name,
               }
             : {}),
+        }
+      : {}),
+    ...(process.env.SPAWN_CLI_UPDATED === "1"
+      ? {
+          cli_updated: true,
         }
       : {}),
   };

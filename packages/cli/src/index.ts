@@ -799,7 +799,12 @@ async function main(): Promise<void> {
 
   const args = expandEqualsFlags(rawArgs);
 
-  await checkForUpdates();
+  // Pre-scan for --output json before checkForUpdates() so install script
+  // stdout can be redirected to stderr, preventing JSON output pollution.
+  const preOutputIdx = args.indexOf("--output");
+  const isJsonOutput = preOutputIdx !== -1 && args[preOutputIdx + 1] === "json";
+
+  await checkForUpdates(isJsonOutput);
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
 
