@@ -328,6 +328,7 @@ CLOUD_ENV
     log_ok "Manual .spawnrc created successfully"
   else
     log_err "Failed to create manual .spawnrc"
+    return 1
   fi
   return 0
 }
