@@ -144,19 +144,27 @@ interface UxIssue {
 const UX_REVIEW_SYSTEM = `You are a UX reviewer for a CLI tool called "spawn" that provisions cloud VMs with AI agents. \
 A user ran "spawn <agent> <cloud>" and the full terminal session was captured.
 
-Review the transcript and identify UX problems:
-- Confusing or misleading messages (e.g. cryptic errors, jargon, wrong expectations)
-- Unnecessary or noisy output (e.g. same information printed twice, debug lines leaking to users)
-- Missing context (e.g. a spinner that doesn't say what it's doing, a progress counter with no explanation)
-- Unhelpful error messages that don't tell the user what to do next
-- Anything that would make a non-expert feel lost or uncertain
+Be selective. Only flag problems that are CLEARLY bad for real users — not minor style nits.
+Flag these (only when obvious):
+- Repeated identical messages (exact same line printed 3+ times in a row)
+- Debug/internal output leaking to users (stack traces, raw JSON, internal paths)
+- Completely cryptic errors with no actionable next step
+- Progress indicators that go silent for 30+ seconds with no status update
+
+Do NOT flag:
+- Minor wording preferences
+- Things that are slightly verbose but still clear
+- Anything a developer would consider normal CLI output
+- Formatting that's clean enough for a non-expert
+
+Only return issues you are CONFIDENT about. If unsure, omit it.
 
 Return ONLY a JSON array of objects with these fields:
   "issue"      — one-sentence description of the UX problem
   "example"    — verbatim excerpt from the transcript that demonstrates it (≤120 chars)
   "suggestion" — concrete improvement in one sentence
 
-If the experience looks clean, return an empty array: []
+If the experience looks clean or borderline, return an empty array: []
 No markdown, no explanation — just the JSON array.`;
 
 async function reviewTranscriptForUX(transcript: string): Promise<UxIssue[]> {
@@ -212,6 +220,13 @@ async function reviewTranscriptForUX(transcript: string): Promise<UxIssue[]> {
     );
 
     process.stderr.write(`[harness] UX review: ${issues.length} issue(s) found\n`);
+
+    // Require at least 3 clear issues before surfacing — avoids noisy one-off nits
+    if (issues.length < 3) {
+      process.stderr.write(`[harness] UX review: below threshold (need 3+), skipping\n`);
+      return [];
+    }
+
     return issues;
   } catch (err) {
     process.stderr.write(`[harness] UX review error: ${err}\n`);
@@ -430,8 +445,13 @@ async function main(): Promise<void> {
 
   const cleanTranscript = redactSecrets(stripAnsi(transcript));
 
-  // Run UX review on successful provisions (skip on timeout/failure — transcript may be incomplete)
-  const uxIssues = success ? await reviewTranscriptForUX(cleanTranscript) : [];
+  // Run UX review on successful provisions (skip on timeout/failure — transcript may be incomplete).
+  // Also randomly skip ~67% of the time so issues are filed occasionally, not every run.
+  const runUxReview = success && Math.random() < 0.33;
+  if (success && !runUxReview) {
+    process.stderr.write("[harness] UX review: skipped this run (random throttle)\n");
+  }
+  const uxIssues = runUxReview ? await reviewTranscriptForUX(cleanTranscript) : [];
 
   // Output result as JSON to stdout
   const result = {
