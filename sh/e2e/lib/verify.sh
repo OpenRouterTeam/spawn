@@ -54,10 +54,15 @@ _validate_base64() {
 _stage_prompt_remotely() {
   local app="$1"
   local encoded_prompt="$2"
-  # Pipe the encoded prompt via stdin to cloud_exec, which writes it to a
-  # temp file on the remote side. The prompt data never appears in the
-  # command string, so there is zero injection surface.
-  printf '%s' "${encoded_prompt}" | cloud_exec "${app}" "cat > /tmp/.e2e-prompt"
+  # Write the base64-encoded prompt to a remote temp file.
+  # The encoded_prompt is validated to contain only [A-Za-z0-9+/=] characters
+  # (by _validate_base64), so embedding it in a printf command is safe — it
+  # cannot break out of single quotes or inject shell metacharacters.
+  # We do NOT use stdin piping here: _hetzner_exec runs commands via
+  # "printf ... | base64 -d | bash", which connects bash's stdin to the
+  # base64 pipe rather than to SSH's outer stdin, so piped data never reaches
+  # the subcommand.
+  cloud_exec "${app}" "printf '%s' '${encoded_prompt}' > /tmp/.e2e-prompt"
 }
 
 # ---------------------------------------------------------------------------
