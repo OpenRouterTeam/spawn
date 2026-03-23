@@ -522,6 +522,41 @@ function isLocationUnavailableError(errMsg: string): boolean {
   return /resource_unavailable|location disabled|location.*unavailable/i.test(errMsg);
 }
 
+/** Check if a Hetzner API error indicates a resource limit was exceeded (e.g. primary_ip_limit). */
+export function isResourceLimitError(errMsg: string): boolean {
+  return /resource_limit_exceeded|primary_ip_limit/i.test(errMsg);
+}
+
+/**
+ * Clean up orphaned Hetzner Primary IPs (not attached to any server).
+ * These accumulate from failed/leaked server provisioning runs and count toward
+ * the account's primary_ip_limit quota. Returns the number of IPs deleted.
+ */
+export async function cleanupOrphanedPrimaryIps(): Promise<number> {
+  const allIps = await hetznerGetAll("/primary_ips", "primary_ips");
+  let deleted = 0;
+  for (const ip of allIps) {
+    // assignee_id is null/0 when the IP is not attached to a server
+    const assigneeId = isNumber(ip.assignee_id) ? ip.assignee_id : 0;
+    if (assigneeId !== 0) {
+      continue;
+    }
+    const ipId = isNumber(ip.id) ? ip.id : 0;
+    if (ipId === 0) {
+      continue;
+    }
+    const ipAddr = isString(ip.ip) ? ip.ip : `ID:${ipId}`;
+    const r = await asyncTryCatch(() => hetznerApi("DELETE", `/primary_ips/${ipId}`));
+    if (r.ok) {
+      logInfo(`Deleted orphaned Primary IP ${ipAddr}`);
+      deleted = deleted + 1;
+    } else {
+      logWarn(`Could not delete Primary IP ${ipAddr}: ${getErrorMessage(r.error)}`);
+    }
+  }
+  return deleted;
+}
+
 export async function createServer(
   name: string,
   serverType?: string,
@@ -549,6 +584,8 @@ export async function createServer(
   // Track locations that failed so the user isn't offered them again
   const failedLocations: string[] = [];
   const maxLocationRetries = 3;
+  // Track whether we've already attempted a resource-limit cleanup+retry
+  let resourceLimitRetried = false;
 
   for (let attempt = 0; attempt <= maxLocationRetries; attempt++) {
     logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc}, image: ${imageLabel})...`);
@@ -580,6 +617,25 @@ export async function createServer(
         continue;
       }
 
+      // Resource limit (e.g. primary_ip_limit) — try cleaning up orphaned IPs, then retry once
+      if (isResourceLimitError(errMsg) && !resourceLimitRetried) {
+        resourceLimitRetried = true;
+        logWarn("Hetzner resource limit exceeded (primary_ip_limit). Cleaning up orphaned Primary IPs...");
+        const cleaned = await asyncTryCatch(() => cleanupOrphanedPrimaryIps());
+        const count = cleaned.ok ? cleaned.data : 0;
+        if (count > 0) {
+          logInfo(`Cleaned up ${count} orphaned Primary IP(s). Retrying server creation...`);
+          continue;
+        }
+        logError("No orphaned Primary IPs found to clean up.");
+        logWarn("Your Hetzner account has reached its Primary IP limit.");
+        logWarn("To fix this:");
+        logWarn("  1. Delete unused servers in the Hetzner Console");
+        logWarn("  2. Go to Networking > Primary IPs and delete unattached IPs");
+        logWarn("  3. Or request a quota increase at: https://console.hetzner.cloud/limits");
+        throw createResult.error;
+      }
+
       throw createResult.error;
     }
 
@@ -605,6 +661,25 @@ export async function createServer(
         }
         loc = newLoc;
         continue;
+      }
+
+      // Resource limit (e.g. primary_ip_limit) — try cleaning up orphaned IPs, then retry once
+      if ((isResourceLimitError(errMsg) || isResourceLimitError(errCode)) && !resourceLimitRetried) {
+        resourceLimitRetried = true;
+        logWarn("Hetzner resource limit exceeded (primary_ip_limit). Cleaning up orphaned Primary IPs...");
+        const cleaned = await asyncTryCatch(() => cleanupOrphanedPrimaryIps());
+        const count = cleaned.ok ? cleaned.data : 0;
+        if (count > 0) {
+          logInfo(`Cleaned up ${count} orphaned Primary IP(s). Retrying server creation...`);
+          continue;
+        }
+        logError("No orphaned Primary IPs found to clean up.");
+        logWarn("Your Hetzner account has reached its Primary IP limit.");
+        logWarn("To fix this:");
+        logWarn("  1. Delete unused servers in the Hetzner Console");
+        logWarn("  2. Go to Networking > Primary IPs and delete unattached IPs");
+        logWarn("  3. Or request a quota increase at: https://console.hetzner.cloud/limits");
+        throw new Error(`Server creation failed: ${errMsg}`);
       }
 
       logError(`Failed to create Hetzner server: ${errMsg}`);
