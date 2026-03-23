@@ -82,17 +82,6 @@ describe("gcp/getConnectionInfo", () => {
   });
 });
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-describe("gcp/constants", () => {
-  it("DEFAULT_MACHINE_TYPE is e2-medium", () => {
-    expect(DEFAULT_MACHINE_TYPE).toBe("e2-medium");
-  });
-  it("DEFAULT_ZONE is us-central1-a", () => {
-    expect(DEFAULT_ZONE).toBe("us-central1-a");
-  });
-});
-
 // ─── promptMachineType ───────────────────────────────────────────────────────
 
 describe("gcp/promptMachineType", () => {

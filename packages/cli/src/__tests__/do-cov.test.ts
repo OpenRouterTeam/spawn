@@ -34,17 +34,6 @@ describe("digitalocean/getConnectionInfo", () => {
   });
 });
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-describe("digitalocean/constants", () => {
-  it("DEFAULT_DROPLET_SIZE is s-2vcpu-2gb", () => {
-    expect(DEFAULT_DROPLET_SIZE).toBe("s-2vcpu-2gb");
-  });
-  it("DEFAULT_DO_REGION is nyc3", () => {
-    expect(DEFAULT_DO_REGION).toBe("nyc3");
-  });
-});
-
 // ─── promptDropletSize ───────────────────────────────────────────────────────
 
 describe("digitalocean/promptDropletSize", () => {

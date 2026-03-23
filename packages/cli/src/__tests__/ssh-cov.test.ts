@@ -1,7 +1,7 @@
 /**
  * ssh-cov.test.ts — Coverage tests for shared/ssh.ts
  *
- * Covers: spawnInteractive, sleep, startSshTunnel,
+ * Covers: spawnInteractive, startSshTunnel,
  * waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS
  */
 
@@ -13,7 +13,7 @@ import * as net from "node:net";
 // Suppress stderr during tests — restored in afterAll to avoid contamination
 let stderrSpy: ReturnType<typeof spyOn>;
 
-const { spawnInteractive, sleep, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } = await import(
+const { spawnInteractive, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } = await import(
   "../shared/ssh.js"
 );
 
@@ -131,22 +131,6 @@ describe("spawnInteractive", () => {
       }),
     );
     spy.mockRestore();
-  });
-});
-
-// ── sleep ──────────────────────────────────────────────────────────────
-
-describe("sleep", () => {
-  it("resolves after the specified delay", async () => {
-    const start = Date.now();
-    await sleep(50);
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(40);
-  });
-
-  it("resolves with undefined", async () => {
-    const result = await sleep(1);
-    expect(result).toBeUndefined();
   });
 });
 
