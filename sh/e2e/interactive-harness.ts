@@ -14,7 +14,7 @@
 // Outputs JSON to stdout: { success: boolean, duration: number, transcript: string }
 
 const IDLE_MS = 2000; // Wait 2s of silence before asking AI
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute overall timeout
+const SESSION_TIMEOUT_MS = 20 * 60 * 1000; // 20 minute overall timeout (provision takes 3-4 min + onboarding)
 const AI_MODEL = "claude-haiku-4-5-20251001";
 
 // ─── Args & validation ──────────────────────────────────────────────────
