@@ -183,7 +183,7 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
  * and sprite-cov test files. Centralised here to avoid repetition.
  */
 export function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
-  function createMockProc() {
+  function createMockProc(): ReturnType<typeof Bun.spawn> {
     return {
       pid: 1234,
       exitCode: Promise.resolve(exitCode),
@@ -201,9 +201,11 @@ export function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
         },
       }),
       kill: mock(() => {}),
+      killed: false,
       ref: () => {},
       unref: () => {},
       stdin: new WritableStream(),
+      signalCode: null,
       resourceUsage: () =>
         ({
           cpuTime: {
@@ -229,8 +231,7 @@ export function mockBunSpawn(exitCode = 0, stdout = "", stderr = "") {
     };
   }
   // Return a fresh mock proc per call so ReadableStreams are not reused
-  // biome-ignore lint: test mock
-  return spyOn(Bun, "spawn").mockImplementation(() => createMockProc() as ReturnType<typeof Bun.spawn>);
+  return spyOn(Bun, "spawn").mockImplementation(() => createMockProc());
 }
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────

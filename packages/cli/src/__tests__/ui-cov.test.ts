@@ -159,26 +159,30 @@ describe("selectFromList", () => {
 
 describe("openBrowser", () => {
   it("shows URL in stderr output on linux", () => {
-    // biome-ignore lint: test mock — spawnSync return type needs assertion
     const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
       exitCode: 1,
       stdout: Buffer.from(""),
       stderr: Buffer.from(""),
       success: false,
-    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+      signalCode: null,
+      resourceUsage: undefined,
+      pid: 0,
+    } satisfies ReturnType<typeof Bun.spawnSync>);
     openBrowser("https://example.com");
     spawnSyncSpy.mockRestore();
     expect(stderrOutput.join("")).toContain("https://example.com");
   });
 
   it("shows different message when browser opens successfully", () => {
-    // biome-ignore lint: test mock — spawnSync return type needs assertion
     const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
       exitCode: 0,
       stdout: Buffer.from(""),
       stderr: Buffer.from(""),
       success: true,
-    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+      signalCode: null,
+      resourceUsage: undefined,
+      pid: 0,
+    } satisfies ReturnType<typeof Bun.spawnSync>);
     openBrowser("https://example.com");
     spawnSyncSpy.mockRestore();
     expect(stderrOutput.join("")).toContain("https://example.com");
