@@ -75,7 +75,13 @@ _stage_prompt_remotely() {
 _stage_timeout_remotely() {
   local app="$1"
   local timeout_val="$2"
-  printf '%s' "${timeout_val}" | cloud_exec "${app}" "cat > /tmp/.e2e-timeout"
+  # timeout_val is validated by _validate_timeout to contain only [0-9] digits,
+  # so embedding it directly in the command string is safe — no injection risk.
+  # We do NOT use stdin piping here: _hetzner_exec runs commands via
+  # "printf ... | base64 -d | bash", which connects bash's stdin to the
+  # base64 pipe rather than to SSH's outer stdin, so piped data never reaches
+  # the subcommand.
+  cloud_exec "${app}" "printf '%s' '${timeout_val}' > /tmp/.e2e-timeout"
 }
 
 # ---------------------------------------------------------------------------
