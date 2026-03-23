@@ -306,17 +306,23 @@ CLOUD_ENV
   # Piping via stdin is NOT used because Sprite's exec driver replaces stdin
   # with the command pipe, causing piped data to be lost.
 
-  # Step 1: Write base64 data to a remote temp file.
+  # Step 1: Create a temp file and write base64 data to it on the remote host.
   # env_b64 is validated above to contain only [A-Za-z0-9+/=] (base64 alphabet),
   # which cannot break out of single quotes or cause shell injection.
-  if ! cloud_exec "${app_name}" "printf '%s' '${env_b64}' > /tmp/.spawnrc.b64" >/dev/null 2>&1; then
+  local b64_tmp
+  b64_tmp=$(cloud_exec "${app_name}" "mktemp -t spawnrc.b64.XXXXXX" 2>/dev/null | tr -d '[:space:]')
+  if [ -z "${b64_tmp}" ]; then
+    log_err "Failed to create remote temp file for .spawnrc payload"
+    return 1
+  fi
+  if ! cloud_exec "${app_name}" "printf '%s' '${env_b64}' > '${b64_tmp}'" >/dev/null 2>&1; then
     log_err "Failed to write .spawnrc payload to remote temp file"
-    return 0
+    return 1
   fi
 
   # Step 2: Decode from the temp file and set up shell rc sourcing.
-  # This command contains NO interpolated variables — it is a static string.
-  if cloud_exec "${app_name}" "base64 -d < /tmp/.spawnrc.b64 > ~/.spawnrc && chmod 600 ~/.spawnrc && rm -f /tmp/.spawnrc.b64 && \
+  # The only interpolated variable is b64_tmp (a mktemp path, safe characters only).
+  if cloud_exec "${app_name}" "base64 -d < '${b64_tmp}' > ~/.spawnrc && chmod 600 ~/.spawnrc && rm -f '${b64_tmp}' && \
     for _rc in ~/.bashrc ~/.profile ~/.bash_profile; do \
     grep -q 'source ~/.spawnrc' \"\$_rc\" 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> \"\$_rc\"; done" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
