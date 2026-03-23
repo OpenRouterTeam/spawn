@@ -85,17 +85,19 @@ describe("logging functions", () => {
     expect(stderrOutput.join("")).toContain("test step");
   });
 
-  it("logStepInline writes without newline", () => {
+  it("logStepInline writes message (newline-terminated in non-TTY)", () => {
     logStepInline("inline msg");
     const output = stderrOutput.join("");
     expect(output).toContain("inline msg");
-    expect(output).not.toEndWith("\n");
+    // In non-TTY (test environment), output ends with newline instead of \r overwrite
+    expect(output).toEndWith("\n");
   });
 
-  it("logStepDone clears the line", () => {
+  it("logStepDone is no-op in non-TTY", () => {
     logStepDone();
     const output = stderrOutput.join("");
-    expect(output).toContain("\r");
+    // In non-TTY (test environment), logStepDone writes nothing
+    expect(output).toBe("");
   });
 
   it("logDebug only outputs when SPAWN_DEBUG=1", () => {

@@ -532,9 +532,7 @@ async function postInstall(
   }
 
   // Launch agent
-  logInfo(`${agent.name} is ready`);
-  process.stderr.write("\n");
-  logInfo(`${cloud.cloudLabel} setup completed successfully!`);
+  logInfo(`Agent setup complete — ${agent.name} is ready on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
 
   const launchCmd = agent.launchCmd();
