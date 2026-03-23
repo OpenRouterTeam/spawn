@@ -272,8 +272,11 @@ async function main(): Promise<void> {
 
     const stripped = stripAnsi(buffer);
 
-    // Check for success markers in output
-    if (/is ready|Starting agent|setup completed successfully/i.test(stripped)) {
+    // Check for success markers in output.
+    // "Starting agent..." = orchestrate.ts line 539 — provisioning+install done, SSH session starting.
+    // "setup completed successfully" = orchestrate.ts line 537 — same stage.
+    // Deliberately avoid "is ready" alone — too broad (matches "SSH is ready" ~30s in).
+    if (/Starting agent\.\.\.|setup completed successfully/i.test(stripped)) {
       success = true;
       break;
     }
