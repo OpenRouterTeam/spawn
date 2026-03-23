@@ -53,6 +53,12 @@ interactive_provision() {
   # loaded by the cloud driver. We just need to set spawn-specific vars.
   local spawn_env=""
   spawn_env="${spawn_env} SPAWN_NAME_KEBAB=${app_name}"
+  # SPAWN_NAME bypasses the "Name your spawn" text prompt in cmdRun
+  # (promptSpawnName() only checks SPAWN_NAME, not SPAWN_NAME_KEBAB)
+  spawn_env="${spawn_env} SPAWN_NAME=${app_name}"
+  # SPAWN_ENABLED_STEPS bypasses the setup options multiselect — accept defaults
+  # so the harness tests provisioning/installation UX, not credential collection
+  spawn_env="${spawn_env} SPAWN_ENABLED_STEPS=auto-update"
 
   # Map ACTIVE_CLOUD to the cloud name spawn expects
   local spawn_cloud="${ACTIVE_CLOUD}"
