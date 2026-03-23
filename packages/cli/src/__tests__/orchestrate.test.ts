@@ -132,6 +132,7 @@ describe("runOrchestration", () => {
     } else {
       delete process.env.SPAWN_HOME;
     }
+    delete process.env.SPAWN_HEADLESS;
     tryCatch(() =>
       rmSync(testDir, {
         recursive: true,
