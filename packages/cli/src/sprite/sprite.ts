@@ -4,6 +4,7 @@ import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { dirname as posixDirname } from "node:path/posix";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getUserHome } from "../shared/paths.js";
 import { asyncTryCatch } from "../shared/result.js";
@@ -560,7 +561,12 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   const basename = normalizedRemote.split("/").pop() || "file";
   const tempRemote = `/tmp/sprite_upload_${basename}_${tempRandom}`;
 
+  // Compute the parent directory in TypeScript to avoid shell interpolation
+  const parentDir = posixDirname(normalizedRemote);
+
   await spriteRetry("sprite upload", async () => {
+    // Upload the file to the temp path, then mkdir + mv using array args
+    // to avoid shell string interpolation (command injection risk).
     const proc = Bun.spawn(
       [
         spriteCmd,
@@ -571,9 +577,10 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         "-file",
         `${localPath}:${tempRemote}`,
         "--",
-        "bash",
-        "-c",
-        `mkdir -p $(dirname '${normalizedRemote}') && mv '${tempRemote}' '${normalizedRemote}'`,
+        "mkdir",
+        "-p",
+        "--",
+        parentDir,
       ],
       {
         stdio: [
@@ -587,7 +594,35 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
     const stderrText = new Response(proc.stderr).text();
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-      throw new Error(`upload failed for ${remotePath}: ${await stderrText}`);
+      throw new Error(`upload mkdir failed for ${remotePath}: ${await stderrText}`);
+    }
+
+    // Move temp file to final destination using array args (no shell interpolation)
+    const mvProc = Bun.spawn(
+      [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        _state.name,
+        "--",
+        "mv",
+        "--",
+        tempRemote,
+        normalizedRemote,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "pipe",
+        ],
+      },
+    );
+    const mvStderrText = new Response(mvProc.stderr).text();
+    const mvExitCode = await mvProc.exited;
+    if (mvExitCode !== 0) {
+      throw new Error(`upload mv failed for ${remotePath}: ${await mvStderrText}`);
     }
   });
 }
