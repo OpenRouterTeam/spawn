@@ -818,6 +818,7 @@ function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spa
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -870,6 +871,7 @@ function runBundleHeadless(
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
