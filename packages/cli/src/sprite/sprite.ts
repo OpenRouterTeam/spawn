@@ -478,6 +478,9 @@ export function getVmConnection(): VMConnection {
  * Run a command on the remote sprite. Retries on transient errors.
  */
 export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
   await spriteRetry("sprite exec", async () => {
     const proc = Bun.spawn(
@@ -515,6 +518,9 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
 
 /** Run a command silently (no stdout/stderr). Throws on failure. */
 async function runSpriteSilent(cmd: string): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
   const proc = Bun.spawn(
     [

@@ -488,6 +488,20 @@ describe("sprite/destroyServer", () => {
   });
 });
 
+// ─── runSprite validation ────────────────────────────────────────────────────
+
+describe("sprite/runSprite validation", () => {
+  it("rejects empty command", async () => {
+    const { runSprite } = await import("../sprite/sprite");
+    await expect(runSprite("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects null byte in command", async () => {
+    const { runSprite } = await import("../sprite/sprite");
+    await expect(runSprite("echo\x00hello")).rejects.toThrow("Invalid command");
+  });
+});
+
 // ─── runSprite ───────────────────────────────────────────────────────────────
 
 describe("sprite/runSprite", () => {
