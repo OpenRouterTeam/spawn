@@ -318,6 +318,35 @@ describe("history", () => {
       expect(data.records[1].agent).toBe("codex");
     });
 
+    it("keeps all entries with no cap", () => {
+      // Save 200 records — all should be retained (history has no entry limit)
+      for (let i = 0; i < 200; i++) {
+        saveSpawnRecord({
+          id: `id-${i}`,
+          agent: `agent-${i}`,
+          cloud: "hetzner",
+          timestamp: `2026-01-01T${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}:00.000Z`,
+        });
+      }
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(200);
+      expect(loaded[0].agent).toBe("agent-0");
+      expect(loaded[199].agent).toBe("agent-199");
+    });
+
+    it("assigns id when missing", () => {
+      saveSpawnRecord({
+        id: "",
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(typeof loaded[0].id).toBe("string");
+      expect(loaded[0].id.length).toBeGreaterThan(0);
+    });
+
     // Corruption recovery and backup tests are in history-corruption.test.ts
   });
 
