@@ -156,9 +156,9 @@ function isValidManifest(data: unknown): data is Manifest {
     "agents" in data &&
     "clouds" in data &&
     "matrix" in data &&
-    !!data.agents &&
-    !!data.clouds &&
-    !!data.matrix
+    isPlainObject(data.agents) &&
+    isPlainObject(data.clouds) &&
+    isPlainObject(data.matrix)
   );
 }
 

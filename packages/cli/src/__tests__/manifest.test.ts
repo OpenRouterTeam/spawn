@@ -1,8 +1,8 @@
 import type { Manifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   _resetCacheForTesting,
@@ -178,6 +178,147 @@ describe("manifest", () => {
       const fetchCount = fetchMock.mock.calls.length;
       await loadManifest();
       expect(fetchMock.mock.calls.length).toBe(fetchCount);
+    });
+
+    it("falls back to stale cache when fetch fails", async () => {
+      const cacheDir = join(env.testDir, "spawn");
+      mkdirSync(cacheDir, {
+        recursive: true,
+      });
+      writeFileSync(join(cacheDir, "manifest.json"), JSON.stringify(mockManifest));
+
+      _resetCacheForTesting();
+      global.fetch = mock(
+        async () =>
+          new Response("error", {
+            status: 500,
+          }),
+      );
+
+      const m = await loadManifest(true);
+      expect(m.agents.claude).toBeDefined();
+      expect(isStaleCache()).toBe(true);
+    });
+
+    it("throws when no cache and fetch fails", async () => {
+      _resetCacheForTesting();
+      global.fetch = mock(
+        async () =>
+          new Response("error", {
+            status: 500,
+          }),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+    });
+
+    it("throws when manifest from GitHub is invalid", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              not: "a manifest",
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects manifest with string agents field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: "claude",
+              clouds: {},
+              matrix: {},
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects manifest with array clouds field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: [
+                "sprite",
+                "hetzner",
+              ],
+              matrix: {},
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects manifest with numeric matrix field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: {},
+              matrix: 42,
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("throws when network errors occur and no cache exists", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(async () => {
+        throw new Error("Network timeout");
+      });
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
     });
   });
 });
