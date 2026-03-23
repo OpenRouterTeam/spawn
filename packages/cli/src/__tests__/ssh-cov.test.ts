@@ -39,23 +39,14 @@ afterEach(() => {
 // ── Constants ──────────────────────────────────────────────────────────
 
 describe("SSH constants", () => {
-  it("SSH_BASE_OPTS includes StrictHostKeyChecking", () => {
+  it("SSH_BASE_OPTS has required non-interactive options", () => {
     expect(SSH_BASE_OPTS).toContain("StrictHostKeyChecking=no");
-  });
-
-  it("SSH_BASE_OPTS includes BatchMode", () => {
     expect(SSH_BASE_OPTS).toContain("BatchMode=yes");
   });
 
-  it("SSH_INTERACTIVE_OPTS includes accept-new", () => {
+  it("SSH_INTERACTIVE_OPTS has interactive options and no BatchMode", () => {
     expect(SSH_INTERACTIVE_OPTS).toContain("StrictHostKeyChecking=accept-new");
-  });
-
-  it("SSH_INTERACTIVE_OPTS includes -t flag", () => {
     expect(SSH_INTERACTIVE_OPTS).toContain("-t");
-  });
-
-  it("SSH_INTERACTIVE_OPTS does not include BatchMode", () => {
     expect(SSH_INTERACTIVE_OPTS).not.toContain("BatchMode=yes");
   });
 });
