@@ -161,7 +161,8 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - `sh/e2e/lib/common.sh` — API helpers, constants
    - `sh/e2e/lib/teardown.sh` — cleanup logic
 7. Run `bash -n` on every modified `.sh` file
-8. Re-run only the failed agents: `./sh/e2e/e2e.sh --cloud CLOUD AGENT_NAME`
+8. Re-run only the failed agents: `SPAWN_E2E_SKIP_EMAIL=1 ./sh/e2e/e2e.sh --cloud CLOUD AGENT_NAME`
+   (SPAWN_E2E_SKIP_EMAIL=1 suppresses the matrix email on partial re-runs — a partial email falsely looks like all-passed)
 9. If changes were made: commit, push, open a PR (NOT draft) with title "fix(e2e): [description]"
 10. Clean up worktree when done
 11. Report: clouds tested, clouds skipped, agents passed, agents failed, fixed

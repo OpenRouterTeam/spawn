@@ -508,6 +508,14 @@ send_matrix_email() {
   local total_fail="$5"
   local duration_str="$6"
 
+  # Skip email for targeted re-runs (partial agent/cloud subset).
+  # Set SPAWN_E2E_SKIP_EMAIL=1 to suppress the email (used by quality cycle
+  # when re-running only failed agents — a partial email looks like all-passed).
+  if [ "${SPAWN_E2E_SKIP_EMAIL:-0}" = "1" ]; then
+    log_info "Matrix email skipped (SPAWN_E2E_SKIP_EMAIL=1)"
+    return 0
+  fi
+
   local resend_key="${RESEND_API_KEY:-}"
   local to_email="${KEY_REQUEST_EMAIL:-}"
 
