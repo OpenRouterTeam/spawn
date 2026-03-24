@@ -1207,6 +1207,10 @@ export async function destroyInstance(name?: string): Promise<void> {
     throw new Error("No instance name");
   }
 
+  if (!_state.project) {
+    throw new Error("No GCP project set — cannot determine which project to delete from");
+  }
+
   logStep(`Destroying GCP instance '${instanceName}'...`);
   const result = await gcloud([
     "compute",
