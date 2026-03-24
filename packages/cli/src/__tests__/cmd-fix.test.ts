@@ -50,6 +50,7 @@ describe("buildFixScript", () => {
     expect(script).toContain("set -eo pipefail");
     expect(script).toContain("Re-injecting credentials");
     expect(script).toContain("IS_SANDBOX");
+    expect(script).toContain("LANG=");
     expect(script).toContain(".npm-global/bin");
     expect(script).toContain(".bun/bin");
     expect(script).toContain(".cargo/bin");
@@ -130,21 +131,27 @@ describe("buildFixScript", () => {
     expect(script).toContain("Re-installing agent");
   });
 
-  it("prepends IS_SANDBOX and PATH before agent env vars (matches generateEnvConfig)", () => {
+  it("prepends IS_SANDBOX, LANG, and PATH before agent env vars (matches generateEnvConfig)", () => {
     const script = buildFixScript(mockManifest, "claude");
 
     const isSandboxIdx = script.indexOf("IS_SANDBOX");
+    const langIdx = script.indexOf("LANG=");
     const pathIdx = script.indexOf(".npm-global/bin");
     const anthropicIdx = script.indexOf("ANTHROPIC_API_KEY");
 
-    // All three must be present
+    // All four must be present
     expect(isSandboxIdx).toBeGreaterThan(-1);
+    expect(langIdx).toBeGreaterThan(-1);
     expect(pathIdx).toBeGreaterThan(-1);
     expect(anthropicIdx).toBeGreaterThan(-1);
 
-    // IS_SANDBOX and PATH must come before agent-specific env vars
+    // IS_SANDBOX, LANG, PATH must come before agent-specific env vars
     expect(isSandboxIdx).toBeLessThan(anthropicIdx);
+    expect(langIdx).toBeLessThan(anthropicIdx);
     expect(pathIdx).toBeLessThan(anthropicIdx);
+    // LANG must come after IS_SANDBOX and before PATH
+    expect(isSandboxIdx).toBeLessThan(langIdx);
+    expect(langIdx).toBeLessThan(pathIdx);
   });
 
   it("throws for unknown agent", () => {
