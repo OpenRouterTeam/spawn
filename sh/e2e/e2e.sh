@@ -243,10 +243,15 @@ run_single_agent() {
   (
     local _inner_status="fail"
     if [ "${INTERACTIVE_MODE}" -eq 1 ]; then
-      # AI-driven interactive mode: provision + verify in one step
+      # AI-driven interactive mode: harness drives the CLI through PTY.
+      # After harness exits (on "Starting agent..." marker), the install is still
+      # running on the remote VM. Run verify_agent to wait for .spawnrc before
+      # the input test — same as headless mode.
       if interactive_provision "${agent}" "${app_name}" "${LOG_DIR}"; then
-        if run_input_test "${agent}" "${app_name}"; then
-          _inner_status="pass"
+        if verify_agent "${agent}" "${app_name}"; then
+          if run_input_test "${agent}" "${app_name}"; then
+            _inner_status="pass"
+          fi
         fi
       fi
     else

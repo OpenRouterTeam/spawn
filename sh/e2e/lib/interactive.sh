@@ -9,15 +9,6 @@
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
-# interactive_provision AGENT APP_NAME LOG_DIR
-#
-# Runs spawn interactively with AI driving the prompts. On success, the
-# instance is provisioned AND the agent is installed — equivalent to
-# provision_agent + verify_agent in the headless flow.
-#
-# Returns 0 on success, 1 on failure.
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 # _report_ux_issues RESULT_JSON AGENT CLOUD
 #
 # Reads uxIssues from the harness JSON result and files one GitHub issue per
@@ -99,6 +90,15 @@ ${example}
   fi
 }
 
+# ---------------------------------------------------------------------------
+# interactive_provision AGENT APP_NAME LOG_DIR
+#
+# Runs spawn interactively with AI driving the prompts. On success, the
+# instance is provisioned AND the agent is installed — equivalent to
+# provision_agent + verify_agent in the headless flow.
+#
+# Returns 0 on success, 1 on failure.
+# ---------------------------------------------------------------------------
 interactive_provision() {
   local agent="$1"
   local app_name="$2"
