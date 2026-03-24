@@ -377,8 +377,9 @@ _hetzner_cleanup_stale() {
 # ---------------------------------------------------------------------------
 # _hetzner_max_parallel
 #
-# Hetzner accounts have a primary IP limit (~5 for most accounts).
+# Hetzner accounts have a primary IP limit. This QA account supports ~3
+# concurrent provisioning operations before hitting resource_limit_exceeded.
 # ---------------------------------------------------------------------------
 _hetzner_max_parallel() {
-  printf '5'
+  printf '3'
 }
