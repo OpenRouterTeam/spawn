@@ -142,9 +142,6 @@ bun test src/__tests__/manifest.test.ts
 ### Manifest (extended)
 - `icon-integrity.test.ts` — Icon file existence and format validation
 
-### Docker mode
-- `docker-cloudinit-skip.test.ts` — Docker mode skips cloud-init wait: Hetzner and GCP `waitForReady` condition includes `useDocker` flag
-
 ### Support files (not test files)
 - `test-helpers.ts` — Shared fixtures: `createMockManifest`, `mockClackPrompts`, `setupTestEnvironment`, etc.
 - `preload.ts` — Global test setup (temp dir isolation, env sandboxing)
