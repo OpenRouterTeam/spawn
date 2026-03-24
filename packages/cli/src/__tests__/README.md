@@ -118,6 +118,7 @@ bun test src/__tests__/manifest.test.ts
 - `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
 - `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
 - `digitalocean-token.test.ts` — DigitalOcean token storage, retrieval, and API client helpers
+- `do-min-size.test.ts` — DigitalOcean minimum droplet size enforcement: `slugRamGb` RAM comparison, `AGENT_MIN_SIZE` map
 - `do-payment-warning.test.ts` — `ensureDoToken` proactive payment method reminder for first-time DigitalOcean users
 - `do-snapshot.test.ts` — `findSpawnSnapshot`: DigitalOcean snapshot lookup, filtering, error handling
 - `hetzner-pagination.test.ts` — Hetzner API pagination: multi-page server listing and cursor handling
@@ -140,6 +141,9 @@ bun test src/__tests__/manifest.test.ts
 
 ### Manifest (extended)
 - `icon-integrity.test.ts` — Icon file existence and format validation
+
+### Docker mode
+- `docker-cloudinit-skip.test.ts` — Docker mode skips cloud-init wait: Hetzner and GCP `waitForReady` condition includes `useDocker` flag
 
 ### Support files (not test files)
 - `test-helpers.ts` — Shared fixtures: `createMockManifest`, `mockClackPrompts`, `setupTestEnvironment`, etc.
