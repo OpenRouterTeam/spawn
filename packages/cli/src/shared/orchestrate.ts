@@ -39,6 +39,11 @@ export const DOCKER_CONTAINER_NAME = "spawn-agent";
 /** Docker registry hosting spawn agent images. */
 export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
 
+/** Wrap a command to run inside the Docker container instead of the host. */
+export function makeDockerExec(cmd: string): string {
+  return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
+}
+
 export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;

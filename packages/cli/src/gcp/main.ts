@@ -6,7 +6,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { shouldSkipCloudInit } from "../shared/cloud-init.js";
-import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, runOrchestration } from "../shared/orchestrate.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerExec, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -48,16 +48,13 @@ async function main() {
     useDocker = true;
   }
 
-  /** Wrap a command to run inside the Docker container instead of the host. */
-  function dockerExec(cmd: string): string {
-    return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
-  }
-
   const cloud: CloudOrchestrator = {
     cloudName: "gcp",
     cloudLabel: "GCP Compute Engine",
     runner: {
-      runServer: useDocker ? (cmd: string, timeoutSecs?: number) => runServer(dockerExec(cmd), timeoutSecs) : runServer,
+      runServer: useDocker
+        ? (cmd: string, timeoutSecs?: number) => runServer(makeDockerExec(cmd), timeoutSecs)
+        : runServer,
       uploadFile,
       downloadFile,
     },
