@@ -251,7 +251,11 @@ export async function runOrchestration(
         installed = await uploadAndExtractTarball(cloud.runner, localTarball.localPath);
         localTarball.cleanup();
       }
-      if (!installed && useTarball && !agent.skipTarball) {
+      // Only try remote tarball download when we didn't already have a local tarball.
+      // If the local tarball was available but upload/extract failed, the remote
+      // download would face the same extraction issues — skip it to save ~150s
+      // and fall through to live install immediately.
+      if (!installed && !localTarball && useTarball && !agent.skipTarball) {
         const tarball = options?.tryTarball ?? tryTarballInstall;
         installed = await tarball(cloud.runner, agentName);
       }
