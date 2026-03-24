@@ -54,7 +54,7 @@ export function tryCatchIf<T>(guard: (err: Error) => boolean, fn: () => T): Resu
     if (guard(err)) {
       return Err(err);
     }
-    throw e;
+    throw err;
   }
 }
 
@@ -70,7 +70,7 @@ export async function asyncTryCatchIf<T>(guard: (err: Error) => boolean, fn: () 
     if (guard(err)) {
       return Err(err);
     }
-    throw e;
+    throw err;
   }
 }
 

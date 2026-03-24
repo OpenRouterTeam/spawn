@@ -134,6 +134,21 @@ describe("tryCatchIf", () => {
       }),
     ).toThrow("unexpected");
   });
+
+  it("re-throws non-Error values as normalized Error instances", () => {
+    const guard = () => false;
+    // Wrap in tryCatch to capture the re-thrown value without raw try/catch
+    const result = tryCatch(() =>
+      tryCatchIf(guard, () => {
+        throw "raw string error";
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error.message).toBe("raw string error");
+    }
+  });
 });
 
 describe("asyncTryCatchIf", () => {
@@ -166,6 +181,20 @@ describe("asyncTryCatchIf", () => {
         throw new Error("unexpected");
       }),
     ).rejects.toThrow("unexpected");
+  });
+
+  it("re-throws non-Error values as normalized Error instances", async () => {
+    const guard = () => false;
+    const result = await asyncTryCatch(() =>
+      asyncTryCatchIf(guard, async () => {
+        throw 404;
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error.message).toBe("404");
+    }
   });
 });
 
