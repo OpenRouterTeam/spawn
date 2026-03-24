@@ -907,6 +907,19 @@ const DROPLET_SIZES: DropletSize[] = [
 
 export const DEFAULT_DROPLET_SIZE = "s-2vcpu-2gb";
 
+/** Extract RAM in GB from a DO slug like "s-2vcpu-4gb" or "s-2vcpu-4gb-intel". Returns 0 if unparseable. */
+export function slugRamGb(slug: string): number {
+  const match = slug.match(/-(\d+)gb/);
+  return match ? Number(match[1]) : 0;
+}
+
+/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
+export const AGENT_MIN_SIZE: Record<string, string> = {
+  // s-2vcpu-4gb is used (not s-2vcpu-4gb-intel) because the intel variant
+  // is no longer available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
+  openclaw: "s-2vcpu-4gb",
+};
+
 // ─── Region Options ──────────────────────────────────────────────────────────
 
 interface DoRegion {

@@ -6,27 +6,47 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { AGENT_MIN_SIZE, slugRamGb } from "../digitalocean/digitalocean.js";
 
-const CLI_SRC = resolve(import.meta.dir, "..");
-const source = readFileSync(resolve(CLI_SRC, "digitalocean/main.ts"), "utf-8");
-
-describe("DigitalOcean minimum droplet size enforcement", () => {
-  it("uses slugRamGb comparison instead of hardcoded slug equality", () => {
-    // The old bug: dropletSize === "s-2vcpu-2gb" only caught the exact default
-    expect(source).not.toContain('dropletSize === "s-2vcpu-2gb"');
-    // The fix: compare RAM parsed from slugs
-    expect(source).toContain("slugRamGb(dropletSize) < slugRamGb(minSize)");
+describe("slugRamGb", () => {
+  it("parses RAM from standard DO slugs", () => {
+    expect(slugRamGb("s-2vcpu-2gb")).toBe(2);
+    expect(slugRamGb("s-2vcpu-4gb")).toBe(4);
+    expect(slugRamGb("s-4vcpu-8gb")).toBe(8);
   });
 
-  it("defines slugRamGb helper to parse RAM from DO slugs", () => {
-    expect(source).toContain("function slugRamGb(slug: string): number");
-    // Should use a regex to extract the GB number from the slug
-    expect(source).toContain("(\\d+)gb");
+  it("parses RAM from intel-variant slugs", () => {
+    expect(slugRamGb("s-2vcpu-4gb-intel")).toBe(4);
+    expect(slugRamGb("s-2vcpu-2gb-intel")).toBe(2);
   });
 
-  it("AGENT_MIN_SIZE includes openclaw with 4gb minimum", () => {
-    expect(source).toContain('openclaw: "s-2vcpu-4gb"');
+  it("returns 0 for unparseable slugs", () => {
+    expect(slugRamGb("")).toBe(0);
+    expect(slugRamGb("unknown-slug")).toBe(0);
+    expect(slugRamGb("s-2vcpu")).toBe(0);
+  });
+
+  it("allows RAM comparison between slugs for min-size enforcement", () => {
+    // a 2gb slug is below the 4gb minimum
+    expect(slugRamGb("s-2vcpu-2gb")).toBeLessThan(slugRamGb("s-2vcpu-4gb"));
+    // a 4gb slug satisfies the 4gb minimum
+    expect(slugRamGb("s-2vcpu-4gb")).not.toBeLessThan(slugRamGb("s-2vcpu-4gb"));
+    // an 8gb slug also satisfies the 4gb minimum
+    expect(slugRamGb("s-4vcpu-8gb")).toBeGreaterThan(slugRamGb("s-2vcpu-4gb"));
+  });
+});
+
+describe("AGENT_MIN_SIZE", () => {
+  it("requires at least 4GB for openclaw", () => {
+    const minSlug = AGENT_MIN_SIZE["openclaw"];
+    expect(minSlug).toBeDefined();
+    expect(slugRamGb(minSlug!)).toBeGreaterThanOrEqual(4);
+  });
+
+  it("maps agent names to valid DO slugs", () => {
+    for (const [agent, slug] of Object.entries(AGENT_MIN_SIZE)) {
+      expect(typeof agent).toBe("string");
+      expect(slugRamGb(slug)).toBeGreaterThan(0);
+    }
   });
 });

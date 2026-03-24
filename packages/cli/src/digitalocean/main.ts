@@ -9,6 +9,7 @@ import { runOrchestration } from "../shared/orchestrate.js";
 import { logInfo } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
+  AGENT_MIN_SIZE,
   checkAccountStatus,
   createServer as createDroplet,
   downloadFile,
@@ -21,23 +22,11 @@ import {
   promptDropletSize,
   promptSpawnName,
   runServer,
+  slugRamGb,
   uploadFile,
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean.js";
-
-/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
-const AGENT_MIN_SIZE: Record<string, string> = {
-  // s-2vcpu-4gb is used (not s-2vcpu-4gb-intel) because the intel variant
-  // is no longer available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
-  openclaw: "s-2vcpu-4gb",
-};
-
-/** Extract RAM in GB from a DO slug like "s-2vcpu-4gb" or "s-2vcpu-4gb-intel". Returns 0 if unparseable. */
-function slugRamGb(slug: string): number {
-  const match = slug.match(/-(\d+)gb/);
-  return match ? Number(match[1]) : 0;
-}
 
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
