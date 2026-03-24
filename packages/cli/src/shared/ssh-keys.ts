@@ -188,26 +188,31 @@ export function generateSshKey(): SshKeyPair {
 
 /** Get the MD5 fingerprint of a public key (for cloud provider matching). */
 export function getSshFingerprint(pubPath: string): string {
-  const result = Bun.spawnSync(
-    [
-      "ssh-keygen",
-      "-lf",
-      pubPath,
-      "-E",
-      "md5",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
+  return unwrapOr(
+    tryCatch(() => {
+      const result = Bun.spawnSync(
+        [
+          "ssh-keygen",
+          "-lf",
+          pubPath,
+          "-E",
+          "md5",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+      const output = new TextDecoder().decode(result.stdout).trim();
+      // Format: "2048 MD5:xx:xx:xx... user@host (ED25519)"
+      const match = output.match(/MD5:([a-f0-9:]+)/i);
+      return match ? match[1] : "";
+    }),
+    "",
   );
-  const output = new TextDecoder().decode(result.stdout).trim();
-  // Format: "2048 MD5:xx:xx:xx... user@host (ED25519)"
-  const match = output.match(/MD5:([a-f0-9:]+)/i);
-  return match ? match[1] : "";
 }
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────

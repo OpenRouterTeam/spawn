@@ -391,6 +391,58 @@ describe("cmdUninstall", () => {
     expect(clack.logSuccess).toHaveBeenCalledWith("Removed:");
   });
 
+  it("preserves RC file when end marker is missing (unclosed block)", async () => {
+    const binaryPath = join(home, ".local", "bin", "spawn");
+    fs.mkdirSync(join(home, ".local", "bin"), {
+      recursive: true,
+    });
+    fs.writeFileSync(binaryPath, "#!/bin/bash\necho spawn");
+
+    // Remove optional dirs
+    const spawnDir = join(home, ".spawn");
+    const configDir = join(home, ".config", "spawn");
+    if (fs.existsSync(spawnDir)) {
+      fs.rmSync(spawnDir, {
+        recursive: true,
+        force: true,
+      });
+    }
+    if (fs.existsSync(configDir)) {
+      fs.rmSync(configDir, {
+        recursive: true,
+        force: true,
+      });
+    }
+
+    // Write an RC file with start marker but NO end marker
+    const rcPath = join(home, ".bashrc");
+    const rcContent = [
+      "# existing config",
+      "alias ll='ls -la'",
+      "",
+      RC_MARKER_START,
+      'export PATH="$HOME/.local/bin:$PATH"',
+      "",
+      "# user aliases that would be lost",
+      "alias gs='git status'",
+    ].join("\n");
+    fs.writeFileSync(rcPath, rcContent);
+
+    clack.confirm.mockResolvedValue(true);
+
+    await cmdUninstall();
+
+    // File should be unchanged — unclosed block means no write
+    const after = fs.readFileSync(rcPath, "utf-8");
+    expect(after).toBe(rcContent);
+    expect(after).toContain("# user aliases that would be lost");
+    expect(after).toContain("alias gs='git status'");
+
+    // Should have warned the user
+    const warnCalls = clack.logWarn.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnCalls.some((msg: string) => msg.includes("missing end marker"))).toBe(true);
+  });
+
   it("shows shell RC hint when RC files were cleaned", async () => {
     const binaryPath = join(home, ".local", "bin", "spawn");
     fs.mkdirSync(join(home, ".local", "bin"), {
