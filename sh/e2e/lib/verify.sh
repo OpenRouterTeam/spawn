@@ -48,40 +48,36 @@ _validate_base64() {
 # _stage_prompt_remotely APP ENCODED_PROMPT
 #
 # Writes the base64-encoded prompt to a temp file on the remote host.
-# Uses stdin piping so the encoded prompt is never interpolated into a
-# command string — eliminating command injection risk entirely.
+# The encoded_prompt is validated by _validate_base64 to contain only
+# [A-Za-z0-9+/=] characters. The value is assigned to a shell variable
+# on the remote side and re-validated there before writing to the file,
+# providing defense-in-depth against injection even if local validation
+# is bypassed.
 # ---------------------------------------------------------------------------
 _stage_prompt_remotely() {
   local app="$1"
   local encoded_prompt="$2"
-  # Write the base64-encoded prompt to a remote temp file.
-  # The encoded_prompt is validated to contain only [A-Za-z0-9+/=] characters
-  # (by _validate_base64), so embedding it in a printf command is safe — it
-  # cannot break out of single quotes or inject shell metacharacters.
-  # We do NOT use stdin piping here: _hetzner_exec runs commands via
-  # "printf ... | base64 -d | bash", which connects bash's stdin to the
-  # base64 pipe rather than to SSH's outer stdin, so piped data never reaches
-  # the subcommand.
-  cloud_exec "${app}" "printf '%s' '${encoded_prompt}' > /tmp/.e2e-prompt"
+  # Assign the validated base64 value to a remote variable, re-validate it
+  # on the remote side (defense-in-depth), then write to the temp file.
+  # Base64 chars [A-Za-z0-9+/=] cannot break out of single quotes.
+  cloud_exec "${app}" "_EP='${encoded_prompt}'; printf '%s' \"\$_EP\" | grep -qE '^[A-Za-z0-9+/=]*$' && printf '%s' \"\$_EP\" > /tmp/.e2e-prompt || exit 1"
 }
 
 # ---------------------------------------------------------------------------
 # _stage_timeout_remotely APP TIMEOUT
 #
 # Writes the validated timeout value to a temp file on the remote host.
-# Like _stage_prompt_remotely, this avoids interpolating the value into
-# any remote command string — eliminating injection surface entirely.
+# The value is assigned to a shell variable on the remote side and
+# re-validated there before writing to the file, providing defense-in-depth
+# against injection even if local validation is bypassed.
 # ---------------------------------------------------------------------------
 _stage_timeout_remotely() {
   local app="$1"
   local timeout_val="$2"
-  # timeout_val is validated by _validate_timeout to contain only [0-9] digits,
-  # so embedding it directly in the command string is safe — no injection risk.
-  # We do NOT use stdin piping here: _hetzner_exec runs commands via
-  # "printf ... | base64 -d | bash", which connects bash's stdin to the
-  # base64 pipe rather than to SSH's outer stdin, so piped data never reaches
-  # the subcommand.
-  cloud_exec "${app}" "printf '%s' '${timeout_val}' > /tmp/.e2e-timeout"
+  # Assign the validated digits-only value to a remote variable, re-validate
+  # it on the remote side (defense-in-depth), then write to the temp file.
+  # Digits [0-9] cannot break out of single quotes or inject shell metacharacters.
+  cloud_exec "${app}" "_TV='${timeout_val}'; printf '%s' \"\$_TV\" | grep -qE '^[0-9]+$' && printf '%s' \"\$_TV\" > /tmp/.e2e-timeout || exit 1"
 }
 
 # ---------------------------------------------------------------------------
