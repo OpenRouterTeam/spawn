@@ -133,6 +133,15 @@ cloud_install_wait() {
   fi
 }
 
+# Refresh auth token if the cloud driver supports it (e.g. Sprite tokens
+# expire after ~60 min). Called before each provisioning batch to prevent
+# auth expiry failures in long-running E2E suites. See #2934.
+cloud_refresh_auth() {
+  if type "_${ACTIVE_CLOUD}_refresh_auth" >/dev/null 2>&1; then
+    "_${ACTIVE_CLOUD}_refresh_auth" "$@"
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Per-agent provision timeout overrides
 #

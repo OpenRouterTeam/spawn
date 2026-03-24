@@ -390,6 +390,10 @@ run_agents_for_cloud() {
         batch_num=$((batch_num + 1))
         log_header "Batch ${batch_num} (${cloud})"
 
+        # Refresh auth before each batch — prevents token expiry in long
+        # E2E runs (60+ min). No-op for clouds without refresh support. #2934
+        cloud_refresh_auth || log_warn "Auth refresh failed before batch ${batch_num}"
+
         pids=""
         for ba in ${batch_agents}; do
           local_result_file="${log_dir}/${cloud}-${ba}.result"
@@ -420,6 +424,9 @@ run_agents_for_cloud() {
     if [ -n "${batch_agents}" ]; then
       batch_num=$((batch_num + 1))
       log_header "Batch ${batch_num} (${cloud})"
+
+      # Refresh auth before partial batch too — same reason as above. #2934
+      cloud_refresh_auth || log_warn "Auth refresh failed before batch ${batch_num}"
 
       pids=""
       for ba in ${batch_agents}; do
