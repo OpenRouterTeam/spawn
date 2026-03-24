@@ -221,10 +221,67 @@ _hetzner_teardown() {
 }
 
 # ---------------------------------------------------------------------------
+# _hetzner_cleanup_orphaned_ips
+#
+# Delete Hetzner Primary IPs not attached to any server. These accumulate
+# from failed/interrupted provisioning runs and consume the account's
+# primary_ip_limit quota, causing resource_limit_exceeded errors (#2933).
+# ---------------------------------------------------------------------------
+_hetzner_cleanup_orphaned_ips() {
+  local response
+  response=$(_hetzner_curl_auth -sf \
+    "${_HETZNER_API}/primary_ips?per_page=50" 2>/dev/null || true)
+
+  if [ -z "${response}" ]; then
+    log_info "Could not list Hetzner primary IPs — skipping IP cleanup"
+    return 0
+  fi
+
+  local orphaned
+  orphaned=$(printf '%s' "${response}" | jq -r '.primary_ips[] | select(.assignee_id == null or .assignee_id == 0) | "\(.id):\(.ip)"' 2>/dev/null || true)
+
+  if [ -z "${orphaned}" ]; then
+    log_ok "No orphaned Hetzner Primary IPs found"
+    return 0
+  fi
+
+  local cleaned=0
+  for entry in ${orphaned}; do
+    local ip_id
+    ip_id=$(printf '%s' "${entry}" | cut -d: -f1)
+
+    local ip_addr
+    ip_addr=$(printf '%s' "${entry}" | cut -d: -f2-)
+
+    # Validate IP ID is numeric before using it in API URL
+    case "${ip_id}" in ''|*[!0-9]*) log_warn "Skipping orphaned IP ${entry} — non-numeric ID"; continue ;; esac
+
+    local http_code
+    http_code=$(_hetzner_curl_auth -s -o /dev/null -w '%{http_code}' \
+      -X DELETE \
+      "${_HETZNER_API}/primary_ips/${ip_id}" 2>/dev/null || printf '000')
+
+    if [ "${http_code}" = "200" ] || [ "${http_code}" = "204" ]; then
+      log_ok "Deleted orphaned Primary IP ${ip_addr} (id=${ip_id})"
+      cleaned=$((cleaned + 1))
+    elif [ "${http_code}" = "404" ]; then
+      log_info "Primary IP ${ip_addr} (id=${ip_id}) already gone"
+    else
+      log_warn "Failed to delete Primary IP ${ip_addr} (id=${ip_id}, HTTP ${http_code})"
+    fi
+  done
+
+  if [ "${cleaned}" -gt 0 ]; then
+    log_ok "Cleaned ${cleaned} orphaned Hetzner Primary IP(s)"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # _hetzner_cleanup_stale
 #
 # List all Hetzner servers, find e2e-* instances older than 30 minutes,
-# and destroy them.
+# and destroy them. Also cleans up orphaned Primary IPs to prevent
+# resource_limit_exceeded errors (#2933).
 # ---------------------------------------------------------------------------
 _hetzner_cleanup_stale() {
   local now
@@ -312,6 +369,9 @@ _hetzner_cleanup_stale() {
   if [ "${skipped}" -gt 0 ]; then
     log_info "Skipped ${skipped} recent Hetzner instance(s)"
   fi
+
+  # Also clean up orphaned Primary IPs to free quota for new provisioning (#2933)
+  _hetzner_cleanup_orphaned_ips
 }
 
 # ---------------------------------------------------------------------------

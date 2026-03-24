@@ -9,6 +9,7 @@ import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, runOrchestration } from "../sha
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
+  cleanupOrphanedPrimaryIps,
   createServer as createHetznerServer,
   downloadFile,
   ensureHcloudToken,
@@ -71,6 +72,16 @@ async function main() {
       location = await promptLocation();
     },
     async createServer(name: string) {
+      // Proactively clean up orphaned Primary IPs before provisioning in headless
+      // mode (E2E batches). This prevents resource_limit_exceeded errors when
+      // previous test runs left behind unattached IPs that consume quota (#2933).
+      if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+        const cleaned = await cleanupOrphanedPrimaryIps();
+        if (cleaned > 0) {
+          logInfo(`Pre-provisioning: cleaned ${cleaned} orphaned Primary IP(s)`);
+        }
+      }
+
       // Check for a pre-built snapshot before provisioning
       snapshotId = await findSpawnSnapshot(agentName);
       if (snapshotId) {
