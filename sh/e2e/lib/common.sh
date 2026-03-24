@@ -156,6 +156,11 @@ cloud_refresh_auth() {
 # ---------------------------------------------------------------------------
 _PROVISION_TIMEOUT_junie=1200
 _AGENT_TIMEOUT_junie=2400
+# Hermes installs a Python virtualenv which can take 20+ min on slow VMs.
+# Provision timeout bumped to match the CLI install timeout (600s).
+# Agent timeout bumped to 3600s to give the install enough headroom.
+_PROVISION_TIMEOUT_hermes=720
+_AGENT_TIMEOUT_hermes=3600
 
 get_provision_timeout() {
   local agent="$1"

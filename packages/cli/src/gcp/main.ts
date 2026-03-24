@@ -5,6 +5,7 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import { shouldSkipCloudInit } from "../shared/cloud-init.js";
 import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
@@ -85,7 +86,12 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      if (useDocker || cloud.skipCloudInit) {
+      if (
+        shouldSkipCloudInit({
+          useDocker,
+          skipCloudInit: cloud.skipCloudInit,
+        })
+      ) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();

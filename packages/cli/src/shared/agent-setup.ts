@@ -1031,7 +1031,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           runner,
           "Hermes Agent",
           "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
-          300,
+          600,
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
