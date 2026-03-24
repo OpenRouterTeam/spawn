@@ -51,8 +51,9 @@ export function buildFixScript(manifest: Manifest, agentKey: string): string {
   lines.push("echo '==> Re-injecting credentials...'");
   // Write new .spawnrc atomically: write to .new then mv into place
   lines.push("{");
-  // Always prepend IS_SANDBOX and PATH — matches generateEnvConfig() in shared/agents.ts
+  // Always prepend IS_SANDBOX, LANG, and PATH — matches generateEnvConfig() in shared/agents.ts
   lines.push("  printf 'export IS_SANDBOX=\\x271\\x27\\n'");
+  lines.push("  printf 'export LANG=\\x27C.UTF-8\\x27\\n'");
   lines.push(
     "  printf 'export PATH=\"$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH\"\\n'",
   );
