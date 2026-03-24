@@ -185,6 +185,8 @@ export function generateEnvConfig(pairs: string[]): string {
     "",
     "# [spawn:env]",
     "export IS_SANDBOX='1'",
+    "# UTF-8 locale — required for agent TUIs that use Unicode (e.g. Claude Code)",
+    "export LANG='C.UTF-8'",
     "# Ensure agent binaries are in PATH on reconnect",
     'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH"',
   ];
