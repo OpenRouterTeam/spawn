@@ -182,10 +182,13 @@ interactive_provision() {
       fi
     else
       log_err "Interactive provision failed (${harness_duration}s): ${harness_reason}"
-      # Dump last 50 lines of harness log for debugging
+      # Save harness log to a persistent path for post-mortem inspection
       if [ -f "${log_file}" ]; then
-        log_info "Last 50 lines of harness log:"
-        tail -50 "${log_file}" | while IFS= read -r line; do
+        local persist_log="/tmp/spawn-interactive-harness-last.log"
+        cp "${log_file}" "${persist_log}" 2>/dev/null || true
+        log_info "Harness log saved to ${persist_log}"
+        log_info "Last 30 [harness] lines:"
+        grep '\[harness\]' "${log_file}" | tail -30 | while IFS= read -r line; do
           printf '    %s\n' "${line}"
         done
       fi
