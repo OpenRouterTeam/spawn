@@ -164,8 +164,11 @@ log "Pre-cycle cleanup..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 
 if [[ "${RUN_MODE}" == "quality" ]]; then
-    # Quality mode syncs to latest main
+    # Quality mode syncs to latest main.
+    # Stash any local modifications first so rebase doesn't abort.
+    git stash --include-untracked 2>&1 | tee -a "${LOG_FILE}" || true
     git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
+    git stash pop 2>&1 | tee -a "${LOG_FILE}" || true
 fi
 
 # Clean stale worktrees
@@ -214,6 +217,8 @@ if [[ "${RUN_MODE}" == "quality" ]]; then
     if [[ -n "$(git diff --name-only -- manifest.json)" ]]; then
         git add manifest.json
         git commit -m "chore: update agent GitHub star counts" 2>&1 | tee -a "${LOG_FILE}" || true
+        # Pull latest before pushing to avoid non-fast-forward rejection
+        git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
         git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
         log "Star counts committed"
     fi
@@ -282,7 +287,7 @@ fi
 
 # Update Claude Code to latest version before launching
 log "Updating Claude Code..."
-claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
+claude update 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
 
 # Launch Claude Code with mode-specific prompt
 # Enable agent teams (required for team-based workflows)
