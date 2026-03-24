@@ -1,19 +1,21 @@
-import { describe, it, expect } from "bun:test";
-import {
-  isPlainObject,
-  isString,
-  isNumber,
-  hasStatus,
-  getErrorMessage,
-  toRecord,
-  toObjectArray,
-} from "../type-guards";
+import { describe, expect, it } from "bun:test";
+import { getErrorMessage, hasStatus, isNumber, isPlainObject, isString, toObjectArray, toRecord } from "../type-guards";
 
 describe("isPlainObject", () => {
   it("returns true for plain objects", () => {
     expect(isPlainObject({})).toBe(true);
-    expect(isPlainObject({ a: 1 })).toBe(true);
-    expect(isPlainObject({ nested: { b: 2 } })).toBe(true);
+    expect(
+      isPlainObject({
+        a: 1,
+      }),
+    ).toBe(true);
+    expect(
+      isPlainObject({
+        nested: {
+          b: 2,
+        },
+      }),
+    ).toBe(true);
   });
 
   it("returns false for null", () => {
@@ -26,7 +28,13 @@ describe("isPlainObject", () => {
 
   it("returns false for arrays", () => {
     expect(isPlainObject([])).toBe(false);
-    expect(isPlainObject([1, 2, 3])).toBe(false);
+    expect(
+      isPlainObject([
+        1,
+        2,
+        3,
+      ]),
+    ).toBe(false);
   });
 
   it("returns false for primitives", () => {
@@ -55,7 +63,7 @@ describe("isNumber", () => {
     expect(isNumber(0)).toBe(true);
     expect(isNumber(42)).toBe(true);
     expect(isNumber(-1)).toBe(true);
-    expect(isNumber(NaN)).toBe(true);
+    expect(isNumber(Number.NaN)).toBe(true);
   });
 
   it("returns false for non-numbers", () => {
@@ -67,15 +75,36 @@ describe("isNumber", () => {
 
 describe("hasStatus", () => {
   it("returns true for objects with numeric status", () => {
-    expect(hasStatus({ status: 200 })).toBe(true);
-    expect(hasStatus({ status: 0 })).toBe(true);
-    expect(hasStatus({ status: 500, other: "field" })).toBe(true);
+    expect(
+      hasStatus({
+        status: 200,
+      }),
+    ).toBe(true);
+    expect(
+      hasStatus({
+        status: 0,
+      }),
+    ).toBe(true);
+    expect(
+      hasStatus({
+        status: 500,
+        other: "field",
+      }),
+    ).toBe(true);
   });
 
   it("returns false for objects without numeric status", () => {
-    expect(hasStatus({ status: "ok" })).toBe(false);
+    expect(
+      hasStatus({
+        status: "ok",
+      }),
+    ).toBe(false);
     expect(hasStatus({})).toBe(false);
-    expect(hasStatus({ status: undefined })).toBe(false);
+    expect(
+      hasStatus({
+        status: undefined,
+      }),
+    ).toBe(false);
   });
 
   it("returns false for non-objects", () => {
@@ -88,7 +117,11 @@ describe("hasStatus", () => {
 describe("getErrorMessage", () => {
   it("returns .message for Error-like objects", () => {
     expect(getErrorMessage(new Error("boom"))).toBe("boom");
-    expect(getErrorMessage({ message: "custom error" })).toBe("custom error");
+    expect(
+      getErrorMessage({
+        message: "custom error",
+      }),
+    ).toBe("custom error");
   });
 
   it("returns String(err) for non-Error values", () => {
@@ -101,7 +134,9 @@ describe("getErrorMessage", () => {
 
 describe("toRecord", () => {
   it("returns plain objects as-is", () => {
-    const obj = { a: 1 };
+    const obj = {
+      a: 1,
+    };
     expect(toRecord(obj)).toBe(obj);
     expect(toRecord({})).toEqual({});
   });
@@ -109,7 +144,12 @@ describe("toRecord", () => {
   it("returns null for non-plain-objects", () => {
     expect(toRecord(null)).toBeNull();
     expect(toRecord(undefined)).toBeNull();
-    expect(toRecord([1, 2])).toBeNull();
+    expect(
+      toRecord([
+        1,
+        2,
+      ]),
+    ).toBeNull();
     expect(toRecord("str")).toBeNull();
     expect(toRecord(42)).toBeNull();
   });
@@ -117,12 +157,45 @@ describe("toRecord", () => {
 
 describe("toObjectArray", () => {
   it("filters non-plain-object items from arrays", () => {
-    const result = toObjectArray([{ a: 1 }, "skip", null, { b: 2 }, 42]);
-    expect(result).toEqual([{ a: 1 }, { b: 2 }]);
+    const result = toObjectArray([
+      {
+        a: 1,
+      },
+      "skip",
+      null,
+      {
+        b: 2,
+      },
+      42,
+    ]);
+    expect(result).toEqual([
+      {
+        a: 1,
+      },
+      {
+        b: 2,
+      },
+    ]);
   });
 
   it("returns all items if all are plain objects", () => {
-    expect(toObjectArray([{ x: 1 }, { y: 2 }])).toEqual([{ x: 1 }, { y: 2 }]);
+    expect(
+      toObjectArray([
+        {
+          x: 1,
+        },
+        {
+          y: 2,
+        },
+      ]),
+    ).toEqual([
+      {
+        x: 1,
+      },
+      {
+        y: 2,
+      },
+    ]);
   });
 
   it("returns empty array for non-arrays", () => {
@@ -134,6 +207,13 @@ describe("toObjectArray", () => {
   });
 
   it("returns empty array for array of only non-objects", () => {
-    expect(toObjectArray([1, "two", null, true])).toEqual([]);
+    expect(
+      toObjectArray([
+        1,
+        "two",
+        null,
+        true,
+      ]),
+    ).toEqual([]);
   });
 });
