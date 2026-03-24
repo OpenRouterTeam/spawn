@@ -1030,7 +1030,11 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
+          // Force git to use HTTPS instead of SSH for GitHub URLs — pip dependencies
+          // using git+ssh:// timeout on cloud VMs where outbound SSH is blocked/slow.
+          'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+            'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
+            "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
           600,
         ),
       envVars: (apiKey) => [
@@ -1050,6 +1054,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
       updateCmd:
+        // Same SSH→HTTPS rewrite for auto-update runs
+        'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+        'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
         "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
     },
 

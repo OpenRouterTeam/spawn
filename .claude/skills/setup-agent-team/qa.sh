@@ -18,9 +18,16 @@ SPAWN_ISSUE="${SPAWN_ISSUE:-}"
 SPAWN_REASON="${SPAWN_REASON:-manual}"
 
 # Validate SPAWN_ISSUE is a positive integer to prevent command injection
-if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: SPAWN_ISSUE must be a positive integer, got: '${SPAWN_ISSUE}'" >&2
-    exit 1
+# Rejects leading zeros, zero itself, and values exceeding 32-bit signed int max (GitHub limit)
+if [[ -n "${SPAWN_ISSUE}" ]]; then
+    if [[ ! "${SPAWN_ISSUE}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: SPAWN_ISSUE must be a positive integer (1 or greater), got: '${SPAWN_ISSUE}'" >&2
+        exit 1
+    fi
+    if [[ "${#SPAWN_ISSUE}" -gt 10 ]] || [[ "${SPAWN_ISSUE}" -gt 2147483647 ]]; then
+        echo "ERROR: SPAWN_ISSUE out of range (max 2147483647), got: '${SPAWN_ISSUE}'" >&2
+        exit 1
+    fi
 fi
 
 if [[ "${SPAWN_REASON}" == "soak" ]]; then
@@ -74,17 +81,23 @@ log() {
 # --- Safe sed substitution (escapes sed metacharacters in replacement) ---
 # Usage: safe_substitute PLACEHOLDER VALUE FILE
 # Replaces all occurrences of PLACEHOLDER with VALUE in FILE, escaping
-# sed-special characters (\, &, |, newline) in VALUE to prevent misinterpretation.
+# sed-special characters (\, &, newline) in VALUE to prevent misinterpretation.
+# Uses \x01 (SOH control char) as sed delimiter to prevent delimiter injection.
 safe_substitute() {
     local placeholder="$1"
     local value="$2"
     local file="$3"
-    # Escape backslashes first, then &, then the delimiter |
+    # Reject values containing the \x01 delimiter (should never occur in normal input)
+    if printf '%s' "$value" | grep -qP '\x01'; then
+        log "ERROR: safe_substitute value contains illegal \\x01 character"
+        return 1
+    fi
+    # Escape backslashes first, then & (sed metacharacters in replacement)
     local escaped
-    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g')
     # Escape literal newlines for sed replacement (backslash + newline)
     escaped="${escaped//$'\n'/\\$'\n'}"
-    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    sed -i.bak "s$(printf '\x01')${placeholder}$(printf '\x01')${escaped}$(printf '\x01')g" "$file"
     rm -f "${file}.bak"
 }
 
