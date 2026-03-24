@@ -102,6 +102,16 @@ provision_agent() {
           continue
           ;;
       esac
+      # Defense-in-depth: reject values containing shell injection characters
+      # ($, `, \) early, before the broader whitelist check. This explicit
+      # check makes the security intent clear and catches dangerous patterns
+      # even if the whitelist regex below is ever relaxed.
+      case "${_env_val}" in
+        *'$'*|*'`'*|*'\\'*)
+          log_err "SECURITY: Dangerous characters in env value for ${_env_name} — rejecting"
+          continue
+          ;;
+      esac
       # Validate value: only allow characters that appear in cloud resource names
       # (server names, regions, sizes). This strict whitelist rejects all shell
       # metacharacters ($, `, ', ", ;, |, &, etc.) preventing command injection
@@ -312,13 +322,15 @@ CLOUD_ENV
   # Step 1: Create a temp file and write base64 data to it on the remote host.
   # env_b64 is validated above to contain only [A-Za-z0-9+/=] (base64 alphabet),
   # which cannot break out of single quotes or cause shell injection.
+  # The remote command re-validates the data as defense-in-depth.
   local b64_tmp
   b64_tmp=$(cloud_exec "${app_name}" "mktemp -t spawnrc.b64.XXXXXX" 2>/dev/null | tr -d '[:space:]')
   if [ -z "${b64_tmp}" ]; then
     log_err "Failed to create remote temp file for .spawnrc payload"
     return 1
   fi
-  if ! cloud_exec "${app_name}" "printf '%s' '${env_b64}' > '${b64_tmp}'" >/dev/null 2>&1; then
+  # Assign to remote variable and re-validate base64 on remote side before writing.
+  if ! cloud_exec "${app_name}" "_B64='${env_b64}'; printf '%s' \"\$_B64\" | grep -qE '^[A-Za-z0-9+/=]+$' && printf '%s' \"\$_B64\" > '${b64_tmp}' || exit 1" >/dev/null 2>&1; then
     log_err "Failed to write .spawnrc payload to remote temp file"
     return 1
   fi

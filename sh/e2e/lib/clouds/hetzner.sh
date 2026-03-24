@@ -151,27 +151,28 @@ _hetzner_exec() {
     return 1
   fi
 
-  # Base64-encode the command to prevent shell injection when passed as an
-  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
-  # making it safe to embed in single quotes. Stdin is preserved for callers
-  # that pipe data into cloud_exec.
+  # Base64-encode the command and pipe the payload via stdin to SSH.
+  # This eliminates variable expansion of the encoded command in the SSH
+  # command string, preventing injection even if base64 validation is bypassed.
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
   # Validate base64 output contains only safe characters (defense-in-depth).
-  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption
-  # and ensures the value cannot break out of single quotes in the SSH command.
+  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption.
   if ! printf '%s' "${encoded_cmd}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
     log_err "Invalid base64 encoding of command for SSH exec"
     return 1
   fi
 
-  ssh -o StrictHostKeyChecking=no \
+  # Pipe the base64 payload via stdin to the remote host. The remote bash
+  # reads stdin, base64-decodes it, and executes the result. No user-controlled
+  # data is interpolated into the SSH command string.
+  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
       -o LogLevel=ERROR \
       -o BatchMode=yes \
       -o ConnectTimeout=10 \
-      "root@${ip}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
+      "root@${ip}" "base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
