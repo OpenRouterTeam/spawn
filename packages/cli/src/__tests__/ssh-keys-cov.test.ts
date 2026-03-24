@@ -176,6 +176,15 @@ describe("getSshFingerprint edge cases", () => {
     spawnSpy.mockRestore();
     expect(fp).toBe("");
   });
+
+  it("returns empty string when ssh-keygen is not found (spawnSync throws)", () => {
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(() => {
+      throw new Error("Executable not found in $PATH: ssh-keygen");
+    });
+    const fp = getSshFingerprint("/tmp/fake.pub");
+    spawnSpy.mockRestore();
+    expect(fp).toBe("");
+  });
 });
 
 describe("discoverSshKeys sorting", () => {
