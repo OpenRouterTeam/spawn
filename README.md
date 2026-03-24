@@ -236,6 +236,20 @@ If spawn fails to install, try these steps:
    spawn openclaw digitalocean
    ```
 
+### Headless JSON mode — agent exits immediately
+
+When using `--headless --output json` with Claude Code, you must also pass `--prompt` (or `-p`). Without it, Claude exits with `Input must be provided through stdin or --prompt` and the JSON output will show `"status":"error"`:
+
+```bash
+# WRONG — Claude exits immediately
+spawn claude gcp --headless --output json
+
+# RIGHT — provide a prompt
+spawn claude gcp --headless --output json --prompt "Fix all linter errors"
+```
+
+Note: auto-update messages may appear before the JSON on older CLI versions. Run `spawn update` to get the fix.
+
 ### Agent launch failures
 
 If an agent fails to install or launch on a cloud:
