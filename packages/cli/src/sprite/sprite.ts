@@ -24,8 +24,10 @@ import {
 
 const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
 
-/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs. */
-const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "300", 10);
+/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs.
+ * Raised from 300s to 600s to accommodate slower Sprite API responses in long
+ * E2E runs where HTTP timeouts were observed (net/http: Client.Timeout). #2934 */
+const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "600", 10);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -84,10 +86,14 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
       break;
     }
 
-    // Only retry on transient network errors
-    if (/TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout/i.test(msg)) {
+    // Only retry on transient network errors and auth expiry (#2934)
+    if (
+      /TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout|Client\.Timeout|request canceled|authentication failed/i.test(
+        msg,
+      )
+    ) {
       logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
-      await sleep(3000);
+      await sleep(3000 * attempt);
       continue;
     }
 
