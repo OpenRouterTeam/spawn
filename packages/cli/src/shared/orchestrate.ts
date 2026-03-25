@@ -41,6 +41,9 @@ export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
 
 /** Wrap a command to run inside the Docker container instead of the host. */
 export function makeDockerExec(cmd: string): string {
+  if (!cmd || cmd.length === 0) {
+    throw new Error("makeDockerExec: command must be non-empty");
+  }
   return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
 }
 
