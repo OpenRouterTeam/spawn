@@ -115,13 +115,19 @@ function wrapWithRestartLoop(cmd: string): string {
 /** Install the spawn CLI on a remote VM. */
 export async function installSpawnCli(runner: CloudRunner): Promise<void> {
   logStep("Installing spawn CLI on VM...");
+  // Build PATH explicitly — non-interactive bash skips .bashrc (PS1 guard),
+  // and some platforms (Sprite) have a broken bun shim that finds via
+  // `command -v` but doesn't actually work. We prepend all known bun
+  // locations so the real binary is found first, then test `bun --version`
+  // (not just existence) and install bun fresh if it doesn't work.
+  const installCmd = [
+    'export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"',
+    'export PATH="$BUN_INSTALL/bin:$HOME/.local/bin:$HOME/.npm-global/bin:/.sprite/languages/bun/bin:/usr/local/bin:$PATH"',
+    'if ! bun --version >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash && export PATH="$HOME/.bun/bin:$PATH"; fi',
+    "curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash",
+  ].join("; ");
   const result = await asyncTryCatch(() =>
-    withRetry(
-      "spawn CLI install",
-      () => wrapSshCall(runner.runServer("curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash")),
-      2,
-      5,
-    ),
+    withRetry("spawn CLI install", () => wrapSshCall(runner.runServer(installCmd)), 2, 5),
   );
   if (!result.ok) {
     logWarn("Spawn CLI install failed — recursive spawning will not be available on this VM");

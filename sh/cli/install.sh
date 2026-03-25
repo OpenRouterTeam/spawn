@@ -305,8 +305,11 @@ _SPAWN_ORIG_PATH="${PATH}"
 export BUN_INSTALL="${BUN_INSTALL:-${HOME}/.bun}"
 export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
-if ! command -v bun &>/dev/null; then
-    log_step "bun not found. Installing bun..."
+# Check that bun exists AND actually works. Some platforms (e.g. Sprite)
+# have a bun shim that delegates to $HOME/.bun/bin/bun — if that binary
+# doesn't exist, `command -v bun` returns 0 but `bun --version` fails.
+if ! bun --version &>/dev/null; then
+    log_step "bun not found or not working. Installing bun..."
 
     # Download the bun installer to a temp file and verify its SHA-256 hash
     # before executing. This defends against a compromised bun.sh CDN or
