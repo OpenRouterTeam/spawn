@@ -608,6 +608,13 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
     "else",
     "  printf '\\n[shell]\\npolicy = \"allow_all\"\\n' >> config.toml",
     "fi",
+    // Force native runtime (no Docker) — zeroclaw auto-detects Docker and
+    // launches in a container otherwise, which hangs the interactive session.
+    'if grep -q "^\\[runtime\\]" config.toml 2>/dev/null; then',
+    "  sed -i 's/^adapter = .*/adapter = \"native\"/' config.toml",
+    "else",
+    "  printf '\\n[runtime]\\nadapter = \"native\"\\n' >> config.toml",
+    "fi",
   ].join("\n");
   await runner.runServer(patchScript);
   logInfo("ZeroClaw configured for autonomous operation");
@@ -1003,6 +1010,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
+        "ZEROCLAW_RUNTIME=native",
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
