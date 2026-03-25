@@ -206,6 +206,145 @@ describe("recursive spawn", () => {
     });
   });
 
+  // ── installSpawnCli ────────────────────────────────────────────────
+
+  describe("installSpawnCli", () => {
+    it("runs install script on the remote runner", async () => {
+      const { installSpawnCli } = await import("../shared/orchestrate.js");
+      const commands: string[] = [];
+      const mockRunner = {
+        runServer: async (cmd: string) => {
+          commands.push(cmd);
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      await installSpawnCli(mockRunner);
+
+      expect(commands.length).toBeGreaterThan(0);
+      expect(commands[0]).toContain("install.sh");
+    });
+
+    it("handles install failure gracefully", async () => {
+      const { installSpawnCli } = await import("../shared/orchestrate.js");
+      const mockRunner = {
+        runServer: async () => {
+          // Throw a timeout error so withRetry doesn't retry (timeouts are non-retryable)
+          throw new Error("command timed out");
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      // Should not throw — installSpawnCli catches errors gracefully
+      await installSpawnCli(mockRunner);
+    });
+  });
+
+  // ── delegateCloudCredentials ──────────────────────────────────────
+
+  describe("delegateCloudCredentials", () => {
+    it("skips when no credential files exist", async () => {
+      const { delegateCloudCredentials } = await import("../shared/orchestrate.js");
+      const commands: string[] = [];
+      const mockRunner = {
+        runServer: async (cmd: string) => {
+          commands.push(cmd);
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      // No credential files exist in test sandbox, so should warn and return
+      await delegateCloudCredentials(mockRunner, "hetzner");
+
+      // Should not have run mkdir since there are no files to delegate
+      expect(commands.length).toBe(0);
+    });
+
+    it("delegates credentials when files exist", async () => {
+      const { delegateCloudCredentials } = await import("../shared/orchestrate.js");
+      const home = process.env.HOME ?? "";
+      const configDir = join(home, ".config", "spawn");
+      mkdirSync(configDir, {
+        recursive: true,
+      });
+      writeFileSync(join(configDir, "hetzner.json"), '{"token":"test-token"}');
+      writeFileSync(join(configDir, "openrouter.json"), '{"key":"test-key"}');
+
+      const commands: string[] = [];
+      const mockRunner = {
+        runServer: async (cmd: string) => {
+          commands.push(cmd);
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      await delegateCloudCredentials(mockRunner, "hetzner");
+
+      // Should have run mkdir + 2 file writes
+      expect(commands.length).toBe(3);
+      expect(commands[0]).toContain("mkdir -p ~/.config/spawn");
+      expect(commands[1]).toContain("hetzner.json");
+      expect(commands[2]).toContain("openrouter.json");
+    });
+
+    it("handles file write failure gracefully", async () => {
+      const { delegateCloudCredentials } = await import("../shared/orchestrate.js");
+      const home = process.env.HOME ?? "";
+      const configDir = join(home, ".config", "spawn");
+      mkdirSync(configDir, {
+        recursive: true,
+      });
+      writeFileSync(join(configDir, "hetzner.json"), '{"token":"test"}');
+
+      let callCount = 0;
+      const mockRunner = {
+        runServer: async (_cmd: string) => {
+          callCount += 1;
+          // First call (mkdir) succeeds (returns void), second call (file write) fails
+          if (callCount >= 2) {
+            throw new Error("write failed");
+          }
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      // Should not throw
+      await delegateCloudCredentials(mockRunner, "hetzner");
+      // At least 2 calls: mkdir + file write(s) that fail
+      expect(callCount).toBeGreaterThanOrEqual(2);
+    });
+
+    it("handles mkdir failure gracefully", async () => {
+      const { delegateCloudCredentials } = await import("../shared/orchestrate.js");
+      const home = process.env.HOME ?? "";
+      const configDir = join(home, ".config", "spawn");
+      mkdirSync(configDir, {
+        recursive: true,
+      });
+      writeFileSync(join(configDir, "hetzner.json"), '{"token":"test"}');
+
+      let callCount = 0;
+      const mockRunner = {
+        runServer: async () => {
+          callCount += 1;
+          throw new Error("SSH failed");
+        },
+        uploadFile: async () => {},
+        downloadFile: async () => {},
+      };
+
+      // Should not throw, just warn
+      await delegateCloudCredentials(mockRunner, "hetzner");
+      // mkdir was called and failed
+      expect(callCount).toBe(1);
+    });
+  });
+
   // ── Recursive env vars ───────────────────────────────────────────────
 
   describe("recursive env vars", () => {

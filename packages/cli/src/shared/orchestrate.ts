@@ -109,7 +109,7 @@ function wrapWithRestartLoop(cmd: string): string {
 // ── Recursive spawn helpers ──────────────────────────────────────────────────
 
 /** Install the spawn CLI on a remote VM. */
-async function installSpawnCli(runner: CloudRunner): Promise<void> {
+export async function installSpawnCli(runner: CloudRunner): Promise<void> {
   logStep("Installing spawn CLI on VM...");
   const result = await asyncTryCatch(() =>
     withRetry(
@@ -127,7 +127,7 @@ async function installSpawnCli(runner: CloudRunner): Promise<void> {
 }
 
 /** Copy local cloud credentials to the remote VM for recursive spawning. */
-async function delegateCloudCredentials(runner: CloudRunner, cloudName: string): Promise<void> {
+export async function delegateCloudCredentials(runner: CloudRunner, cloudName: string): Promise<void> {
   logStep("Delegating cloud credentials to VM...");
 
   // Validate cloudName to prevent command injection via crafted cloud names
