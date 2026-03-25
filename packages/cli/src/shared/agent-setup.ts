@@ -390,6 +390,9 @@ async function setupOpenclawConfig(
             model: {
               primary: modelId,
             },
+            sandbox: {
+              mode: "off",
+            },
           },
         },
       },
@@ -411,6 +414,15 @@ async function setupOpenclawConfig(
       logWarn("Custom model config failed (non-fatal)");
     }
   }
+
+  // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
+  // auto-detects it and runs agents inside containers, which hangs the session.
+  await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set agents.defaults.sandbox.mode off >/dev/null",
+    ),
+  );
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Redirect stdout to suppress doctor warnings on each call.
