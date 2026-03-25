@@ -2,5 +2,6 @@ language js(typescript)
 
 TsAsExpression() as $expr where {
   ! $expr <: `$_ as const`,
+  ! $expr <: JsNamedImportSpecifier(),
   register_diagnostic(span=$expr, message="Type assertions (`as`) are banned. Use schema validation (parseJsonWith), type guards, or `satisfies` instead.", severity="error")
 }
