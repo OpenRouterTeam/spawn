@@ -6,7 +6,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { shouldSkipCloudInit } from "../shared/cloud-init.js";
-import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerExec, runOrchestration } from "../shared/orchestrate.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -51,13 +51,17 @@ async function main() {
   const cloud: CloudOrchestrator = {
     cloudName: "gcp",
     cloudLabel: "GCP Compute Engine",
-    runner: {
-      runServer: useDocker
-        ? (cmd: string, timeoutSecs?: number) => runServer(makeDockerExec(cmd), timeoutSecs)
-        : runServer,
-      uploadFile,
-      downloadFile,
-    },
+    runner: useDocker
+      ? makeDockerRunner({
+          runServer,
+          uploadFile,
+          downloadFile,
+        })
+      : {
+          runServer,
+          uploadFile,
+          downloadFile,
+        },
     async authenticate() {
       await promptSpawnName();
       await ensureGcloudCli();
