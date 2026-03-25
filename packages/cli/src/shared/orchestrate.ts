@@ -11,7 +11,7 @@ import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
 import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
-import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball.js";
+import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
 import { getSpawnPreferencesPath } from "./paths.js";
@@ -187,7 +187,7 @@ export async function runOrchestration(
     const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
 
     // These all run concurrently with server boot
-    const [bootResult, apiKeyResult, , , tarballResult] = await Promise.allSettled([
+    const [bootResult, apiKeyResult] = await Promise.allSettled([
       serverBootPromise,
       resolveApiKey(agentName, cloud.cloudName),
       cloud.checkAccountReady
@@ -200,7 +200,6 @@ export async function runOrchestration(
         : Promise.resolve({
             ok: true,
           }),
-      !cloud.skipAgentInstall && !agent.skipTarball ? downloadTarballLocally(agentName) : Promise.resolve(null),
     ]);
 
     // Server boot must succeed — retry if it failed
@@ -246,21 +245,12 @@ export async function runOrchestration(
     }
     const envContent = generateEnvConfig(envPairs);
 
-    // Install agent — parallel tarball upload, fallback to remote, then live
+    // Install agent — remote tarball, fallback to live install
     if (cloud.skipAgentInstall) {
       logInfo("Snapshot boot — skipping agent install");
     } else {
       let installed = false;
-      const localTarball = tarballResult.status === "fulfilled" ? tarballResult.value : null;
-      if (localTarball) {
-        installed = await uploadAndExtractTarball(cloud.runner, localTarball.localPath);
-        localTarball.cleanup();
-      }
-      // Only try remote tarball download when we didn't already have a local tarball.
-      // If the local tarball was available but upload/extract failed, the remote
-      // download would face the same extraction issues — skip it to save ~150s
-      // and fall through to live install immediately.
-      if (!installed && !localTarball && useTarball && !agent.skipTarball) {
+      if (useTarball && !agent.skipTarball) {
         const tarball = options?.tryTarball ?? tryTarballInstall;
         installed = await tarball(cloud.runner, agentName);
       }
