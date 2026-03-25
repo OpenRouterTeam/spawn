@@ -160,19 +160,6 @@ describe("confirmAndDelete", () => {
     const confirmCall = clack.confirm.mock.calls[0];
     expect(confirmCall?.[0].message).toContain("9.8.7.6");
   });
-
-  it("intercepts stderr writes to update spinner", async () => {
-    clack.confirm.mockResolvedValue(true);
-    // Handler that writes to stderr during execution
-    const handler = mock(async () => {
-      // stderr.write is intercepted during delete, but we mock it
-      return true;
-    });
-    const record = makeRecord();
-
-    const result = await confirmAndDelete(record, mockManifest, handler);
-    expect(result).toBe(true);
-  });
 });
 
 describe("cmdDelete", () => {

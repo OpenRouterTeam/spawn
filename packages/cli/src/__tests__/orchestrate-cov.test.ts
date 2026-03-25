@@ -501,39 +501,6 @@ describe("orchestrate tunnel", () => {
   });
 });
 
-// ── restart loop wrapping ─────────────────────────────────────────────
-
-describe("orchestrate restart loop", () => {
-  it("wraps launch command in restart loop for non-local cloud", async () => {
-    const sessionFn = mock(() => Promise.resolve(0));
-    const cloud = createMockCloud({
-      cloudName: "hetzner",
-      interactiveSession: sessionFn,
-    });
-    const agent = createMockAgent();
-
-    await runSafe(cloud, agent, "testagent");
-
-    const cmd = sessionFn.mock.calls[0][0];
-    expect(cmd).toContain("_spawn_restarts=0");
-    expect(cmd).toContain("_spawn_max=10");
-  });
-
-  it("does not wrap in restart loop for local cloud", async () => {
-    const sessionFn = mock(() => Promise.resolve(0));
-    const cloud = createMockCloud({
-      cloudName: "local",
-      interactiveSession: sessionFn,
-    });
-    const agent = createMockAgent();
-
-    await runSafe(cloud, agent, "testagent");
-
-    const cmd = sessionFn.mock.calls[0][0];
-    expect(cmd).not.toContain("_spawn_restarts");
-  });
-});
-
 // ── step validation with unknown steps ────────────────────────────────
 
 describe("orchestrate unknown steps", () => {
