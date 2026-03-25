@@ -246,6 +246,17 @@ describe("recursive spawn", () => {
   // ── delegateCloudCredentials ──────────────────────────────────────
 
   describe("delegateCloudCredentials", () => {
+    beforeEach(() => {
+      // Remove credential files that other test files may have written to the shared sandbox HOME
+      const configDir = join(process.env.HOME ?? "", ".config", "spawn");
+      if (existsSync(configDir)) {
+        rmSync(configDir, {
+          recursive: true,
+          force: true,
+        });
+      }
+    });
+
     it("skips when no credential files exist", async () => {
       const { delegateCloudCredentials } = await import("../shared/orchestrate.js");
       const commands: string[] = [];
