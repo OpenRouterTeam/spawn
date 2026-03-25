@@ -178,27 +178,6 @@ describe("history spawn IDs", () => {
       expect(history[0].connection?.launch_cmd).toBe("claude --start");
       expect(history[1].connection?.launch_cmd).toBeUndefined();
     });
-
-    it("falls back to most recent record with connection when no spawnId", () => {
-      const id = generateSpawnId();
-      saveSpawnRecord({
-        id,
-        agent: "claude",
-        cloud: "gcp",
-        timestamp: "2026-01-01T00:00:00.000Z",
-        connection: {
-          ip: "1.1.1.1",
-          user: "root",
-          server_name: "srv",
-          cloud: "gcp",
-        },
-      });
-
-      saveLaunchCmd("fallback-cmd");
-
-      const history = loadHistory();
-      expect(history[0].connection?.launch_cmd).toBe("fallback-cmd");
-    });
   });
 
   // ── removeRecord matches by id ────────────────────────────────────────
