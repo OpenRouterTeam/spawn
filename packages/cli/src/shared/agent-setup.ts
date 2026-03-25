@@ -285,6 +285,7 @@ async function setupCodexConfig(runner: CloudRunner): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
+sandbox_mode = "danger-full-access"
 
 [model_providers.openrouter]
 name = "OpenRouter"
@@ -390,6 +391,9 @@ async function setupOpenclawConfig(
             model: {
               primary: modelId,
             },
+            sandbox: {
+              mode: "off",
+            },
           },
         },
       },
@@ -411,6 +415,15 @@ async function setupOpenclawConfig(
       logWarn("Custom model config failed (non-fatal)");
     }
   }
+
+  // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
+  // auto-detects it and runs agents inside containers, which hangs the session.
+  await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set agents.defaults.sandbox.mode off >/dev/null",
+    ),
+  );
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Redirect stdout to suppress doctor warnings on each call.
@@ -607,6 +620,13 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
     "  sed -i 's/^policy = .*/policy = \"allow_all\"/' config.toml",
     "else",
     "  printf '\\n[shell]\\npolicy = \"allow_all\"\\n' >> config.toml",
+    "fi",
+    // Force native runtime (no Docker) — zeroclaw auto-detects Docker and
+    // launches in a container otherwise, which hangs the interactive session.
+    'if grep -q "^\\[runtime\\]" config.toml 2>/dev/null; then',
+    "  sed -i 's/^adapter = .*/adapter = \"native\"/' config.toml",
+    "else",
+    "  printf '\\n[runtime]\\nadapter = \"native\"\\n' >> config.toml",
     "fi",
   ].join("\n");
   await runner.runServer(patchScript);
@@ -1003,6 +1023,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
+        "ZEROCLAW_RUNTIME=native",
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
