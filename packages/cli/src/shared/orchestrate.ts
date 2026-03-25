@@ -17,6 +17,7 @@ import { getOrPromptApiKey } from "./oauth.js";
 import { getSpawnCloudConfigPath, getSpawnPreferencesPath, getUserHome } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell.js";
+import { injectSpawnSkill } from "./spawn-skill.js";
 import { sleep, startSshTunnel } from "./ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys.js";
 import {
@@ -549,11 +550,11 @@ async function postInstall(
     await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
   }
 
-  // Recursive spawn setup — install spawn CLI and delegate credentials
-  const betaFeaturesPost = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
-  if (betaFeaturesPost.has("recursive") && cloud.cloudName !== "local") {
+  // Spawn CLI + skill injection (recursive spawn)
+  if (enabledSteps?.has("spawn") && cloud.cloudName !== "local") {
     await installSpawnCli(cloud.runner);
     await delegateCloudCredentials(cloud.runner, cloud.cloudName);
+    await injectSpawnSkill(cloud.runner, agentName);
   }
 
   // Pre-launch hooks (retry loop)

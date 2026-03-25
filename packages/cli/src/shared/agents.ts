@@ -113,6 +113,14 @@ const AGENT_EXTRA_STEPS: Record<string, OptionalStep[]> = {
   ],
 };
 
+/** The "spawn" step — only shown when --beta recursive is active. */
+const SPAWN_STEP: OptionalStep = {
+  value: "spawn",
+  label: "Spawn CLI",
+  hint: "install spawn for recursive VM creation",
+  defaultOn: true,
+};
+
 /** Steps shown for every agent. */
 const COMMON_STEPS: OptionalStep[] = [
   {
@@ -140,13 +148,23 @@ const COMMON_STEPS: OptionalStep[] = [
 
 /** Get the optional setup steps for a given agent (no CloudRunner required). */
 export function getAgentOptionalSteps(agentName: string): OptionalStep[] {
-  const extra = AGENT_EXTRA_STEPS[agentName];
-  return extra
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",").filter(Boolean);
+  const hasRecursive = betaFeatures.includes("recursive");
+
+  const steps = hasRecursive
     ? [
         ...COMMON_STEPS,
-        ...extra,
+        SPAWN_STEP,
       ]
-    : COMMON_STEPS;
+    : [
+        ...COMMON_STEPS,
+      ];
+
+  const extra = AGENT_EXTRA_STEPS[agentName];
+  if (extra) {
+    steps.push(...extra);
+  }
+  return steps;
 }
 
 /** Validate step names against the known steps for an agent.
