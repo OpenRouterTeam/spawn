@@ -242,7 +242,7 @@ export async function confirmAndDelete(
 }
 
 /** Pull child history from a remote VM via SSH before deleting it. */
-async function pullChildHistory(record: SpawnRecord): Promise<void> {
+export async function pullChildHistory(record: SpawnRecord): Promise<void> {
   const conn = record.connection;
   if (!conn?.ip || !conn.user || conn.cloud === "local" || conn.ip === "sprite-console") {
     return;
@@ -298,7 +298,7 @@ async function pullChildHistory(record: SpawnRecord): Promise<void> {
 }
 
 /** Find all children of a given spawn record (direct and transitive). */
-function findDescendants(parentId: string): SpawnRecord[] {
+export function findDescendants(parentId: string): SpawnRecord[] {
   const history = loadHistory();
   const descendants: SpawnRecord[] = [];
   const queue = [

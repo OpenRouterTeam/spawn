@@ -3,6 +3,7 @@ import type { SpawnRecord } from "../history.js";
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { findDescendants, pullChildHistory } from "../commands/delete.js";
 import { cmdTree } from "../commands/tree.js";
 import { exportHistory, HISTORY_SCHEMA_VERSION, loadHistory, mergeChildHistory, saveSpawnRecord } from "../history.js";
 
@@ -559,6 +560,165 @@ describe("recursive spawn", () => {
       const output = logs.join("\n");
       expect(output).toContain("deleted");
       expect(output).toContain("depth=1");
+    });
+  });
+
+  // ── findDescendants ──────────────────────────────────────────────────
+
+  describe("findDescendants", () => {
+    it("finds direct children", () => {
+      saveSpawnRecord({
+        id: "parent-1",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        id: "child-1",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+        parent_id: "parent-1",
+      });
+      saveSpawnRecord({
+        id: "child-2",
+        agent: "openclaw",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T02:00:00.000Z",
+        parent_id: "parent-1",
+      });
+
+      const descendants = findDescendants("parent-1");
+      expect(descendants).toHaveLength(2);
+      expect(descendants.map((d) => d.id).sort()).toEqual([
+        "child-1",
+        "child-2",
+      ]);
+    });
+
+    it("finds transitive descendants", () => {
+      saveSpawnRecord({
+        id: "root",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        id: "child",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+        parent_id: "root",
+      });
+      saveSpawnRecord({
+        id: "grandchild",
+        agent: "openclaw",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T02:00:00.000Z",
+        parent_id: "child",
+      });
+
+      const descendants = findDescendants("root");
+      expect(descendants).toHaveLength(2);
+      expect(descendants.map((d) => d.id)).toContain("child");
+      expect(descendants.map((d) => d.id)).toContain("grandchild");
+    });
+
+    it("returns empty array when no children", () => {
+      saveSpawnRecord({
+        id: "lonely",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+
+      const descendants = findDescendants("lonely");
+      expect(descendants).toHaveLength(0);
+    });
+
+    it("excludes deleted descendants", () => {
+      saveSpawnRecord({
+        id: "parent",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        id: "deleted-child",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+        parent_id: "parent",
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          deleted: true,
+          deleted_at: "2026-03-24T05:00:00.000Z",
+        },
+      });
+
+      const descendants = findDescendants("parent");
+      expect(descendants).toHaveLength(0);
+    });
+  });
+
+  // ── pullChildHistory ─────────────────────────────────────────────────
+
+  describe("pullChildHistory", () => {
+    it("skips records without connection", async () => {
+      const record: SpawnRecord = {
+        id: "no-conn",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      };
+      // Should not throw
+      await pullChildHistory(record);
+    });
+
+    it("skips local cloud records", async () => {
+      const record: SpawnRecord = {
+        id: "local-1",
+        agent: "claude",
+        cloud: "local",
+        timestamp: "2026-03-24T00:00:00.000Z",
+        connection: {
+          ip: "127.0.0.1",
+          user: "me",
+          cloud: "local",
+        },
+      };
+      await pullChildHistory(record);
+    });
+
+    it("skips sprite-console records", async () => {
+      const record: SpawnRecord = {
+        id: "sprite-1",
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-03-24T00:00:00.000Z",
+        connection: {
+          ip: "sprite-console",
+          user: "root",
+          cloud: "sprite",
+        },
+      };
+      await pullChildHistory(record);
+    });
+
+    it("skips records without IP", async () => {
+      const record: SpawnRecord = {
+        id: "no-ip",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+        connection: {
+          ip: "",
+          user: "root",
+          cloud: "hetzner",
+        },
+      };
+      await pullChildHistory(record);
     });
   });
 });
