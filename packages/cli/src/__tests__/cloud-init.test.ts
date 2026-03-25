@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getPackagesForTier, needsBun, needsNode } from "../shared/cloud-init.js";
+import { getPackagesForTier, needsBun, needsNode, shouldSkipCloudInit } from "../shared/cloud-init.js";
 
 describe("getPackagesForTier", () => {
   const MINIMAL_PACKAGES = [
@@ -111,5 +111,78 @@ describe("needsBun", () => {
   }
   it("defaults to true (full tier)", () => {
     expect(needsBun()).toBe(true);
+  });
+});
+
+describe("shouldSkipCloudInit", () => {
+  it("returns true when useDocker is true", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true when snapshotId is a non-null string", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+        snapshotId: "snap-123",
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true when skipCloudInit is true", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+        skipCloudInit: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when all flags are off", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when snapshotId is null", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+        snapshotId: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when snapshotId is undefined", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+        snapshotId: undefined,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when skipCloudInit is false", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: false,
+        skipCloudInit: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true when multiple flags are set", () => {
+    expect(
+      shouldSkipCloudInit({
+        useDocker: true,
+        snapshotId: "snap-1",
+        skipCloudInit: true,
+      }),
+    ).toBe(true);
   });
 });

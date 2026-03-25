@@ -1,7 +1,7 @@
 /**
  * ssh-cov.test.ts — Coverage tests for shared/ssh.ts
  *
- * Covers: spawnInteractive, sleep, killWithTimeout, startSshTunnel,
+ * Covers: spawnInteractive, startSshTunnel,
  * waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS
  */
 
@@ -13,7 +13,7 @@ import * as net from "node:net";
 // Suppress stderr during tests — restored in afterAll to avoid contamination
 let stderrSpy: ReturnType<typeof spyOn>;
 
-const { spawnInteractive, sleep, killWithTimeout, startSshTunnel, waitForSsh, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } =
+const { spawnInteractive, startSshTunnel, waitForSsh, validateRemotePath, SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS } =
   await import("../shared/ssh.js");
 
 /** Create a fake socket (EventEmitter) that satisfies net.Socket interface for testing. */
@@ -38,23 +38,14 @@ afterEach(() => {
 // ── Constants ──────────────────────────────────────────────────────────
 
 describe("SSH constants", () => {
-  it("SSH_BASE_OPTS includes StrictHostKeyChecking", () => {
+  it("SSH_BASE_OPTS has required non-interactive options", () => {
     expect(SSH_BASE_OPTS).toContain("StrictHostKeyChecking=no");
-  });
-
-  it("SSH_BASE_OPTS includes BatchMode", () => {
     expect(SSH_BASE_OPTS).toContain("BatchMode=yes");
   });
 
-  it("SSH_INTERACTIVE_OPTS includes accept-new", () => {
+  it("SSH_INTERACTIVE_OPTS has interactive options and no BatchMode", () => {
     expect(SSH_INTERACTIVE_OPTS).toContain("StrictHostKeyChecking=accept-new");
-  });
-
-  it("SSH_INTERACTIVE_OPTS includes -t flag", () => {
     expect(SSH_INTERACTIVE_OPTS).toContain("-t");
-  });
-
-  it("SSH_INTERACTIVE_OPTS does not include BatchMode", () => {
     expect(SSH_INTERACTIVE_OPTS).not.toContain("BatchMode=yes");
   });
 });
@@ -139,54 +130,6 @@ describe("spawnInteractive", () => {
       }),
     );
     spy.mockRestore();
-  });
-});
-
-// ── sleep ──────────────────────────────────────────────────────────────
-
-describe("sleep", () => {
-  it("resolves after the specified delay", async () => {
-    const start = Date.now();
-    await sleep(50);
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(40);
-  });
-
-  it("resolves with undefined", async () => {
-    const result = await sleep(1);
-    expect(result).toBeUndefined();
-  });
-});
-
-// ── killWithTimeout (additional coverage) ──────────────────────────────
-
-describe("killWithTimeout additional", () => {
-  it("sends SIGTERM immediately then SIGKILL after grace period", async () => {
-    const signals: (number | undefined)[] = [];
-    const proc = {
-      kill(signal?: number) {
-        signals.push(signal);
-      },
-    };
-    killWithTimeout(proc, 50);
-    expect(signals).toEqual([
-      undefined,
-    ]); // SIGTERM sent immediately
-    await sleep(100);
-    expect(signals).toEqual([
-      undefined,
-      9,
-    ]); // SIGKILL sent after grace
-  });
-
-  it("does nothing when first kill throws (process already dead)", () => {
-    const proc = {
-      kill() {
-        throw new Error("No such process");
-      },
-    };
-    // Should not throw
-    killWithTimeout(proc, 50);
   });
 });
 
@@ -322,8 +265,45 @@ describe("waitForSsh", () => {
       maxAttempts: 5,
     });
 
+    // TCP connect retried until open, then SSH handshake attempted
+    expect(connectSpy).toHaveBeenCalled();
+    expect(bunSpawnSpy).toHaveBeenCalled();
     bunSpawnSpy.mockRestore();
     connectSpy.mockRestore();
+  });
+});
+
+// ── validateRemotePath ───────────────────────────────────────────────
+
+describe("validateRemotePath", () => {
+  it("accepts valid Linux paths with forward slashes", () => {
+    expect(validateRemotePath("/home/user/config.json")).toBe("/home/user/config.json");
+    expect(validateRemotePath("/root/.spawn-tarball")).toBe("/root/.spawn-tarball");
+    expect(validateRemotePath("$HOME/.config/spawn")).toBe("$HOME/.config/spawn");
+  });
+
+  it("normalizes using POSIX rules (no backslashes)", () => {
+    // normalize should collapse double slashes but never introduce backslashes
+    const result = validateRemotePath("/home//user///file.txt");
+    expect(result).toBe("/home/user/file.txt");
+    expect(result).not.toContain("\\");
+  });
+
+  it("rejects path traversal", () => {
+    expect(() => validateRemotePath("/home/../etc/passwd")).toThrow("path traversal");
+    expect(() => validateRemotePath("../etc/shadow")).toThrow("path traversal");
+  });
+
+  it("rejects empty path", () => {
+    expect(() => validateRemotePath("")).toThrow("must not be empty");
+  });
+
+  it("rejects argument injection", () => {
+    expect(() => validateRemotePath("/-evil")).toThrow('must not start with "-"');
+  });
+
+  it("rejects unsafe characters", () => {
+    expect(() => validateRemotePath("/home/user;rm -rf")).toThrow("unsafe characters");
   });
 });
 

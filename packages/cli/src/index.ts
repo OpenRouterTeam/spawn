@@ -127,6 +127,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
+    console.error(`    ${pc.cyan("--beta docker")}       Use Docker CE app image on Hetzner/GCP (faster boot)`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -798,7 +799,12 @@ async function main(): Promise<void> {
 
   const args = expandEqualsFlags(rawArgs);
 
-  await checkForUpdates();
+  // Pre-scan for --output json before checkForUpdates() so install script
+  // stdout can be redirected to stderr, preventing JSON output pollution.
+  const preOutputIdx = args.indexOf("--output");
+  const isJsonOutput = preOutputIdx !== -1 && args[preOutputIdx + 1] === "json";
+
+  await checkForUpdates(isJsonOutput);
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
 
@@ -850,6 +856,7 @@ async function main(): Promise<void> {
     "tarball",
     "images",
     "parallel",
+    "docker",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
@@ -859,12 +866,13 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
       console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
       console.error(`  ${pc.cyan("parallel")}  Parallelize server boot with setup prompts`);
+      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner/GCP (faster boot)`);
       process.exit(1);
     }
   }
   // --fast implies all beta features
   if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel");
+    betaFeatures.push("tarball", "images", "parallel", "docker");
   }
   if (betaFeatures.length > 0) {
     process.env.SPAWN_BETA = [

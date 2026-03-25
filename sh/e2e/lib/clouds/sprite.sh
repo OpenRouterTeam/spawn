@@ -138,10 +138,57 @@ _sprite_headless_env() {
 }
 
 # ---------------------------------------------------------------------------
+# _sprite_refresh_auth
+#
+# Re-validate Sprite credentials by running `sprite org list`. If the token
+# has expired (common after ~60 min), re-run `sprite auth login --headless`
+# to obtain a fresh token. Updates _SPRITE_ORG on success.
+#
+# Called before each E2E provisioning batch to prevent auth expiry failures
+# in long-running E2E suites (73+ min). See #2934.
+# ---------------------------------------------------------------------------
+_sprite_refresh_auth() {
+  local org_output
+  org_output=$(sprite org list 2>/dev/null || true)
+
+  if [ -n "${org_output}" ]; then
+    # Token is still valid — update org in case it changed
+    local refreshed_org
+    refreshed_org=$(printf '%s' "${org_output}" | sed -n 's/.*Currently selected org: *//p' | awk '{print $1}')
+    if [ -n "${refreshed_org}" ]; then
+      _SPRITE_ORG="${refreshed_org}"
+    fi
+    log_info "Sprite auth token is still valid"
+    return 0
+  fi
+
+  # Token expired — attempt re-auth via sprite auth refresh
+  log_warn "Sprite auth token expired — attempting refresh..."
+  if sprite auth refresh >/dev/null 2>&1; then
+    org_output=$(sprite org list 2>/dev/null || true)
+    if [ -n "${org_output}" ]; then
+      local refreshed_org
+      refreshed_org=$(printf '%s' "${org_output}" | sed -n 's/.*Currently selected org: *//p' | awk '{print $1}')
+      if [ -n "${refreshed_org}" ]; then
+        _SPRITE_ORG="${refreshed_org}"
+      fi
+      log_ok "Sprite auth token refreshed successfully"
+      return 0
+    fi
+  fi
+
+  log_err "Sprite auth refresh failed — subsequent operations may fail"
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # _sprite_provision_verify APP LOG_DIR
 #
 # Verify sprite VM exists after provisioning by checking `sprite list` output
 # for the APP name. Write sentinel and metadata files for downstream steps.
+#
+# Retries up to 3 times with exponential backoff (5s, 10s, 20s) to handle
+# transient list failures from CLI rate-limiting or config corruption (#2934).
 #
 # Writes:
 #   $LOG_DIR/$APP.ip    — "sprite-cli" sentinel (no IP — Sprite uses names)
@@ -150,31 +197,55 @@ _sprite_headless_env() {
 _sprite_provision_verify() {
   local app="$1"
   local log_dir="$2"
+  local _max_retries=3
+  local _retry_delay=5
 
-  # Check instance exists in sprite list
-  _sprite_fix_config
-  local sprite_output
-  sprite_output=$(_sprite_cmd list 2>/dev/null || true)
+  local _attempt=0
+  while [ "${_attempt}" -lt "${_max_retries}" ]; do
+    # Fix config before each attempt (concurrent writes may corrupt it)
+    _sprite_fix_config
+    local sprite_output
+    sprite_output=$(_sprite_cmd list 2>/dev/null || true)
 
-  if [ -z "${sprite_output}" ]; then
-    log_err "Could not list Sprite instances"
-    return 1
-  fi
+    if [ -z "${sprite_output}" ]; then
+      _attempt=$((_attempt + 1))
+      if [ "${_attempt}" -lt "${_max_retries}" ]; then
+        log_warn "Could not list Sprite instances — retrying in ${_retry_delay}s (${_attempt}/${_max_retries})"
+        sleep "${_retry_delay}"
+        _retry_delay=$((_retry_delay * 2))
+        continue
+      fi
+      log_err "Could not list Sprite instances after ${_max_retries} attempts"
+      return 1
+    fi
 
-  if ! printf '%s' "${sprite_output}" | grep -qF "${app}"; then
-    log_err "Sprite instance ${app} not found in sprite list"
-    return 1
-  fi
+    if ! printf '%s' "${sprite_output}" | grep -qF "${app}"; then
+      _attempt=$((_attempt + 1))
+      if [ "${_attempt}" -lt "${_max_retries}" ]; then
+        log_warn "Sprite instance ${app} not found — retrying in ${_retry_delay}s (${_attempt}/${_max_retries})"
+        sleep "${_retry_delay}"
+        _retry_delay=$((_retry_delay * 2))
+        continue
+      fi
+      log_err "Sprite instance ${app} not found in sprite list after ${_max_retries} attempts"
+      return 1
+    fi
 
-  log_ok "Sprite instance ${app} exists"
+    # Found the instance
+    log_ok "Sprite instance ${app} exists"
 
-  # Write sentinel — Sprite has no IP; use "sprite-cli" as marker
-  printf '%s' "sprite-cli" > "${log_dir}/${app}.ip"
+    # Write sentinel — Sprite has no IP; use "sprite-cli" as marker
+    printf '%s' "sprite-cli" > "${log_dir}/${app}.ip"
 
-  # Write metadata file
-  printf '{"name":"%s"}\n' "${app}" > "${log_dir}/${app}.meta"
+    # Write metadata file
+    printf '{"name":"%s"}\n' "${app}" > "${log_dir}/${app}.meta"
 
-  return 0
+    return 0
+  done
+
+  # Should not reach here, but guard against it
+  log_err "Sprite instance ${app} verification exhausted retries"
+  return 1
 }
 
 # ---------------------------------------------------------------------------

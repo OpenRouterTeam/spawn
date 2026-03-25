@@ -134,16 +134,16 @@ export async function tryTarballInstall(
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "/root/$_d" ]; then',
     '      mkdir -p "$HOME/$_d"',
-    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    `      ${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`,
     "    fi",
     "  done",
     "  # Copy marker file",
-    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    `  ${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`,
     "  # Fix ownership — files were extracted as root",
-    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    `  ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`,
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "$HOME/$_d" ]; then',
-    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    `      ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`,
     "    fi",
     "  done",
     "fi",
@@ -160,7 +160,7 @@ export async function tryTarballInstall(
 
 // ─── Parallel tarball: local download + SCP upload ──────────────────────────
 
-export interface LocalTarball {
+interface LocalTarball {
   localPath: string;
   cleanup: () => void;
 }
@@ -262,14 +262,14 @@ export async function uploadAndExtractTarball(runner: CloudRunner, localPath: st
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "/root/$_d" ]; then',
     '      mkdir -p "$HOME/$_d"',
-    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    `      ${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`,
     "    fi",
     "  done",
-    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
-    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    `  ${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`,
+    `  ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`,
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "$HOME/$_d" ]; then',
-    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    `      ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`,
     "    fi",
     "  done",
     "fi",

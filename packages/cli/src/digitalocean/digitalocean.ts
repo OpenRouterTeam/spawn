@@ -390,9 +390,10 @@ export async function promptSwitchAccount(): Promise<boolean> {
 }
 
 /**
- * Check DigitalOcean account status for billing issues.
+ * Check DigitalOcean account status for billing issues and droplet limits.
  * Uses the /v2/account endpoint which is already called during token validation.
- * Throws if the account is locked (billing issue). Warns on other statuses.
+ * Throws if the account is locked (billing issue) or at the droplet limit (in headless mode).
+ * Warns on other statuses.
  */
 export async function checkAccountStatus(): Promise<void> {
   if (!_state.token) {
@@ -407,6 +408,7 @@ export async function checkAccountStatus(): Promise<void> {
     }
     const status = isString(rec.status) ? rec.status : "";
     const emailVerified = rec.email_verified;
+    const dropletLimit = isNumber(rec.droplet_limit) ? rec.droplet_limit : 0;
 
     if (status === "locked") {
       logWarn("Your DigitalOcean account is locked (usually a billing issue).");
@@ -440,10 +442,31 @@ export async function checkAccountStatus(): Promise<void> {
     if (emailVerified === false) {
       logWarn("Your DigitalOcean email is not verified. Verify it to avoid account restrictions.");
     }
+
+    // Check droplet limit — fail fast before attempting creation
+    if (dropletLimit > 0) {
+      const existingDroplets = await asyncTryCatch(() => doGetAll("/droplets", "droplets"));
+      if (existingDroplets.ok) {
+        const currentCount = existingDroplets.data.length;
+        if (currentCount >= dropletLimit) {
+          const msg = `DigitalOcean droplet limit reached: ${currentCount}/${dropletLimit} droplets in use. Delete existing droplets or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase`;
+          logWarn(msg);
+          if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+            throw new Error(msg);
+          }
+        } else if (dropletLimit - currentCount <= 2) {
+          logWarn(`DigitalOcean droplet quota almost full: ${currentCount}/${dropletLimit} droplets in use.`);
+        }
+      }
+    }
   });
   if (!r.ok) {
-    // Only re-throw if it's our explicit lock error
-    if (r.error instanceof Error && r.error.message === "DigitalOcean account is locked") {
+    // Re-throw explicit errors (account locked, droplet limit in headless mode)
+    if (
+      r.error instanceof Error &&
+      (r.error.message === "DigitalOcean account is locked" ||
+        r.error.message.startsWith("DigitalOcean droplet limit reached"))
+    ) {
       throw r.error;
     }
     // Otherwise non-fatal — let createServer be the final check
@@ -870,7 +893,7 @@ const DROPLET_SIZES: DropletSize[] = [
   },
   {
     id: "s-2vcpu-4gb-intel",
-    label: "2 vCPU \u00b7 4 GB RAM \u00b7 $28/mo (Intel, available in all regions)",
+    label: "2 vCPU \u00b7 4 GB RAM \u00b7 $28/mo (Intel)",
   },
   {
     id: "s-4vcpu-8gb",
@@ -883,6 +906,19 @@ const DROPLET_SIZES: DropletSize[] = [
 ];
 
 export const DEFAULT_DROPLET_SIZE = "s-2vcpu-2gb";
+
+/** Extract RAM in GB from a DO slug like "s-2vcpu-4gb" or "s-2vcpu-4gb-intel". Returns 0 if unparseable. */
+export function slugRamGb(slug: string): number {
+  const match = slug.match(/-(\d+)gb/);
+  return match ? Number(match[1]) : 0;
+}
+
+/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
+export const AGENT_MIN_SIZE: Record<string, string> = {
+  // s-2vcpu-4gb is used (not s-2vcpu-4gb-intel) because the intel variant
+  // is no longer available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
+  openclaw: "s-2vcpu-4gb",
+};
 
 // ─── Region Options ──────────────────────────────────────────────────────────
 
@@ -1086,10 +1122,20 @@ export async function createServer(
         }
         logError(`Retry failed: ${String(retryData?.message || "Unknown error")}`);
       }
+    } else if (/droplet.limit|limit.exceeded|error 422.*unprocessable/i.test(errMsg)) {
+      logError(
+        "Droplet limit exceeded. Delete existing droplets or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase",
+      );
+      // Offer account switch — user might have another account with capacity
+      const switched = await promptSwitchAccount();
+      if (switched) {
+        logStep("Retrying droplet creation with new account...");
+        return createServer(name, tier, dropletSize, region, imageOverride);
+      }
     } else {
       showNonBillingError(digitaloceanBilling, [
         "Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)",
-        "Droplet limit reached (check account limits)",
+        "Droplet limit reached (check account limits at https://cloud.digitalocean.com/account/team/droplet_limit_increase)",
       ]);
       // Offer account switch for non-billing errors too (e.g. quota on wrong account)
       const switched = await promptSwitchAccount();
@@ -1334,7 +1380,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
   const serverIp = ip || _state.serverIp;
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && bash -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -1343,7 +1389,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `root@${serverIp}`,
-      `bash -c ${shellQuote(fullCmd)}`,
+      fullCmd,
     ],
     {
       stdio: [
@@ -1438,7 +1484,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([

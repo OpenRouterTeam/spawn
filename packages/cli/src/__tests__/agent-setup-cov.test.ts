@@ -80,40 +80,41 @@ describe("offerGithubAuth", () => {
       uploadFile: mock(() => Promise.resolve()),
       downloadFile: mock(() => Promise.resolve()),
     };
-    // Should not throw
     await offerGithubAuth(runner, true);
+    // runServer was attempted — error swallowed, not rethrown
+    expect(runner.runServer).toHaveBeenCalled();
   });
 });
 
 // ── createCloudAgents ──────────────────────────────────────────────────
 
 describe("createCloudAgents", () => {
-  it("returns agents map and resolveAgent function", () => {
-    const result = createCloudAgents({
+  let runner: {
+    runServer: ReturnType<typeof mock>;
+    uploadFile: ReturnType<typeof mock>;
+    downloadFile: ReturnType<typeof mock>;
+  };
+  let result: ReturnType<typeof createCloudAgents>;
+
+  beforeEach(() => {
+    runner = {
       runServer: mock(() => Promise.resolve()),
       uploadFile: mock(() => Promise.resolve()),
       downloadFile: mock(() => Promise.resolve()),
-    });
-    expect(typeof result.agents).toBe("object");
-    expect(typeof result.resolveAgent).toBe("function");
+    };
+    result = createCloudAgents(runner);
+  });
+
+  it("returns agents map with all expected agent keys", () => {
     const keys = Object.keys(result.agents);
     expect(keys.length).toBeGreaterThan(0);
-    // Verify each agent has required fields
+    // All registered agents must have non-empty names
     for (const key of keys) {
-      const agent = result.agents[key];
-      expect(agent.name).toBeDefined();
-      expect(typeof agent.install).toBe("function");
-      expect(typeof agent.envVars).toBe("function");
-      expect(typeof agent.launchCmd).toBe("function");
+      expect(result.agents[key].name.length).toBeGreaterThan(0);
     }
   });
 
   it("agents generate env vars with API key", () => {
-    const result = createCloudAgents({
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    });
     const firstAgent = Object.values(result.agents)[0];
     const envVars = firstAgent.envVars("sk-test-key");
     expect(envVars.length).toBeGreaterThan(0);
@@ -121,65 +122,127 @@ describe("createCloudAgents", () => {
   });
 
   it("resolveAgent returns agent by name", () => {
-    const result = createCloudAgents({
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    });
     const firstKey = Object.keys(result.agents)[0];
     const agent = result.resolveAgent(firstKey);
     expect(agent.name).toBe(result.agents[firstKey].name);
   });
 
-  it("agents return non-empty launch commands", () => {
-    const result = createCloudAgents({
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    });
-    for (const agent of Object.values(result.agents)) {
-      const cmd = agent.launchCmd();
-      expect(cmd.length).toBeGreaterThan(0);
-    }
-  });
-
   it("resolveAgent throws for unknown agent", () => {
-    const result = createCloudAgents({
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    });
     expect(() => result.resolveAgent("nonexistent-agent")).toThrow();
   });
 
   it("agents have install functions that can be called", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    // Call install on the first agent
     const firstKey = Object.keys(result.agents)[0];
     const agent = result.agents[firstKey];
     await agent.install();
     expect(runner.runServer).toHaveBeenCalled();
   });
 
-  it("agents have configure functions for configurable agents", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    // Find an agent with a configure function
+  it("claude agent configure calls runServer", async () => {
+    await result.agents.claude.configure?.("sk-test-key", undefined, new Set());
+    expect(runner.runServer).toHaveBeenCalled();
+  });
+
+  it("codex agent configure calls uploadFile", async () => {
+    await result.agents.codex.configure?.("sk-test-key", undefined, new Set());
+    expect(runner.uploadFile).toHaveBeenCalled();
+  });
+
+  it("openclaw agent envVars include OPENROUTER_API_KEY", () => {
+    const envVars = result.agents.openclaw.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
+    expect(envVars.some((v: string) => v.includes("ANTHROPIC_BASE_URL"))).toBe(true);
+  });
+
+  it("openclaw agent has tunnel config", () => {
+    const openclaw = result.agents.openclaw;
+    expect(openclaw.tunnel).toBeDefined();
+    expect(openclaw.tunnel?.remotePort).toBe(18789);
+    const url = openclaw.tunnel?.browserUrl(8080);
+    expect(url).toContain("localhost:8080");
+  });
+
+  it("zeroclaw agent envVars include ZEROCLAW_PROVIDER", () => {
+    const envVars = result.agents.zeroclaw.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("ZEROCLAW_PROVIDER=openrouter"))).toBe(true);
+  });
+
+  it("zeroclaw agent configure calls runServer", async () => {
+    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
+    expect(runner.runServer).toHaveBeenCalled();
+  });
+
+  it("hermes agent envVars include OPENAI_BASE_URL", () => {
+    const envVars = result.agents.hermes.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("OPENAI_BASE_URL"))).toBe(true);
+    expect(envVars.some((v: string) => v.includes("HERMES_YOLO_MODE"))).toBe(true);
+  });
+
+  it("hermes agent configure removes YOLO mode when not enabled", async () => {
+    // Pass empty set (yolo-mode not in enabled steps)
+    await result.agents.hermes.configure?.("sk-test", undefined, new Set());
+    const calls = runner.runServer.mock.calls;
+    const allCmds = calls.map((c: unknown[]) => String(c[0])).join(" ");
+    expect(allCmds).toContain("HERMES_YOLO_MODE");
+  });
+
+  it("hermes agent configure keeps YOLO mode when enabled", async () => {
+    // Pass set with yolo-mode
+    await result.agents.hermes.configure?.(
+      "sk-test",
+      undefined,
+      new Set([
+        "yolo-mode",
+      ]),
+    );
+    // Should NOT call runServer to remove YOLO mode (no sed)
+    expect(runner.runServer).not.toHaveBeenCalled();
+  });
+
+  it("junie agent envVars include JUNIE_OPENROUTER_API_KEY", () => {
+    const envVars = result.agents.junie.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("JUNIE_OPENROUTER_API_KEY"))).toBe(true);
+  });
+
+  it("kilocode agent envVars include KILO_PROVIDER_TYPE", () => {
+    const envVars = result.agents.kilocode.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("KILO_PROVIDER_TYPE=openrouter"))).toBe(true);
+  });
+
+  it("opencode agent envVars include OPENROUTER_API_KEY", () => {
+    const envVars = result.agents.opencode.envVars("sk-or-v1-test");
+    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
+  });
+
+  it("all agents have launchCmd returning non-empty string", () => {
     for (const agent of Object.values(result.agents)) {
-      if (agent.configure) {
-        await agent.configure("sk-or-v1-test", undefined, new Set());
-        break;
-      }
+      const cmd = agent.launchCmd();
+      expect(typeof cmd).toBe("string");
+      expect(cmd.length).toBeGreaterThan(0);
     }
+  });
+
+  it("all agents have a cloudInitTier", () => {
+    for (const agent of Object.values(result.agents)) {
+      expect([
+        "minimal",
+        "node",
+        "full",
+      ]).toContain(agent.cloudInitTier);
+    }
+  });
+
+  it("openclaw agent configure sets up config", async () => {
+    await result.agents.openclaw.configure?.("sk-or-v1-test", "openrouter/auto", new Set());
+    // Should have called uploadFile for the config
+    expect(runner.uploadFile).toHaveBeenCalled();
+  });
+
+  it("openclaw agent preLaunch starts gateway", async () => {
+    const openclaw = result.agents.openclaw;
+    expect(openclaw.preLaunch).toBeDefined();
+    await openclaw.preLaunch?.();
+    expect(runner.runServer).toHaveBeenCalled();
   });
 });
 
@@ -198,216 +261,5 @@ describe("offerGithubAuth with token", () => {
     await offerGithubAuth(runner, true);
     expect(runner.runServer).toHaveBeenCalled();
     delete process.env.GITHUB_TOKEN;
-  });
-});
-
-// ── startGateway ──────────────────────────────────────────────────────
-
-// ── Agent install, configure, and envVars coverage ────────────────────
-
-describe("createCloudAgents detailed", () => {
-  it("claude agent configure calls runServer", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const claude = result.agents.claude;
-    await claude.configure?.("sk-test-key", undefined, new Set());
-    expect(runner.runServer).toHaveBeenCalled();
-  });
-
-  it("codex agent configure calls uploadFile", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const codex = result.agents.codex;
-    await codex.configure?.("sk-test-key", undefined, new Set());
-    expect(runner.uploadFile).toHaveBeenCalled();
-  });
-
-  it("openclaw agent envVars include OPENROUTER_API_KEY", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.openclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("ANTHROPIC_BASE_URL"))).toBe(true);
-  });
-
-  it("openclaw agent has tunnel config", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const openclaw = result.agents.openclaw;
-    expect(openclaw.tunnel).toBeDefined();
-    expect(openclaw.tunnel?.remotePort).toBe(18789);
-    const url = openclaw.tunnel?.browserUrl(8080);
-    expect(url).toContain("localhost:8080");
-  });
-
-  it("zeroclaw agent envVars include ZEROCLAW_PROVIDER", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.zeroclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("ZEROCLAW_PROVIDER=openrouter"))).toBe(true);
-  });
-
-  it("zeroclaw agent configure calls runServer", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
-    expect(runner.runServer).toHaveBeenCalled();
-  });
-
-  it("hermes agent envVars include OPENAI_BASE_URL", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.hermes.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENAI_BASE_URL"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("HERMES_YOLO_MODE"))).toBe(true);
-  });
-
-  it("hermes agent configure removes YOLO mode when not enabled", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    // Pass empty set (yolo-mode not in enabled steps)
-    await result.agents.hermes.configure?.("sk-test", undefined, new Set());
-    const calls = runner.runServer.mock.calls;
-    const allCmds = calls.map((c: unknown[]) => String(c[0])).join(" ");
-    expect(allCmds).toContain("HERMES_YOLO_MODE");
-  });
-
-  it("hermes agent configure keeps YOLO mode when enabled", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    // Pass set with yolo-mode
-    await result.agents.hermes.configure?.(
-      "sk-test",
-      undefined,
-      new Set([
-        "yolo-mode",
-      ]),
-    );
-    // Should NOT call runServer to remove YOLO mode (no sed)
-    expect(runner.runServer).not.toHaveBeenCalled();
-  });
-
-  it("junie agent envVars include JUNIE_OPENROUTER_API_KEY", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.junie.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("JUNIE_OPENROUTER_API_KEY"))).toBe(true);
-  });
-
-  it("kilocode agent envVars include KILO_PROVIDER_TYPE", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.kilocode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("KILO_PROVIDER_TYPE=openrouter"))).toBe(true);
-  });
-
-  it("opencode agent envVars include OPENROUTER_API_KEY", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const envVars = result.agents.opencode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
-  });
-
-  it("all agents have launchCmd returning non-empty string", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    for (const agent of Object.values(result.agents)) {
-      const cmd = agent.launchCmd();
-      expect(typeof cmd).toBe("string");
-      expect(cmd.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("all agents have a cloudInitTier", () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    for (const agent of Object.values(result.agents)) {
-      expect([
-        "minimal",
-        "node",
-        "full",
-      ]).toContain(agent.cloudInitTier);
-    }
-  });
-
-  it("openclaw agent configure sets up config", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    await result.agents.openclaw.configure?.("sk-or-v1-test", "openrouter/auto", new Set());
-    // Should have called uploadFile for the config
-    expect(runner.uploadFile).toHaveBeenCalled();
-  });
-
-  it("openclaw agent preLaunch starts gateway", async () => {
-    const runner = {
-      runServer: mock(() => Promise.resolve()),
-      uploadFile: mock(() => Promise.resolve()),
-      downloadFile: mock(() => Promise.resolve()),
-    };
-    const result = createCloudAgents(runner);
-    const openclaw = result.agents.openclaw;
-    expect(openclaw.preLaunch).toBeDefined();
-    await openclaw.preLaunch?.();
-    expect(runner.runServer).toHaveBeenCalled();
   });
 });

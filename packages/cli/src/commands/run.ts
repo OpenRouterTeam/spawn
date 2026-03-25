@@ -764,6 +764,7 @@ interface SpawnResult {
   ssh_user?: string;
   error_message?: string;
   error_code?: string;
+  cli_updated?: boolean;
 }
 
 function headlessOutput(result: SpawnResult, outputFormat?: string): void {
@@ -818,6 +819,7 @@ function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spa
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -870,6 +872,7 @@ function runBundleHeadless(
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -1145,6 +1148,11 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
                 server_name: record.connection.server_name,
               }
             : {}),
+        }
+      : {}),
+    ...(process.env.SPAWN_CLI_UPDATED === "1"
+      ? {
+          cli_updated: true,
         }
       : {}),
   };

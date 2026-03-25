@@ -34,6 +34,16 @@ import {
   withRetry,
 } from "./ui.js";
 
+/** Docker container name used by --beta docker deployments. */
+export const DOCKER_CONTAINER_NAME = "spawn-agent";
+/** Docker registry hosting spawn agent images. */
+export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
+
+/** Wrap a command to run inside the Docker container instead of the host. */
+export function makeDockerExec(cmd: string): string {
+  return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
+}
+
 export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;
@@ -246,7 +256,11 @@ export async function runOrchestration(
         installed = await uploadAndExtractTarball(cloud.runner, localTarball.localPath);
         localTarball.cleanup();
       }
-      if (!installed && useTarball && !agent.skipTarball) {
+      // Only try remote tarball download when we didn't already have a local tarball.
+      // If the local tarball was available but upload/extract failed, the remote
+      // download would face the same extraction issues — skip it to save ~150s
+      // and fall through to live install immediately.
+      if (!installed && !localTarball && useTarball && !agent.skipTarball) {
         const tarball = options?.tryTarball ?? tryTarballInstall;
         installed = await tarball(cloud.runner, agentName);
       }
@@ -526,23 +540,35 @@ async function postInstall(
     logInfo(`Tip: ${agent.preLaunchMsg}`);
   }
 
-  // Launch interactive session
-  logInfo(`${agent.name} is ready`);
+  // Launch agent
+  logInfo(`Agent setup complete — ${agent.name} is ready on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
-  logInfo(`${cloud.cloudLabel} setup completed successfully!`);
-  process.stderr.write("\n");
-  logStep("Starting agent...");
-
-  prepareStdinForHandoff();
 
   const launchCmd = agent.launchCmd();
   saveLaunchCmd(launchCmd, spawnId);
 
+  // In headless mode, provisioning is done — skip the interactive session.
+  // The VM is healthy and the agent is installed; callers can SSH in or use `spawn connect`.
+  const isHeadless = process.env.SPAWN_HEADLESS === "1";
+  if (isHeadless) {
+    logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    if (tunnelHandle) {
+      tunnelHandle.stop();
+    }
+    process.exit(0);
+  }
+
+  logStep("Starting agent...");
+
+  prepareStdinForHandoff();
+
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
 
-  // Auto-reconnect on SSH drops (exit 255). Ctrl+C (exit 0 or 130) exits immediately.
-  // Only applies to remote clouds — local sessions don't have SSH drops.
+  // Auto-reconnect on connection drops. Ctrl+C (exit 0 or 130) exits immediately.
+  // Only applies to remote clouds — local sessions don't have connection drops.
+  // SSH exits 255 on connection loss; Sprite CLI exits 1 on "connection closed".
   const maxReconnects = cloud.cloudName === "local" ? 0 : 5;
+  const isConnectionDrop = (code: number): boolean => code === 255 || (cloud.cloudName === "sprite" && code === 1);
   let exitCode = 0;
 
   for (let attempt = 0; attempt <= maxReconnects; attempt++) {
@@ -554,14 +580,12 @@ async function postInstall(
     }
     exitCode = await cloud.interactiveSession(sessionCmd);
 
-    // SSH exit 255 = connection dropped/timed out — retry
-    // Everything else (0 = clean exit, 130 = Ctrl+C, other = agent crash) — stop
-    if (exitCode !== 255) {
+    if (!isConnectionDrop(exitCode)) {
       break;
     }
   }
 
-  if (exitCode === 255) {
+  if (isConnectionDrop(exitCode)) {
     process.stderr.write("\n");
     logWarn("Could not reconnect. Server is still running.");
     logInfo("Reconnect manually: spawn connect");

@@ -2,7 +2,7 @@
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
-import { normalize } from "node:path";
+import { normalize } from "node:path/posix";
 import { asyncTryCatch, tryCatch } from "./result.js";
 import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
 

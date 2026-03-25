@@ -82,6 +82,8 @@ describe("sprite/ensureSpriteCli", () => {
 
     const { ensureSpriteCli } = await import("../sprite/sprite");
     await ensureSpriteCli();
+    // spawnSync called twice: once to locate sprite, once for version
+    expect(spy.mock.calls.length).toBe(2);
     spy.mockRestore();
   });
 
@@ -108,6 +110,8 @@ describe("sprite/ensureSpriteCli", () => {
 
     const { ensureSpriteCli } = await import("../sprite/sprite");
     await ensureSpriteCli();
+    // spawnSync called twice: locate + version check
+    expect(spy.mock.calls.length).toBe(2);
     spy.mockRestore();
   });
 
@@ -142,6 +146,8 @@ describe("sprite/ensureSpriteCli", () => {
 
     const { ensureSpriteCli } = await import("../sprite/sprite");
     await ensureSpriteCli();
+    // Bun.spawn was called to run the installer
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -160,7 +166,7 @@ describe("sprite/ensureSpriteCli", () => {
 // ─── ensureSpriteAuthenticated ───────────────────────────────────────────────
 
 describe("sprite/ensureSpriteAuthenticated", () => {
-  it("succeeds when already authenticated", async () => {
+  it("succeeds when already authenticated without running login", async () => {
     const spy = spyOn(Bun, "spawnSync")
       .mockReturnValueOnce({
         exitCode: 0,
@@ -180,13 +186,17 @@ describe("sprite/ensureSpriteAuthenticated", () => {
         resourceUsage: undefined,
         pid: 2,
       } satisfies ReturnType<typeof Bun.spawnSync>);
+    const spawnSpy = mockBunSpawn(0);
 
     const { ensureSpriteAuthenticated } = await import("../sprite/sprite");
     await ensureSpriteAuthenticated();
+    // Already authenticated: Bun.spawn (login) should NOT have been invoked
+    expect(spawnSpy.mock.calls.length).toBe(0);
     spy.mockRestore();
+    spawnSpy.mockRestore();
   });
 
-  it("uses SPRITE_ORG from env", async () => {
+  it("uses SPRITE_ORG from env without triggering login", async () => {
     process.env.SPRITE_ORG = "env-org";
     const spy = spyOn(Bun, "spawnSync")
       .mockReturnValueOnce({
@@ -207,10 +217,14 @@ describe("sprite/ensureSpriteAuthenticated", () => {
         resourceUsage: undefined,
         pid: 2,
       } satisfies ReturnType<typeof Bun.spawnSync>);
+    const spawnSpy = mockBunSpawn(0);
 
     const { ensureSpriteAuthenticated } = await import("../sprite/sprite");
     await ensureSpriteAuthenticated();
+    // org from env + already authed: no Bun.spawn (login) invoked
+    expect(spawnSpy.mock.calls.length).toBe(0);
     spy.mockRestore();
+    spawnSpy.mockRestore();
   });
 
   it("runs login when not authenticated and succeeds", async () => {
@@ -251,6 +265,8 @@ describe("sprite/ensureSpriteAuthenticated", () => {
 
     const { ensureSpriteAuthenticated } = await import("../sprite/sprite");
     await ensureSpriteAuthenticated();
+    // Not authenticated initially: Bun.spawn (login) must have been called
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -288,7 +304,7 @@ describe("sprite/ensureSpriteAuthenticated", () => {
 // ─── createSprite ────────────────────────────────────────────────────────────
 
 describe("sprite/createSprite", () => {
-  it("reuses existing sprite if already exists", async () => {
+  it("reuses existing sprite without creating a new one", async () => {
     const spy = spyOn(Bun, "spawnSync")
       .mockReturnValueOnce({
         exitCode: 0,
@@ -308,10 +324,14 @@ describe("sprite/createSprite", () => {
         resourceUsage: undefined,
         pid: 2,
       } satisfies ReturnType<typeof Bun.spawnSync>);
+    const spawnSpy = mockBunSpawn(0);
 
     const { createSprite } = await import("../sprite/sprite");
     await createSprite("my-sprite");
+    // Existing sprite found: Bun.spawn (create) should NOT have been called
+    expect(spawnSpy.mock.calls.length).toBe(0);
     spy.mockRestore();
+    spawnSpy.mockRestore();
   });
 
   it("creates new sprite when not existing", async () => {
@@ -361,6 +381,8 @@ describe("sprite/createSprite", () => {
 
     const { createSprite } = await import("../sprite/sprite");
     await createSprite("new-sprite");
+    // No existing sprite: Bun.spawn (create) must have been called
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -369,7 +391,7 @@ describe("sprite/createSprite", () => {
 // ─── verifySpriteConnectivity ────────────────────────────────────────────────
 
 describe("sprite/verifySpriteConnectivity", () => {
-  it("succeeds on first attempt", async () => {
+  it("succeeds on first attempt with exactly two spawnSync calls", async () => {
     // Set poll delay to 0 for tests
     process.env.SPRITE_CONNECTIVITY_POLL_DELAY = "0";
     const spy = spyOn(Bun, "spawnSync")
@@ -394,6 +416,8 @@ describe("sprite/verifySpriteConnectivity", () => {
 
     const { verifySpriteConnectivity } = await import("../sprite/sprite");
     await verifySpriteConnectivity(1);
+    // locate sprite + connectivity check = 2 calls
+    expect(spy.mock.calls.length).toBe(2);
     spy.mockRestore();
   });
 });
@@ -411,11 +435,12 @@ describe("sprite/uploadFileSprite", () => {
     await expect(uploadFileSprite("/local/file", "/-evil")).rejects.toThrow("Invalid remote path");
   });
 
-  it("succeeds for valid paths", async () => {
+  it("succeeds for valid paths and calls sprite exec", async () => {
     const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
     const spawnSpy = mockBunSpawn(0);
     const { uploadFileSprite } = await import("../sprite/sprite");
     await uploadFileSprite("/tmp/local.txt", "/root/file.txt");
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -429,11 +454,12 @@ describe("sprite/downloadFileSprite", () => {
     await expect(downloadFileSprite("/root/bad;rm", "/tmp/out")).rejects.toThrow("Invalid remote path");
   });
 
-  it("handles $HOME prefix", async () => {
+  it("handles $HOME prefix and calls sprite exec", async () => {
     const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
     const spawnSpy = mockBunSpawn(0, "file contents");
     const { downloadFileSprite } = await import("../sprite/sprite");
     await downloadFileSprite("$HOME/file.txt", "/tmp/out.txt");
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -442,11 +468,12 @@ describe("sprite/downloadFileSprite", () => {
 // ─── destroyServer ───────────────────────────────────────────────────────────
 
 describe("sprite/destroyServer", () => {
-  it("succeeds when sprite destroy returns 0", async () => {
+  it("succeeds when sprite destroy returns 0 and calls destroy command", async () => {
     const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
     const spawnSpy = mockBunSpawn(0);
     const { destroyServer } = await import("../sprite/sprite");
     await destroyServer("test-sprite");
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });
@@ -458,6 +485,20 @@ describe("sprite/destroyServer", () => {
     await expect(destroyServer("test-sprite")).rejects.toThrow("Sprite destruction failed");
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
+  });
+});
+
+// ─── runSprite validation ────────────────────────────────────────────────────
+
+describe("sprite/runSprite validation", () => {
+  it("rejects empty command", async () => {
+    const { runSprite } = await import("../sprite/sprite");
+    await expect(runSprite("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects null byte in command", async () => {
+    const { runSprite } = await import("../sprite/sprite");
+    await expect(runSprite("echo\x00hello")).rejects.toThrow("Invalid command");
   });
 });
 
@@ -487,11 +528,13 @@ describe("sprite/runSprite", () => {
 // ─── setupShellEnvironment ───────────────────────────────────────────────────
 
 describe("sprite/setupShellEnvironment", () => {
-  it("sets up shell environment", async () => {
+  it("invokes multiple sprite exec commands to configure PATH and shell", async () => {
     const spawnSyncSpy = mockSpawnSync(0, "/usr/bin/sprite");
     const spawnSpy = mockBunSpawn(0);
     const { setupShellEnvironment } = await import("../sprite/sprite");
     await setupShellEnvironment();
+    // setupShellEnvironment runs multiple sprite exec calls (sed cleanup, PATH config, zsh check, etc.)
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(1);
     spawnSyncSpy.mockRestore();
     spawnSpy.mockRestore();
   });

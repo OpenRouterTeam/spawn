@@ -102,14 +102,14 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
 
   const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin";
   const pathSetup = `for rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`;
-  const finalize = `claude install --force 2>/dev/null || true; ${pathSetup}`;
+  const finalize = `claude install --force >/dev/null 2>&1 || true; ${pathSetup}`;
 
   const script = [
     `export PATH="${claudePath}:$PATH"`,
     `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
-    "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash || true",
+    "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     "if ! command -v node >/dev/null 2>&1; then export N_PREFIX=$HOME/.n; curl --proto '=https' -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; export PATH=$N_PREFIX/bin:$PATH; fi",
@@ -125,7 +125,7 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     logError("Claude Code installation failed");
     throw new Error("Claude Code install failed");
   }
-  logInfo("Claude Code installed");
+  logInfo("Claude Code agent installed successfully");
 }
 
 async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {
@@ -637,7 +637,10 @@ const NPM_PREFIX_SETUP =
   'if ! [ -w "$(npm prefix -g 2>/dev/null || echo /usr/local)" ] || ' +
   '! printf "%s" ":${PATH}:" | grep -qF ":${_npm_gbin}:"; then ' +
   'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
-  'export PATH="$HOME/.npm-global/bin:$PATH"';
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
+  // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
+  'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -675,8 +678,9 @@ const KILOCODE_BINARY_VERIFY =
   '[ -d "$_kc_pkg" ] || _kc_pkg="$HOME/.npm-global/lib/node_modules/@kilocode/cli"; ' +
   'if [ -d "$_kc_pkg" ]; then ' +
   // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
   'echo "==> kilocode binary not found, re-running postinstall..."; ' +
-  'cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'cd ~ && cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "if command -v kilocode >/dev/null 2>&1 && kilocode --version >/dev/null 2>&1; then exit 0; fi; " +
   // Postinstall re-run didn't help — search for native binary in the package
@@ -694,6 +698,39 @@ const KILOCODE_BINARY_VERIFY =
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "command -v kilocode >/dev/null 2>&1 || " +
   '{ echo "WARNING: kilocode binary still not found after recovery attempts"; }; ' +
+  "}";
+
+/**
+ * Shell snippet that verifies the junie binary is actually available after
+ * npm install. @jetbrains/junie-cli uses a postinstall script that downloads a
+ * native binary. On some clouds (notably Sprite with flaky IPv6 routing), the
+ * postinstall can fail, leaving bin/index.js present but the native binary absent.
+ *
+ * This snippet:
+ * 1. Checks if `junie` is already working
+ * 2. If not, finds the npm package dir and re-runs the postinstall
+ * 3. Warns if still not found after recovery
+ */
+const JUNIE_BINARY_VERIFY =
+  "{ " +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  // Quick check: if junie already works, nothing to do
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  // Find the npm package directory
+  '_jn_pkg="$(npm prefix -g 2>/dev/null)/lib/node_modules/@jetbrains/junie-cli"; ' +
+  '[ -d "$_jn_pkg" ] || _jn_pkg="$HOME/.npm-global/lib/node_modules/@jetbrains/junie-cli"; ' +
+  'if [ -d "$_jn_pkg" ]; then ' +
+  // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
+  'echo "==> junie binary not found, re-running postinstall..."; ' +
+  'cd ~ && cd "$_jn_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  "fi; " +
+  // Final check
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "command -v junie >/dev/null 2>&1 || " +
+  '{ echo "WARNING: junie binary still not found after recovery attempts"; }; ' +
   "}";
 
 // ─── Auto-Update Service ─────────────────────────────────────────────────────
@@ -928,7 +965,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Kilo Code",
-          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @kilocode/cli && ${NPM_GLOBAL_PATH_PERSIST} && ${KILOCODE_BINARY_VERIFY}`,
+          `cd "$HOME" && ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @kilocode/cli && ${NPM_GLOBAL_PATH_PERSIST} && ${KILOCODE_BINARY_VERIFY}`,
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -993,8 +1030,12 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
-          300,
+          // Force git to use HTTPS instead of SSH for GitHub URLs — pip dependencies
+          // using git+ssh:// timeout on cloud VMs where outbound SSH is blocked/slow.
+          'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+            'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
+            "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
+          600,
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -1013,6 +1054,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
       updateCmd:
+        // Same SSH→HTTPS rewrite for auto-update runs
+        'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+        'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
         "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
     },
 
@@ -1024,7 +1068,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Junie",
-          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST}`,
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST} && ${JUNIE_BINARY_VERIFY}`,
         ),
       envVars: (apiKey) => [
         `JUNIE_OPENROUTER_API_KEY=${apiKey}`,

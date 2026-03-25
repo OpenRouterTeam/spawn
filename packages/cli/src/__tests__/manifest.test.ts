@@ -237,6 +237,75 @@ describe("manifest", () => {
       consoleSpy.mockRestore();
     });
 
+    it("rejects manifest with string agents field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: "claude",
+              clouds: {},
+              matrix: {},
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects manifest with array clouds field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: [
+                "sprite",
+                "hetzner",
+              ],
+              matrix: {},
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
+    it("rejects manifest with numeric matrix field", async () => {
+      const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: {},
+              matrix: 42,
+            }),
+          ),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+      consoleSpy.mockRestore();
+    });
+
     it("throws when network errors occur and no cache exists", async () => {
       const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
       global.fetch = mock(async () => {

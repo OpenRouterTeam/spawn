@@ -1,23 +1,32 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
-  Ok,
-  Err,
-  tryCatch,
   asyncTryCatch,
-  tryCatchIf,
   asyncTryCatchIf,
-  unwrapOr,
-  mapResult,
+  Err,
   isFileError,
   isNetworkError,
   isOperationalError,
+  mapResult,
+  Ok,
+  tryCatch,
+  tryCatchIf,
+  unwrapOr,
 } from "../result";
 
 describe("Ok", () => {
   it("creates an Ok result", () => {
-    expect(Ok(42)).toEqual({ ok: true, data: 42 });
-    expect(Ok("hello")).toEqual({ ok: true, data: "hello" });
-    expect(Ok(null)).toEqual({ ok: true, data: null });
+    expect(Ok(42)).toEqual({
+      ok: true,
+      data: 42,
+    });
+    expect(Ok("hello")).toEqual({
+      ok: true,
+      data: "hello",
+    });
+    expect(Ok(null)).toEqual({
+      ok: true,
+      data: null,
+    });
   });
 });
 
@@ -35,7 +44,10 @@ describe("Err", () => {
 describe("tryCatch", () => {
   it("returns Ok for successful functions", () => {
     const result = tryCatch(() => 42);
-    expect(result).toEqual({ ok: true, data: 42 });
+    expect(result).toEqual({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("returns Err for thrown Error instances", () => {
@@ -63,7 +75,10 @@ describe("tryCatch", () => {
 describe("asyncTryCatch", () => {
   it("returns Ok for successful async functions", async () => {
     const result = await asyncTryCatch(async () => 42);
-    expect(result).toEqual({ ok: true, data: 42 });
+    expect(result).toEqual({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("returns Err for rejected promises", async () => {
@@ -90,8 +105,14 @@ describe("asyncTryCatch", () => {
 
 describe("tryCatchIf", () => {
   it("returns Ok for successful functions", () => {
-    const result = tryCatchIf(() => true, () => 42);
-    expect(result).toEqual({ ok: true, data: 42 });
+    const result = tryCatchIf(
+      () => true,
+      () => 42,
+    );
+    expect(result).toEqual({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("catches errors matching the guard", () => {
@@ -113,12 +134,33 @@ describe("tryCatchIf", () => {
       }),
     ).toThrow("unexpected");
   });
+
+  it("re-throws non-Error values as normalized Error instances", () => {
+    const guard = () => false;
+    // Wrap in tryCatch to capture the re-thrown value without raw try/catch
+    const result = tryCatch(() =>
+      tryCatchIf(guard, () => {
+        throw "raw string error";
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error.message).toBe("raw string error");
+    }
+  });
 });
 
 describe("asyncTryCatchIf", () => {
   it("returns Ok for successful async functions", async () => {
-    const result = await asyncTryCatchIf(() => true, async () => 42);
-    expect(result).toEqual({ ok: true, data: 42 });
+    const result = await asyncTryCatchIf(
+      () => true,
+      async () => 42,
+    );
+    expect(result).toEqual({
+      ok: true,
+      data: 42,
+    });
   });
 
   it("catches errors matching the guard", async () => {
@@ -140,6 +182,20 @@ describe("asyncTryCatchIf", () => {
       }),
     ).rejects.toThrow("unexpected");
   });
+
+  it("re-throws non-Error values as normalized Error instances", async () => {
+    const guard = () => false;
+    const result = await asyncTryCatch(() =>
+      asyncTryCatchIf(guard, async () => {
+        throw 404;
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error.message).toBe("404");
+    }
+  });
 });
 
 describe("unwrapOr", () => {
@@ -157,7 +213,10 @@ describe("unwrapOr", () => {
 describe("mapResult", () => {
   it("transforms Ok data", () => {
     const result = mapResult(Ok(2), (n) => n * 3);
-    expect(result).toEqual({ ok: true, data: 6 });
+    expect(result).toEqual({
+      ok: true,
+      data: 6,
+    });
   });
 
   it("passes Err through unchanged", () => {
@@ -172,14 +231,25 @@ describe("mapResult", () => {
 
 describe("isFileError", () => {
   it("returns true for file error codes", () => {
-    for (const code of ["ENOENT", "EACCES", "EISDIR", "ENOSPC", "EPERM", "ENOTDIR"]) {
-      const err = Object.assign(new Error("fail"), { code });
+    for (const code of [
+      "ENOENT",
+      "EACCES",
+      "EISDIR",
+      "ENOSPC",
+      "EPERM",
+      "ENOTDIR",
+    ]) {
+      const err = Object.assign(new Error("fail"), {
+        code,
+      });
       expect(isFileError(err)).toBe(true);
     }
   });
 
   it("returns false for non-file error codes", () => {
-    const err = Object.assign(new Error("fail"), { code: "ECONNREFUSED" });
+    const err = Object.assign(new Error("fail"), {
+      code: "ECONNREFUSED",
+    });
     expect(isFileError(err)).toBe(false);
   });
 
@@ -190,8 +260,17 @@ describe("isFileError", () => {
 
 describe("isNetworkError", () => {
   it("returns true for network error codes", () => {
-    for (const code of ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EPIPE", "EAI_AGAIN"]) {
-      const err = Object.assign(new Error("fail"), { code });
+    for (const code of [
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ENOTFOUND",
+      "EPIPE",
+      "EAI_AGAIN",
+    ]) {
+      const err = Object.assign(new Error("fail"), {
+        code,
+      });
       expect(isNetworkError(err)).toBe(true);
     }
   });
@@ -232,12 +311,16 @@ describe("isNetworkError", () => {
 
 describe("isOperationalError", () => {
   it("returns true for file errors", () => {
-    const err = Object.assign(new Error("fail"), { code: "ENOENT" });
+    const err = Object.assign(new Error("fail"), {
+      code: "ENOENT",
+    });
     expect(isOperationalError(err)).toBe(true);
   });
 
   it("returns true for network errors", () => {
-    const err = Object.assign(new Error("fail"), { code: "ECONNREFUSED" });
+    const err = Object.assign(new Error("fail"), {
+      code: "ECONNREFUSED",
+    });
     expect(isOperationalError(err)).toBe(true);
   });
 

@@ -18,9 +18,16 @@ SPAWN_ISSUE="${SPAWN_ISSUE:-}"
 SPAWN_REASON="${SPAWN_REASON:-manual}"
 
 # Validate SPAWN_ISSUE is a positive integer to prevent command injection
-if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: SPAWN_ISSUE must be a positive integer, got: '${SPAWN_ISSUE}'" >&2
-    exit 1
+# Rejects leading zeros, zero itself, and values exceeding 32-bit signed int max (GitHub limit)
+if [[ -n "${SPAWN_ISSUE}" ]]; then
+    if [[ ! "${SPAWN_ISSUE}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: SPAWN_ISSUE must be a positive integer (1 or greater), got: '${SPAWN_ISSUE}'" >&2
+        exit 1
+    fi
+    if [[ "${#SPAWN_ISSUE}" -gt 10 ]] || [[ "${SPAWN_ISSUE}" -gt 2147483647 ]]; then
+        echo "ERROR: SPAWN_ISSUE out of range (max 2147483647), got: '${SPAWN_ISSUE}'" >&2
+        exit 1
+    fi
 fi
 
 if [[ "${SPAWN_REASON}" == "soak" ]]; then
@@ -74,17 +81,23 @@ log() {
 # --- Safe sed substitution (escapes sed metacharacters in replacement) ---
 # Usage: safe_substitute PLACEHOLDER VALUE FILE
 # Replaces all occurrences of PLACEHOLDER with VALUE in FILE, escaping
-# sed-special characters (\, &, |, newline) in VALUE to prevent misinterpretation.
+# sed-special characters (\, &, newline) in VALUE to prevent misinterpretation.
+# Uses \x01 (SOH control char) as sed delimiter to prevent delimiter injection.
 safe_substitute() {
     local placeholder="$1"
     local value="$2"
     local file="$3"
-    # Escape backslashes first, then &, then the delimiter |
+    # Reject values containing the \x01 delimiter (should never occur in normal input)
+    if printf '%s' "$value" | grep -qP '\x01'; then
+        log "ERROR: safe_substitute value contains illegal \\x01 character"
+        return 1
+    fi
+    # Escape backslashes first, then & (sed metacharacters in replacement)
     local escaped
-    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g')
     # Escape literal newlines for sed replacement (backslash + newline)
     escaped="${escaped//$'\n'/\\$'\n'}"
-    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    sed -i.bak "s$(printf '\x01')${placeholder}$(printf '\x01')${escaped}$(printf '\x01')g" "$file"
     rm -f "${file}.bak"
 }
 
@@ -164,8 +177,11 @@ log "Pre-cycle cleanup..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 
 if [[ "${RUN_MODE}" == "quality" ]]; then
-    # Quality mode syncs to latest main
+    # Quality mode syncs to latest main.
+    # Stash any local modifications first so rebase doesn't abort.
+    git stash --include-untracked 2>&1 | tee -a "${LOG_FILE}" || true
     git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
+    git stash pop 2>&1 | tee -a "${LOG_FILE}" || true
 fi
 
 # Clean stale worktrees
@@ -214,6 +230,8 @@ if [[ "${RUN_MODE}" == "quality" ]]; then
     if [[ -n "$(git diff --name-only -- manifest.json)" ]]; then
         git add manifest.json
         git commit -m "chore: update agent GitHub star counts" 2>&1 | tee -a "${LOG_FILE}" || true
+        # Pull latest before pushing to avoid non-fast-forward rejection
+        git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
         git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
         log "Star counts committed"
     fi
@@ -282,7 +300,7 @@ fi
 
 # Update Claude Code to latest version before launching
 log "Updating Claude Code..."
-claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
+claude update 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
 
 # Launch Claude Code with mode-specific prompt
 # Enable agent teams (required for team-based workflows)
@@ -460,6 +478,8 @@ elif [[ "${RUN_MODE}" == "e2e-interactive" ]]; then
                 _ekey="${_ekey#"${_ekey%%[! ]*}"}"
                 case "${_ekey}" in
                     ANTHROPIC_API_KEY) export ANTHROPIC_API_KEY="${_eval}" ;;
+                    # QA VMs store this as ANTHROPIC_AUTH_TOKEN — accept either
+                    ANTHROPIC_AUTH_TOKEN) export ANTHROPIC_API_KEY="${_eval}" ;;
                 esac
             done < /etc/spawn-qa-auth.env
         fi

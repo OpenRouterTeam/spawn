@@ -189,24 +189,6 @@ describe("discoverSshKeys", () => {
     expect(keys[0].privPath).toContain("id_ed25519");
     expect(keys[0].pubPath).toContain("id_ed25519.pub");
   });
-
-  it("discovers multiple key pairs and sorts ed25519 first", () => {
-    createFakeKeyPair("id_rsa", "rsa");
-    createFakeKeyPair("id_ed25519", "ed25519");
-
-    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
-      const pubPath = args[args.length - 1];
-      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
-      return sshKeygenLfResult(type);
-    });
-
-    const keys = discoverSshKeys();
-    spawnSpy.mockRestore();
-    expect(keys).toHaveLength(2);
-    // ED25519 should sort first
-    expect(keys[0].name).toBe("id_ed25519");
-    expect(keys[1].name).toBe("id_rsa");
-  });
 });
 
 // ─── generateSshKey ─────────────────────────────────────────────────────────

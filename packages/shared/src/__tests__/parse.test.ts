@@ -1,13 +1,19 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import * as v from "valibot";
-import { parseJsonWith, parseJsonObj } from "../parse";
+import { parseJsonObj, parseJsonWith } from "../parse";
 
 describe("parseJsonWith", () => {
-  const UserSchema = v.object({ id: v.number(), name: v.string() });
+  const UserSchema = v.object({
+    id: v.number(),
+    name: v.string(),
+  });
 
   it("returns validated data for valid JSON matching schema", () => {
     const result = parseJsonWith('{"id": 1, "name": "Alice"}', UserSchema);
-    expect(result).toEqual({ id: 1, name: "Alice" });
+    expect(result).toEqual({
+      id: 1,
+      name: "Alice",
+    });
   });
 
   it("returns null for invalid JSON", () => {
@@ -28,15 +34,25 @@ describe("parseJsonWith", () => {
 
   it("works with array schemas", () => {
     const ArraySchema = v.array(v.number());
-    expect(parseJsonWith("[1, 2, 3]", ArraySchema)).toEqual([1, 2, 3]);
+    expect(parseJsonWith("[1, 2, 3]", ArraySchema)).toEqual([
+      1,
+      2,
+      3,
+    ]);
     expect(parseJsonWith('["a", "b"]', ArraySchema)).toBeNull();
   });
 });
 
 describe("parseJsonObj", () => {
   it("returns Record for valid JSON objects", () => {
-    expect(parseJsonObj('{"a": 1}')).toEqual({ a: 1 });
-    expect(parseJsonObj('{"nested": {"b": 2}}')).toEqual({ nested: { b: 2 } });
+    expect(parseJsonObj('{"a": 1}')).toEqual({
+      a: 1,
+    });
+    expect(parseJsonObj('{"nested": {"b": 2}}')).toEqual({
+      nested: {
+        b: 2,
+      },
+    });
   });
 
   it("returns null for JSON arrays", () => {
