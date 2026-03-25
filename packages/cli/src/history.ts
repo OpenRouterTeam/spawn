@@ -37,6 +37,8 @@ export interface SpawnRecord {
   name?: string;
   prompt?: string;
   connection?: VMConnection;
+  parent_id?: string;
+  depth?: number;
 }
 
 /** Simplified cloud instance info returned by each provider's listServers(). */
@@ -71,6 +73,8 @@ const SpawnRecordSchema = v.object({
   name: v.optional(v.string()),
   prompt: v.optional(v.string()),
   connection: v.optional(VMConnectionSchema),
+  parent_id: v.optional(v.string()),
+  depth: v.optional(v.number()),
 });
 
 /** v1 history file format: { version: 1, records: SpawnRecord[] } */
@@ -548,6 +552,43 @@ export function updateRecordConnection(
 export function getActiveServers(): SpawnRecord[] {
   const records = loadHistory();
   return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);
+}
+
+/** Merge child spawn records into local history.
+ *  Sets parent_id on each child record and deduplicates by spawn ID. */
+export function mergeChildHistory(parentSpawnId: string, childRecords: SpawnRecord[]): void {
+  if (childRecords.length === 0) {
+    return;
+  }
+
+  withHistoryLock(() => {
+    const history = loadHistory();
+    const existingIds = new Set(history.map((r) => r.id));
+
+    for (const child of childRecords) {
+      if (!child.id) {
+        child.id = generateSpawnId();
+      }
+      // Skip duplicates
+      if (existingIds.has(child.id)) {
+        continue;
+      }
+      // Ensure parent_id is set
+      if (!child.parent_id) {
+        child.parent_id = parentSpawnId;
+      }
+      history.push(child);
+      existingIds.add(child.id);
+    }
+
+    writeHistory(history);
+  });
+}
+
+/** Export history records as JSON string (for `spawn history export`). */
+export function exportHistory(): string {
+  const records = loadHistory();
+  return JSON.stringify(records, null, 2);
 }
 
 export function filterHistory(agentFilter?: string, cloudFilter?: string): SpawnRecord[] {

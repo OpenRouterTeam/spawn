@@ -665,6 +665,8 @@ export async function execScript(
 ): Promise<void> {
   // Generate a unique spawn ID and record the spawn before execution
   const spawnId = generateSpawnId();
+  const parentId = process.env.SPAWN_PARENT_ID || undefined;
+  const depth = process.env.SPAWN_DEPTH ? Number(process.env.SPAWN_DEPTH) : undefined;
   const saveResult = tryCatchIf(isFileError, () =>
     saveSpawnRecord({
       id: spawnId,
@@ -679,6 +681,16 @@ export async function execScript(
       ...(prompt
         ? {
             prompt,
+          }
+        : {}),
+      ...(parentId
+        ? {
+            parent_id: parentId,
+          }
+        : {}),
+      ...(depth !== undefined && !Number.isNaN(depth)
+        ? {
+            depth,
           }
         : {}),
     }),

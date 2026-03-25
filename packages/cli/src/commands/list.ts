@@ -6,6 +6,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import {
   clearHistory,
+  exportHistory,
   filterHistory,
   getActiveServers,
   markRecordDeleted,
@@ -194,6 +195,81 @@ function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilte
     console.log(line);
   }
   console.log();
+}
+
+// ── Tree rendering ──────────────────────────────────────────────────────────
+
+interface TreeNode {
+  record: SpawnRecord;
+  children: TreeNode[];
+}
+
+/** Build a tree structure from records that have parent_id. */
+function buildTree(records: SpawnRecord[]): TreeNode[] {
+  const nodeMap = new Map<string, TreeNode>();
+  const roots: TreeNode[] = [];
+
+  // Create nodes for all records
+  for (const r of records) {
+    nodeMap.set(r.id, {
+      record: r,
+      children: [],
+    });
+  }
+
+  // Link children to parents
+  for (const r of records) {
+    const node = nodeMap.get(r.id);
+    if (!node) {
+      continue;
+    }
+    if (r.parent_id && nodeMap.has(r.parent_id)) {
+      nodeMap.get(r.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
+}
+
+/** Render a tree node with indentation and tree-drawing characters. */
+function renderTreeNode(
+  node: TreeNode,
+  manifest: Manifest | null,
+  prefix: string,
+  isLast: boolean,
+  isRoot: boolean,
+): void {
+  const r = node.record;
+  const name = r.name || r.connection?.server_name || "unnamed";
+  const connector = isRoot ? "" : isLast ? "└─ " : "├─ ";
+  const line1 = `${prefix}${connector}${pc.bold(name)}`;
+  console.log(line1);
+  console.log(`${prefix}${isRoot ? "" : isLast ? "   " : "│  "}  ${pc.dim(buildRecordSubtitle(r, manifest))}`);
+
+  const childPrefix = isRoot ? "" : `${prefix}${isLast ? "   " : "│  "}`;
+  for (let i = 0; i < node.children.length; i++) {
+    renderTreeNode(node.children[i], manifest, childPrefix, i === node.children.length - 1, false);
+  }
+}
+
+/** Render records as a tree when parent_id relationships exist. */
+function renderTreeTable(records: SpawnRecord[], manifest: Manifest | null): void {
+  console.log();
+  const roots = buildTree(records);
+  for (let i = 0; i < roots.length; i++) {
+    renderTreeNode(roots[i], manifest, "", i === roots.length - 1, true);
+    if (i < roots.length - 1) {
+      console.log();
+    }
+  }
+  console.log();
+}
+
+/** Check if any records have parent_id (indicating a tree structure). */
+function hasTreeStructure(records: SpawnRecord[]): boolean {
+  return records.some((r) => r.parent_id);
 }
 
 function renderListTable(records: SpawnRecord[], manifest: Manifest | null): void {
@@ -805,14 +881,29 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
   }
 
   // Non-interactive: show full history table
+  const flat = process.argv.includes("--flat");
   const records = filterHistory(agentFilter, cloudFilter);
   if (records.length === 0) {
     await showEmptyListMessage(agentFilter, cloudFilter);
     return;
   }
 
-  renderListTable(records, manifest);
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify(records, null, 2));
+    return;
+  }
+
+  if (!flat && hasTreeStructure(records)) {
+    renderTreeTable(records, manifest);
+  } else {
+    renderListTable(records, manifest);
+  }
   showListFooter(records, agentFilter, cloudFilter);
+}
+
+export function cmdHistoryExport(): void {
+  const json = exportHistory();
+  console.log(json);
 }
 
 export async function cmdLast(): Promise<void> {

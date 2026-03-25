@@ -13,7 +13,7 @@ import {
   resolveProject as gcpResolveProject,
 } from "../gcp/gcp.js";
 import { ensureHcloudToken, destroyServer as hetznerDestroyServer } from "../hetzner/hetzner.js";
-import { getActiveServers, markRecordDeleted } from "../history.js";
+import { getActiveServers, loadHistory, markRecordDeleted, mergeChildHistory } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
@@ -238,6 +238,111 @@ export async function confirmAndDelete(
     p.log.error(`Failed to delete "${label}"${detail}`);
   }
   return success;
+}
+
+/** Pull child history from a remote VM via SSH before deleting it. */
+async function pullChildHistory(record: SpawnRecord): Promise<void> {
+  const conn = record.connection;
+  if (!conn?.ip || !conn.user || conn.cloud === "local" || conn.ip === "sprite-console") {
+    return;
+  }
+
+  const { ensureSshKeys, getSshKeyOpts } = await import("../shared/ssh-keys.js");
+  const { SSH_BASE_OPTS } = await import("../shared/ssh.js");
+
+  const pullResult = await asyncTryCatch(async () => {
+    const keys = await ensureSshKeys();
+    const keyOpts = getSshKeyOpts(keys);
+    const proc = Bun.spawn(
+      [
+        "ssh",
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        `${conn.user}@${conn.ip}`,
+        "spawn history export 2>/dev/null",
+      ],
+      {
+        stdout: "pipe",
+        stderr: "ignore",
+        stdin: "ignore",
+      },
+    );
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    return output.trim();
+  });
+
+  if (!pullResult.ok || !pullResult.data) {
+    // Non-fatal: VM might already be unreachable
+    return;
+  }
+
+  await asyncTryCatch(async () => {
+    const parsed: unknown = JSON.parse(pullResult.data);
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+    const childRecords: SpawnRecord[] = parsed.filter(
+      (r: unknown): r is SpawnRecord => typeof r === "object" && r !== null && "agent" in r && "cloud" in r,
+    );
+    if (childRecords.length > 0) {
+      mergeChildHistory(record.id, childRecords);
+      p.log.info(`Merged ${childRecords.length} child record(s) from ${conn.server_name || conn.ip}`);
+    }
+  });
+}
+
+/** Find all children of a given spawn record (direct and transitive). */
+function findDescendants(parentId: string): SpawnRecord[] {
+  const history = loadHistory();
+  const descendants: SpawnRecord[] = [];
+  const queue = [
+    parentId,
+  ];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    for (const r of history) {
+      if (r.parent_id === currentId && !r.connection?.deleted) {
+        descendants.push(r);
+        queue.push(r.id);
+      }
+    }
+  }
+
+  return descendants;
+}
+
+/** Delete a spawn and all its descendants (depth-first). */
+export async function cascadeDelete(record: SpawnRecord, manifest: Manifest | null): Promise<boolean> {
+  const descendants = findDescendants(record.id);
+
+  if (descendants.length > 0) {
+    const totalCount = descendants.length + 1;
+    const confirmed = await p.confirm({
+      message: `This will delete ${totalCount} server(s) (1 parent + ${descendants.length} child${descendants.length !== 1 ? "ren" : ""}). Continue?`,
+      initialValue: false,
+    });
+
+    if (p.isCancel(confirmed) || !confirmed) {
+      p.log.info("Cascade delete cancelled.");
+      return false;
+    }
+
+    // Delete children first (depth-first by reversing — deepest children last in queue, first to delete)
+    descendants.reverse();
+    for (const child of descendants) {
+      if (!child.connection?.deleted) {
+        p.log.step(`Deleting child: ${child.connection?.server_name || child.id}`);
+        await pullChildHistory(child);
+        await execDeleteServer(child);
+      }
+    }
+  }
+
+  // Delete the parent
+  await pullChildHistory(record);
+  return confirmAndDelete(record, manifest);
 }
 
 export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {

@@ -15,6 +15,7 @@ import {
   cmdFeedback,
   cmdFix,
   cmdHelp,
+  cmdHistoryExport,
   cmdInteractive,
   cmdLast,
   cmdLink,
@@ -25,6 +26,7 @@ import {
   cmdRun,
   cmdRunHeadless,
   cmdStatus,
+  cmdTree,
   cmdUninstall,
   cmdUpdate,
   findClosestKeyByNameOrKey,
@@ -719,7 +721,21 @@ async function dispatchCommand(
     return;
   }
 
+  if (cmd === "tree") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    const jsonFlag = filteredArgs.slice(1).includes("--json");
+    await cmdTree(jsonFlag);
+    return;
+  }
   if (LIST_COMMANDS.has(cmd)) {
+    // Handle "history export" subcommand
+    if (cmd === "history" && filteredArgs[1] === "export") {
+      cmdHistoryExport();
+      return;
+    }
     await dispatchListCommand(filteredArgs);
     return;
   }
@@ -857,16 +873,18 @@ async function main(): Promise<void> {
     "images",
     "parallel",
     "docker",
+    "recursive",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
       console.error("\nAvailable beta features:");
-      console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
-      console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
-      console.error(`  ${pc.cyan("parallel")}  Parallelize server boot with setup prompts`);
-      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("tarball")}     Use pre-built tarball for agent installation`);
+      console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
+      console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
+      console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
       process.exit(1);
     }
   }

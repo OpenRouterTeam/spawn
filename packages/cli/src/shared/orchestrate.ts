@@ -6,7 +6,7 @@ import type { CloudRunner } from "./agent-setup.js";
 import type { AgentConfig } from "./agents.js";
 import type { SshTunnelHandle } from "./ssh.js";
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
@@ -14,7 +14,7 @@ import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js"
 import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
-import { getSpawnPreferencesPath } from "./paths.js";
+import { getSpawnCloudConfigPath, getSpawnPreferencesPath, getUserHome } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell.js";
 import { sleep, startSshTunnel } from "./ssh.js";
@@ -104,6 +104,89 @@ function wrapWithRestartLoop(cmd: string): string {
     "fi",
     'exit "${_spawn_exit:-0}"',
   ].join("\n");
+}
+
+// ── Recursive spawn helpers ──────────────────────────────────────────────────
+
+/** Install the spawn CLI on a remote VM. */
+async function installSpawnCli(runner: CloudRunner): Promise<void> {
+  logStep("Installing spawn CLI on VM...");
+  const result = await asyncTryCatch(() =>
+    withRetry(
+      "spawn CLI install",
+      () => wrapSshCall(runner.runServer("curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash")),
+      2,
+      5,
+    ),
+  );
+  if (!result.ok) {
+    logWarn("Spawn CLI install failed — recursive spawning will not be available on this VM");
+  } else {
+    logInfo("Spawn CLI installed on VM");
+  }
+}
+
+/** Copy local cloud credentials to the remote VM for recursive spawning. */
+async function delegateCloudCredentials(runner: CloudRunner, cloudName: string): Promise<void> {
+  logStep("Delegating cloud credentials to VM...");
+
+  const filesToDelegate: {
+    localPath: string;
+    remotePath: string;
+  }[] = [];
+
+  // Current cloud's credentials
+  const cloudConfigPath = getSpawnCloudConfigPath(cloudName);
+  if (existsSync(cloudConfigPath)) {
+    filesToDelegate.push({
+      localPath: cloudConfigPath,
+      remotePath: `~/.config/spawn/${cloudName}.json`,
+    });
+  }
+
+  // OpenRouter credentials (always needed for child spawns)
+  const orConfigPath = `${getUserHome()}/.config/spawn/openrouter.json`;
+  if (existsSync(orConfigPath)) {
+    filesToDelegate.push({
+      localPath: orConfigPath,
+      remotePath: "~/.config/spawn/openrouter.json",
+    });
+  }
+
+  if (filesToDelegate.length === 0) {
+    logWarn("No credentials to delegate — child spawns may require manual auth");
+    return;
+  }
+
+  // Ensure config dir exists on VM
+  const mkdirResult = await asyncTryCatch(() =>
+    runner.runServer("mkdir -p ~/.config/spawn && chmod 700 ~/.config/spawn"),
+  );
+  if (!mkdirResult.ok) {
+    logWarn("Could not create config directory on VM");
+    return;
+  }
+
+  for (const file of filesToDelegate) {
+    const content = readFileSync(file.localPath, "utf-8");
+    const b64 = Buffer.from(content).toString("base64");
+    const writeResult = await asyncTryCatch(() =>
+      runner.runServer(`printf '%s' '${b64}' | base64 -d > ${file.remotePath} && chmod 600 ${file.remotePath}`),
+    );
+    if (!writeResult.ok) {
+      logWarn(`Could not delegate ${file.remotePath}`);
+    }
+  }
+
+  logInfo("Cloud credentials delegated to VM");
+}
+
+/** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
+export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
+  const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
+  envPairs.push(`SPAWN_PARENT_ID=${spawnId}`);
+  envPairs.push(`SPAWN_DEPTH=${currentDepth + 1}`);
+  envPairs.push("SPAWN_BETA=recursive");
 }
 
 /** Options for runOrchestration (used in tests to inject mock dependencies). */
@@ -257,6 +340,9 @@ export async function runOrchestration(
     if (modelId && agent.modelEnvVar) {
       envPairs.push(`${agent.modelEnvVar}=${modelId}`);
     }
+    if (betaFeatures.has("recursive")) {
+      appendRecursiveEnvVars(envPairs, spawnId);
+    }
     const envContent = generateEnvConfig(envPairs);
 
     // Install agent — remote tarball, fallback to live install
@@ -356,6 +442,9 @@ export async function runOrchestration(
     if (modelId && agent.modelEnvVar) {
       envPairs.push(`${agent.modelEnvVar}=${modelId}`);
     }
+    if (betaFeatures.has("recursive")) {
+      appendRecursiveEnvVars(envPairs, spawnId);
+    }
     const envContent = generateEnvConfig(envPairs);
 
     // 8. Install agent
@@ -449,6 +538,13 @@ async function postInstall(
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
     await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+  }
+
+  // Recursive spawn setup — install spawn CLI and delegate credentials
+  const betaFeaturesPost = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+  if (betaFeaturesPost.has("recursive") && cloud.cloudName !== "local") {
+    await installSpawnCli(cloud.runner);
+    await delegateCloudCredentials(cloud.runner, cloud.cloudName);
   }
 
   // Pre-launch hooks (retry loop)
