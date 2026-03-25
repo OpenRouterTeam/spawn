@@ -50,7 +50,9 @@ export function makeDockerRunner(hostRunner: CloudRunner): CloudRunner {
     runServer: (cmd: string, timeoutSecs?: number) => hostRunner.runServer(makeDockerExec(cmd), timeoutSecs),
     uploadFile: async (localPath: string, remotePath: string) => {
       await hostRunner.uploadFile(localPath, remotePath);
-      await hostRunner.runServer(`docker cp ${remotePath} ${DOCKER_CONTAINER_NAME}:${remotePath}`);
+      await hostRunner.runServer(
+        `docker cp ${shellQuote(remotePath)} ${DOCKER_CONTAINER_NAME}:${shellQuote(remotePath)}`,
+      );
     },
     downloadFile: hostRunner.downloadFile,
   };
