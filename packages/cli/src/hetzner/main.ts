@@ -6,7 +6,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { shouldSkipCloudInit } from "../shared/cloud-init.js";
-import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerExec, runOrchestration } from "../shared/orchestrate.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -53,18 +53,17 @@ async function main() {
     cloudName: "hetzner",
     cloudLabel: "Hetzner Cloud",
     skipAgentInstall: false,
-    runner: {
-      runServer: useDocker
-        ? (cmd: string, timeoutSecs?: number) => runServer(makeDockerExec(cmd), timeoutSecs)
-        : runServer,
-      uploadFile: useDocker
-        ? async (localPath: string, remotePath: string) => {
-            await uploadFile(localPath, remotePath);
-            await runServer(`docker cp ${remotePath} ${DOCKER_CONTAINER_NAME}:${remotePath}`);
-          }
-        : uploadFile,
-      downloadFile,
-    },
+    runner: useDocker
+      ? makeDockerRunner({
+          runServer,
+          uploadFile,
+          downloadFile,
+        })
+      : {
+          runServer,
+          uploadFile,
+          downloadFile,
+        },
     async authenticate() {
       await promptSpawnName();
       await ensureHcloudToken();

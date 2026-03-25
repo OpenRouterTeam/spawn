@@ -44,6 +44,18 @@ export function makeDockerExec(cmd: string): string {
   return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
 }
 
+/** Wrap a CloudRunner so all commands and uploads target the Docker container. */
+export function makeDockerRunner(hostRunner: CloudRunner): CloudRunner {
+  return {
+    runServer: (cmd: string, timeoutSecs?: number) => hostRunner.runServer(makeDockerExec(cmd), timeoutSecs),
+    uploadFile: async (localPath: string, remotePath: string) => {
+      await hostRunner.uploadFile(localPath, remotePath);
+      await hostRunner.runServer(`docker cp ${remotePath} ${DOCKER_CONTAINER_NAME}:${remotePath}`);
+    },
+    downloadFile: hostRunner.downloadFile,
+  };
+}
+
 export interface CloudOrchestrator {
   cloudName: string;
   cloudLabel: string;
