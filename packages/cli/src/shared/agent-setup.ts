@@ -554,6 +554,12 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
 
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(unitB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const script = [
     "source ~/.spawnrc 2>/dev/null",
@@ -855,6 +861,15 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
   const timerB64 = Buffer.from(timerFile).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(unitB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(timerB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const script = [
     "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
