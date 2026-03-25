@@ -872,7 +872,7 @@ async function main(): Promise<void> {
   }
   // --fast implies all beta features
   if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel", "docker");
+    betaFeatures.push("tarball", "images", "parallel");
   }
   if (betaFeatures.length > 0) {
     process.env.SPAWN_BETA = [

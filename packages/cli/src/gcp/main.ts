@@ -55,7 +55,12 @@ async function main() {
       runServer: useDocker
         ? (cmd: string, timeoutSecs?: number) => runServer(makeDockerExec(cmd), timeoutSecs)
         : runServer,
-      uploadFile,
+      uploadFile: useDocker
+        ? async (localPath: string, remotePath: string) => {
+            await uploadFile(localPath, remotePath);
+            await runServer(`docker cp ${remotePath} ${DOCKER_CONTAINER_NAME}:${remotePath}`);
+          }
+        : uploadFile,
       downloadFile,
     },
     async authenticate() {
