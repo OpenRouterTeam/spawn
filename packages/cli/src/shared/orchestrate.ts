@@ -551,7 +551,14 @@ async function postInstall(
   }
 
   // Spawn CLI + skill injection (recursive spawn)
-  if (enabledSteps?.has("spawn") && cloud.cloudName !== "local") {
+  // The "spawn" step is defaultOn when --beta recursive is active, so it should
+  // run when no explicit steps are selected (!enabledSteps) AND the beta flag is set.
+  const betaFeaturesPost = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+  if (
+    cloud.cloudName !== "local" &&
+    betaFeaturesPost.has("recursive") &&
+    (!enabledSteps || enabledSteps.has("spawn"))
+  ) {
     await installSpawnCli(cloud.runner);
     await delegateCloudCredentials(cloud.runner, cloud.cloudName);
     await injectSpawnSkill(cloud.runner, agentName);
