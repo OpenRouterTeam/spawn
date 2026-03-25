@@ -285,6 +285,7 @@ async function setupCodexConfig(runner: CloudRunner): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
+sandbox_mode = "danger-full-access"
 
 [model_providers.openrouter]
 name = "OpenRouter"
