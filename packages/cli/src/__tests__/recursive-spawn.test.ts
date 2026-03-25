@@ -1,8 +1,9 @@
 import type { SpawnRecord } from "../history.js";
 
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cmdTree } from "../commands/tree.js";
 import { exportHistory, HISTORY_SCHEMA_VERSION, loadHistory, mergeChildHistory, saveSpawnRecord } from "../history.js";
 
 describe("recursive spawn", () => {
@@ -240,16 +241,29 @@ describe("recursive spawn", () => {
     });
   });
 
-  // ── Tree building ────────────────────────────────────────────────────
+  // ── cmdTree ────────────────────────────────────────────────────────
 
-  describe("tree command", () => {
-    it("builds tree structure from records with parent_id", async () => {
-      // Save a parent and two children
+  describe("cmdTree", () => {
+    it("shows empty message when no history", async () => {
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+
+      await cmdTree();
+
+      console.log = origLog;
+      // p.log.info writes to stderr, not captured — but cmdTree should not throw
+    });
+
+    it("renders tree with parent-child relationships", async () => {
       saveSpawnRecord({
         id: "root-1",
         agent: "claude",
         cloud: "hetzner",
         timestamp: "2026-03-24T00:00:00.000Z",
+        name: "my-root",
       });
       saveSpawnRecord({
         id: "child-1",
@@ -258,6 +272,7 @@ describe("recursive spawn", () => {
         timestamp: "2026-03-24T01:00:00.000Z",
         parent_id: "root-1",
         depth: 1,
+        name: "my-child",
       });
       saveSpawnRecord({
         id: "child-2",
@@ -276,63 +291,135 @@ describe("recursive spawn", () => {
         depth: 2,
       });
 
-      const loaded = loadHistory();
-      expect(loaded).toHaveLength(4);
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
 
-      // Verify parent-child relationships
-      const root = loaded.find((r) => r.id === "root-1");
-      expect(root).toBeDefined();
-      expect(root!.parent_id).toBeUndefined();
+      // Mock loadManifest to avoid network calls
+      const manifestMod = await import("../manifest.js");
+      const manifestSpy = spyOn(manifestMod, "loadManifest").mockRejectedValue(new Error("no network"));
 
-      const child1 = loaded.find((r) => r.id === "child-1");
-      expect(child1!.parent_id).toBe("root-1");
+      await cmdTree();
 
-      const grandchild = loaded.find((r) => r.id === "grandchild-1");
-      expect(grandchild!.parent_id).toBe("child-1");
-      expect(grandchild!.depth).toBe(2);
+      console.log = origLog;
+      manifestSpy.mockRestore();
+
+      // Should have output with tree characters
+      const output = logs.join("\n");
+      expect(output).toContain("my-root");
+      expect(output).toContain("my-child");
+      // Tree connectors
+      expect(output).toContain("├─");
+      expect(output).toContain("└─");
     });
-  });
 
-  // ── List tree rendering ──────────────────────────────────────────────
+    it("outputs JSON when --json flag is set", async () => {
+      saveSpawnRecord({
+        id: "root-1",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        id: "child-1",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+        parent_id: "root-1",
+        depth: 1,
+      });
 
-  describe("list with tree structure", () => {
-    it("detects tree structure in records", async () => {
-      const recordsWithTree: SpawnRecord[] = [
-        {
-          id: "root",
-          agent: "claude",
-          cloud: "hetzner",
-          timestamp: "2026-03-24T00:00:00.000Z",
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+
+      const manifestMod = await import("../manifest.js");
+      const manifestSpy = spyOn(manifestMod, "loadManifest").mockRejectedValue(new Error("no network"));
+
+      await cmdTree(true);
+
+      console.log = origLog;
+      manifestSpy.mockRestore();
+
+      const output = logs.join("\n");
+      const parsed: unknown = JSON.parse(output);
+      expect(Array.isArray(parsed)).toBe(true);
+      const records = Array.isArray(parsed) ? parsed : [];
+      expect(records).toHaveLength(2);
+    });
+
+    it("shows flat message when no parent-child relationships", async () => {
+      saveSpawnRecord({
+        id: "a",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        id: "b",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+      });
+
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+
+      const manifestMod = await import("../manifest.js");
+      const manifestSpy = spyOn(manifestMod, "loadManifest").mockRejectedValue(new Error("no network"));
+
+      await cmdTree();
+
+      console.log = origLog;
+      manifestSpy.mockRestore();
+    });
+
+    it("renders deleted and depth labels", async () => {
+      saveSpawnRecord({
+        id: "root-1",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T00:00:00.000Z",
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          deleted: true,
+          deleted_at: "2026-03-24T05:00:00.000Z",
         },
-        {
-          id: "child",
-          agent: "codex",
-          cloud: "hetzner",
-          timestamp: "2026-03-24T01:00:00.000Z",
-          parent_id: "root",
-        },
-      ];
+      });
+      saveSpawnRecord({
+        id: "child-1",
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-03-24T01:00:00.000Z",
+        parent_id: "root-1",
+        depth: 1,
+      });
 
-      const hasTree = recordsWithTree.some((r) => r.parent_id);
-      expect(hasTree).toBe(true);
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
 
-      const recordsFlat: SpawnRecord[] = [
-        {
-          id: "a",
-          agent: "claude",
-          cloud: "hetzner",
-          timestamp: "2026-03-24T00:00:00.000Z",
-        },
-        {
-          id: "b",
-          agent: "codex",
-          cloud: "hetzner",
-          timestamp: "2026-03-24T01:00:00.000Z",
-        },
-      ];
+      const manifestMod = await import("../manifest.js");
+      const manifestSpy = spyOn(manifestMod, "loadManifest").mockRejectedValue(new Error("no network"));
 
-      const hasTreeFlat = recordsFlat.some((r) => r.parent_id);
-      expect(hasTreeFlat).toBe(false);
+      await cmdTree();
+
+      console.log = origLog;
+      manifestSpy.mockRestore();
+
+      const output = logs.join("\n");
+      expect(output).toContain("deleted");
+      expect(output).toContain("depth=1");
     });
   });
 });
