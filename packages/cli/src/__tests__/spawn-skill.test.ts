@@ -1,13 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import {
-  getSpawnSkillPath,
-  getSpawnSkillSourceFile,
-  injectSpawnSkill,
-  isAppendMode,
-  readSkillContent,
-} from "../shared/spawn-skill.js";
+import { getSkillContent, getSpawnSkillPath, injectSpawnSkill, isAppendMode } from "../shared/spawn-skill.js";
 
 // ─── Path mapping tests ─────────────────────────────────────────────────────
 
@@ -49,44 +41,6 @@ describe("getSpawnSkillPath", () => {
   });
 });
 
-describe("getSpawnSkillSourceFile", () => {
-  it("returns correct source for claude", () => {
-    expect(getSpawnSkillSourceFile("claude")).toBe("claude/SKILL.md");
-  });
-
-  it("returns correct source for codex", () => {
-    expect(getSpawnSkillSourceFile("codex")).toBe("codex/SKILL.md");
-  });
-
-  it("returns correct source for openclaw", () => {
-    expect(getSpawnSkillSourceFile("openclaw")).toBe("openclaw/SKILL.md");
-  });
-
-  it("returns correct source for zeroclaw", () => {
-    expect(getSpawnSkillSourceFile("zeroclaw")).toBe("zeroclaw/AGENTS.md");
-  });
-
-  it("returns correct source for opencode", () => {
-    expect(getSpawnSkillSourceFile("opencode")).toBe("opencode/AGENTS.md");
-  });
-
-  it("returns correct source for kilocode", () => {
-    expect(getSpawnSkillSourceFile("kilocode")).toBe("kilocode/spawn.md");
-  });
-
-  it("returns correct source for hermes", () => {
-    expect(getSpawnSkillSourceFile("hermes")).toBe("hermes/SOUL.md");
-  });
-
-  it("returns correct source for junie", () => {
-    expect(getSpawnSkillSourceFile("junie")).toBe("junie/AGENTS.md");
-  });
-
-  it("returns undefined for unknown agent", () => {
-    expect(getSpawnSkillSourceFile("nonexistent")).toBeUndefined();
-  });
-});
-
 // ─── Append mode tests ──────────────────────────────────────────────────────
 
 describe("isAppendMode", () => {
@@ -123,12 +77,9 @@ describe("isAppendMode", () => {
   });
 });
 
-// ─── Skill file existence tests ─────────────────────────────────────────────
+// ─── Embedded content tests ─────────────────────────────────────────────────
 
-describe("skill files exist in repo", () => {
-  // Find the skills/ directory relative to this test
-  const skillsDir = join(import.meta.dir, "../../../../skills");
-
+describe("getSkillContent", () => {
   const agents = [
     "claude",
     "codex",
@@ -141,13 +92,10 @@ describe("skill files exist in repo", () => {
   ];
 
   for (const agent of agents) {
-    it(`skill file exists and is non-empty for ${agent}`, () => {
-      const sourceFile = getSpawnSkillSourceFile(agent);
-      expect(sourceFile).toBeDefined();
-      const filePath = join(skillsDir, sourceFile!);
-      expect(existsSync(filePath)).toBe(true);
-      const content = readFileSync(filePath, "utf-8");
-      expect(content.length).toBeGreaterThan(0);
+    it(`returns non-empty content for ${agent}`, () => {
+      const content = getSkillContent(agent);
+      expect(content).toBeDefined();
+      expect(content!.length).toBeGreaterThan(0);
     });
   }
 
@@ -156,12 +104,11 @@ describe("skill files exist in repo", () => {
     "codex",
     "openclaw",
   ]) {
-    it(`${agent} skill file contains YAML frontmatter with name: spawn`, () => {
-      const sourceFile = getSpawnSkillSourceFile(agent);
-      const filePath = join(skillsDir, sourceFile!);
-      const content = readFileSync(filePath, "utf-8");
-      expect(content).toStartWith("---\n");
-      expect(content).toContain("name: spawn");
+    it(`${agent} content has YAML frontmatter with name: spawn`, () => {
+      const content = getSkillContent(agent);
+      expect(content).toBeDefined();
+      expect(content!).toStartWith("---\n");
+      expect(content!).toContain("name: spawn");
     });
   }
 
@@ -171,13 +118,23 @@ describe("skill files exist in repo", () => {
     "kilocode",
     "junie",
   ]) {
-    it(`${agent} skill file is plain markdown (no YAML frontmatter)`, () => {
-      const sourceFile = getSpawnSkillSourceFile(agent);
-      const filePath = join(skillsDir, sourceFile!);
-      const content = readFileSync(filePath, "utf-8");
-      expect(content).toStartWith("# Spawn");
+    it(`${agent} content is plain markdown (no YAML frontmatter)`, () => {
+      const content = getSkillContent(agent);
+      expect(content).toBeDefined();
+      expect(content!).toStartWith("# Spawn");
     });
   }
+
+  it("hermes content is short append snippet", () => {
+    const content = getSkillContent("hermes");
+    expect(content).toBeDefined();
+    expect(content!).toContain("Spawn Capability");
+    expect(content!).not.toContain("# Spawn — Create Child VMs");
+  });
+
+  it("returns undefined for unknown agent", () => {
+    expect(getSkillContent("nonexistent")).toBeUndefined();
+  });
 });
 
 // ─── injectSpawnSkill tests ─────────────────────────────────────────────────
@@ -290,20 +247,6 @@ describe("injectSpawnSkill", () => {
   });
 });
 
-// ─── readSkillContent tests ─────────────────────────────────────────────────
-
-describe("readSkillContent", () => {
-  it("returns content for known agent", () => {
-    const content = readSkillContent("claude");
-    expect(content).not.toBeNull();
-    expect(content).toContain("Spawn");
-  });
-
-  it("returns null for unknown agent", () => {
-    expect(readSkillContent("nonexistent")).toBeNull();
-  });
-});
-
 // ─── "spawn" step visibility tests ──────────────────────────────────────────
 
 describe("spawn step gating", () => {
@@ -319,7 +262,6 @@ describe("spawn step gating", () => {
 
   it("spawn step appears when SPAWN_BETA includes recursive", async () => {
     process.env.SPAWN_BETA = "recursive";
-    // Re-import to pick up the env var (the function reads env at call time)
     const { getAgentOptionalSteps } = await import("../shared/agents.js");
     const steps = getAgentOptionalSteps("claude");
     const spawnStep = steps.find((s) => s.value === "spawn");
