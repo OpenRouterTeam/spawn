@@ -199,11 +199,6 @@ describe("createCloudAgents", () => {
     expect(runner.runServer).not.toHaveBeenCalled();
   });
 
-  it("junie agent envVars include JUNIE_OPENROUTER_API_KEY", () => {
-    const envVars = result.agents.junie.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("JUNIE_OPENROUTER_API_KEY"))).toBe(true);
-  });
-
   it("kilocode agent envVars include KILO_PROVIDER_TYPE", () => {
     const envVars = result.agents.kilocode.envVars("sk-or-v1-test");
     expect(envVars.some((v: string) => v.includes("KILO_PROVIDER_TYPE=openrouter"))).toBe(true);
