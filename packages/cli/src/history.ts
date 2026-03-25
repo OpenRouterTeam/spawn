@@ -65,7 +65,7 @@ const VMConnectionSchema = v.object({
   metadata: v.optional(v.record(v.string(), v.string())),
 });
 
-const SpawnRecordSchema = v.object({
+export const SpawnRecordSchema = v.object({
   id: v.optional(v.string()), // optional for backwards compat with pre-migration records on disk
   agent: v.string(),
   cloud: v.string(),

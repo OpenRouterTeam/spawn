@@ -4,6 +4,7 @@ import type { Manifest } from "../manifest.js";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
+import * as v from "valibot";
 import { authenticate as awsAuthenticate, destroyServer as awsDestroyServer, ensureAwsCli } from "../aws/aws.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
 import {
@@ -13,7 +14,7 @@ import {
   resolveProject as gcpResolveProject,
 } from "../gcp/gcp.js";
 import { ensureHcloudToken, destroyServer as hetznerDestroyServer } from "../hetzner/hetzner.js";
-import { getActiveServers, loadHistory, markRecordDeleted, mergeChildHistory } from "../history.js";
+import { getActiveServers, loadHistory, markRecordDeleted, mergeChildHistory, SpawnRecordSchema } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateMetadataValue, validateServerIdentifier } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
@@ -282,9 +283,13 @@ async function pullChildHistory(record: SpawnRecord): Promise<void> {
     if (!Array.isArray(parsed)) {
       return;
     }
-    const childRecords: SpawnRecord[] = parsed.filter(
-      (r: unknown): r is SpawnRecord => typeof r === "object" && r !== null && "agent" in r && "cloud" in r,
-    );
+    const childRecords: SpawnRecord[] = [];
+    for (const el of parsed) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        childRecords.push(result.output);
+      }
+    }
     if (childRecords.length > 0) {
       mergeChildHistory(record.id, childRecords);
       p.log.info(`Merged ${childRecords.length} child record(s) from ${conn.server_name || conn.ip}`);

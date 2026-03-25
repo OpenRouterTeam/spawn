@@ -130,6 +130,12 @@ async function installSpawnCli(runner: CloudRunner): Promise<void> {
 async function delegateCloudCredentials(runner: CloudRunner, cloudName: string): Promise<void> {
   logStep("Delegating cloud credentials to VM...");
 
+  // Validate cloudName to prevent command injection via crafted cloud names
+  if (!/^[a-z0-9-]+$/.test(cloudName)) {
+    logWarn(`Invalid cloud name for credential delegation: ${cloudName}`);
+    return;
+  }
+
   const filesToDelegate: {
     localPath: string;
     remotePath: string;
