@@ -204,7 +204,9 @@ export async function confirmAndDelete(
     await ensureDeleteCredentials(record);
   }
 
-  const s = p.spinner();
+  const s = p.spinner({
+    output: process.stderr,
+  });
   s.start(`Deleting ${label}...`);
 
   // Cloud destroy functions log progress to stderr (logStep/logInfo).

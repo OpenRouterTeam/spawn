@@ -135,6 +135,29 @@ export function spawnInteractive(args: string[], env?: Record<string, string | u
     stdio: "inherit",
     env: env ?? process.env,
   });
+
+  // Reset terminal state after the interactive session ends.
+  // The remote agent's TUI (e.g. Claude Code) may leave the terminal in
+  // raw mode or with altered attributes, causing garbled post-session output.
+  if (process.stderr.isTTY) {
+    process.stderr.write("\x1b[0m\x1b[?25h"); // reset attributes + show cursor
+  }
+  if (process.stdout.isTTY) {
+    process.stdout.write("\x1b[0m\x1b[?25h");
+  }
+  // Restore sane terminal settings (cooked mode, echo, etc.)
+  tryCatch(() =>
+    nodeSpawnSync(
+      "stty",
+      [
+        "sane",
+      ],
+      {
+        stdio: "inherit",
+      },
+    ),
+  );
+
   return result.status ?? 1;
 }
 

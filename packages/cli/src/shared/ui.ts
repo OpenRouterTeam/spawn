@@ -1,6 +1,8 @@
 // shared/ui.ts — Logging, prompts, and browser opening
 // @clack/prompts is bundled into cli.js at build time.
 
+import "../unicode-detect.js"; // Must run before @clack/prompts: configures TERM for unicode detection
+
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";

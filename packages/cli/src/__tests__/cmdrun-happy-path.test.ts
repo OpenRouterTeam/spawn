@@ -113,11 +113,13 @@ describe("cmdRun happy-path pipeline", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
   let processExitSpy: ReturnType<typeof spyOn>;
+  let stderrSpy: ReturnType<typeof spyOn>;
   let historyDir: string;
   let originalSpawnHome: string | undefined;
 
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
+    stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     mockLogError.mockClear();
     mockLogInfo.mockClear();
     mockLogStep.mockClear();
@@ -144,6 +146,7 @@ describe("cmdRun happy-path pipeline", () => {
   afterEach(() => {
     global.fetch = originalFetch;
     processExitSpy.mockRestore();
+    stderrSpy.mockRestore();
     restoreMocks(consoleMocks.log, consoleMocks.error);
 
     // Clean up history directory
@@ -173,7 +176,7 @@ describe("cmdRun happy-path pipeline", () => {
       expect(scriptFetches[0].url).toContain("openrouter.ai");
     });
 
-    it("should show spinner start and stop for successful download", async () => {
+    it("should log download start and completion messages for successful download", async () => {
       global.fetch = mockFetchForDownload({
         primaryOk: true,
       });
@@ -181,11 +184,9 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c[0]);
-      expect(startCalls.some((msg: string) => msg.includes("Downloading"))).toBe(true);
-
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c[0]);
-      expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("downloaded"))).toBe(true);
+      const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+      expect(stderrOutput).toContain("Downloading");
+      expect(stderrOutput).toContain("downloaded");
     });
 
     it("should not call process.exit on successful execution", async () => {
@@ -220,7 +221,7 @@ describe("cmdRun happy-path pipeline", () => {
       expect(scriptFetches[1].url).toContain("raw.githubusercontent.com");
     });
 
-    it("should show fallback spinner message when primary fails", async () => {
+    it("should log fallback step message when primary fails", async () => {
       global.fetch = mockFetchForDownload({
         primaryOk: false,
         primaryStatus: 502,
@@ -230,11 +231,11 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const messageCalls = mockSpinnerMessage.mock.calls.map((c: unknown[]) => c[0]);
-      expect(messageCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
+      const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+      expect(stderrOutput).toContain("fallback");
     });
 
-    it("should show 'fallback' in stop message when fallback succeeds", async () => {
+    it("should log 'fallback' in completion message when fallback succeeds", async () => {
       global.fetch = mockFetchForDownload({
         primaryOk: false,
         primaryStatus: 403,
@@ -244,8 +245,8 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c[0]);
-      expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("fallback"))).toBe(true);
+      const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+      expect(stderrOutput).toContain("fallback");
     });
   });
 
