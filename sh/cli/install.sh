@@ -182,6 +182,21 @@ ensure_in_path() {
     local linked=false
     local bun_path
     bun_path="$(command -v bun 2>/dev/null || true)"
+    # Validate bun is in an expected directory before symlinking with elevated
+    # privileges. If an attacker controls PATH, `command -v bun` could resolve
+    # to a malicious binary — symlinking that to /usr/local/bin with sudo would
+    # be a privilege escalation vector.
+    if [ -n "$bun_path" ]; then
+        case "$bun_path" in
+            "${HOME}/.bun/bin/bun"|"${HOME}/.local/bin/bun"|/usr/local/bin/bun|"${BUN_INSTALL}/bin/bun")
+                # Expected bun installation location — safe to symlink
+                ;;
+            *)
+                log_warn "bun found at unexpected location: ${bun_path} — skipping symlink"
+                bun_path=""
+                ;;
+        esac
+    fi
     if [ "$spawn_in_path" = false ]; then
         if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
             safe_ln_sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
