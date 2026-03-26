@@ -9,7 +9,14 @@ import pc from "picocolors";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "../guidance-data.js";
 import { generateSpawnId, getActiveServers, loadHistory, saveSpawnRecord } from "../history.js";
 import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
-import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
+import {
+  validateConnectionIP,
+  validateIdentifier,
+  validatePrompt,
+  validateScriptContent,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
 import { getLocalShell, isWindows } from "../shared/shell.js";
 import { maybeShowStarPrompt } from "../shared/star-prompt.js";
@@ -1138,32 +1145,36 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     );
   }
 
-  // Read the spawn record saved during orchestration to populate connection fields
+  // Read the spawn record saved during orchestration to populate connection fields.
+  // Validate each field individually — silently omit any that fail validation to avoid
+  // surfacing attacker-controlled data from a tampered history file in headless output.
   const history = loadHistory();
   const record = history
     .filter((r) => r.agent === resolvedAgent && r.cloud === resolvedCloud && r.connection && !r.connection.deleted)
     .pop();
 
+  const connectionFields: Partial<Pick<SpawnResult, "ip_address" | "ssh_user" | "server_id" | "server_name">> = {};
+  if (record?.connection) {
+    const conn = record.connection;
+    if (conn.ip && tryCatch(() => validateConnectionIP(conn.ip)).ok) {
+      connectionFields.ip_address = conn.ip;
+    }
+    if (conn.user && tryCatch(() => validateUsername(conn.user)).ok) {
+      connectionFields.ssh_user = conn.user;
+    }
+    if (conn.server_id && tryCatch(() => validateServerIdentifier(conn.server_id)).ok) {
+      connectionFields.server_id = conn.server_id;
+    }
+    if (conn.server_name && tryCatch(() => validateServerIdentifier(conn.server_name)).ok) {
+      connectionFields.server_name = conn.server_name;
+    }
+  }
+
   const result: SpawnResult = {
     status: "success",
     cloud: resolvedCloud,
     agent: resolvedAgent,
-    ...(record?.connection
-      ? {
-          ip_address: record.connection.ip,
-          ssh_user: record.connection.user,
-          ...(record.connection.server_id
-            ? {
-                server_id: record.connection.server_id,
-              }
-            : {}),
-          ...(record.connection.server_name
-            ? {
-                server_name: record.connection.server_name,
-              }
-            : {}),
-        }
-      : {}),
+    ...connectionFields,
     ...(process.env.SPAWN_CLI_UPDATED === "1"
       ? {
           cli_updated: true,
