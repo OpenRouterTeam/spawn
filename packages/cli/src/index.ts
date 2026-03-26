@@ -613,8 +613,16 @@ async function dispatchDeleteCommand(filteredArgs: string[]): Promise<void> {
     cmdHelp();
     return;
   }
-  const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
-  await cmdDelete(agentFilter, cloudFilter);
+  const args = filteredArgs.slice(1);
+  const forceYes = args.includes("--yes") || args.includes("-y");
+  let nameFilter: string | undefined;
+  const nameIdx = args.indexOf("--name");
+  if (nameIdx !== -1 && args[nameIdx + 1]) {
+    nameFilter = args[nameIdx + 1];
+  }
+  const cleanArgs = args.filter((a) => a !== "--yes" && a !== "-y" && a !== "--name" && a !== nameFilter);
+  const { agentFilter, cloudFilter } = parseListFilters(cleanArgs);
+  await cmdDelete(agentFilter, cloudFilter, nameFilter, forceYes);
 }
 
 /** Handle status/ps commands with --prune and --json flags */

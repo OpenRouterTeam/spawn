@@ -352,7 +352,12 @@ export async function cascadeDelete(record: SpawnRecord, manifest: Manifest | nu
   return confirmAndDelete(record, manifest);
 }
 
-export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+export async function cmdDelete(
+  agentFilter?: string,
+  cloudFilter?: string,
+  nameFilter?: string,
+  forceYes?: boolean,
+): Promise<void> {
   const resolved = await resolveListFilters(agentFilter, cloudFilter);
   agentFilter = resolved.agentFilter;
   cloudFilter = resolved.cloudFilter;
@@ -367,6 +372,15 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
   if (cloudFilter) {
     const lower = cloudFilter.toLowerCase();
     filtered = filtered.filter((r) => r.cloud.toLowerCase() === lower);
+  }
+  if (nameFilter) {
+    const lower = nameFilter.toLowerCase();
+    filtered = filtered.filter(
+      (r) =>
+        (r.name ?? "").toLowerCase() === lower ||
+        (r.connection?.server_name ?? "").toLowerCase() === lower ||
+        r.id === nameFilter,
+    );
   }
 
   if (filtered.length === 0) {
@@ -387,10 +401,22 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
   const manifestResult = await asyncTryCatchIf(isNetworkError, loadManifest);
   const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
+  // Non-interactive headless delete: --name + --yes skips the picker
   if (!isInteractiveTTY()) {
-    p.log.error("spawn delete requires an interactive terminal.");
-    p.log.info(`Use ${pc.cyan("spawn list")} to see your servers.`);
-    process.exit(1);
+    if (!forceYes) {
+      p.log.error("spawn delete requires --yes in non-interactive mode.");
+      p.log.info(`Usage: ${pc.cyan("spawn delete --name <name> --yes")}`);
+      process.exit(1);
+    }
+    for (const record of filtered) {
+      const label = record.connection?.server_name || record.name || record.id;
+      await ensureDeleteCredentials(record);
+      const ok = await execDeleteServer(record);
+      if (ok) {
+        p.log.success(`Server "${label}" deleted`);
+      }
+    }
+    return;
   }
 
   await activeServerPicker(filtered, manifest);
