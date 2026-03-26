@@ -146,20 +146,13 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
   }
 }`;
 
-  // Safety: base64 output only contains [A-Za-z0-9+/=] — never single quotes —
-  // so interpolating into a single-quoted shell string is safe.
-  const settingsB64 = Buffer.from(settingsJson).toString("base64");
-  if (!/^[A-Za-z0-9+/=]+$/.test(settingsB64)) {
-    throw new Error("Unexpected characters in base64 output");
-  }
+  // Upload settings via SCP — avoids base64 interpolation into shell commands.
+  await uploadConfigFile(runner, settingsJson, "$HOME/.claude/settings.json");
 
   // Build ~/.claude.json on the remote using $HOME so the workspace trust
   // entry uses the actual home directory path (e.g. /root, /home/user).
   // This pre-accepts the "Quick safety check" trust dialog for the home dir.
   const stateScript = [
-    "mkdir -p ~/.claude",
-    `printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json`,
-    "chmod 600 ~/.claude/settings.json",
     'printf \'{"hasCompletedOnboarding":true,"bypassPermissionsModeAccepted":true,"projects":{"%s":{"hasTrustDialogAccepted":true}}}\\n\' "$HOME" > ~/.claude.json',
     "chmod 600 ~/.claude.json",
     "touch ~/.claude/CLAUDE.md",
@@ -208,29 +201,19 @@ async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<
     "",
   ].join("\n");
 
-  const configB64 = Buffer.from(configJson).toString("base64");
-  if (!/^[A-Za-z0-9+/=]+$/.test(configB64)) {
-    throw new Error("Unexpected characters in base64 output");
-  }
+  // Upload config files via SCP — avoids base64 interpolation into shell commands.
+  await uploadConfigFile(runner, configJson, "$HOME/.cursor/cli-config.json");
+  await uploadConfigFile(runner, spawnRule, "$HOME/.cursor/rules/spawn.mdc");
+  // Spawn rule should be world-readable (not sensitive)
+  await runner.runServer("chmod 644 ~/.cursor/rules/spawn.mdc");
 
-  const ruleB64 = Buffer.from(spawnRule).toString("base64");
-  if (!/^[A-Za-z0-9+/=]+$/.test(ruleB64)) {
-    throw new Error("Unexpected characters in base64 output");
-  }
-
-  const script = [
-    "mkdir -p ~/.cursor ~/.cursor/rules",
-    `printf '%s' '${configB64}' | base64 -d > ~/.cursor/cli-config.json`,
-    "chmod 600 ~/.cursor/cli-config.json",
-    // Inject spawn skill as a Cursor rule
-    `printf '%s' '${ruleB64}' | base64 -d > ~/.cursor/rules/spawn.mdc`,
-    "chmod 644 ~/.cursor/rules/spawn.mdc",
-    // Persist PATH so agent binary is available
+  // Persist PATH so agent binary is available
+  const pathScript = [
     'grep -q ".cursor/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.bashrc',
     'grep -q ".cursor/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.zshrc',
   ].join(" && ");
 
-  await runner.runServer(script);
+  await runner.runServer(pathScript);
   logInfo("Cursor CLI configured");
 }
 
@@ -532,7 +515,9 @@ async function setupOpenclawConfig(
           "openclaw config set channels.telegram.enabled true >/dev/null; " +
           `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
           "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
-          "openclaw config set channels.telegram.groupPolicy open >/dev/null",
+          "openclaw config set channels.telegram.groupPolicy open >/dev/null; " +
+          // Restrict config file permissions — it now contains the Telegram bot token
+          "chmod 600 ~/.openclaw/openclaw.json 2>/dev/null || true",
       ),
     );
     if (telegramResult.ok) {
