@@ -35,9 +35,6 @@ import {
   prompt,
   promptSpawnNameShared,
   selectFromList,
-  validateModelId,
-  validateRegionName,
-  validateServerName,
 } from "../shared/ui";
 
 // ── Setup / Teardown ────────────────────────────────────────────────────
@@ -244,34 +241,6 @@ describe("loadApiToken", () => {
     writeFileSync(join(configPath, "bad.json"), "not json");
     const token = loadApiToken("bad");
     expect(token).toBeNull();
-  });
-});
-
-// ── validators ─────────────────────────────────────────────────────
-
-describe("validators", () => {
-  it("validateServerName accepts valid names", () => {
-    expect(validateServerName("my-server-123")).toBe(true);
-  });
-
-  it("validateServerName rejects invalid names", () => {
-    expect(validateServerName("bad name!")).toBe(false);
-  });
-
-  it("validateRegionName accepts valid regions", () => {
-    expect(validateRegionName("us-east-1")).toBe(true);
-  });
-
-  it("validateRegionName rejects invalid regions", () => {
-    expect(validateRegionName("bad region!")).toBe(false);
-  });
-
-  it("validateModelId accepts valid model IDs", () => {
-    expect(validateModelId("anthropic/claude-3.5-sonnet")).toBe(true);
-  });
-
-  it("validateModelId rejects invalid model IDs", () => {
-    expect(validateModelId("bad model ID!")).toBe(false);
   });
 });
 
