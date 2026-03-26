@@ -149,6 +149,10 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("-c, --cloud")}         Filter history by cloud`);
     console.error(`    ${pc.cyan("--clear")}             Clear all spawn history`);
     console.error();
+    console.error(`  For ${pc.cyan("spawn delete")}:`);
+    console.error(`    ${pc.cyan("--name <name>")}       Filter by server name or ID`);
+    console.error(`    ${pc.cyan("--yes, -y")}           Skip confirmation (required for non-interactive)`);
+    console.error();
     console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
     process.exit(1);
   }

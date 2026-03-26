@@ -169,10 +169,10 @@ ensure_in_path() {
     # 1. Check if install_dir and bun are already in the user's real PATH
     local spawn_in_path=false
     local bun_in_path=false
-    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
+    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qxF "${install_dir}"; then
         spawn_in_path=true
     fi
-    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qx "${bun_bin_dir}"; then
+    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qxF "${bun_bin_dir}"; then
         bun_in_path=true
     fi
 

@@ -31,6 +31,7 @@ function getHelpUsageSection(): string {
   spawn delete                       Delete a previously spawned server (aliases: rm, destroy, kill)
   spawn delete -a <agent>            Filter servers by agent
   spawn delete -c <cloud>            Filter servers by cloud
+  spawn delete --name <name> --yes   Headless delete by name (no prompts)
   spawn status                       Show live state of cloud servers (aliases: ps)
   spawn status -a <agent>            Filter status by agent (or --agent)
   spawn status -c <cloud>            Filter status by cloud (or --cloud)
