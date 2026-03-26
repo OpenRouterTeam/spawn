@@ -308,6 +308,13 @@ ensure_gh_auth() {
         fi
 
         log_info "Persisting GITHUB_TOKEN to gh credential store..."
+        # Ensure credential directory exists with restrictive permissions BEFORE writing token
+        # (prevents race condition where token file is world-readable before chmod)
+        mkdir -p "${HOME}/.config/gh"
+        chmod 700 "${HOME}/.config/gh" 2>/dev/null || printf 'Warning: could not set restrictive permissions on gh config directory\n' >&2
+        # Set restrictive umask so the token file is created with 0600 permissions
+        _old_umask=$(umask)
+        umask 077
         # GITHUB_TOKEN is already unset above so gh auth login won't refuse
         # with "The value of the GITHUB_TOKEN environment variable is being
         # used for authentication."
@@ -315,14 +322,13 @@ ensure_gh_auth() {
 ${_gh_token}
 EOF
             log_error "Failed to authenticate with GITHUB_TOKEN"
+            umask "${_old_umask}"
             export GITHUB_TOKEN="${_gh_token}"
             return 1
         }
-        # Restrict token file permissions to owner-only (prevents exposure on multi-user systems)
-        chmod 600 "${HOME}/.config/gh/hosts.yml" || {
-            log_error "Failed to restrict token file permissions — aborting to prevent credential exposure"
-            return 1
-        }
+        umask "${_old_umask}"
+        # Belt-and-suspenders: explicitly restrict token file permissions
+        chmod 600 "${HOME}/.config/gh/hosts.yml" 2>/dev/null || printf 'Warning: could not set restrictive permissions on gh credentials file\n' >&2
         export GITHUB_TOKEN="${_gh_token}"
     elif gh auth status &>/dev/null; then
         log_info "Authenticated with GitHub CLI"
