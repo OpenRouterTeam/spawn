@@ -211,7 +211,7 @@ _gcp_exec() {
   # Pass encoded command via stdin instead of shell interpolation.
   # This completely avoids command injection — the remote side only sees
   # stdin data, never an interpolated shell string.
-  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       "${ssh_user}@${_GCP_INSTANCE_IP}" "base64 -d | bash"
 }

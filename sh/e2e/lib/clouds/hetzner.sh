@@ -167,7 +167,7 @@ _hetzner_exec() {
   # Pipe the base64 payload via stdin to the remote host. The remote bash
   # reads stdin, base64-decodes it, and executes the result. No user-controlled
   # data is interpolated into the SSH command string.
-  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=no \
+  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=accept-new \
       -o UserKnownHostsFile=/dev/null \
       -o LogLevel=ERROR \
       -o BatchMode=yes \
