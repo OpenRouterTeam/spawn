@@ -7,8 +7,9 @@ import type { SpawnRecord } from "../history.js";
 
 import * as v from "valibot";
 import { getActiveServers, mergeChildHistory, SpawnRecordSchema } from "../history.js";
+import { validateConnectionIP, validateUsername } from "../security.js";
 import { parseJsonWith } from "../shared/parse.js";
-import { asyncTryCatch } from "../shared/result.js";
+import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { logDebug, logInfo } from "../shared/ui.js";
 
@@ -98,12 +99,12 @@ export async function cmdPullHistory(): Promise<void> {
     const { ip, user } = record.connection;
     const spawnId = record.id;
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(user)) {
-      logDebug(`Skipping record with invalid user: ${user}`);
-      continue;
-    }
-    if (!/^[0-9.:a-fA-F[\]-]+$/.test(ip)) {
-      logDebug(`Skipping record with invalid ip: ${ip}`);
+    const validation = tryCatch(() => {
+      validateUsername(user);
+      validateConnectionIP(ip);
+    });
+    if (!validation.ok) {
+      logDebug(`Skipping record with invalid connection: ${user}@${ip}`);
       continue;
     }
 

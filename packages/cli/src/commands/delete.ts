@@ -16,7 +16,12 @@ import {
 import { ensureHcloudToken, destroyServer as hetznerDestroyServer } from "../hetzner/hetzner.js";
 import { getActiveServers, loadHistory, markRecordDeleted, mergeChildHistory, SpawnRecordSchema } from "../history.js";
 import { loadManifest } from "../manifest.js";
-import { validateMetadataValue, validateServerIdentifier } from "../security.js";
+import {
+  validateConnectionIP,
+  validateMetadataValue,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
@@ -247,6 +252,14 @@ export async function confirmAndDelete(
 export async function pullChildHistory(record: SpawnRecord): Promise<void> {
   const conn = record.connection;
   if (!conn?.ip || !conn.user || conn.cloud === "local" || conn.ip === "sprite-console") {
+    return;
+  }
+
+  const connValidation = tryCatch(() => {
+    validateUsername(conn.user);
+    validateConnectionIP(conn.ip);
+  });
+  if (!connValidation.ok) {
     return;
   }
 
