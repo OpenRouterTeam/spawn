@@ -28,7 +28,7 @@ Returns JSON: `{"status":"success","ip_address":"...","ssh_user":"root","server_
 ## Managing Children
 
 - `spawn list --json` — see running children
-- `spawn delete` — tear down a child VM
+- `spawn delete --name <name> --yes` — tear down a child VM
 - `spawn tree` — see the full spawn tree
 
 ## Context
