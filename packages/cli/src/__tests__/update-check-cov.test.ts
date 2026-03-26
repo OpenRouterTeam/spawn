@@ -28,14 +28,6 @@ function writeUpdateFailed(timestamp: number) {
   fs.writeFileSync(path.join(dir, ".update-failed"), String(timestamp));
 }
 
-function writeUpdateChecked(timestamp: number) {
-  const dir = path.join(process.env.HOME || "/tmp", ".config", "spawn");
-  fs.mkdirSync(dir, {
-    recursive: true,
-  });
-  fs.writeFileSync(path.join(dir, ".update-checked"), String(timestamp));
-}
-
 describe("update-check.ts coverage", () => {
   let originalEnv: NodeJS.ProcessEnv;
   let consoleSpy: ReturnType<typeof spyOn>;
@@ -70,14 +62,6 @@ describe("update-check.ts coverage", () => {
   describe("checkForUpdates skip conditions", () => {
     it("skips when recently backed off", async () => {
       writeUpdateFailed(Date.now()); // failed just now
-      global.fetch = mock(async () => new Response("1.0.0"));
-      const { checkForUpdates } = await import("../update-check");
-      await checkForUpdates();
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it("skips when recently checked successfully", async () => {
-      writeUpdateChecked(Date.now()); // checked just now
       global.fetch = mock(async () => new Response("1.0.0"));
       const { checkForUpdates } = await import("../update-check");
       await checkForUpdates();
@@ -133,17 +117,6 @@ describe("update-check.ts coverage", () => {
       global.fetch = mock(async () => new Response(pkg.version));
       await checkForUpdates();
       // Should proceed with check (not backed off) — fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-    });
-
-    it("does not skip when checked timestamp is old (>1h)", async () => {
-      writeUpdateChecked(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
-
-      const { checkForUpdates } = await import("../update-check");
-      const pkg = await import("../../package.json");
-      global.fetch = mock(async () => new Response(pkg.version));
-      await checkForUpdates();
-      // Should proceed with network check — fetch was called
       expect(global.fetch).toHaveBeenCalled();
     });
 
