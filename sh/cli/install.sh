@@ -269,7 +269,8 @@ ensure_in_path() {
 # --- Helper: build and install the CLI using bun ---
 build_and_install() {
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "${tmpdir}"' EXIT
+    [ -n "$tmpdir" ] || { log_error "mktemp failed to produce a directory path"; exit 1; }
+    trap '[ -n "${tmpdir}" ] && [ -d "${tmpdir}" ] && rm -rf "${tmpdir}"' EXIT
 
     log_step "Downloading pre-built CLI binary..."
     curl -fsSL --proto '=https' "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
