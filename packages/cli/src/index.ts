@@ -23,6 +23,7 @@ import {
   cmdListClear,
   cmdMatrix,
   cmdPick,
+  cmdPullHistory,
   cmdRun,
   cmdRunHeadless,
   cmdStatus,
@@ -730,6 +731,10 @@ async function dispatchCommand(
     }
     const jsonFlag = filteredArgs.slice(1).includes("--json");
     await cmdTree(jsonFlag);
+    return;
+  }
+  if (cmd === "pull-history") {
+    await cmdPullHistory();
     return;
   }
   if (LIST_COMMANDS.has(cmd)) {
