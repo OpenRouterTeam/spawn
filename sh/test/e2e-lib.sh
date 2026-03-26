@@ -458,6 +458,7 @@ for script in \
   "${REPO_ROOT}/sh/e2e/lib/teardown.sh" \
   "${REPO_ROOT}/sh/e2e/lib/soak.sh" \
   "${REPO_ROOT}/sh/e2e/lib/interactive.sh" \
+  "${REPO_ROOT}/sh/e2e/lib/ai-review.sh" \
   "${REPO_ROOT}/sh/e2e/lib/clouds/aws.sh" \
   "${REPO_ROOT}/sh/e2e/lib/clouds/digitalocean.sh" \
   "${REPO_ROOT}/sh/e2e/lib/clouds/gcp.sh" \
