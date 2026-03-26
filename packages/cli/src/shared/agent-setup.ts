@@ -182,15 +182,49 @@ async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<
   }
 }`;
 
+  // Spawn skill rule — injected into .cursor/rules/ so the agent knows
+  // it can provision child VMs via the spawn CLI.
+  const spawnRule = [
+    "---",
+    "description: Spawn CLI — provision child cloud VMs with AI coding agents",
+    "alwaysApply: true",
+    "---",
+    "",
+    "# Spawn — Create Child VMs",
+    "",
+    "You have the `spawn` CLI installed. Use it to provision cloud VMs with AI agents.",
+    "",
+    "## Usage",
+    "",
+    "```bash",
+    'spawn <agent> <cloud> --headless --output json --prompt "task description"',
+    "```",
+    "",
+    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie, cursor",
+    "## Clouds: hetzner, digitalocean, aws, gcp, sprite",
+    "",
+    "The command returns JSON with connection details. Use this to delegate subtasks",
+    "to specialized agents running on separate cloud VMs.",
+    "",
+  ].join("\n");
+
   const configB64 = Buffer.from(configJson).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(configB64)) {
     throw new Error("Unexpected characters in base64 output");
   }
 
+  const ruleB64 = Buffer.from(spawnRule).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(ruleB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+
   const script = [
-    "mkdir -p ~/.cursor",
+    "mkdir -p ~/.cursor ~/.cursor/rules",
     `printf '%s' '${configB64}' | base64 -d > ~/.cursor/cli-config.json`,
     "chmod 600 ~/.cursor/cli-config.json",
+    // Inject spawn skill as a Cursor rule
+    `printf '%s' '${ruleB64}' | base64 -d > ~/.cursor/rules/spawn.mdc`,
+    "chmod 644 ~/.cursor/rules/spawn.mdc",
     // Persist PATH so agent binary is available
     'grep -q ".cursor/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.bashrc',
     'grep -q ".cursor/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.zshrc',
