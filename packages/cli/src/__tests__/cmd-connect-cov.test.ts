@@ -207,7 +207,7 @@ describe("cmdEnterAgent", () => {
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
-  it("enters agent via sprite console", async () => {
+  it("enters agent via sprite exec -tty", async () => {
     const conn = makeConn({
       ip: "sprite-console",
       server_name: "my-sprite",
@@ -217,7 +217,9 @@ describe("cmdEnterAgent", () => {
     expect(spawnInteractiveSpy).toHaveBeenCalled();
     const args = spawnInteractiveSpy.mock.calls[0][0];
     expect(args[0]).toBe("sprite");
-    expect(args).toContain("console");
+    expect(args).toContain("exec");
+    expect(args).toContain("-tty");
+    expect(args).toContain("my-sprite");
   });
 
   it("uses agent key as fallback when manifest is null", async () => {
