@@ -27,6 +27,8 @@ function getHelpUsageSection(): string {
   spawn list <filter>                Filter history by agent or cloud name
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
+  spawn list --flat                  Show flat list (disable tree view)
+  spawn list --json                  Output history as JSON
   spawn list --clear                 Clear all spawn history
   spawn delete                       Delete a previously spawned server (aliases: rm, destroy, kill)
   spawn delete -a <agent>            Filter servers by agent
@@ -45,6 +47,9 @@ function getHelpUsageSection(): string {
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
+  spawn tree                         Show recursive spawn tree (parent/child relationships)
+  spawn tree --json                  Output spawn tree as JSON
+  spawn history export               Dump history as JSON to stdout
   spawn feedback "message"            Send feedback to the Spawn team
   spawn uninstall                    Uninstall spawn CLI and optionally remove data
   spawn update                       Check for CLI updates
