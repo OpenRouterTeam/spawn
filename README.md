@@ -61,12 +61,7 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn list <filter>` | Filter history by agent or cloud name |
 | `spawn list -a <agent>` | Filter history by agent |
 | `spawn list -c <cloud>` | Filter history by cloud |
-| `spawn list --flat` | Show flat list (disable tree view) |
-| `spawn list --json` | Output history as JSON |
 | `spawn list --clear` | Clear all spawn history |
-| `spawn tree` | Show recursive spawn tree (parent/child relationships) |
-| `spawn tree --json` | Output spawn tree as JSON |
-| `spawn history export` | Dump history as JSON to stdout (used by parent VMs) |
 | `spawn fix` | Re-run agent setup on an existing VM (re-inject credentials, reinstall) |
 | `spawn fix <spawn-id>` | Fix a specific spawn by name or ID |
 | `spawn link <ip>` | Register an existing VM by IP |
