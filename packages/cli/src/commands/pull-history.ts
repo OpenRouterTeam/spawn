@@ -98,6 +98,15 @@ export async function cmdPullHistory(): Promise<void> {
     const { ip, user } = record.connection;
     const spawnId = record.id;
 
+    if (!/^[a-zA-Z0-9_-]+$/.test(user)) {
+      logDebug(`Skipping record with invalid user: ${user}`);
+      continue;
+    }
+    if (!/^[0-9.:a-fA-F[\]-]+$/.test(ip)) {
+      logDebug(`Skipping record with invalid ip: ${ip}`);
+      continue;
+    }
+
     await pullFromChild(ip, user, spawnId, sshKeyOpts);
   }
 }
