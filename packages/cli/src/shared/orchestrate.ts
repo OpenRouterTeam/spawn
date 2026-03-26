@@ -14,7 +14,7 @@ import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js"
 import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
-import { getSpawnCloudConfigPath, getSpawnPreferencesPath, getUserHome } from "./paths.js";
+import { getSpawnCloudConfigPath, getSpawnPreferencesPath } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell.js";
 import { injectSpawnSkill } from "./spawn-skill.js";
@@ -137,7 +137,7 @@ export async function installSpawnCli(runner: CloudRunner): Promise<void> {
 }
 
 /** Copy local cloud credentials to the remote VM for recursive spawning. */
-export async function delegateCloudCredentials(runner: CloudRunner, _cloudName: string): Promise<void> {
+export async function delegateCloudCredentials(runner: CloudRunner): Promise<void> {
   logStep("Delegating cloud credentials to VM...");
 
   const filesToDelegate: {
@@ -147,7 +147,6 @@ export async function delegateCloudCredentials(runner: CloudRunner, _cloudName: 
 
   // Delegate ALL cloud credentials so the child VM can spawn on any cloud,
   // not just the one the parent is running on.
-  const configDir = `${getUserHome()}/.config/spawn`;
   const cloudNames = [
     "hetzner",
     "digitalocean",
@@ -166,7 +165,7 @@ export async function delegateCloudCredentials(runner: CloudRunner, _cloudName: 
   }
 
   // OpenRouter credentials (always needed for child spawns)
-  const orConfigPath = `${configDir}/openrouter.json`;
+  const orConfigPath = getSpawnCloudConfigPath("openrouter");
   if (existsSync(orConfigPath)) {
     filesToDelegate.push({
       localPath: orConfigPath,
@@ -577,7 +576,7 @@ async function postInstall(
     (!enabledSteps || enabledSteps.has("spawn"))
   ) {
     await installSpawnCli(cloud.runner);
-    await delegateCloudCredentials(cloud.runner, cloud.cloudName);
+    await delegateCloudCredentials(cloud.runner);
     await injectSpawnSkill(cloud.runner, agentName);
   }
 

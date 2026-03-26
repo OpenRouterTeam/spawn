@@ -269,7 +269,7 @@ describe("recursive spawn", () => {
       };
 
       // No credential files exist in test sandbox, so should warn and return
-      await delegateCloudCredentials(mockRunner, "hetzner");
+      await delegateCloudCredentials(mockRunner);
 
       // Should not have run mkdir since there are no files to delegate
       expect(commands.length).toBe(0);
@@ -294,7 +294,7 @@ describe("recursive spawn", () => {
         downloadFile: async () => {},
       };
 
-      await delegateCloudCredentials(mockRunner, "hetzner");
+      await delegateCloudCredentials(mockRunner);
 
       // Should have run mkdir + 2 file writes
       expect(commands.length).toBe(3);
@@ -326,7 +326,7 @@ describe("recursive spawn", () => {
       };
 
       // Should not throw
-      await delegateCloudCredentials(mockRunner, "hetzner");
+      await delegateCloudCredentials(mockRunner);
       // At least 2 calls: mkdir + file write(s) that fail
       expect(callCount).toBeGreaterThanOrEqual(2);
     });
@@ -351,7 +351,7 @@ describe("recursive spawn", () => {
       };
 
       // Should not throw, just warn
-      await delegateCloudCredentials(mockRunner, "hetzner");
+      await delegateCloudCredentials(mockRunner);
       // mkdir was called and failed
       expect(callCount).toBe(1);
     });
