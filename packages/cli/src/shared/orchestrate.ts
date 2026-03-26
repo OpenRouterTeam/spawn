@@ -191,6 +191,9 @@ export async function delegateCloudCredentials(runner: CloudRunner, _cloudName: 
   for (const file of filesToDelegate) {
     const content = readFileSync(file.localPath, "utf-8");
     const b64 = Buffer.from(content).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
+      throw new Error("Unexpected characters in base64 output");
+    }
     const writeResult = await asyncTryCatch(() =>
       runner.runServer(`printf '%s' '${b64}' | base64 -d > ${file.remotePath} && chmod 600 ${file.remotePath}`),
     );
@@ -498,6 +501,9 @@ export async function runOrchestration(
 async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const isLocalWindows = cloud.cloudName === "local" && isWindows();
   const envSetupCmd = isLocalWindows
