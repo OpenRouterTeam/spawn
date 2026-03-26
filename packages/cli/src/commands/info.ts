@@ -26,7 +26,7 @@ const COMPACT_NAME_WIDTH = 20;
 const COMPACT_COUNT_WIDTH = 10;
 const COMPACT_READY_WIDTH = 10;
 
-export function getTerminalWidth(): number {
+function getTerminalWidth(): number {
   return process.stdout.columns || 80;
 }
 
