@@ -34,6 +34,8 @@ export {
 } from "./list.js";
 // pick.ts — cmdPick
 export { cmdPick } from "./pick.js";
+// pull-history.ts — cmdPullHistory (recursive child history pull)
+export { cmdPullHistory } from "./pull-history.js";
 // run.ts — cmdRun, cmdRunHeadless, script failure guidance
 export {
   cmdRun,

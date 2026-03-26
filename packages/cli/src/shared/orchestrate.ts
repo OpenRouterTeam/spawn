@@ -1,20 +1,28 @@
 // shared/orchestrate.ts — Shared orchestration pipeline for deploying agents
 // Each cloud implements CloudOrchestrator and calls runOrchestration().
 
-import type { VMConnection } from "../history.js";
+import type { SpawnRecord, VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup.js";
 import type { AgentConfig } from "./agents.js";
 import type { SshTunnelHandle } from "./ssh.js";
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
+import {
+  generateSpawnId,
+  mergeChildHistory,
+  SpawnRecordSchema,
+  saveLaunchCmd,
+  saveMetadata,
+  saveSpawnRecord,
+} from "../history.js";
 import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
 import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
-import { getSpawnCloudConfigPath, getSpawnPreferencesPath } from "./paths.js";
+import { parseJsonWith } from "./parse.js";
+import { getSpawnCloudConfigPath, getSpawnPreferencesPath, getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell.js";
 import { injectSpawnSkill } from "./spawn-skill.js";
@@ -204,6 +212,25 @@ export async function delegateCloudCredentials(runner: CloudRunner): Promise<voi
   logInfo("Cloud credentials delegated to VM");
 }
 
+/** Get parent_id and depth fields for spawn records (set when running inside a child VM). */
+function getParentFields(): {
+  parent_id?: string;
+  depth?: number;
+} {
+  const parentId = process.env.SPAWN_PARENT_ID;
+  const depth = Number(process.env.SPAWN_DEPTH) || 0;
+  return parentId
+    ? {
+        parent_id: parentId,
+        depth,
+      }
+    : depth > 0
+      ? {
+          depth,
+        }
+      : {};
+}
+
 /** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
 export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
   const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
@@ -298,6 +325,7 @@ export async function runOrchestration(
               name: spawnName,
             }
           : {}),
+        ...getParentFields(),
         connection: conn,
       });
       await cloud.waitForReady();
@@ -340,6 +368,7 @@ export async function runOrchestration(
               name: spawnName2,
             }
           : {}),
+        ...getParentFields(),
         connection,
       });
       await cloud.waitForReady();
@@ -447,6 +476,7 @@ export async function runOrchestration(
             name: spawnName,
           }
         : {}),
+      ...getParentFields(),
       connection,
     });
 
@@ -688,6 +718,10 @@ async function postInstall(
     if (tunnelHandle) {
       tunnelHandle.stop();
     }
+    // Pull child history even in headless mode so parent trees stay complete
+    if (cloud.cloudName !== "local") {
+      await pullChildHistory(cloud.runner, spawnId);
+    }
     process.exit(0);
   }
 
@@ -734,5 +768,103 @@ async function postInstall(
   if (tunnelHandle) {
     tunnelHandle.stop();
   }
+
+  // Pull child's spawn history back to the parent for `spawn tree`
+  if (cloud.cloudName !== "local") {
+    await pullChildHistory(cloud.runner, spawnId);
+  }
+
   process.exit(exitCode);
+}
+
+/**
+ * Pull spawn history from a child VM and merge it into local history.
+ * This enables `spawn tree` to show the full recursive hierarchy.
+ */
+async function pullChildHistory(runner: CloudRunner, parentSpawnId: string): Promise<void> {
+  const result = await asyncTryCatch(async () => {
+    const tmpPath = `${getTmpDir()}/child-history-${parentSpawnId}.json`;
+
+    // Recursive pull: tell the child to pull from ALL its children first.
+    // `spawn pull-history` recursively SSHes into each active child, pulls
+    // their history, and merges it into the child's local history.json.
+    // After this, the child's history contains the full subtree.
+    const recursePull = await asyncTryCatch(() =>
+      runner.runServer(
+        'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"; spawn pull-history 2>/dev/null || true',
+        120,
+      ),
+    );
+    if (!recursePull.ok) {
+      logDebug("Recursive history pull skipped (spawn CLI may not support pull-history yet)");
+    }
+
+    // Copy the child's history via the runner's downloadFile
+    // Try both possible history locations (legacy ~/.spawn/ and new ~/.config/spawn/)
+    const copyResult = await asyncTryCatch(() =>
+      runner.runServer(
+        "cp ~/.spawn/history.json /tmp/_spawn_history.json 2>/dev/null || cp ~/.config/spawn/history.json /tmp/_spawn_history.json 2>/dev/null || echo '{}'  > /tmp/_spawn_history.json",
+      ),
+    );
+    if (!copyResult.ok) {
+      return;
+    }
+
+    await runner.downloadFile("/tmp/_spawn_history.json", tmpPath);
+
+    const json = readFileSync(tmpPath, "utf-8");
+    const ChildHistorySchema = v.object({
+      version: v.optional(v.number()),
+      records: v.array(SpawnRecordSchema),
+    });
+    const parsed = parseJsonWith(json, ChildHistorySchema);
+    if (!parsed || parsed.records.length === 0) {
+      return;
+    }
+
+    // Filter to valid records with an id
+    const validRecords: SpawnRecord[] = [];
+    for (const r of parsed.records) {
+      if (r.id) {
+        validRecords.push({
+          id: r.id,
+          agent: r.agent,
+          cloud: r.cloud,
+          timestamp: r.timestamp,
+          ...(r.name
+            ? {
+                name: r.name,
+              }
+            : {}),
+          ...(r.parent_id
+            ? {
+                parent_id: r.parent_id,
+              }
+            : {}),
+          ...(r.depth !== undefined
+            ? {
+                depth: r.depth,
+              }
+            : {}),
+          ...(r.connection
+            ? {
+                connection: r.connection,
+              }
+            : {}),
+        });
+      }
+    }
+
+    if (validRecords.length > 0) {
+      mergeChildHistory(parentSpawnId, validRecords);
+      logInfo(`Pulled ${validRecords.length} spawn record(s) from child VM`);
+    }
+
+    // Clean up temp file
+    tryCatch(() => unlinkSync(tmpPath));
+  });
+
+  if (!result.ok) {
+    logDebug(`Could not pull child history: ${getErrorMessage(result.error)}`);
+  }
 }
