@@ -195,24 +195,25 @@ _gcp_exec() {
     fi
   fi
 
-  # Base64-encode the command to prevent shell injection when passed as an
-  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
-  # making it safe to embed in single quotes. Stdin is preserved for callers
-  # that pipe data into cloud_exec.
+  # Base64-encode the command and pipe it via stdin to avoid any shell
+  # interpolation on the remote side. This is structurally immune to
+  # injection regardless of the command content.
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
   # Validate base64 output contains only safe characters (defense-in-depth).
-  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption
-  # and ensures the value cannot break out of single quotes in the SSH command.
+  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption.
   if ! printf '%s' "${encoded_cmd}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
     log_err "Invalid base64 encoding of command for SSH exec"
     return 1
   fi
 
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  # Pass encoded command via stdin instead of shell interpolation.
+  # This completely avoids command injection — the remote side only sees
+  # stdin data, never an interpolated shell string.
+  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "${ssh_user}@${_GCP_INSTANCE_IP}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
+      "${ssh_user}@${_GCP_INSTANCE_IP}" "base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------
