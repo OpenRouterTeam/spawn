@@ -169,6 +169,37 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
   logInfo("Claude Code configured");
 }
 
+// ─── Cursor CLI Config ────────────────────────────────────────────────────────
+
+async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+  logStep("Configuring Cursor CLI for OpenRouter...");
+
+  const configJson = `{
+  "version": 1,
+  "permissions": {
+    "allow": ["Shell(*)", "Read(*)", "Write(*)", "WebFetch(*)", "Mcp(*)"],
+    "deny": []
+  }
+}`;
+
+  const configB64 = Buffer.from(configJson).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(configB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+
+  const script = [
+    "mkdir -p ~/.cursor",
+    `printf '%s' '${configB64}' | base64 -d > ~/.cursor/cli-config.json`,
+    "chmod 600 ~/.cursor/cli-config.json",
+    // Persist PATH so agent binary is available
+    'grep -q ".cursor/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.bashrc',
+    'grep -q ".cursor/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.zshrc',
+  ].join(" && ");
+
+  await runner.runServer(script);
+  logInfo("Cursor CLI configured");
+}
+
 // ─── GitHub Auth ─────────────────────────────────────────────────────────────
 
 let githubAuthRequested = false;
@@ -1114,6 +1145,28 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       updateCmd:
         'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
         "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
+    },
+
+    cursor: {
+      name: "Cursor CLI",
+      cloudInitTier: "minimal",
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Cursor CLI",
+          "curl https://cursor.com/install -fsS | bash && " +
+            'export PATH="$HOME/.cursor/bin:$PATH" && ' +
+            "agent --version",
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+        `CURSOR_API_KEY=${apiKey}`,
+      ],
+      configure: (apiKey) => setupCursorConfig(runner, apiKey),
+      launchCmd: () =>
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cursor/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
+      updateCmd: 'export PATH="$HOME/.cursor/bin:$PATH"; agent update',
     },
   };
 }

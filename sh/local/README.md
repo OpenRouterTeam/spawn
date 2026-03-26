@@ -17,6 +17,7 @@ spawn opencode local
 spawn kilocode local
 spawn hermes local
 spawn junie local
+spawn cursor local
 ```
 
 Or run directly without the CLI:
@@ -30,6 +31,7 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/kilocode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/hermes.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/junie.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/cursor.sh)
 ```
 
 ## Non-Interactive Mode
