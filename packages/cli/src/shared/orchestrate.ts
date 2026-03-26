@@ -688,6 +688,13 @@ async function postInstall(
 
   logStep("Starting agent...");
 
+  // Reset terminal state before handing off to the interactive SSH session.
+  // @clack/prompts may have left the cursor hidden or set ANSI attributes
+  // (e.g. color, bold) that would corrupt the remote agent's TUI rendering.
+  if (process.stderr.isTTY) {
+    process.stderr.write("\x1b[?25h\x1b[0m");
+  }
+
   prepareStdinForHandoff();
 
   const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
