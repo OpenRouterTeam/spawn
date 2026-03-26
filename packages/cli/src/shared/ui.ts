@@ -1,6 +1,8 @@
 // shared/ui.ts — Logging, prompts, and browser opening
 // @clack/prompts is bundled into cli.js at build time.
 
+import "../unicode-detect.js"; // Must run before @clack/prompts: configures TERM for unicode detection
+
 import { readFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
@@ -38,14 +40,21 @@ export function logStep(msg: string): void {
   process.stderr.write(`${CYAN}${msg}${NC}\n`);
 }
 
-/** Overwrite the current line with a status message (no newline). Call logStepDone() when finished. */
+/** Overwrite the current line with a status message (no newline). Call logStepDone() when finished.
+ *  Falls back to newline-separated output when stderr is not a TTY (e.g., piped or captured). */
 export function logStepInline(msg: string): void {
-  process.stderr.write(`\r${CYAN}${msg}${NC}\x1b[K`);
+  if (process.stderr.isTTY) {
+    process.stderr.write(`\r${CYAN}${msg}${NC}\x1b[K`);
+  } else {
+    process.stderr.write(`${CYAN}${msg}${NC}\n`);
+  }
 }
 
 /** End an inline status line by moving to the next line. */
 export function logStepDone(): void {
-  process.stderr.write("\r\x1b[K");
+  if (process.stderr.isTTY) {
+    process.stderr.write("\r\x1b[K");
+  }
 }
 
 /** Prompt for a line of user input. Throws if non-interactive.

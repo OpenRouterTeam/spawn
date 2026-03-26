@@ -182,6 +182,21 @@ ensure_in_path() {
     local linked=false
     local bun_path
     bun_path="$(command -v bun 2>/dev/null || true)"
+    # Validate bun is in an expected directory before symlinking with elevated
+    # privileges. If an attacker controls PATH, `command -v bun` could resolve
+    # to a malicious binary — symlinking that to /usr/local/bin with sudo would
+    # be a privilege escalation vector.
+    if [ -n "$bun_path" ]; then
+        case "$bun_path" in
+            "${HOME}/.bun/bin/bun"|"${HOME}/.local/bin/bun"|/usr/local/bin/bun|"${BUN_INSTALL}/bin/bun")
+                # Expected bun installation location — safe to symlink
+                ;;
+            *)
+                log_warn "bun found at unexpected location: ${bun_path} — skipping symlink"
+                bun_path=""
+                ;;
+        esac
+    fi
     if [ "$spawn_in_path" = false ]; then
         if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
             safe_ln_sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
@@ -269,7 +284,8 @@ ensure_in_path() {
 # --- Helper: build and install the CLI using bun ---
 build_and_install() {
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "${tmpdir}"' EXIT
+    [ -n "$tmpdir" ] || { log_error "mktemp failed to produce a directory path"; exit 1; }
+    trap '[ -n "${tmpdir}" ] && [ -d "${tmpdir}" ] && rm -rf "${tmpdir}"' EXIT
 
     log_step "Downloading pre-built CLI binary..."
     curl -fsSL --proto '=https' "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
@@ -305,8 +321,11 @@ _SPAWN_ORIG_PATH="${PATH}"
 export BUN_INSTALL="${BUN_INSTALL:-${HOME}/.bun}"
 export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
-if ! command -v bun &>/dev/null; then
-    log_step "bun not found. Installing bun..."
+# Check that bun exists AND actually works. Some platforms (e.g. Sprite)
+# have a bun shim that delegates to $HOME/.bun/bin/bun — if that binary
+# doesn't exist, `command -v bun` returns 0 but `bun --version` fails.
+if ! bun --version &>/dev/null; then
+    log_step "bun not found or not working. Installing bun..."
 
     # Download the bun installer to a temp file and verify its SHA-256 hash
     # before executing. This defends against a compromised bun.sh CDN or

@@ -4,6 +4,7 @@ import type { VMConnection } from "../history.js";
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { dirname as posixDirname } from "node:path/posix";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { getUserHome } from "../shared/paths.js";
 import { asyncTryCatch } from "../shared/result.js";
@@ -23,8 +24,10 @@ import {
 
 const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
 
-/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs. */
-const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "300", 10);
+/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs.
+ * Raised from 300s to 600s to accommodate slower Sprite API responses in long
+ * E2E runs where HTTP timeouts were observed (net/http: Client.Timeout). #2934 */
+const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "600", 10);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -83,10 +86,14 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
       break;
     }
 
-    // Only retry on transient network errors
-    if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
+    // Only retry on transient network errors and auth expiry (#2934)
+    if (
+      /TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout|Client\.Timeout|request canceled|authentication failed/i.test(
+        msg,
+      )
+    ) {
       logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
-      await sleep(3000);
+      await sleep(3000 * attempt);
       continue;
     }
 
@@ -386,6 +393,52 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
   throw new Error("Sprite connectivity timeout");
 }
 
+// ─── Local Keep-Alive ────────────────────────────────────────────────────────
+
+/**
+ * Background keep-alive that pings the sprite's public URL every 30s from the
+ * local machine. Prevents the sprite from going idle during long operations
+ * like agent installation (where the remote keep-alive script isn't running yet).
+ */
+let _keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startLocalKeepAlive(): void {
+  if (_keepAliveTimer) {
+    return;
+  }
+
+  const cmd = getSpriteCmd();
+  if (!cmd || !_state.name) {
+    return;
+  }
+
+  // Get the sprite's public URL
+  const urlResult = spawnSync([
+    cmd,
+    ...orgFlags(),
+    "url",
+    "-s",
+    _state.name,
+  ]);
+  const urlMatch = urlResult.stdout.match(/https:\/\/\S+/);
+  if (!urlMatch) {
+    return;
+  }
+
+  const spriteUrl = urlMatch[0];
+  _keepAliveTimer = setInterval(() => {
+    // Fire-and-forget fetch to keep the sprite alive
+    fetch(spriteUrl).catch(() => {});
+  }, 30_000);
+}
+
+export function stopLocalKeepAlive(): void {
+  if (_keepAliveTimer) {
+    clearInterval(_keepAliveTimer);
+    _keepAliveTimer = null;
+  }
+}
+
 // ─── Shell Environment Setup ─────────────────────────────────────────────────
 
 export async function setupShellEnvironment(): Promise<void> {
@@ -431,6 +484,9 @@ export function getVmConnection(): VMConnection {
  * Run a command on the remote sprite. Retries on transient errors.
  */
 export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
   await spriteRetry("sprite exec", async () => {
     const proc = Bun.spawn(
@@ -468,6 +524,9 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
 
 /** Run a command silently (no stdout/stderr). Throws on failure. */
 async function runSpriteSilent(cmd: string): Promise<void> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
   const proc = Bun.spawn(
     [
@@ -514,7 +573,18 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   const basename = normalizedRemote.split("/").pop() || "file";
   const tempRemote = `/tmp/sprite_upload_${basename}_${tempRandom}`;
 
+  // Compute the parent directory in TypeScript to avoid shell interpolation
+  const parentDir = posixDirname(normalizedRemote);
+
+  // 180s timeout — prevents indefinite hangs during tarball uploads in fast mode.
+  // Without this, large file uploads (e.g. 300MB openclaw tarball) or stalled
+  // Sprite connections can block the entire provisioning pipeline past the
+  // E2E provision timeout (720s), causing agent binary not-found failures.
+  const UPLOAD_TIMEOUT_MS = 180_000;
+
   await spriteRetry("sprite upload", async () => {
+    // Upload the file to the temp path, then mkdir + mv using array args
+    // to avoid shell string interpolation (command injection risk).
     const proc = Bun.spawn(
       [
         spriteCmd,
@@ -525,9 +595,10 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         "-file",
         `${localPath}:${tempRemote}`,
         "--",
-        "bash",
-        "-c",
-        `mkdir -p $(dirname '${normalizedRemote}') && mv '${tempRemote}' '${normalizedRemote}'`,
+        "mkdir",
+        "-p",
+        "--",
+        parentDir,
       ],
       {
         stdio: [
@@ -539,9 +610,47 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
     );
     // Drain stderr before awaiting exit to prevent pipe buffer deadlock
     const stderrText = new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      throw new Error(`upload failed for ${remotePath}: ${await stderrText}`);
+    const uploadTimer = setTimeout(() => killWithTimeout(proc), UPLOAD_TIMEOUT_MS);
+    const uploadResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(uploadTimer);
+    if (!uploadResult.ok) {
+      throw new Error(`upload timed out for ${remotePath}`);
+    }
+    if (uploadResult.data !== 0) {
+      throw new Error(`upload mkdir failed for ${remotePath}: ${await stderrText}`);
+    }
+
+    // Move temp file to final destination using array args (no shell interpolation)
+    const mvProc = Bun.spawn(
+      [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        _state.name,
+        "--",
+        "mv",
+        "--",
+        tempRemote,
+        normalizedRemote,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "pipe",
+        ],
+      },
+    );
+    const mvStderrText = new Response(mvProc.stderr).text();
+    const mvTimer = setTimeout(() => killWithTimeout(mvProc), 60_000);
+    const mvResult = await asyncTryCatch(() => mvProc.exited);
+    clearTimeout(mvTimer);
+    if (!mvResult.ok) {
+      throw new Error(`upload mv timed out for ${remotePath}`);
+    }
+    if (mvResult.data !== 0) {
+      throw new Error(`upload mv failed for ${remotePath}: ${await mvStderrText}`);
     }
   });
 }
@@ -623,6 +732,9 @@ export async function installSpriteKeepAlive(): Promise<void> {
  * /v1/tasks API for the duration of the session.
  */
 export async function interactiveSession(cmd: string, spawnFn?: (args: string[]) => number): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
   const spriteCmd = getSpriteCmd()!;
 
   // Encode the session command to handle multi-line restart loop scripts safely

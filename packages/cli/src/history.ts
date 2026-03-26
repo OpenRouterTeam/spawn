@@ -37,6 +37,8 @@ export interface SpawnRecord {
   name?: string;
   prompt?: string;
   connection?: VMConnection;
+  parent_id?: string;
+  depth?: number;
 }
 
 /** Simplified cloud instance info returned by each provider's listServers(). */
@@ -63,7 +65,7 @@ const VMConnectionSchema = v.object({
   metadata: v.optional(v.record(v.string(), v.string())),
 });
 
-const SpawnRecordSchema = v.object({
+export const SpawnRecordSchema = v.object({
   id: v.optional(v.string()), // optional for backwards compat with pre-migration records on disk
   agent: v.string(),
   cloud: v.string(),
@@ -71,6 +73,8 @@ const SpawnRecordSchema = v.object({
   name: v.optional(v.string()),
   prompt: v.optional(v.string()),
   connection: v.optional(VMConnectionSchema),
+  parent_id: v.optional(v.string()),
+  depth: v.optional(v.number()),
 });
 
 /** v1 history file format: { version: 1, records: SpawnRecord[] } */
@@ -115,7 +119,12 @@ function acquireLock(): boolean {
     });
     if (mkdirResult.ok) {
       // Write PID + timestamp for stale detection
-      tryCatch(() => writeFileSync(join(lockPath, "pid"), `${process.pid}\n${Date.now()}`));
+      const pidWriteResult = tryCatch(() => writeFileSync(join(lockPath, "pid"), `${process.pid}\n${Date.now()}`));
+      if (!pidWriteResult.ok) {
+        // PID write failed — clean up and retry so we don't leave an undetectable lock
+        tryCatch(() => rmdirSync(lockPath));
+        continue;
+      }
       return true;
     }
 
@@ -132,6 +141,10 @@ function acquireLock(): boolean {
           tryCatch(() => rmdirSync(lockPath));
           return true; // Retry on next iteration
         }
+      } else {
+        // Lock dir exists but no PID file — broken lock, force remove
+        tryCatch(() => rmdirSync(lockPath));
+        return true;
       }
       return false;
     });
@@ -539,6 +552,43 @@ export function updateRecordConnection(
 export function getActiveServers(): SpawnRecord[] {
   const records = loadHistory();
   return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);
+}
+
+/** Merge child spawn records into local history.
+ *  Sets parent_id on each child record and deduplicates by spawn ID. */
+export function mergeChildHistory(parentSpawnId: string, childRecords: SpawnRecord[]): void {
+  if (childRecords.length === 0) {
+    return;
+  }
+
+  withHistoryLock(() => {
+    const history = loadHistory();
+    const existingIds = new Set(history.map((r) => r.id));
+
+    for (const child of childRecords) {
+      if (!child.id) {
+        child.id = generateSpawnId();
+      }
+      // Skip duplicates
+      if (existingIds.has(child.id)) {
+        continue;
+      }
+      // Ensure parent_id is set
+      if (!child.parent_id) {
+        child.parent_id = parentSpawnId;
+      }
+      history.push(child);
+      existingIds.add(child.id);
+    }
+
+    writeHistory(history);
+  });
+}
+
+/** Export history records as JSON string (for `spawn history export`). */
+export function exportHistory(): string {
+  const records = loadHistory();
+  return JSON.stringify(records, null, 2);
 }
 
 export function filterHistory(agentFilter?: string, cloudFilter?: string): SpawnRecord[] {

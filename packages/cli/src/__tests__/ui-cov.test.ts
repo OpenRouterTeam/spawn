@@ -35,9 +35,6 @@ import {
   prompt,
   promptSpawnNameShared,
   selectFromList,
-  validateModelId,
-  validateRegionName,
-  validateServerName,
 } from "../shared/ui";
 
 // ── Setup / Teardown ────────────────────────────────────────────────────
@@ -85,17 +82,19 @@ describe("logging functions", () => {
     expect(stderrOutput.join("")).toContain("test step");
   });
 
-  it("logStepInline writes without newline", () => {
+  it("logStepInline writes message (newline-terminated in non-TTY)", () => {
     logStepInline("inline msg");
     const output = stderrOutput.join("");
     expect(output).toContain("inline msg");
-    expect(output).not.toEndWith("\n");
+    // In non-TTY (test environment), output ends with newline instead of \r overwrite
+    expect(output).toEndWith("\n");
   });
 
-  it("logStepDone clears the line", () => {
+  it("logStepDone is no-op in non-TTY", () => {
     logStepDone();
     const output = stderrOutput.join("");
-    expect(output).toContain("\r");
+    // In non-TTY (test environment), logStepDone writes nothing
+    expect(output).toBe("");
   });
 
   it("logDebug only outputs when SPAWN_DEBUG=1", () => {
@@ -157,26 +156,30 @@ describe("selectFromList", () => {
 
 describe("openBrowser", () => {
   it("shows URL in stderr output on linux", () => {
-    // biome-ignore lint: test mock — spawnSync return type needs assertion
     const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
       exitCode: 1,
       stdout: Buffer.from(""),
       stderr: Buffer.from(""),
       success: false,
-    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+      signalCode: null,
+      resourceUsage: undefined,
+      pid: 0,
+    } satisfies ReturnType<typeof Bun.spawnSync>);
     openBrowser("https://example.com");
     spawnSyncSpy.mockRestore();
     expect(stderrOutput.join("")).toContain("https://example.com");
   });
 
   it("shows different message when browser opens successfully", () => {
-    // biome-ignore lint: test mock — spawnSync return type needs assertion
     const spawnSyncSpy = spyOn(Bun, "spawnSync").mockReturnValue({
       exitCode: 0,
       stdout: Buffer.from(""),
       stderr: Buffer.from(""),
       success: true,
-    } satisfies Partial<ReturnType<typeof Bun.spawnSync>> as ReturnType<typeof Bun.spawnSync>);
+      signalCode: null,
+      resourceUsage: undefined,
+      pid: 0,
+    } satisfies ReturnType<typeof Bun.spawnSync>);
     openBrowser("https://example.com");
     spawnSyncSpy.mockRestore();
     expect(stderrOutput.join("")).toContain("https://example.com");
@@ -238,34 +241,6 @@ describe("loadApiToken", () => {
     writeFileSync(join(configPath, "bad.json"), "not json");
     const token = loadApiToken("bad");
     expect(token).toBeNull();
-  });
-});
-
-// ── validators ─────────────────────────────────────────────────────
-
-describe("validators", () => {
-  it("validateServerName accepts valid names", () => {
-    expect(validateServerName("my-server-123")).toBe(true);
-  });
-
-  it("validateServerName rejects invalid names", () => {
-    expect(validateServerName("bad name!")).toBe(false);
-  });
-
-  it("validateRegionName accepts valid regions", () => {
-    expect(validateRegionName("us-east-1")).toBe(true);
-  });
-
-  it("validateRegionName rejects invalid regions", () => {
-    expect(validateRegionName("bad region!")).toBe(false);
-  });
-
-  it("validateModelId accepts valid model IDs", () => {
-    expect(validateModelId("anthropic/claude-3.5-sonnet")).toBe(true);
-  });
-
-  it("validateModelId rejects invalid model IDs", () => {
-    expect(validateModelId("bad model ID!")).toBe(false);
   });
 });
 

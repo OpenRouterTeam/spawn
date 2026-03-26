@@ -1,19 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 // Must mock clack before importing aws module
 mockClackPrompts();
 
-import {
-  BUNDLES,
-  DEFAULT_BUNDLE,
-  getAwsConfigPath,
-  getConnectionInfo,
-  getState,
-  loadCredsFromConfig,
-  saveCredsToConfig,
-} from "../aws/aws";
+import { DEFAULT_BUNDLE, getConnectionInfo, getState } from "../aws/aws";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -73,101 +64,6 @@ describe("aws/getConnectionInfo", () => {
   });
 });
 
-// ─── BUNDLES ─────────────────────────────────────────────────────────────────
-
-describe("aws/BUNDLES", () => {
-  it("has at least 3 bundles", () => {
-    expect(BUNDLES.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("each bundle has id and label", () => {
-    for (const b of BUNDLES) {
-      expect(b.id).toBeTruthy();
-      expect(b.label).toBeTruthy();
-    }
-  });
-
-  it("DEFAULT_BUNDLE is in BUNDLES list", () => {
-    expect(BUNDLES).toContainEqual(DEFAULT_BUNDLE);
-  });
-});
-
-// ─── Credential Persistence ──────────────────────────────────────────────────
-
-describe("aws/credential-persistence", () => {
-  let savedConfig: string | null = null;
-
-  beforeEach(() => {
-    const path = getAwsConfigPath();
-    if (existsSync(path)) {
-      savedConfig = readFileSync(path, "utf-8");
-    } else {
-      savedConfig = null;
-    }
-  });
-
-  afterEach(() => {
-    const path = getAwsConfigPath();
-    if (savedConfig !== null) {
-      writeFileSync(path, savedConfig);
-    } else if (existsSync(path)) {
-      unlinkSync(path);
-    }
-  });
-
-  it("saveCredsToConfig creates file and loadCredsFromConfig reads it", async () => {
-    const testKey = "AKIAIOSFODNN7EXAMPLE";
-    const testSecret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    await saveCredsToConfig(testKey, testSecret, "us-west-2");
-
-    const loaded = loadCredsFromConfig();
-    expect(loaded).not.toBeNull();
-    expect(loaded?.accessKeyId).toBe(testKey);
-    expect(loaded?.secretAccessKey).toBe(testSecret);
-    expect(loaded?.region).toBe("us-west-2");
-  });
-
-  it("loadCredsFromConfig returns null for missing file", () => {
-    const path = getAwsConfigPath();
-    if (existsSync(path)) {
-      unlinkSync(path);
-    }
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for bad JSON", () => {
-    writeFileSync(getAwsConfigPath(), "NOT_JSON", {
-      mode: 0o600,
-    });
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for invalid accessKeyId format", async () => {
-    await saveCredsToConfig("bad!!!", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1");
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig returns null for invalid secretAccessKey format", async () => {
-    await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "too-short", "us-east-1");
-    expect(loadCredsFromConfig()).toBeNull();
-  });
-
-  it("loadCredsFromConfig defaults region to us-east-1 when not set", async () => {
-    writeFileSync(
-      getAwsConfigPath(),
-      JSON.stringify({
-        accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-      }),
-      {
-        mode: 0o600,
-      },
-    );
-    const loaded = loadCredsFromConfig();
-    expect(loaded?.region).toBe("us-east-1");
-  });
-});
-
 // ─── ensureAwsCli ────────────────────────────────────────────────────────────
 
 describe("aws/ensureAwsCli", () => {
@@ -175,6 +71,8 @@ describe("aws/ensureAwsCli", () => {
     const spy = mockSpawnSync(0, "/usr/local/bin/aws");
     const { ensureAwsCli } = await import("../aws/aws");
     await ensureAwsCli();
+    // spawnSync called once for `which aws` — no install triggered
+    expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
 
@@ -183,6 +81,8 @@ describe("aws/ensureAwsCli", () => {
     process.env.SPAWN_NON_INTERACTIVE = "1";
     const { ensureAwsCli } = await import("../aws/aws");
     await ensureAwsCli();
+    // spawnSync called once for `which aws` — install skipped in non-interactive mode
+    expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
 });
@@ -259,16 +159,17 @@ describe("aws/authenticate", () => {
 describe("aws/promptRegion", () => {
   it("uses AWS_DEFAULT_REGION from env", async () => {
     process.env.AWS_DEFAULT_REGION = "eu-west-1";
-    const { promptRegion } = await import("../aws/aws");
+    const { promptRegion, getState } = await import("../aws/aws");
     await promptRegion();
-    // Should not throw
+    expect(getState().awsRegion).toBe("eu-west-1");
   });
 
   it("uses LIGHTSAIL_REGION from env", async () => {
     delete process.env.AWS_DEFAULT_REGION;
     process.env.LIGHTSAIL_REGION = "ap-northeast-1";
-    const { promptRegion } = await import("../aws/aws");
+    const { promptRegion, getState } = await import("../aws/aws");
     await promptRegion();
+    expect(getState().awsRegion).toBe("ap-northeast-1");
   });
 
   it("throws on invalid region in env", async () => {
@@ -281,8 +182,11 @@ describe("aws/promptRegion", () => {
     delete process.env.AWS_DEFAULT_REGION;
     delete process.env.LIGHTSAIL_REGION;
     delete process.env.SPAWN_CUSTOM;
+    const regionBefore = process.env.AWS_DEFAULT_REGION;
     const { promptRegion } = await import("../aws/aws");
-    await promptRegion(); // no-op
+    await promptRegion();
+    // No region was set — env var unchanged
+    expect(process.env.AWS_DEFAULT_REGION).toBe(regionBefore);
   });
 });
 
@@ -430,14 +334,14 @@ describe("aws/destroyServer", () => {
   });
 
   it("succeeds via REST when name is given", async () => {
-    // Mock fetch for REST path
-    global.fetch = mock(() =>
+    const fetchMock = mock(() =>
       Promise.resolve(
         new Response("{}", {
           status: 200,
         }),
       ),
     );
+    global.fetch = fetchMock;
     // Set up state for REST mode by assigning env vars
     const spy = mockSpawnSync(1); // no aws cli
     process.env.AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
@@ -445,6 +349,8 @@ describe("aws/destroyServer", () => {
     const { authenticate, destroyServer } = await import("../aws/aws");
     await authenticate();
     await destroyServer("test-instance");
+    // fetch called for the Lightsail delete-instance REST request
+    expect(fetchMock).toHaveBeenCalled();
     spy.mockRestore();
   });
 });

@@ -160,19 +160,6 @@ describe("confirmAndDelete", () => {
     const confirmCall = clack.confirm.mock.calls[0];
     expect(confirmCall?.[0].message).toContain("9.8.7.6");
   });
-
-  it("intercepts stderr writes to update spinner", async () => {
-    clack.confirm.mockResolvedValue(true);
-    // Handler that writes to stderr during execution
-    const handler = mock(async () => {
-      // stderr.write is intercepted during delete, but we mock it
-      return true;
-    });
-    const record = makeRecord();
-
-    const result = await confirmAndDelete(record, mockManifest, handler);
-    expect(result).toBe(true);
-  });
 });
 
 describe("cmdDelete", () => {
@@ -379,5 +366,51 @@ describe("confirmAndDelete edge cases", () => {
     const record = makeRecord();
     const result = await confirmAndDelete(record, mockManifest, handler);
     expect(result).toBe(false);
+  });
+
+  it("fails fast when GCP record is missing project metadata", async () => {
+    clack.confirm.mockResolvedValue(true);
+    const record = makeRecord({
+      cloud: "gcp",
+      connection: {
+        ip: "10.0.0.1",
+        user: "root",
+        server_name: "spawn-gcp-123",
+        server_id: "gcp-123",
+        cloud: "gcp",
+        metadata: {
+          zone: "us-central1-a",
+          // project intentionally omitted
+        },
+      },
+    });
+
+    // ensureDeleteCredentials throws before the spinner starts,
+    // so the error propagates as a rejection from confirmAndDelete
+    await expect(confirmAndDelete(record, mockManifest)).rejects.toThrow("Cannot determine GCP project");
+  });
+
+  it("succeeds when GCP record has project metadata", async () => {
+    clack.confirm.mockResolvedValue(true);
+    // With a custom handler that simulates successful deletion,
+    // the project metadata path should not throw
+    const handler = mock(async () => true);
+    const record = makeRecord({
+      cloud: "gcp",
+      connection: {
+        ip: "10.0.0.1",
+        user: "root",
+        server_name: "spawn-gcp-456",
+        server_id: "gcp-456",
+        cloud: "gcp",
+        metadata: {
+          zone: "us-central1-a",
+          project: "my-gcp-project",
+        },
+      },
+    });
+
+    const result = await confirmAndDelete(record, mockManifest, handler);
+    expect(result).toBe(true);
   });
 });

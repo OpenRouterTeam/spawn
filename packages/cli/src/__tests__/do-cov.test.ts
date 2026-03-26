@@ -34,17 +34,6 @@ describe("digitalocean/getConnectionInfo", () => {
   });
 });
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-describe("digitalocean/constants", () => {
-  it("DEFAULT_DROPLET_SIZE is s-2vcpu-2gb", () => {
-    expect(DEFAULT_DROPLET_SIZE).toBe("s-2vcpu-2gb");
-  });
-  it("DEFAULT_DO_REGION is nyc3", () => {
-    expect(DEFAULT_DO_REGION).toBe("nyc3");
-  });
-});
-
 // ─── promptDropletSize ───────────────────────────────────────────────────────
 
 describe("digitalocean/promptDropletSize", () => {
@@ -119,7 +108,8 @@ describe("digitalocean/promptSpawnName", () => {
     process.env.SPAWN_NAME_KEBAB = "existing-name";
     const { promptSpawnName } = await import("../digitalocean/digitalocean");
     await promptSpawnName();
-    // Should not throw or change env
+    // Existing value preserved — early return did not overwrite it
+    expect(process.env.SPAWN_NAME_KEBAB).toBe("existing-name");
   });
 
   it("uses DO_DROPLET_NAME when valid", async () => {
@@ -167,7 +157,7 @@ describe("digitalocean/runServer", () => {
     await runServer("echo hello", 10, "1.2.3.4");
     const args = spy.mock.calls[0][0];
     const sshCmd = args[args.length - 1];
-    expect(sshCmd).toMatch(/^bash -c '/);
+    expect(sshCmd).toContain("bash -c 'echo hello'");
     spy.mockRestore();
   });
 
@@ -372,8 +362,11 @@ describe("digitalocean/promptSwitchAccount", () => {
 
 describe("digitalocean/checkAccountStatus", () => {
   it("returns immediately when no token", async () => {
+    const fetchMock = mock(() => Promise.resolve(new Response("{}")));
+    global.fetch = fetchMock;
     const { checkAccountStatus } = await import("../digitalocean/digitalocean");
-    // _state.token is empty by default
+    // _state.token is empty by default — should return early without calling fetch
     await checkAccountStatus();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

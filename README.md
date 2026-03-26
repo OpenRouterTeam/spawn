@@ -61,7 +61,12 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn list <filter>` | Filter history by agent or cloud name |
 | `spawn list -a <agent>` | Filter history by agent |
 | `spawn list -c <cloud>` | Filter history by cloud |
+| `spawn list --flat` | Show flat list (disable tree view) |
+| `spawn list --json` | Output history as JSON |
 | `spawn list --clear` | Clear all spawn history |
+| `spawn tree` | Show recursive spawn tree (parent/child relationships) |
+| `spawn tree --json` | Output spawn tree as JSON |
+| `spawn history export` | Dump history as JSON to stdout (used by parent VMs) |
 | `spawn fix` | Re-run agent setup on an existing VM (re-inject credentials, reinstall) |
 | `spawn fix <spawn-id>` | Fix a specific spawn by name or ID |
 | `spawn link <ip>` | Register an existing VM by IP |
@@ -149,8 +154,37 @@ spawn claude gcp --beta tarball --beta parallel
 | `tarball` | Use pre-built tarball for agent install (faster, skips live install) |
 | `images` | Use pre-built cloud images/snapshots (faster boot) |
 | `parallel` | Parallelize server boot with setup prompts |
+| `recursive` | Install spawn CLI on VM so it can spawn child VMs |
 
-`--fast` enables all three.
+`--fast` enables `tarball`, `images`, and `parallel` (not `recursive`).
+
+#### Recursive Spawn
+
+Use `--beta recursive` to let spawned VMs create their own child VMs:
+
+```bash
+spawn claude hetzner --beta recursive
+```
+
+What this does:
+- **Installs spawn CLI** on the remote VM
+- **Delegates credentials** (cloud + OpenRouter) so child VMs can authenticate
+- **Injects parent tracking** (`SPAWN_PARENT_ID`, `SPAWN_DEPTH`) into the VM environment
+- **Passes `--beta recursive`** to children so they can also spawn recursively
+
+View the spawn tree:
+```bash
+spawn tree
+# spawn-abc  Claude Code / Hetzner  2m ago
+#   ├─ spawn-def  Codex CLI / Hetzner  1m ago
+#   └─ spawn-ghi  OpenClaw / Hetzner  30s ago
+#       └─ spawn-jkl  Claude Code / Hetzner  10s ago
+```
+
+Tear down an entire tree:
+```bash
+spawn delete --cascade <id>    # Delete a VM and all its children
+```
 
 ### Without the CLI
 
@@ -235,6 +269,20 @@ If spawn fails to install, try these steps:
    Remove-Item -Recurse -Force "$HOME\.config\spawn\digitalocean.json" -ErrorAction SilentlyContinue
    spawn openclaw digitalocean
    ```
+
+### Headless JSON mode — agent exits immediately
+
+When using `--headless --output json` with Claude Code, you must also pass `--prompt` (or `-p`). Without it, Claude exits with `Input must be provided through stdin or --prompt` and the JSON output will show `"status":"error"`:
+
+```bash
+# WRONG — Claude exits immediately
+spawn claude gcp --headless --output json
+
+# RIGHT — provide a prompt
+spawn claude gcp --headless --output json --prompt "Fix all linter errors"
+```
+
+Note: auto-update messages may appear before the JSON on older CLI versions. Run `spawn update` to get the fix.
 
 ### Agent launch failures
 

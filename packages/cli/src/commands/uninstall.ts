@@ -71,6 +71,14 @@ function cleanRcFile(rcPath: string): boolean {
     cleaned.push(line);
   }
 
+  // Safety: if insideBlock is still true, the end marker is missing.
+  // Abort to avoid truncating the user's shell config.
+  if (insideBlock) {
+    p.log.warn(`Spawn block in ${rcPath} is missing end marker — skipping to avoid data loss.`);
+    p.log.warn(`Manually remove the line "${RC_MARKER_START}" and the spawn PATH export from ${rcPath}.`);
+    return false;
+  }
+
   if (changed) {
     fs.writeFileSync(rcPath, cleaned.join("\n"));
   }

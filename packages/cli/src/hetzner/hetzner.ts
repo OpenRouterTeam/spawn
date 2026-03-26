@@ -26,6 +26,7 @@ import {
   getServerNameFromEnv,
   jsonEscape,
   loadApiToken,
+  logDebug,
   logError,
   logInfo,
   logStep,
@@ -250,9 +251,13 @@ export async function ensureSshKey(): Promise<void> {
 
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
+    if (!fingerprint) {
+      logWarn(`Could not determine fingerprint for SSH key '${key.name}'`);
+      continue;
+    }
     const pubKey = readFileSync(key.pubPath, "utf-8").trim();
 
-    const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
+    const alreadyRegistered = sshKeys.some((k) => k.fingerprint === fingerprint);
 
     if (alreadyRegistered) {
       logInfo(`SSH key '${key.name}' already registered with Hetzner`);
@@ -484,7 +489,7 @@ export async function findSpawnSnapshot(agentName: string): Promise<string | nul
     const text = await hetznerApi("GET", "/images?type=snapshot&per_page=100", undefined, 1);
     const data = parseJsonObj(text);
     const allImages = toObjectArray(data?.images);
-    // Hetzner Packer sets snapshot_name → description field in the API
+    // Snapshots are named `spawn-{agent}-*` and stored in the description field
     const images = allImages.filter((img) => isString(img.description) && img.description.startsWith(prefix));
     if (images.length === 0) {
       return null;
@@ -522,17 +527,53 @@ function isLocationUnavailableError(errMsg: string): boolean {
   return /resource_unavailable|location disabled|location.*unavailable/i.test(errMsg);
 }
 
+/** Check if a Hetzner API error indicates a resource limit was exceeded (e.g. primary_ip_limit). */
+export function isResourceLimitError(errMsg: string): boolean {
+  return /resource_limit_exceeded|primary_ip_limit/i.test(errMsg);
+}
+
+/**
+ * Clean up orphaned Hetzner Primary IPs (not attached to any server).
+ * These accumulate from failed/leaked server provisioning runs and count toward
+ * the account's primary_ip_limit quota. Returns the number of IPs deleted.
+ */
+export async function cleanupOrphanedPrimaryIps(): Promise<number> {
+  const allIps = await hetznerGetAll("/primary_ips", "primary_ips");
+  let deleted = 0;
+  for (const ip of allIps) {
+    // assignee_id is null/0 when the IP is not attached to a server
+    const assigneeId = isNumber(ip.assignee_id) ? ip.assignee_id : 0;
+    if (assigneeId !== 0) {
+      continue;
+    }
+    const ipId = isNumber(ip.id) ? ip.id : 0;
+    if (ipId === 0) {
+      continue;
+    }
+    const ipAddr = isString(ip.ip) ? ip.ip : `ID:${ipId}`;
+    const r = await asyncTryCatch(() => hetznerApi("DELETE", `/primary_ips/${ipId}`));
+    if (r.ok) {
+      logInfo(`Deleted orphaned Primary IP ${ipAddr}`);
+      deleted = deleted + 1;
+    } else {
+      logWarn(`Could not delete Primary IP ${ipAddr}: ${getErrorMessage(r.error)}`);
+    }
+  }
+  return deleted;
+}
+
 export async function createServer(
   name: string,
   serverType?: string,
   location?: string,
   tier?: CloudInitTier,
   snapshotId?: string,
+  dockerImage?: string,
 ): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   let loc = location || process.env.HETZNER_LOCATION || DEFAULT_LOCATION;
-  const image = snapshotId ? Number(snapshotId) : "ubuntu-24.04";
-  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : "ubuntu-24.04";
+  const image: string | number = snapshotId ? Number(snapshotId) : (dockerImage ?? "ubuntu-24.04");
+  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : (dockerImage ?? "ubuntu-24.04");
 
   if (!validateRegionName(loc)) {
     logError("Invalid HETZNER_LOCATION");
@@ -548,6 +589,8 @@ export async function createServer(
   // Track locations that failed so the user isn't offered them again
   const failedLocations: string[] = [];
   const maxLocationRetries = 3;
+  // Track whether we've already attempted a resource-limit cleanup+retry
+  let resourceLimitRetried = false;
 
   for (let attempt = 0; attempt <= maxLocationRetries; attempt++) {
     logStep(`Creating Hetzner server '${name}' (type: ${sType}, location: ${loc}, image: ${imageLabel})...`);
@@ -579,6 +622,25 @@ export async function createServer(
         continue;
       }
 
+      // Resource limit (e.g. primary_ip_limit) — try cleaning up orphaned IPs, then retry once
+      if (isResourceLimitError(errMsg) && !resourceLimitRetried) {
+        resourceLimitRetried = true;
+        logWarn("Hetzner resource limit exceeded (primary_ip_limit). Cleaning up orphaned Primary IPs...");
+        const cleaned = await asyncTryCatch(() => cleanupOrphanedPrimaryIps());
+        const count = cleaned.ok ? cleaned.data : 0;
+        if (count > 0) {
+          logInfo(`Cleaned up ${count} orphaned Primary IP(s). Retrying server creation...`);
+          continue;
+        }
+        logError("No orphaned Primary IPs found to clean up.");
+        logWarn("Your Hetzner account has reached its Primary IP limit.");
+        logWarn("To fix this:");
+        logWarn("  1. Delete unused servers in the Hetzner Console");
+        logWarn("  2. Go to Networking > Primary IPs and delete unattached IPs");
+        logWarn("  3. Or request a quota increase at: https://console.hetzner.cloud/limits");
+        throw createResult.error;
+      }
+
       throw createResult.error;
     }
 
@@ -604,6 +666,25 @@ export async function createServer(
         }
         loc = newLoc;
         continue;
+      }
+
+      // Resource limit (e.g. primary_ip_limit) — try cleaning up orphaned IPs, then retry once
+      if ((isResourceLimitError(errMsg) || isResourceLimitError(errCode)) && !resourceLimitRetried) {
+        resourceLimitRetried = true;
+        logWarn("Hetzner resource limit exceeded (primary_ip_limit). Cleaning up orphaned Primary IPs...");
+        const cleaned = await asyncTryCatch(() => cleanupOrphanedPrimaryIps());
+        const count = cleaned.ok ? cleaned.data : 0;
+        if (count > 0) {
+          logInfo(`Cleaned up ${count} orphaned Primary IP(s). Retrying server creation...`);
+          continue;
+        }
+        logError("No orphaned Primary IPs found to clean up.");
+        logWarn("Your Hetzner account has reached its Primary IP limit.");
+        logWarn("To fix this:");
+        logWarn("  1. Delete unused servers in the Hetzner Console");
+        logWarn("  2. Go to Networking > Primary IPs and delete unattached IPs");
+        logWarn("  3. Or request a quota increase at: https://console.hetzner.cloud/limits");
+        throw new Error(`Server creation failed: ${errMsg}`);
       }
 
       logError(`Failed to create Hetzner server: ${errMsg}`);
@@ -744,7 +825,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
   const serverIp = ip || _state.serverIp;
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && bash -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -753,26 +834,43 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `root@${serverIp}`,
-      `bash -c ${shellQuote(fullCmd)}`,
+      fullCmd,
     ],
     {
       stdio: [
         "ignore",
-        "inherit",
-        "inherit",
+        "pipe",
+        "pipe",
       ],
     },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  const runResult = await asyncTryCatch(() => proc.exited);
+  // Drain both pipes to prevent buffer deadlocks, then await exit
+  const runResult = await asyncTryCatch(async () => {
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    return {
+      stdout,
+      stderr,
+      exitCode,
+    };
+  });
   clearTimeout(timer);
   if (!runResult.ok) {
     throw runResult.error;
   }
-  if (runResult.data !== 0) {
-    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
+  if (runResult.data.exitCode !== 0) {
+    // Show captured stderr on failure for debugging
+    const stderr = runResult.data.stderr.trim();
+    if (stderr) {
+      logDebug(stderr);
+    }
+    throw new Error(`run_server failed (exit ${runResult.data.exitCode}): ${cmd}`);
   }
 }
 
@@ -849,7 +947,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' LC_ALL='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 

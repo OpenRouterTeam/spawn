@@ -9,6 +9,88 @@
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
+# _report_ux_issues RESULT_JSON AGENT CLOUD
+#
+# Reads uxIssues from the harness JSON result and files one GitHub issue per
+# unique problem found. Skips silently if gh is unavailable or no issues found.
+# ---------------------------------------------------------------------------
+_report_ux_issues() {
+  local result_file="$1"
+  local agent="$2"
+  local cloud="$3"
+
+  if ! command -v gh >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local issue_count
+  issue_count=$(jq -r '(.uxIssues // []) | length' "${result_file}" 2>/dev/null || printf '0')
+  if [ "${issue_count}" = "0" ] || [ -z "${issue_count}" ]; then
+    return 0
+  fi
+
+  log_info "UX review found ${issue_count} issue(s) — filing GitHub issue(s)..."
+
+  # Build a single issue that lists all findings
+  local title
+  title="ux: spawn ${agent} ${cloud} — ${issue_count} UX issue(s) found in interactive session"
+
+  local body
+  body="$(printf '%s\n' \
+    "## UX issues found during interactive E2E test" \
+    "" \
+    "The AI-driven interactive harness recorded a real \`spawn ${agent} ${cloud}\` session" \
+    "and flagged the following UX problems in the terminal output:" \
+    ""
+  )"
+
+  local i=0
+  while [ "${i}" -lt "${issue_count}" ]; do
+    local issue example suggestion
+    issue=$(jq -r ".uxIssues[${i}].issue // \"\"" "${result_file}" 2>/dev/null || printf '')
+    example=$(jq -r ".uxIssues[${i}].example // \"\"" "${result_file}" 2>/dev/null || printf '')
+    suggestion=$(jq -r ".uxIssues[${i}].suggestion // \"\"" "${result_file}" 2>/dev/null || printf '')
+    i=$((i + 1))
+    [ -z "${issue}" ] && continue
+    body="${body}
+### ${i}. ${issue}
+
+\`\`\`
+${example}
+\`\`\`
+
+**Suggestion:** ${suggestion}
+"
+  done
+
+  body="${body}
+---
+*Filed automatically by the interactive E2E harness after a live \`spawn ${agent} ${cloud}\` session.*"
+
+  local issue_url
+  if issue_url=$(gh issue create \
+    --repo OpenRouterTeam/spawn \
+    --title "${title}" \
+    --label "ux" \
+    --body "${body}" 2>/dev/null); then
+    log_ok "UX issue filed: ${issue_url}"
+  else
+    # Label may not exist — retry without it
+    if issue_url=$(gh issue create \
+      --repo OpenRouterTeam/spawn \
+      --title "${title}" \
+      --body "${body}" 2>/dev/null); then
+      log_ok "UX issue filed: ${issue_url}"
+    else
+      log_warn "Could not file UX issue (gh issue create failed)"
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # interactive_provision AGENT APP_NAME LOG_DIR
 #
 # Runs spawn interactively with AI driving the prompts. On success, the
@@ -53,6 +135,12 @@ interactive_provision() {
   # loaded by the cloud driver. We just need to set spawn-specific vars.
   local spawn_env=""
   spawn_env="${spawn_env} SPAWN_NAME_KEBAB=${app_name}"
+  # SPAWN_NAME bypasses the "Name your spawn" text prompt in cmdRun
+  # (promptSpawnName() only checks SPAWN_NAME, not SPAWN_NAME_KEBAB)
+  spawn_env="${spawn_env} SPAWN_NAME=${app_name}"
+  # SPAWN_ENABLED_STEPS bypasses the setup options multiselect — accept defaults
+  # so the harness tests provisioning/installation UX, not credential collection
+  spawn_env="${spawn_env} SPAWN_ENABLED_STEPS=auto-update"
 
   # Map ACTIVE_CLOUD to the cloud name spawn expects
   local spawn_cloud="${ACTIVE_CLOUD}"
@@ -81,6 +169,9 @@ interactive_provision() {
     if [ "${harness_success}" = "true" ]; then
       log_ok "Interactive provision succeeded (${harness_duration}s, ${harness_turns} AI turns)"
 
+      # File GitHub issues for any UX problems found in the transcript
+      _report_ux_issues "${result_file}" "${agent}" "${ACTIVE_CLOUD}"
+
       # Now verify the instance exists via cloud driver so teardown works
       if cloud_provision_verify "${app_name}" "${log_dir}"; then
         log_ok "Cloud driver confirmed instance exists"
@@ -91,13 +182,19 @@ interactive_provision() {
       fi
     else
       log_err "Interactive provision failed (${harness_duration}s): ${harness_reason}"
-      # Dump last 50 lines of harness log for debugging
+      # Save harness log to a persistent path for post-mortem inspection
       if [ -f "${log_file}" ]; then
-        log_info "Last 50 lines of harness log:"
-        tail -50 "${log_file}" | while IFS= read -r line; do
+        local persist_log="/tmp/spawn-interactive-harness-last.log"
+        cp "${log_file}" "${persist_log}" 2>/dev/null || true
+        log_info "Harness log saved to ${persist_log}"
+        log_info "Last 30 [harness] lines:"
+        grep '\[harness\]' "${log_file}" | tail -30 | while IFS= read -r line; do
           printf '    %s\n' "${line}"
         done
       fi
+      # Even on failure, try to write the .meta file so teardown can clean up
+      # any VM that was partially created (e.g. on timeout mid-provision).
+      cloud_provision_verify "${app_name}" "${log_dir}" 2>/dev/null || true
       return 1
     fi
   else

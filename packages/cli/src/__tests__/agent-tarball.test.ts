@@ -268,6 +268,23 @@ describe("tryTarballInstall", () => {
       }
     });
 
+    it("uses sudo for cp and chown in mirror commands", () => {
+      // sudo is needed because non-root users can't read /root/ or chown root-owned files
+      const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+      // cp from /root/ needs sudo
+      expect(mirrorCmd).toContain(`${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`);
+      // cp marker file needs sudo
+      expect(mirrorCmd).toContain(`${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`);
+      // chown needs sudo
+      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`);
+      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`);
+    });
+
+    it("does not suppress errors with 2>/dev/null || true", () => {
+      // Errors must propagate so failures are visible, not silently swallowed
+      expect(mirrorCmd).not.toContain("2>/dev/null || true");
+    });
+
     it("returns true even when mirror step fails (non-fatal)", async () => {
       const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
       const runner = createMockRunner();

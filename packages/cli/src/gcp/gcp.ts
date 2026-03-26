@@ -144,6 +144,10 @@ const ZONES: ZoneOption[] = [
 
 export const DEFAULT_ZONE = "us-central1-a";
 
+// ─── Disk Size ───────────────────────────────────────────────────────────────
+
+export const DEFAULT_DISK_SIZE_GB = 40;
+
 // ─── State ──────────────────────────────────────────────────────────────────
 
 interface GcpState {
@@ -727,6 +731,8 @@ export async function createInstance(
   zone: string,
   machineType: string,
   tier?: CloudInitTier,
+  imageFamily?: string,
+  imageProject?: string,
 ): Promise<VMConnection> {
   const username = resolveUsername();
   assertSafeUsername(username);
@@ -737,13 +743,20 @@ export async function createInstance(
     .map((k) => `${username}:${k}`)
     .join("\n");
 
-  logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone})...`);
+  const family = imageFamily ?? "ubuntu-2404-lts-amd64";
+  const project = imageProject ?? "ubuntu-os-cloud";
+  logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone}, image: ${family})...`);
 
-  // Write startup script to a temp file (random suffix prevents collisions and predictable paths)
-  const tmpFile = `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
-  writeFileSync(tmpFile, getStartupScript(tier), {
-    mode: 0o600,
-  });
+  // Skip startup script for Container-Optimized OS (read-only filesystem, no apt-get)
+  const skipStartupScript = imageProject === "cos-cloud";
+  const tmpFile = skipStartupScript
+    ? undefined
+    : `/tmp/spawn_startup_${Date.now()}_${Math.random().toString(36).slice(2)}.sh`;
+  if (tmpFile) {
+    writeFileSync(tmpFile, getStartupScript(tier), {
+      mode: 0o600,
+    });
+  }
 
   const args = [
     "compute",
@@ -752,11 +765,16 @@ export async function createInstance(
     name,
     `--zone=${zone}`,
     `--machine-type=${machineType}`,
-    "--image-family=ubuntu-2404-lts-amd64",
-    "--image-project=ubuntu-os-cloud",
+    `--image-family=${family}`,
+    `--image-project=${project}`,
+    `--boot-disk-size=${process.env.GCP_DISK_SIZE ?? String(DEFAULT_DISK_SIZE_GB)}GB`,
     `--network=${process.env.GCP_NETWORK ?? "default"}`,
     `--subnet=${process.env.GCP_SUBNET ?? "default"}`,
-    `--metadata-from-file=startup-script=${tmpFile}`,
+    ...(tmpFile
+      ? [
+          `--metadata-from-file=startup-script=${tmpFile}`,
+        ]
+      : []),
     `--metadata=ssh-keys=${sshKeysMetadata}`,
     `--project=${_state.project}`,
     "--quiet",
@@ -852,13 +870,15 @@ export async function createInstance(
     }
   });
   // Clean up temp file after all retry paths have completed
-  tryCatch(() =>
-    Bun.spawnSync([
-      "rm",
-      "-f",
-      tmpFile,
-    ]),
-  );
+  if (tmpFile) {
+    tryCatch(() =>
+      Bun.spawnSync([
+        "rm",
+        "-f",
+        tmpFile,
+      ]),
+    );
+  }
   if (!createResult.ok) {
     throw createResult.error;
   }
@@ -970,7 +990,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
   const username = resolveUsername();
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && bash -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -979,7 +999,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `${username}@${_state.serverIp}`,
-      `bash -c ${shellQuote(fullCmd)}`,
+      fullCmd,
     ],
     {
       stdio: [
@@ -1087,7 +1107,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Use shellQuote for consistent single-quote escaping (prevents shell expansion of $variables in cmd)
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([
@@ -1185,6 +1205,10 @@ export async function destroyInstance(name?: string): Promise<void> {
   if (!instanceName) {
     logError("destroy: no instance name provided");
     throw new Error("No instance name");
+  }
+
+  if (!_state.project) {
+    throw new Error("No GCP project set — cannot determine which project to delete from");
   }
 
   logStep(`Destroying GCP instance '${instanceName}'...`);

@@ -1117,7 +1117,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   if (!cmd || /\0/.test(cmd)) {
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
-  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && bash -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
@@ -1125,7 +1125,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
       ...SSH_BASE_OPTS,
       ...keyOpts,
       `${SSH_USER}@${_state.instanceIp}`,
-      `bash -c ${shellQuote(fullCmd)}`,
+      fullCmd,
     ],
     {
       stdio: [
@@ -1213,7 +1213,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
     throw new Error("Invalid command: must be non-empty and must not contain null bytes");
   }
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = spawnInteractive([
     "ssh",

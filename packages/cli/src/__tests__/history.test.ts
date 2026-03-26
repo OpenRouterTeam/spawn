@@ -60,29 +60,19 @@ describe("history", () => {
       expect(loadHistory()).toEqual([]);
     });
 
-    it("returns empty array when file contains a non-array JSON value", () => {
-      writeFileSync(
-        join(testDir, "history.json"),
+    it("returns empty array when file contains an unrecognized JSON value", () => {
+      // All non-array, non-v1 JSON values hit the same "Unrecognized format" branch
+      for (const content of [
         JSON.stringify({
           not: "array",
         }),
-      );
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains a JSON string", () => {
-      writeFileSync(join(testDir, "history.json"), JSON.stringify("just a string"));
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains JSON null", () => {
-      writeFileSync(join(testDir, "history.json"), "null");
-      expect(loadHistory()).toEqual([]);
-    });
-
-    it("returns empty array when file contains JSON number", () => {
-      writeFileSync(join(testDir, "history.json"), "42");
-      expect(loadHistory()).toEqual([]);
+        JSON.stringify("just a string"),
+        "null",
+        "42",
+      ]) {
+        writeFileSync(join(testDir, "history.json"), content);
+        expect(loadHistory()).toEqual([]);
+      }
     });
 
     it("loads multiple records preserving order", () => {
@@ -328,6 +318,35 @@ describe("history", () => {
       expect(data.records[1].agent).toBe("codex");
     });
 
+    it("keeps all entries with no cap", () => {
+      // Save 200 records — all should be retained (history has no entry limit)
+      for (let i = 0; i < 200; i++) {
+        saveSpawnRecord({
+          id: `id-${i}`,
+          agent: `agent-${i}`,
+          cloud: "hetzner",
+          timestamp: `2026-01-01T${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}:00.000Z`,
+        });
+      }
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(200);
+      expect(loaded[0].agent).toBe("agent-0");
+      expect(loaded[199].agent).toBe("agent-199");
+    });
+
+    it("assigns id when missing", () => {
+      saveSpawnRecord({
+        id: "",
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(typeof loaded[0].id).toBe("string");
+      expect(loaded[0].id.length).toBeGreaterThan(0);
+    });
+
     // Corruption recovery and backup tests are in history-corruption.test.ts
   });
 
@@ -461,6 +480,53 @@ describe("history", () => {
       });
       const loaded = loadHistory();
       expect(loaded[0].timestamp).toBe("not-a-date");
+    });
+  });
+
+  // ── Lock recovery ───────────────────────────────────────────────────────
+
+  describe("lock recovery", () => {
+    it("recovers from a broken lock directory with no PID file", () => {
+      // Simulate a crashed process that left a lock dir without a PID file
+      const lockPath = join(testDir, "history.json.lock");
+      mkdirSync(lockPath, {
+        recursive: true,
+      });
+      // No pid file inside — this is the broken state
+
+      // saveSpawnRecord uses withLock internally — should clean up the broken lock and succeed
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: new Date().toISOString(),
+      });
+
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("claude");
+      // Lock dir should be cleaned up
+      expect(existsSync(lockPath)).toBe(false);
+    });
+
+    it("recovers from a stale lock with expired PID file", () => {
+      // Simulate a lock left by a process that died long ago
+      const lockPath = join(testDir, "history.json.lock");
+      mkdirSync(lockPath, {
+        recursive: true,
+      });
+      // Write a PID file with a timestamp far in the past (> 30s stale threshold)
+      writeFileSync(join(lockPath, "pid"), `99999\n${Date.now() - 60_000}`);
+
+      saveSpawnRecord({
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+      });
+
+      const loaded = loadHistory();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].agent).toBe("codex");
+      expect(existsSync(lockPath)).toBe(false);
     });
   });
 });

@@ -12,7 +12,7 @@ import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
 import { getLocalShell, isWindows } from "../shared/shell.js";
-import { prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
+import { logError, logInfo, logStep, prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
 import {
@@ -203,8 +203,7 @@ export function showDryRunPreview(manifest: Manifest, agent: string, cloud: stri
 // ── Script download ──────────────────────────────────────────────────────────
 
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
-  const s = p.spinner();
-  s.start("Downloading spawn script...");
+  logStep("Downloading spawn script...");
 
   const r = await asyncTryCatch(async () => {
     const res = await fetch(primaryUrl, {
@@ -212,26 +211,26 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
     });
     if (res.ok) {
       const text = await res.text();
-      s.stop("Script downloaded");
+      logInfo("Script downloaded");
       return text;
     }
 
     // Fallback to GitHub raw
-    s.message("Trying fallback source...");
+    logStep("Trying fallback source...");
     const ghRes = await fetch(fallbackUrl, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
     if (!ghRes.ok) {
-      s.stop(pc.red("Download failed"));
+      logError("Download failed");
       reportDownloadFailure(res.status, ghRes.status);
       process.exit(1);
     }
     const text = await ghRes.text();
-    s.stop("Script downloaded (fallback)");
+    logInfo("Script downloaded (fallback)");
     return text;
   });
   if (!r.ok) {
-    s.stop(pc.red("Download failed"));
+    logError("Download failed");
     throw r.error;
   }
   return r.data;
@@ -589,8 +588,7 @@ function runBashScript(
  */
 async function downloadBundle(cloud: string): Promise<string> {
   const bundleUrl = `https://github.com/${REPO}/releases/download/${cloud}-latest/${cloud}.js`;
-  const s = p.spinner();
-  s.start("Downloading spawn bundle...");
+  logStep("Downloading spawn bundle...");
 
   const r = await asyncTryCatch(async () => {
     const res = await fetch(bundleUrl, {
@@ -598,16 +596,16 @@ async function downloadBundle(cloud: string): Promise<string> {
       redirect: "follow",
     });
     if (!res.ok) {
-      s.stop(pc.red("Download failed"));
+      logError("Download failed");
       p.log.error(`Bundle not found at ${bundleUrl} (HTTP ${res.status})`);
       process.exit(2);
     }
     const text = await res.text();
-    s.stop("Bundle downloaded");
+    logInfo("Bundle downloaded");
     return text;
   });
   if (!r.ok) {
-    s.stop(pc.red("Download failed"));
+    logError("Download failed");
     throw r.error;
   }
   return r.data;
@@ -665,6 +663,8 @@ export async function execScript(
 ): Promise<void> {
   // Generate a unique spawn ID and record the spawn before execution
   const spawnId = generateSpawnId();
+  const parentId = process.env.SPAWN_PARENT_ID || undefined;
+  const depth = process.env.SPAWN_DEPTH ? Number(process.env.SPAWN_DEPTH) : undefined;
   const saveResult = tryCatchIf(isFileError, () =>
     saveSpawnRecord({
       id: spawnId,
@@ -679,6 +679,16 @@ export async function execScript(
       ...(prompt
         ? {
             prompt,
+          }
+        : {}),
+      ...(parentId
+        ? {
+            parent_id: parentId,
+          }
+        : {}),
+      ...(depth !== undefined && !Number.isNaN(depth)
+        ? {
+            depth,
           }
         : {}),
     }),
@@ -764,6 +774,7 @@ interface SpawnResult {
   ssh_user?: string;
   error_message?: string;
   error_code?: string;
+  cli_updated?: boolean;
 }
 
 function headlessOutput(result: SpawnResult, outputFormat?: string): void {
@@ -818,6 +829,7 @@ function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spa
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -870,6 +882,7 @@ function runBundleHeadless(
   };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
+  env.SPAWN_NON_INTERACTIVE = "1";
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -1145,6 +1158,11 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
                 server_name: record.connection.server_name,
               }
             : {}),
+        }
+      : {}),
+    ...(process.env.SPAWN_CLI_UPDATED === "1"
+      ? {
+          cli_updated: true,
         }
       : {}),
   };

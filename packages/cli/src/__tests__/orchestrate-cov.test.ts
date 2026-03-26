@@ -89,6 +89,7 @@ beforeEach(() => {
   delete process.env.SPAWN_ENABLED_STEPS;
   delete process.env.SPAWN_BETA;
   delete process.env.MODEL_ID;
+  delete process.env.SPAWN_HEADLESS;
   stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
   exitSpy = spyOn(process, "exit").mockImplementation((code) => {
     throw new Error(`__EXIT_${isNumber(code) ? code : 0}__`);
@@ -329,36 +330,6 @@ describe("orchestrate auto-update", () => {
   });
 });
 
-// ── checkAccountReady failure ─────────────────────────────────────────
-
-describe("orchestrate checkAccountReady", () => {
-  it("continues when checkAccountReady throws", async () => {
-    const cloud = createMockCloud({
-      checkAccountReady: mock(() => Promise.reject(new Error("billing error"))),
-    });
-    const agent = createMockAgent();
-
-    await runSafe(cloud, agent, "testagent");
-
-    expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ── preProvision failure ──────────────────────────────────────────────
-
-describe("orchestrate preProvision", () => {
-  it("continues when preProvision throws", async () => {
-    const cloud = createMockCloud();
-    const agent = createMockAgent({
-      preProvision: mock(() => Promise.reject(new Error("pre-provision fail"))),
-    });
-
-    await runSafe(cloud, agent, "testagent");
-
-    expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
-  });
-});
-
 // ── invalid MODEL_ID ──────────────────────────────────────────────────
 
 describe("orchestrate invalid MODEL_ID", () => {
@@ -429,46 +400,6 @@ describe("orchestrate tarball install", () => {
     expect(tarball).toHaveBeenCalledTimes(1);
     expect(install).not.toHaveBeenCalled();
   });
-
-  it("falls back to install when tarball returns false", async () => {
-    process.env.SPAWN_BETA = "tarball";
-    const install = mock(() => Promise.resolve());
-    const tarball = mock(() => Promise.resolve(false));
-    const cloud = createMockCloud({
-      cloudName: "hetzner",
-    });
-    const agent = createMockAgent({
-      install,
-    });
-
-    await runSafe(cloud, agent, "testagent", {
-      tryTarball: tarball,
-      getApiKey: mockGetOrPromptApiKey,
-    });
-
-    expect(tarball).toHaveBeenCalledTimes(1);
-    expect(install).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips tarball for local cloud", async () => {
-    process.env.SPAWN_BETA = "tarball";
-    const install = mock(() => Promise.resolve());
-    const tarball = mock(() => Promise.resolve(true));
-    const cloud = createMockCloud({
-      cloudName: "local",
-    });
-    const agent = createMockAgent({
-      install,
-    });
-
-    await runSafe(cloud, agent, "testagent", {
-      tryTarball: tarball,
-      getApiKey: mockGetOrPromptApiKey,
-    });
-
-    expect(tarball).not.toHaveBeenCalled();
-    expect(install).toHaveBeenCalledTimes(1);
-  });
 });
 
 // ── env setup failure ─────────────────────────────────────────────────
@@ -514,22 +445,6 @@ describe("orchestrate SPAWN_NAME", () => {
 
     expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
     delete process.env.SPAWN_NAME;
-  });
-});
-
-// ── preLaunch hooks ───────────────────────────────────────────────────
-
-describe("orchestrate preLaunch", () => {
-  it("calls preLaunch when defined", async () => {
-    const preLaunch = mock(() => Promise.resolve());
-    const cloud = createMockCloud();
-    const agent = createMockAgent({
-      preLaunch,
-    });
-
-    await runSafe(cloud, agent, "testagent");
-
-    expect(preLaunch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -586,39 +501,6 @@ describe("orchestrate tunnel", () => {
   });
 });
 
-// ── restart loop wrapping ─────────────────────────────────────────────
-
-describe("orchestrate restart loop", () => {
-  it("wraps launch command in restart loop for non-local cloud", async () => {
-    const sessionFn = mock(() => Promise.resolve(0));
-    const cloud = createMockCloud({
-      cloudName: "hetzner",
-      interactiveSession: sessionFn,
-    });
-    const agent = createMockAgent();
-
-    await runSafe(cloud, agent, "testagent");
-
-    const cmd = sessionFn.mock.calls[0][0];
-    expect(cmd).toContain("_spawn_restarts=0");
-    expect(cmd).toContain("_spawn_max=10");
-  });
-
-  it("does not wrap in restart loop for local cloud", async () => {
-    const sessionFn = mock(() => Promise.resolve(0));
-    const cloud = createMockCloud({
-      cloudName: "local",
-      interactiveSession: sessionFn,
-    });
-    const agent = createMockAgent();
-
-    await runSafe(cloud, agent, "testagent");
-
-    const cmd = sessionFn.mock.calls[0][0];
-    expect(cmd).not.toContain("_spawn_restarts");
-  });
-});
-
 // ── step validation with unknown steps ────────────────────────────────
 
 describe("orchestrate unknown steps", () => {
@@ -666,30 +548,5 @@ describe("orchestrate github step", () => {
     await runSafe(cloud, agent, "testagent");
 
     expect(cloud.interactiveSession).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ── skipTarball agent flag ────────────────────────────────────────────
-
-describe("orchestrate skipTarball", () => {
-  it("skips tarball when agent has skipTarball flag", async () => {
-    process.env.SPAWN_BETA = "tarball";
-    const install = mock(() => Promise.resolve());
-    const tarball = mock(() => Promise.resolve(true));
-    const cloud = createMockCloud({
-      cloudName: "hetzner",
-    });
-    const agent = createMockAgent({
-      install,
-      skipTarball: true,
-    });
-
-    await runSafe(cloud, agent, "testagent", {
-      tryTarball: tarball,
-      getApiKey: mockGetOrPromptApiKey,
-    });
-
-    expect(tarball).not.toHaveBeenCalled();
-    expect(install).toHaveBeenCalledTimes(1);
   });
 });

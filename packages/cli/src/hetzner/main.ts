@@ -5,9 +5,12 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate.js";
+import { shouldSkipCloudInit } from "../shared/cloud-init.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
+import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
+  cleanupOrphanedPrimaryIps,
   createServer as createHetznerServer,
   downloadFile,
   ensureHcloudToken,
@@ -38,16 +41,29 @@ async function main() {
   let serverType = "";
   let location = "";
   let snapshotId: string | null = null;
+  let useDocker = false;
+
+  // Check if --beta docker is active
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+  if (betaFeatures.includes("docker")) {
+    useDocker = true;
+  }
 
   const cloud: CloudOrchestrator = {
     cloudName: "hetzner",
     cloudLabel: "Hetzner Cloud",
     skipAgentInstall: false,
-    runner: {
-      runServer,
-      uploadFile,
-      downloadFile,
-    },
+    runner: useDocker
+      ? makeDockerRunner({
+          runServer,
+          uploadFile,
+          downloadFile,
+        })
+      : {
+          runServer,
+          uploadFile,
+          downloadFile,
+        },
     async authenticate() {
       await promptSpawnName();
       await ensureHcloudToken();
@@ -58,22 +74,58 @@ async function main() {
       location = await promptLocation();
     },
     async createServer(name: string) {
+      // Proactively clean up orphaned Primary IPs before provisioning in headless
+      // mode (E2E batches). This prevents resource_limit_exceeded errors when
+      // previous test runs left behind unattached IPs that consume quota (#2933).
+      if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+        const cleaned = await cleanupOrphanedPrimaryIps();
+        if (cleaned > 0) {
+          logInfo(`Pre-provisioning: cleaned ${cleaned} orphaned Primary IP(s)`);
+        }
+      }
+
       // Check for a pre-built snapshot before provisioning
       snapshotId = await findSpawnSnapshot(agentName);
       if (snapshotId) {
         cloud.skipAgentInstall = true;
       }
-      return await createHetznerServer(name, serverType, location, agent.cloudInitTier, snapshotId ?? undefined);
+      return await createHetznerServer(
+        name,
+        serverType,
+        location,
+        agent.cloudInitTier,
+        snapshotId ?? undefined,
+        useDocker && !snapshotId ? "docker-ce" : undefined,
+      );
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId || cloud.skipCloudInit) {
+      if (
+        shouldSkipCloudInit({
+          useDocker,
+          snapshotId,
+          skipCloudInit: cloud.skipCloudInit,
+        })
+      ) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();
       }
+
+      // Pull and start the agent Docker container after the server is ready
+      if (useDocker && !snapshotId) {
+        const image = `${DOCKER_REGISTRY}/spawn-${agentName}:latest`;
+        logStep(`Pulling Docker image ${image}...`);
+        await runServer(`docker pull ${image}`, 300);
+        logStep("Starting agent container...");
+        await runServer(`docker run -d --name ${DOCKER_CONTAINER_NAME} --network host ${image}`);
+        cloud.skipAgentInstall = true;
+        logInfo("Agent container running");
+      }
     },
-    interactiveSession,
+    interactiveSession: useDocker
+      ? (cmd: string) => interactiveSession(`docker exec -it ${DOCKER_CONTAINER_NAME} bash -l -c ${shellQuote(cmd)}`)
+      : interactiveSession,
     getConnectionInfo,
   };
 

@@ -100,6 +100,18 @@ describe("installSpriteKeepAlive", () => {
   });
 });
 
+// ── Tests: interactiveSession validation ──────────────────────────────────────
+
+describe("sprite/interactiveSession input validation", () => {
+  it("rejects empty command", async () => {
+    await expect(interactiveSession("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects command with null bytes", async () => {
+    await expect(interactiveSession("echo\x00hi")).rejects.toThrow("Invalid command");
+  });
+});
+
 // ── Tests: interactiveSession ─────────────────────────────────────────────────
 
 describe("interactiveSession (keep-alive wrapper)", () => {

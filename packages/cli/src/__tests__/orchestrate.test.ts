@@ -114,6 +114,7 @@ describe("runOrchestration", () => {
     // Ensure no stale env leaks between tests
     delete process.env.SPAWN_ENABLED_STEPS;
     delete process.env.SPAWN_BETA;
+    delete process.env.SPAWN_HEADLESS;
     stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
     exitSpy = spyOn(process, "exit").mockImplementation((code) => {
       capturedExitCode = isNumber(code) ? code : 0;
@@ -131,6 +132,7 @@ describe("runOrchestration", () => {
     } else {
       delete process.env.SPAWN_HOME;
     }
+    delete process.env.SPAWN_HEADLESS;
     tryCatch(() =>
       rmSync(testDir, {
         recursive: true,
@@ -869,6 +871,47 @@ describe("runOrchestration", () => {
 
       expect(cloud.skipCloudInit).toBeUndefined();
       delete process.env.SPAWN_FAST;
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+  });
+
+  describe("headless mode", () => {
+    it("skips interactive session and exits 0 when SPAWN_HEADLESS=1", async () => {
+      process.env.SPAWN_HEADLESS = "1";
+      const cloud = createMockCloud();
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      // Provisioning steps should still run
+      expect(cloud.authenticate).toHaveBeenCalledTimes(1);
+      expect(cloud.createServer).toHaveBeenCalledTimes(1);
+      expect(cloud.waitForReady).toHaveBeenCalledTimes(1);
+      expect(agent.install).toHaveBeenCalledTimes(1);
+
+      // Interactive session should NOT be called
+      expect(cloud.interactiveSession).toHaveBeenCalledTimes(0);
+
+      // Should exit with code 0
+      expect(capturedExitCode).toBe(0);
+      stderrSpy.mockRestore();
+      exitSpy.mockRestore();
+    });
+
+    it("still saves launch command in headless mode", async () => {
+      process.env.SPAWN_HEADLESS = "1";
+      const cloud = createMockCloud();
+      const agent = createMockAgent({
+        launchCmd: mock(() => "claude --print"),
+      });
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      // launchCmd should be called (to save it for later `spawn connect`)
+      expect(agent.launchCmd).toHaveBeenCalledTimes(1);
+      expect(cloud.interactiveSession).toHaveBeenCalledTimes(0);
+      expect(capturedExitCode).toBe(0);
       stderrSpy.mockRestore();
       exitSpy.mockRestore();
     });
