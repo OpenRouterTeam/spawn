@@ -60,6 +60,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/hermes.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/junie.sh)
 ```
 
+#### Cursor CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/cursor.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

@@ -252,6 +252,7 @@ export interface OrchestrationOptions {
  */
 const PreferencesSchema = v.object({
   models: v.optional(v.record(v.string(), v.string())),
+  starPromptShownAt: v.optional(v.string()),
 });
 
 function loadPreferredModel(agentName: string): string | null {

@@ -7,6 +7,7 @@ import { agentKeys } from "../manifest.js";
 import { getAgentOptionalSteps } from "../shared/agents.js";
 import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
+import { maybeShowStarPrompt } from "../shared/star-prompt.js";
 import { validateModelId } from "../shared/ui.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
@@ -272,7 +273,7 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(
+  const success = await execScript(
     cloudChoice,
     agentChoice,
     undefined,
@@ -281,6 +282,9 @@ export async function cmdInteractive(): Promise<void> {
     undefined,
     spawnName,
   );
+  if (success) {
+    maybeShowStarPrompt();
+  }
 }
 
 /** Interactive cloud selection when agent is already known (e.g. `spawn claude`) */
@@ -328,7 +332,7 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${resolvedAgent} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(
+  const success = await execScript(
     cloudChoice,
     resolvedAgent,
     prompt,
@@ -337,4 +341,7 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
     undefined,
     spawnName,
   );
+  if (success) {
+    maybeShowStarPrompt();
+  }
 }

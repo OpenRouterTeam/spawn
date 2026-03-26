@@ -4,36 +4,50 @@ import { getSkillContent, getSpawnSkillPath, injectSpawnSkill, isAppendMode } fr
 // ─── Path mapping tests ─────────────────────────────────────────────────────
 
 describe("getSpawnSkillPath", () => {
-  it("returns correct path for claude", () => {
-    expect(getSpawnSkillPath("claude")).toBe("~/.claude/skills/spawn/SKILL.md");
-  });
+  const expectedPaths: Array<
+    [
+      string,
+      string,
+    ]
+  > = [
+    [
+      "claude",
+      "~/.claude/skills/spawn/SKILL.md",
+    ],
+    [
+      "codex",
+      "~/.agents/skills/spawn/SKILL.md",
+    ],
+    [
+      "openclaw",
+      "~/.openclaw/skills/spawn/SKILL.md",
+    ],
+    [
+      "zeroclaw",
+      "~/.zeroclaw/workspace/AGENTS.md",
+    ],
+    [
+      "opencode",
+      "~/.config/opencode/AGENTS.md",
+    ],
+    [
+      "kilocode",
+      "~/.kilocode/rules/spawn.md",
+    ],
+    [
+      "hermes",
+      "~/.hermes/SOUL.md",
+    ],
+    [
+      "junie",
+      "~/.junie/AGENTS.md",
+    ],
+  ];
 
-  it("returns correct path for codex", () => {
-    expect(getSpawnSkillPath("codex")).toBe("~/.agents/skills/spawn/SKILL.md");
-  });
-
-  it("returns correct path for openclaw", () => {
-    expect(getSpawnSkillPath("openclaw")).toBe("~/.openclaw/skills/spawn/SKILL.md");
-  });
-
-  it("returns correct path for zeroclaw", () => {
-    expect(getSpawnSkillPath("zeroclaw")).toBe("~/.zeroclaw/workspace/AGENTS.md");
-  });
-
-  it("returns correct path for opencode", () => {
-    expect(getSpawnSkillPath("opencode")).toBe("~/.config/opencode/AGENTS.md");
-  });
-
-  it("returns correct path for kilocode", () => {
-    expect(getSpawnSkillPath("kilocode")).toBe("~/.kilocode/rules/spawn.md");
-  });
-
-  it("returns correct path for hermes", () => {
-    expect(getSpawnSkillPath("hermes")).toBe("~/.hermes/SOUL.md");
-  });
-
-  it("returns correct path for junie", () => {
-    expect(getSpawnSkillPath("junie")).toBe("~/.junie/AGENTS.md");
+  it("returns correct remote path for each known agent", () => {
+    for (const [agent, expectedPath] of expectedPaths) {
+      expect(getSpawnSkillPath(agent), `agent "${agent}"`).toBe(expectedPath);
+    }
   });
 
   it("returns undefined for unknown agent", () => {
@@ -44,36 +58,23 @@ describe("getSpawnSkillPath", () => {
 // ─── Append mode tests ──────────────────────────────────────────────────────
 
 describe("isAppendMode", () => {
-  it("returns true for hermes", () => {
+  it("returns true only for hermes (appends to SOUL.md)", () => {
     expect(isAppendMode("hermes")).toBe(true);
   });
 
-  it("returns false for claude", () => {
-    expect(isAppendMode("claude")).toBe(false);
-  });
-
-  it("returns false for codex", () => {
-    expect(isAppendMode("codex")).toBe(false);
-  });
-
-  it("returns false for openclaw", () => {
-    expect(isAppendMode("openclaw")).toBe(false);
-  });
-
-  it("returns false for zeroclaw", () => {
-    expect(isAppendMode("zeroclaw")).toBe(false);
-  });
-
-  it("returns false for opencode", () => {
-    expect(isAppendMode("opencode")).toBe(false);
-  });
-
-  it("returns false for kilocode", () => {
-    expect(isAppendMode("kilocode")).toBe(false);
-  });
-
-  it("returns false for junie", () => {
-    expect(isAppendMode("junie")).toBe(false);
+  it("returns false for all non-hermes agents", () => {
+    const overwriteAgents = [
+      "claude",
+      "codex",
+      "openclaw",
+      "zeroclaw",
+      "opencode",
+      "kilocode",
+      "junie",
+    ];
+    for (const agent of overwriteAgents) {
+      expect(isAppendMode(agent), `agent "${agent}"`).toBe(false);
+    }
   });
 });
 

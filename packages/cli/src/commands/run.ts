@@ -12,6 +12,7 @@ import { loadManifest, RAW_BASE, REPO, SPAWN_CDN } from "../manifest.js";
 import { validateIdentifier, validatePrompt, validateScriptContent } from "../security.js";
 import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/result.js";
 import { getLocalShell, isWindows } from "../shared/shell.js";
+import { maybeShowStarPrompt } from "../shared/star-prompt.js";
 import { logError, logInfo, logStep, prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
 import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
@@ -660,7 +661,7 @@ export async function execScript(
   dashboardUrl?: string,
   debug?: boolean,
   spawnName?: string,
-): Promise<void> {
+): Promise<boolean> {
   // Generate a unique spawn ID and record the spawn before execution
   const spawnId = generateSpawnId();
   const parentId = process.env.SPAWN_PARENT_ID || undefined;
@@ -705,7 +706,7 @@ export async function execScript(
     if (!dlResult.ok) {
       const ghUrl = `https://github.com/${REPO}/releases/download/${cloud}-latest/${cloud}.js`;
       reportDownloadError(ghUrl, dlResult.error);
-      return;
+      return false;
     }
 
     const env: Record<string, string | undefined> = {
@@ -729,8 +730,9 @@ export async function execScript(
       const errMsg = getErrorMessage(r.error);
       handleUserInterrupt(errMsg, dashboardUrl);
       reportScriptFailure(errMsg, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
+      return false;
     }
-    return;
+    return true;
   }
 
   // macOS/Linux: download the bash wrapper script and run via bash
@@ -740,13 +742,15 @@ export async function execScript(
   const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
   if (!dlResult.ok) {
     reportDownloadError(ghUrl, dlResult.error);
-    return;
+    return false;
   }
 
   const lastErr = runBashScript(dlResult.data, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
+    return false;
   }
+  return true;
 }
 
 // ── Headless Mode ────────────────────────────────────────────────────────────
@@ -1226,5 +1230,16 @@ export async function cmdRun(
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url, debug, spawnName);
+  const success = await execScript(
+    cloud,
+    agent,
+    prompt,
+    getAuthHint(manifest, cloud),
+    manifest.clouds[cloud].url,
+    debug,
+    spawnName,
+  );
+  if (success) {
+    maybeShowStarPrompt();
+  }
 }

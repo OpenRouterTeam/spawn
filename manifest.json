@@ -304,6 +304,55 @@
         "jetbrains",
         "byok"
       ]
+    },
+    "cursor": {
+      "name": "Cursor CLI",
+      "description": "Cursor's terminal-based AI coding agent — autonomous coding with plan, agent, and ask modes",
+      "url": "https://cursor.com/cli",
+      "install": "curl https://cursor.com/install -fsS | bash",
+      "launch": "agent",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "CURSOR_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "config_files": {
+        "~/.cursor/cli-config.json": {
+          "version": 1,
+          "permissions": {
+            "allow": [
+              "Shell(*)",
+              "Read(*)",
+              "Write(*)",
+              "WebFetch(*)",
+              "Mcp(*)"
+            ],
+            "deny": []
+          }
+        }
+      },
+      "notes": "Works with OpenRouter via --endpoint flag pointing to openrouter.ai/api/v1 and CURSOR_API_KEY set to OpenRouter key. Binary installs to ~/.cursor/bin/agent.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/cursor.png",
+      "featured_cloud": [
+        "digitalocean",
+        "sprite"
+      ],
+      "creator": "Anysphere",
+      "repo": "anysphere/cursor",
+      "license": "Proprietary",
+      "created": "2025-01",
+      "added": "2026-03",
+      "github_stars": 10000,
+      "stars_updated": "2026-03-26",
+      "language": "TypeScript",
+      "runtime": "binary",
+      "category": "cli",
+      "tagline": "Cursor's AI coding agent — plan, build, and ship from the terminal",
+      "tags": [
+        "coding",
+        "terminal",
+        "agentic",
+        "cursor"
+      ]
     }
   },
   "clouds": {
@@ -450,6 +499,12 @@
     "aws/junie": "implemented",
     "digitalocean/junie": "implemented",
     "gcp/junie": "implemented",
-    "sprite/junie": "implemented"
+    "sprite/junie": "implemented",
+    "local/cursor": "implemented",
+    "hetzner/cursor": "implemented",
+    "aws/cursor": "implemented",
+    "digitalocean/cursor": "implemented",
+    "gcp/cursor": "implemented",
+    "sprite/cursor": "implemented"
   }
 }

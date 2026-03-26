@@ -54,6 +54,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/hermes.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/junie.sh)
 ```
 
+#### Cursor CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/cursor.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
