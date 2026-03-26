@@ -297,6 +297,11 @@ CLOUD_ENV
         printf 'export JUNIE_OPENROUTER_API_KEY=%q\n' "${api_key}"
       } >> "${env_tmp}"
       ;;
+    cursor)
+      {
+        printf 'export CURSOR_API_KEY=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
   esac
 
   # Base64-encode credentials, validate the output, then pipe to cloud_exec.
@@ -345,5 +350,94 @@ CLOUD_ENV
     log_err "Failed to create manual .spawnrc"
     return 1
   fi
+
+  # Verify the agent binary is present — the provision timeout may have killed
+  # the CLI before the agent install completed (tarball extract or npm install).
+  # If missing, attempt a direct install on the remote VM.
+  # Non-fatal: .spawnrc was created, so the agent can be installed manually later.
+  _ensure_agent_binary "${app_name}" "${agent}" || log_warn "Agent binary verification/install failed — agent may need manual install"
   return 0
+}
+
+# ---------------------------------------------------------------------------
+# _ensure_agent_binary APP_NAME AGENT
+#
+# Check if the agent binary exists on the remote VM. If not, run the install
+# command directly. This covers the case where the provision timeout killed
+# the CLI mid-install (e.g. openclaw in --fast mode on Sprite, where the
+# tarball extract or npm install hadn't finished).
+#
+# Uses hardcoded install commands per agent — these mirror the TypeScript
+# agent configs in packages/cli/src/shared/agent-setup.ts.
+# ---------------------------------------------------------------------------
+_ensure_agent_binary() {
+  local app="$1"
+  local agent="$2"
+
+  # Map agent to its binary name and install command.
+  # PATH includes all common binary locations for detection.
+  local bin_name=""
+  local install_cmd=""
+  local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$HOME/.cursor/bin:/usr/local/bin:$PATH"'
+
+  case "${agent}" in
+    claude)
+      bin_name="claude"
+      install_cmd="curl --proto '=https' -fsSL https://claude.ai/install.sh | bash || npm install -g @anthropic-ai/claude-code"
+      ;;
+    openclaw)
+      bin_name="openclaw"
+      install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global openclaw"
+      ;;
+    codex)
+      bin_name="codex"
+      install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global @openai/codex"
+      ;;
+    zeroclaw)
+      bin_name="zeroclaw"
+      install_cmd="curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
+      ;;
+    opencode)
+      bin_name="opencode"
+      install_cmd="curl -fsSL https://opencode.ai/install | bash"
+      ;;
+    kilocode)
+      bin_name="kilocode"
+      install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global @kilocode/cli"
+      ;;
+    hermes)
+      bin_name="hermes"
+      install_cmd="curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+      ;;
+    junie)
+      bin_name="junie"
+      install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global @jetbrains/junie-cli"
+      ;;
+    cursor)
+      bin_name="agent"
+      install_cmd="curl https://cursor.com/install -fsS | bash"
+      ;;
+    *)
+      log_warn "No binary check defined for agent: ${agent}"
+      return 0
+      ;;
+  esac
+
+  log_step "Checking ${agent} binary on remote VM..."
+  if cloud_exec "${app}" "${path_prefix}; command -v ${bin_name}" >/dev/null 2>&1; then
+    log_ok "${agent} binary found"
+    return 0
+  fi
+
+  log_warn "${agent} binary not found — installing directly on VM..."
+  if cloud_exec "${app}" "${path_prefix}; source ~/.bashrc 2>/dev/null; ${install_cmd}" >/dev/null 2>&1; then
+    # Verify install succeeded
+    if cloud_exec "${app}" "${path_prefix}; command -v ${bin_name}" >/dev/null 2>&1; then
+      log_ok "${agent} binary installed successfully"
+      return 0
+    fi
+  fi
+
+  log_err "${agent} binary install failed on remote VM"
+  return 1
 }
