@@ -30,5 +30,9 @@
   "junie": {
     "url": "custom:Junie_Icon.svg (official JetBrains Junie icon, converted to PNG)",
     "ext": "png"
+  },
+  "cursor": {
+    "url": "https://cursor.com/apple-touch-icon.png",
+    "ext": "png"
   }
 }
