@@ -163,22 +163,24 @@ export async function cmdEnterAgent(
 
   const agentName = agentDef?.name || agentKey;
 
-  // Handle Sprite console connections
+  // Handle Sprite connections — use `sprite exec -tty` to run a command interactively.
+  // `sprite console` does NOT accept arguments; it is a pure interactive shell.
   if (connection.ip === "sprite-console" && connection.server_name) {
     p.log.step(`Entering ${pc.bold(agentName)} on sprite ${pc.bold(connection.server_name)}...`);
     return runInteractiveCommand(
       "sprite",
       [
-        "console",
+        "exec",
         "-s",
         connection.server_name,
+        "-tty",
         "--",
         "bash",
         "-lc",
         remoteCmd,
       ],
       `Failed to enter ${agentName}`,
-      `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`,
+      `sprite exec -s ${connection.server_name} -tty -- bash -lc '${remoteCmd}'`,
     );
   }
 
