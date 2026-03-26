@@ -41,7 +41,7 @@ export const DOCKER_CONTAINER_NAME = "spawn-agent";
 export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
 
 /** Wrap a command to run inside the Docker container instead of the host. */
-export function makeDockerExec(cmd: string): string {
+function makeDockerExec(cmd: string): string {
   if (!cmd || cmd.length === 0) {
     throw new Error("makeDockerExec: command must be non-empty");
   }
@@ -137,31 +137,36 @@ export async function installSpawnCli(runner: CloudRunner): Promise<void> {
 }
 
 /** Copy local cloud credentials to the remote VM for recursive spawning. */
-export async function delegateCloudCredentials(runner: CloudRunner, cloudName: string): Promise<void> {
+export async function delegateCloudCredentials(runner: CloudRunner, _cloudName: string): Promise<void> {
   logStep("Delegating cloud credentials to VM...");
-
-  // Validate cloudName to prevent command injection via crafted cloud names
-  if (!/^[a-z0-9-]+$/.test(cloudName)) {
-    logWarn(`Invalid cloud name for credential delegation: ${cloudName}`);
-    return;
-  }
 
   const filesToDelegate: {
     localPath: string;
     remotePath: string;
   }[] = [];
 
-  // Current cloud's credentials
-  const cloudConfigPath = getSpawnCloudConfigPath(cloudName);
-  if (existsSync(cloudConfigPath)) {
-    filesToDelegate.push({
-      localPath: cloudConfigPath,
-      remotePath: `~/.config/spawn/${cloudName}.json`,
-    });
+  // Delegate ALL cloud credentials so the child VM can spawn on any cloud,
+  // not just the one the parent is running on.
+  const configDir = `${getUserHome()}/.config/spawn`;
+  const cloudNames = [
+    "hetzner",
+    "digitalocean",
+    "aws",
+    "gcp",
+    "sprite",
+  ];
+  for (const cloud of cloudNames) {
+    const cloudConfigPath = getSpawnCloudConfigPath(cloud);
+    if (existsSync(cloudConfigPath)) {
+      filesToDelegate.push({
+        localPath: cloudConfigPath,
+        remotePath: `~/.config/spawn/${cloud}.json`,
+      });
+    }
   }
 
   // OpenRouter credentials (always needed for child spawns)
-  const orConfigPath = `${getUserHome()}/.config/spawn/openrouter.json`;
+  const orConfigPath = `${configDir}/openrouter.json`;
   if (existsSync(orConfigPath)) {
     filesToDelegate.push({
       localPath: orConfigPath,
