@@ -31,7 +31,9 @@ export function handleCancel(): never {
 }
 
 async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
-  const s = p.spinner();
+  const s = p.spinner({
+    output: process.stderr,
+  });
   s.start(msg);
   const r = await asyncTryCatch(fn);
   s.stop(r.ok ? (doneMsg ?? msg.replace(/\.{3}$/, "")) : pc.red("Failed"));

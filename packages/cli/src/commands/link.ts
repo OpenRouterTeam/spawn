@@ -247,7 +247,9 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   }
 
   // ── Check connectivity ─────────────────────────────────────────────────────
-  const connectSpinner = p.spinner();
+  const connectSpinner = p.spinner({
+    output: process.stderr,
+  });
   connectSpinner.start(`Checking connectivity to ${pc.cyan(ip)}...`);
 
   const reachable = await tcpCheckFn(ip, 22, 10000);
@@ -272,7 +274,9 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   const needsDetection = !detectedAgent || !detectedCloud;
 
   if (needsDetection) {
-    const detectSpinner = p.spinner();
+    const detectSpinner = p.spinner({
+      output: process.stderr,
+    });
     detectSpinner.start("Auto-detecting agent and cloud provider...");
 
     if (!detectedAgent) {
