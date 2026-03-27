@@ -379,6 +379,21 @@ run_agents_for_cloud() {
     fi
   fi
 
+  # Bail out early if the cloud reports zero capacity (e.g. droplet limit reached).
+  # All agents would fail anyway — skip with an actionable error instead of wasting
+  # time on retries that cannot succeed. (#3059)
+  if [ "${effective_parallel}" -eq 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
+    log_err "No capacity available on ${cloud} — all ${cloud} agents will be marked as failed."
+    log_err "Delete existing instances or request a limit increase, then re-run."
+    for agent in ${AGENTS_TO_TEST}; do
+      printf 'fail' > "${log_dir}/${cloud}-${agent}.result"
+      if [ -z "${cloud_failed}" ]; then cloud_failed="${agent}"; else cloud_failed="${cloud_failed} ${agent}"; fi
+    done
+    printf '%s %s %s %s %s' "0" "$(printf '%s\n' "${AGENTS_TO_TEST}" | wc -w | tr -d ' ')" "0s" "" "|${cloud_failed}" \
+      > "${log_dir}/${cloud}.summary"
+    return 1
+  fi
+
   if [ "${effective_parallel}" -gt 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
     # Parallel mode: batch agents
     log_info "Running agents in parallel (batch size: ${effective_parallel})"
