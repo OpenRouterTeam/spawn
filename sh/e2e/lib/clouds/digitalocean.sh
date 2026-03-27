@@ -186,7 +186,7 @@ _digitalocean_exec() {
     return 1
   fi
 
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       "root@${ip}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
 }
