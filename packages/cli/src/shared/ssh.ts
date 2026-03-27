@@ -347,7 +347,9 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
       logInfo("SSH port 22 is open");
       break;
     }
-    logStepInline(`SSH port closed (${attempt}/${maxAttempts})`);
+    if (attempt % 5 === 0 || attempt === 1) {
+      logStepInline(`Waiting for SSH port... (${attempt}/${maxAttempts} attempts)`);
+    }
     await sleep(2000);
   }
 

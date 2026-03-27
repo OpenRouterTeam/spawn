@@ -30,7 +30,7 @@ You have the \`spawn\` CLI installed. Use it to provision cloud VMs with AI agen
 spawn <agent> <cloud> --headless --output json --prompt "task description"
 \`\`\`
 
-## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie
+## Agents: claude, cursor, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie
 ## Clouds: hetzner, digitalocean, aws, gcp, sprite
 
 ## Example
@@ -40,6 +40,21 @@ spawn claude hetzner --headless --output json --prompt "Implement the auth modul
 \`\`\`
 
 Returns JSON: \`{"status":"success","ip_address":"...","ssh_user":"root","server_id":"..."}\`
+
+## Running a prompt on a child VM
+
+**--headless only provisions the VM — it does NOT run the prompt on it.**
+To actually execute work on the child, SSH in and run the agent:
+
+\`\`\`bash
+ssh -o StrictHostKeyChecking=accept-new root@<ip_address> '~/.local/bin/claude --print "your prompt"'
+\`\`\`
+
+### Known gotchas — do NOT waste time rediscovering these:
+- Agent binaries are at \`~/.local/bin/\`, NOT on the default PATH. Always use the full path: \`~/.local/bin/claude\`, \`~/.local/bin/cursor\`, etc.
+- Claude Code blocks \`--dangerously-skip-permissions\` as root. Use \`--print\` for one-shot prompts instead — it works as root and returns the response directly.
+- Do NOT try to create a non-root user to work around root restrictions — it requires copying config files (\`.claude.json\`, \`.claude/settings.json\`, env vars) and is fragile. Just use \`--print\`.
+- For long-running tasks, use \`spawn delete --name <name> --yes\` to clean up when done.
 
 ## Managing Children
 
@@ -61,8 +76,9 @@ const HERMES_SNIPPET = `
 
 You have the \`spawn\` CLI for creating child cloud VMs with AI agents.
 Use \`spawn <agent> <cloud> --headless --output json --prompt "task"\` to delegate work.
-Available agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie.
+Available agents: claude, cursor, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie.
 Cloud credentials are pre-configured. Run \`spawn list --json\` to see children.
+Note: --headless only provisions the VM. To run a prompt, SSH in: \`ssh root@<ip> '~/.local/bin/<agent> --print "prompt"'\`.
 `;
 
 // ─── Agent config ───────────────────────────────────────────────────────────
