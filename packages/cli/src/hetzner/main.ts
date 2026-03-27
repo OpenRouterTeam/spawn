@@ -5,10 +5,12 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, runOrchestration } from "../shared/orchestrate.js";
+import { shouldSkipCloudInit } from "../shared/cloud-init.js";
+import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
+  cleanupOrphanedPrimaryIps,
   createServer as createHetznerServer,
   downloadFile,
   ensureHcloudToken,
@@ -47,20 +49,21 @@ async function main() {
     useDocker = true;
   }
 
-  /** Wrap a command to run inside the Docker container instead of the host. */
-  function dockerExec(cmd: string): string {
-    return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
-  }
-
   const cloud: CloudOrchestrator = {
     cloudName: "hetzner",
     cloudLabel: "Hetzner Cloud",
     skipAgentInstall: false,
-    runner: {
-      runServer: useDocker ? (cmd: string, timeoutSecs?: number) => runServer(dockerExec(cmd), timeoutSecs) : runServer,
-      uploadFile,
-      downloadFile,
-    },
+    runner: useDocker
+      ? makeDockerRunner({
+          runServer,
+          uploadFile,
+          downloadFile,
+        })
+      : {
+          runServer,
+          uploadFile,
+          downloadFile,
+        },
     async authenticate() {
       await promptSpawnName();
       await ensureHcloudToken();
@@ -71,6 +74,16 @@ async function main() {
       location = await promptLocation();
     },
     async createServer(name: string) {
+      // Proactively clean up orphaned Primary IPs before provisioning in headless
+      // mode (E2E batches). This prevents resource_limit_exceeded errors when
+      // previous test runs left behind unattached IPs that consume quota (#2933).
+      if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+        const cleaned = await cleanupOrphanedPrimaryIps();
+        if (cleaned > 0) {
+          logInfo(`Pre-provisioning: cleaned ${cleaned} orphaned Primary IP(s)`);
+        }
+      }
+
       // Check for a pre-built snapshot before provisioning
       snapshotId = await findSpawnSnapshot(agentName);
       if (snapshotId) {
@@ -87,7 +100,13 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId || cloud.skipCloudInit) {
+      if (
+        shouldSkipCloudInit({
+          useDocker,
+          snapshotId,
+          skipCloudInit: cloud.skipCloudInit,
+        })
+      ) {
         await waitForSshOnly();
       } else {
         await waitForCloudInit();

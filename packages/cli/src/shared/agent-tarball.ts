@@ -4,12 +4,9 @@
 
 import type { CloudRunner } from "./agent-setup.js";
 
-import { unlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { asyncTryCatch, tryCatch } from "./result.js";
+import { asyncTryCatch } from "./result.js";
 import { logDebug, logInfo, logStep, logWarn } from "./ui.js";
 
 const REPO = "OpenRouterTeam/spawn";
@@ -134,16 +131,16 @@ export async function tryTarballInstall(
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "/root/$_d" ]; then',
     '      mkdir -p "$HOME/$_d"',
-    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
+    `      ${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`,
     "    fi",
     "  done",
     "  # Copy marker file",
-    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
+    `  ${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`,
     "  # Fix ownership — files were extracted as root",
-    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
+    `  ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`,
     "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
     '    if [ -d "$HOME/$_d" ]; then',
-    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
+    `      ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`,
     "    fi",
     "  done",
     "fi",
@@ -155,127 +152,5 @@ export async function tryTarballInstall(
   }
 
   logInfo("Agent installed from pre-built tarball");
-  return true;
-}
-
-// ─── Parallel tarball: local download + SCP upload ──────────────────────────
-
-interface LocalTarball {
-  localPath: string;
-  cleanup: () => void;
-}
-
-/**
- * Download the agent tarball to a local temp file (for parallel boot + download).
- * Always downloads x86_64 (all current cloud VMs are x86_64).
- * Returns null on any failure — caller falls back to remote download.
- */
-export async function downloadTarballLocally(
-  agentName: string,
-  fetchFn: typeof fetch = fetch,
-): Promise<LocalTarball | null> {
-  logStep("Downloading tarball locally...");
-
-  const r = await asyncTryCatch(async () => {
-    const tag = `agent-${agentName}-latest`;
-    const resp = await fetchFn(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!resp.ok) {
-      return null;
-    }
-
-    const json: unknown = await resp.json();
-    const parsed = v.safeParse(ReleaseSchema, json);
-    if (!parsed.success) {
-      return null;
-    }
-
-    const x86Asset = parsed.output.assets.find((a) => a.name.includes("-x86_64-") && a.name.endsWith(".tar.gz"));
-    const downloadUrl = x86Asset?.browser_download_url;
-    if (!downloadUrl) {
-      return null;
-    }
-
-    const urlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/[^\s'"`;|&$()]+$/;
-    if (!urlPattern.test(downloadUrl)) {
-      return null;
-    }
-
-    const dlResp = await fetchFn(downloadUrl, {
-      signal: AbortSignal.timeout(120_000),
-      redirect: "follow",
-    });
-    if (!dlResp.ok || !dlResp.body) {
-      return null;
-    }
-
-    const localPath = join(tmpdir(), `spawn-agent-${agentName}-${Date.now()}.tar.gz`);
-    await Bun.write(localPath, dlResp);
-
-    logInfo("Tarball downloaded locally");
-    return {
-      localPath,
-      cleanup: () => {
-        tryCatch(() => unlinkSync(localPath));
-      },
-    };
-  });
-
-  if (!r.ok) {
-    logDebug(`Local tarball download failed: ${getErrorMessage(r.error)}`);
-    return null;
-  }
-  return r.data;
-}
-
-/**
- * Upload a locally-downloaded tarball to the remote VM and extract it.
- */
-export async function uploadAndExtractTarball(runner: CloudRunner, localPath: string): Promise<boolean> {
-  logStep("Uploading tarball to server...");
-  const remotePath = "/tmp/spawn-agent-parallel.tar.gz";
-  const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
-
-  const uploadResult = await asyncTryCatch(() => runner.uploadFile(localPath, remotePath));
-  if (!uploadResult.ok) {
-    logWarn("Tarball upload failed");
-    logDebug(getErrorMessage(uploadResult.error));
-    return false;
-  }
-
-  const extractCmd =
-    `${sudo} tar xz -C / -f ${remotePath} && ` + `${sudo} test -f /root/.spawn-tarball && ` + `rm -f ${remotePath}`;
-  const extractResult = await asyncTryCatch(() => runner.runServer(extractCmd, 150));
-  if (!extractResult.ok) {
-    logWarn("Tarball extraction failed on remote VM");
-    logDebug(getErrorMessage(extractResult.error));
-    return false;
-  }
-
-  // Mirror /root/ files for non-root SSH users
-  const mirrorCmd = [
-    'if [ "$(id -u)" != "0" ]; then',
-    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
-    '    if [ -d "/root/$_d" ]; then',
-    '      mkdir -p "$HOME/$_d"',
-    '      cp -a "/root/$_d/." "$HOME/$_d/" 2>/dev/null || true',
-    "    fi",
-    "  done",
-    '  cp /root/.spawn-tarball "$HOME/.spawn-tarball" 2>/dev/null || true',
-    '  chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball" 2>/dev/null || true',
-    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
-    '    if [ -d "$HOME/$_d" ]; then',
-    '      chown -R "$(id -u):$(id -g)" "$HOME/$_d" 2>/dev/null || true',
-    "    fi",
-    "  done",
-    "fi",
-  ].join("\n");
-  await asyncTryCatch(() => runner.runServer(mirrorCmd, 30));
-
-  logInfo("Agent installed from pre-built tarball (parallel)");
   return true;
 }

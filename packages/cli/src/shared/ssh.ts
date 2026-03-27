@@ -2,7 +2,7 @@
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
-import { normalize } from "node:path";
+import { normalize } from "node:path/posix";
 import { asyncTryCatch, tryCatch } from "./result.js";
 import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
 
@@ -11,7 +11,7 @@ import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js"
 /** Base SSH options shared across all clouds (array form for Bun.spawn). */
 export const SSH_BASE_OPTS: string[] = [
   "-o",
-  "StrictHostKeyChecking=no",
+  "StrictHostKeyChecking=accept-new",
   "-o",
   "UserKnownHostsFile=/dev/null",
   "-o",
@@ -135,6 +135,29 @@ export function spawnInteractive(args: string[], env?: Record<string, string | u
     stdio: "inherit",
     env: env ?? process.env,
   });
+
+  // Reset terminal state after the interactive session ends.
+  // The remote agent's TUI (e.g. Claude Code) may leave the terminal in
+  // raw mode or with altered attributes, causing garbled post-session output.
+  if (process.stderr.isTTY) {
+    process.stderr.write("\x1b[0m\x1b[?25h"); // reset attributes + show cursor
+  }
+  if (process.stdout.isTTY) {
+    process.stdout.write("\x1b[0m\x1b[?25h");
+  }
+  // Restore sane terminal settings (cooked mode, echo, etc.)
+  tryCatch(() =>
+    nodeSpawnSync(
+      "stty",
+      [
+        "sane",
+      ],
+      {
+        stdio: "inherit",
+      },
+    ),
+  );
+
   return result.status ?? 1;
 }
 
@@ -324,7 +347,9 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
       logInfo("SSH port 22 is open");
       break;
     }
-    logStepInline(`SSH port closed (${attempt}/${maxAttempts})`);
+    if (attempt % 5 === 0 || attempt === 1) {
+      logStepInline(`Waiting for SSH port... (${attempt}/${maxAttempts} attempts)`);
+    }
     await sleep(2000);
   }
 

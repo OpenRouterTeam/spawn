@@ -4,6 +4,7 @@ import type { Manifest } from "../manifest.js";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
+import * as v from "valibot";
 import { authenticate as awsAuthenticate, destroyServer as awsDestroyServer, ensureAwsCli } from "../aws/aws.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
 import {
@@ -13,9 +14,14 @@ import {
   resolveProject as gcpResolveProject,
 } from "../gcp/gcp.js";
 import { ensureHcloudToken, destroyServer as hetznerDestroyServer } from "../hetzner/hetzner.js";
-import { getActiveServers, markRecordDeleted } from "../history.js";
+import { getActiveServers, loadHistory, markRecordDeleted, mergeChildHistory, SpawnRecordSchema } from "../history.js";
 import { loadManifest } from "../manifest.js";
-import { validateMetadataValue, validateServerIdentifier } from "../security.js";
+import {
+  validateConnectionIP,
+  validateMetadataValue,
+  validateServerIdentifier,
+  validateUsername,
+} from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
@@ -43,14 +49,19 @@ async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
     case "gcp": {
       const zone = conn.metadata?.zone || "us-central1-a";
       const project = conn.metadata?.project || "";
+      if (!project) {
+        throw new Error(
+          "Cannot determine GCP project for this instance.\n\n" +
+            "The history entry is missing project metadata. Without it, deletion\n" +
+            "could target the wrong project.\n\n" +
+            "To fix: delete the instance manually from the GCP Console:\n" +
+            "  https://console.cloud.google.com/compute/instances",
+        );
+      }
       validateMetadataValue(zone, "GCP zone");
-      if (project) {
-        validateMetadataValue(project, "GCP project");
-      }
+      validateMetadataValue(project, "GCP project");
       process.env.GCP_ZONE = zone;
-      if (project) {
-        process.env.GCP_PROJECT = project;
-      }
+      process.env.GCP_PROJECT = project;
       await gcpEnsureGcloudCli();
       await gcpAuthenticate();
       break;
@@ -125,27 +136,25 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
     case "gcp": {
       const zone = conn.metadata?.zone || "us-central1-a";
       const project = conn.metadata?.project || "";
+      if (!project) {
+        throw new Error(
+          "Cannot determine GCP project for this instance.\n\n" +
+            "The history entry is missing project metadata. Without it, deletion\n" +
+            "could target the wrong project.\n\n" +
+            "To fix: delete the instance manually from the GCP Console:\n" +
+            "  https://console.cloud.google.com/compute/instances",
+        );
+      }
       // SECURITY: Validate metadata values to prevent injection via tampered history
       validateMetadataValue(zone, "GCP zone");
-      if (project) {
-        validateMetadataValue(project, "GCP project");
-      }
+      validateMetadataValue(project, "GCP project");
       return tryDelete(async () => {
         process.env.GCP_ZONE = zone;
-        if (project) {
-          process.env.GCP_PROJECT = project;
-        }
+        process.env.GCP_PROJECT = project;
         await gcpEnsureGcloudCli();
         await gcpAuthenticate();
-        // Deletion runs under a spinner — suppress interactive prompts
-        const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
-        process.env.SPAWN_NON_INTERACTIVE = "1";
+        // resolveProject reads GCP_PROJECT directly — no fallback needed
         const resolveResult = await asyncTryCatch(() => gcpResolveProject());
-        if (prevNonInteractive === undefined) {
-          delete process.env.SPAWN_NON_INTERACTIVE;
-        } else {
-          process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
-        }
         if (!resolveResult.ok) {
           throw resolveResult.error;
         }
@@ -200,7 +209,9 @@ export async function confirmAndDelete(
     await ensureDeleteCredentials(record);
   }
 
-  const s = p.spinner();
+  const s = p.spinner({
+    output: process.stderr,
+  });
   s.start(`Deleting ${label}...`);
 
   // Cloud destroy functions log progress to stderr (logStep/logInfo).
@@ -237,7 +248,129 @@ export async function confirmAndDelete(
   return success;
 }
 
-export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+/** Pull child history from a remote VM via SSH before deleting it. */
+export async function pullChildHistory(record: SpawnRecord): Promise<void> {
+  const conn = record.connection;
+  if (!conn?.ip || !conn.user || conn.cloud === "local" || conn.ip === "sprite-console") {
+    return;
+  }
+
+  const connValidation = tryCatch(() => {
+    validateUsername(conn.user);
+    validateConnectionIP(conn.ip);
+  });
+  if (!connValidation.ok) {
+    return;
+  }
+
+  const { ensureSshKeys, getSshKeyOpts } = await import("../shared/ssh-keys.js");
+  const { SSH_BASE_OPTS } = await import("../shared/ssh.js");
+
+  const pullResult = await asyncTryCatch(async () => {
+    const keys = await ensureSshKeys();
+    const keyOpts = getSshKeyOpts(keys);
+    const proc = Bun.spawn(
+      [
+        "ssh",
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        `${conn.user}@${conn.ip}`,
+        "spawn history export 2>/dev/null",
+      ],
+      {
+        stdout: "pipe",
+        stderr: "ignore",
+        stdin: "ignore",
+      },
+    );
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    return output.trim();
+  });
+
+  if (!pullResult.ok || !pullResult.data) {
+    // Non-fatal: VM might already be unreachable
+    return;
+  }
+
+  await asyncTryCatch(async () => {
+    const parsed: unknown = JSON.parse(pullResult.data);
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+    const childRecords: SpawnRecord[] = [];
+    for (const el of parsed) {
+      const result = v.safeParse(SpawnRecordSchema, el);
+      if (result.success) {
+        childRecords.push(result.output);
+      }
+    }
+    if (childRecords.length > 0) {
+      mergeChildHistory(record.id, childRecords);
+      p.log.info(`Merged ${childRecords.length} child record(s) from ${conn.server_name || conn.ip}`);
+    }
+  });
+}
+
+/** Find all children of a given spawn record (direct and transitive). */
+export function findDescendants(parentId: string): SpawnRecord[] {
+  const history = loadHistory();
+  const descendants: SpawnRecord[] = [];
+  const queue = [
+    parentId,
+  ];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    for (const r of history) {
+      if (r.parent_id === currentId && !r.connection?.deleted) {
+        descendants.push(r);
+        queue.push(r.id);
+      }
+    }
+  }
+
+  return descendants;
+}
+
+/** Delete a spawn and all its descendants (depth-first). */
+export async function cascadeDelete(record: SpawnRecord, manifest: Manifest | null): Promise<boolean> {
+  const descendants = findDescendants(record.id);
+
+  if (descendants.length > 0) {
+    const totalCount = descendants.length + 1;
+    const confirmed = await p.confirm({
+      message: `This will delete ${totalCount} server(s) (1 parent + ${descendants.length} child${descendants.length !== 1 ? "ren" : ""}). Continue?`,
+      initialValue: false,
+    });
+
+    if (p.isCancel(confirmed) || !confirmed) {
+      p.log.info("Cascade delete cancelled.");
+      return false;
+    }
+
+    // Delete children first (depth-first by reversing — deepest children last in queue, first to delete)
+    descendants.reverse();
+    for (const child of descendants) {
+      if (!child.connection?.deleted) {
+        p.log.step(`Deleting child: ${child.connection?.server_name || child.id}`);
+        await pullChildHistory(child);
+        await execDeleteServer(child);
+      }
+    }
+  }
+
+  // Delete the parent
+  await pullChildHistory(record);
+  return confirmAndDelete(record, manifest);
+}
+
+export async function cmdDelete(
+  agentFilter?: string,
+  cloudFilter?: string,
+  nameFilter?: string,
+  forceYes?: boolean,
+): Promise<void> {
   const resolved = await resolveListFilters(agentFilter, cloudFilter);
   agentFilter = resolved.agentFilter;
   cloudFilter = resolved.cloudFilter;
@@ -252,6 +385,15 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
   if (cloudFilter) {
     const lower = cloudFilter.toLowerCase();
     filtered = filtered.filter((r) => r.cloud.toLowerCase() === lower);
+  }
+  if (nameFilter) {
+    const lower = nameFilter.toLowerCase();
+    filtered = filtered.filter(
+      (r) =>
+        (r.name ?? "").toLowerCase() === lower ||
+        (r.connection?.server_name ?? "").toLowerCase() === lower ||
+        r.id === nameFilter,
+    );
   }
 
   if (filtered.length === 0) {
@@ -272,10 +414,22 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
   const manifestResult = await asyncTryCatchIf(isNetworkError, loadManifest);
   const manifest: Manifest | null = manifestResult.ok ? manifestResult.data : null;
 
+  // Non-interactive headless delete: --name + --yes skips the picker
   if (!isInteractiveTTY()) {
-    p.log.error("spawn delete requires an interactive terminal.");
-    p.log.info(`Use ${pc.cyan("spawn list")} to see your servers.`);
-    process.exit(1);
+    if (!forceYes) {
+      p.log.error("spawn delete requires --yes in non-interactive mode.");
+      p.log.info(`Usage: ${pc.cyan("spawn delete --name <name> --yes")}`);
+      process.exit(1);
+    }
+    for (const record of filtered) {
+      const label = record.connection?.server_name || record.name || record.id;
+      await ensureDeleteCredentials(record);
+      const ok = await execDeleteServer(record);
+      if (ok) {
+        p.log.success(`Server "${label}" deleted`);
+      }
+    }
+    return;
   }
 
   await activeServerPicker(filtered, manifest);

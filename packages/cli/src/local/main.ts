@@ -4,8 +4,10 @@
 
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
+import * as p from "@clack/prompts";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import { runOrchestration } from "../shared/orchestrate.js";
+import { logWarn } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import { downloadFile, interactiveSession, runLocal, uploadFile } from "./local.js";
 
@@ -18,6 +20,25 @@ async function main() {
   }
 
   const agent = resolveAgent(agentName);
+
+  // Warn about security implications of installing agents locally
+  if (process.env.SPAWN_NON_INTERACTIVE !== "1") {
+    process.stderr.write("\n");
+    logWarn("⚠  Local installation warning");
+    logWarn(`   This will install ${agent.name} directly on your machine.`);
+    logWarn("   The agent will have full access to your filesystem, shell, and network.");
+    logWarn("   For isolation, consider running on a cloud VM instead.\n");
+
+    const confirmed = await p.confirm({
+      message: "Continue with local installation?",
+      initialValue: true,
+    });
+
+    if (p.isCancel(confirmed) || !confirmed) {
+      p.log.info("Installation cancelled.");
+      process.exit(0);
+    }
+  }
 
   const cloud: CloudOrchestrator = {
     cloudName: "local",

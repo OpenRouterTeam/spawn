@@ -243,10 +243,15 @@ run_single_agent() {
   (
     local _inner_status="fail"
     if [ "${INTERACTIVE_MODE}" -eq 1 ]; then
-      # AI-driven interactive mode: provision + verify in one step
+      # AI-driven interactive mode: harness drives the CLI through PTY.
+      # After harness exits (on "Starting agent..." marker), the install is still
+      # running on the remote VM. Run verify_agent to wait for .spawnrc before
+      # the input test — same as headless mode.
       if interactive_provision "${agent}" "${app_name}" "${LOG_DIR}"; then
-        if run_input_test "${agent}" "${app_name}"; then
-          _inner_status="pass"
+        if verify_agent "${agent}" "${app_name}"; then
+          if run_input_test "${agent}" "${app_name}"; then
+            _inner_status="pass"
+          fi
         fi
       fi
     else
@@ -374,6 +379,21 @@ run_agents_for_cloud() {
     fi
   fi
 
+  # Bail out early if the cloud reports zero capacity (e.g. droplet limit reached).
+  # All agents would fail anyway — skip with an actionable error instead of wasting
+  # time on retries that cannot succeed. (#3059)
+  if [ "${effective_parallel}" -eq 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
+    log_err "No capacity available on ${cloud} — all ${cloud} agents will be marked as failed."
+    log_err "Delete existing instances or request a limit increase, then re-run."
+    for agent in ${AGENTS_TO_TEST}; do
+      printf 'fail' > "${log_dir}/${cloud}-${agent}.result"
+      if [ -z "${cloud_failed}" ]; then cloud_failed="${agent}"; else cloud_failed="${cloud_failed} ${agent}"; fi
+    done
+    printf '%s %s %s %s %s' "0" "$(printf '%s\n' "${AGENTS_TO_TEST}" | wc -w | tr -d ' ')" "0s" "" "|${cloud_failed}" \
+      > "${log_dir}/${cloud}.summary"
+    return 1
+  fi
+
   if [ "${effective_parallel}" -gt 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
     # Parallel mode: batch agents
     log_info "Running agents in parallel (batch size: ${effective_parallel})"
@@ -389,6 +409,10 @@ run_agents_for_cloud() {
       if [ "${batch_count}" -ge "${effective_parallel}" ]; then
         batch_num=$((batch_num + 1))
         log_header "Batch ${batch_num} (${cloud})"
+
+        # Refresh auth before each batch — prevents token expiry in long
+        # E2E runs (60+ min). No-op for clouds without refresh support. #2934
+        cloud_refresh_auth || log_warn "Auth refresh failed before batch ${batch_num}"
 
         pids=""
         for ba in ${batch_agents}; do
@@ -420,6 +444,9 @@ run_agents_for_cloud() {
     if [ -n "${batch_agents}" ]; then
       batch_num=$((batch_num + 1))
       log_header "Batch ${batch_num} (${cloud})"
+
+      # Refresh auth before partial batch too — same reason as above. #2934
+      cloud_refresh_auth || log_warn "Auth refresh failed before batch ${batch_num}"
 
       pids=""
       for ba in ${batch_agents}; do
@@ -495,6 +522,14 @@ send_matrix_email() {
   local total_pass="$4"
   local total_fail="$5"
   local duration_str="$6"
+
+  # Skip email for targeted re-runs (partial agent/cloud subset).
+  # Set SPAWN_E2E_SKIP_EMAIL=1 to suppress the email (used by quality cycle
+  # when re-running only failed agents — a partial email looks like all-passed).
+  if [ "${SPAWN_E2E_SKIP_EMAIL:-0}" = "1" ]; then
+    log_info "Matrix email skipped (SPAWN_E2E_SKIP_EMAIL=1)"
+    return 0
+  fi
 
   local resend_key="${RESEND_API_KEY:-}"
   local to_email="${KEY_REQUEST_EMAIL:-}"

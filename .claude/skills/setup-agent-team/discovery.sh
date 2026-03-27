@@ -36,16 +36,23 @@ log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%
 
 # --- Safe sed substitution (escapes sed metacharacters in replacement) ---
 # Usage: safe_substitute PLACEHOLDER VALUE FILE
-# Escapes \, &, |, and newlines in VALUE to prevent sed injection.
+# Escapes \, &, and newlines in VALUE to prevent sed injection.
+# Uses \x01 (SOH control char) as sed delimiter to prevent delimiter injection.
 safe_substitute() {
     local placeholder="$1"
     local value="$2"
     local file="$3"
+    # Reject values containing the \x01 delimiter (should never occur in normal input)
+    if printf '%s' "$value" | grep -qP '\x01'; then
+        log_error "safe_substitute value contains illegal \\x01 character"
+        return 1
+    fi
+    # Escape backslashes first, then & (sed metacharacters in replacement)
     local escaped
-    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g')
     # Escape literal newlines for sed replacement (backslash + newline)
     escaped="${escaped//$'\n'/\\$'\n'}"
-    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    sed -i.bak "s$(printf '\x01')${placeholder}$(printf '\x01')${escaped}$(printf '\x01')g" "$file"
     rm -f "${file}.bak"
 }
 

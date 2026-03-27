@@ -9,6 +9,7 @@ import { runOrchestration } from "../shared/orchestrate.js";
 import { logInfo } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
+  AGENT_MIN_SIZE,
   checkAccountStatus,
   createServer as createDroplet,
   downloadFile,
@@ -21,17 +22,11 @@ import {
   promptDropletSize,
   promptSpawnName,
   runServer,
+  slugRamGb,
   uploadFile,
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean.js";
-
-/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
-const AGENT_MIN_SIZE: Record<string, string> = {
-  // s-2vcpu-4gb is used (not s-2vcpu-4gb-intel) because the intel variant
-  // is no longer available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
-  openclaw: "s-2vcpu-4gb",
-};
 
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
@@ -80,7 +75,7 @@ async function main() {
       dropletSize = await promptDropletSize();
       // Enforce minimum size for agents that need more RAM (e.g. openclaw-plugins OOMs on 2GB)
       const minSize = AGENT_MIN_SIZE[agentName];
-      if (minSize && (!dropletSize || dropletSize === "s-2vcpu-2gb")) {
+      if (minSize && (!dropletSize || slugRamGb(dropletSize) < slugRamGb(minSize))) {
         dropletSize = minSize;
         logInfo(`Using ${minSize} (minimum for ${agentName})`);
       }

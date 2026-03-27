@@ -85,17 +85,16 @@ describe("picker.ts coverage", () => {
 
     it("returns empty array for empty input", () => {
       expect(parsePickerInput("")).toEqual([]);
-      expect(parsePickerInput("   ")).toEqual([]);
-      expect(parsePickerInput("\n\n")).toEqual([]);
+      expect(parsePickerInput("   \n  \n")).toEqual([]);
     });
 
     it("trims whitespace from fields", () => {
-      const result = parsePickerInput("  val \t  Label \t  Hint  ");
+      const result = parsePickerInput("  value  \t  label  \t  hint  ");
       expect(result).toEqual([
         {
-          value: "val",
-          label: "Label",
-          hint: "Hint",
+          value: "value",
+          label: "label",
+          hint: "hint",
         },
       ]);
     });
@@ -135,7 +134,6 @@ describe("picker.ts coverage", () => {
     });
 
     it("filters lines where all tab-separated parts are empty", () => {
-      // "\t\t" is trimmed to "", which is filtered by the l.length > 0 check
       const result = parsePickerInput("\t\t");
       expect(result).toEqual([]);
     });
@@ -365,6 +363,61 @@ describe("picker.ts coverage", () => {
       readSpy.mockRestore();
     });
 
+    // ── TTY interaction tests (stty + raw mode) ────────────────────────
+    // Each test uses a shared stty mock helper to avoid boilerplate repetition.
+
+    /**
+     * Build a spawnSync mock for the standard stty call sequence:
+     *   call 1 → stty -g (save settings, returns savedSettings)
+     *   call 2 → stty raw -echo (enable raw mode)
+     *   call 3 → stty size (returns terminalSize, e.g. "24 80")
+     *   call N → stty restore (any subsequent call, returns null stdout)
+     */
+    function makeSttySpawnSyncSpy(savedSettings = "saved", terminalSize = "24 80") {
+      let callCount = 0;
+      return spyOn(child_process, "spawnSync").mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            status: 0,
+            stdout: Buffer.from(savedSettings),
+            stderr: null,
+            pid: 0,
+            output: [],
+            signal: null,
+          };
+        }
+        if (callCount === 2) {
+          return {
+            status: 0,
+            stdout: null,
+            stderr: null,
+            pid: 0,
+            output: [],
+            signal: null,
+          };
+        }
+        if (callCount === 3) {
+          return {
+            status: 0,
+            stdout: Buffer.from(terminalSize),
+            stderr: null,
+            pid: 0,
+            output: [],
+            signal: null,
+          };
+        }
+        return {
+          status: 0,
+          stdout: null,
+          stderr: null,
+          pid: 0,
+          output: [],
+          signal: null,
+        };
+      });
+    }
+
     it("falls back when raw mode fails", () => {
       let spawnCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
@@ -419,61 +472,15 @@ describe("picker.ts coverage", () => {
     });
 
     it("handles Enter key to select in TTY mode", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount === 1) {
-          // stty -g
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 2) {
-          // stty raw -echo
-          return {
-            status: 0,
-            stdout: null,
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          // stty size for getTTYCols
-          return {
-            status: 0,
-            stdout: Buffer.from("24 80"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        // stty restore
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy();
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {
-          // Enter key
-          buf[0] = 0x0d;
+          buf[0] = 0x0d; // Enter key
           return 1;
         }
         return 0;
@@ -505,42 +512,11 @@ describe("picker.ts coverage", () => {
     });
 
     it("handles arrow keys and delete key in TTY mode", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount <= 2) {
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          return {
-            status: 0,
-            stdout: Buffer.from("24 80"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy();
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {
@@ -551,8 +527,7 @@ describe("picker.ts coverage", () => {
           return 3;
         }
         if (readCallCount === 2) {
-          // 'd' key for delete
-          buf[0] = 0x64;
+          buf[0] = 0x64; // 'd' key for delete
           return 1;
         }
         return 0;
@@ -585,47 +560,15 @@ describe("picker.ts coverage", () => {
     });
 
     it("handles Ctrl-C cancel in TTY mode", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount <= 2) {
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          return {
-            status: 0,
-            stdout: Buffer.from("24 80"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy();
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {
-          // Ctrl-C
-          buf[0] = 0x03;
+          buf[0] = 0x03; // Ctrl-C
           return 1;
         }
         return 0;
@@ -652,42 +595,11 @@ describe("picker.ts coverage", () => {
     });
 
     it("handles options with subtitles and hints", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount <= 2) {
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          return {
-            status: 0,
-            stdout: Buffer.from("24 120"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy("saved", "24 120");
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {
@@ -726,42 +638,11 @@ describe("picker.ts coverage", () => {
     });
 
     it("handles 'd' key when deleteKey is disabled (no-op)", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount <= 2) {
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          return {
-            status: 0,
-            stdout: Buffer.from("24 80"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy();
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {
@@ -797,42 +678,11 @@ describe("picker.ts coverage", () => {
     });
 
     it("uses defaultValue to set initial selection", () => {
-      let spawnCallCount = 0;
       let readCallCount = 0;
       const openSpy = spyOn(fs, "openSync").mockReturnValue(99);
       const closeSpy = spyOn(fs, "closeSync").mockImplementation(() => {});
       const writeSpy = spyOn(fs, "writeSync").mockImplementation(() => 0);
-      const spawnSyncSpy = spyOn(child_process, "spawnSync").mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount <= 2) {
-          return {
-            status: 0,
-            stdout: Buffer.from("saved"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        if (spawnCallCount === 3) {
-          return {
-            status: 0,
-            stdout: Buffer.from("24 80"),
-            stderr: null,
-            pid: 0,
-            output: [],
-            signal: null,
-          };
-        }
-        return {
-          status: 0,
-          stdout: null,
-          stderr: null,
-          pid: 0,
-          output: [],
-          signal: null,
-        };
-      });
+      const spawnSyncSpy = makeSttySpawnSyncSpy();
       const readSpy = spyOn(fs, "readSync").mockImplementation((fd, buf: Buffer) => {
         readCallCount++;
         if (readCallCount === 1) {

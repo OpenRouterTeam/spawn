@@ -46,3 +46,15 @@ export function needsNode(tier: CloudInitTier = "full"): boolean {
 export function needsBun(tier: CloudInitTier = "full"): boolean {
   return tier === "bun" || tier === "full";
 }
+
+/**
+ * Determines whether cloud-init wait should be skipped in favor of SSH-only wait.
+ * Extracted from the inline condition in hetzner/main.ts and gcp/main.ts.
+ */
+export function shouldSkipCloudInit(opts: {
+  useDocker: boolean;
+  snapshotId?: string | null | undefined;
+  skipCloudInit?: boolean;
+}): boolean {
+  return opts.useDocker || opts.snapshotId != null || (opts.skipCloudInit ?? false);
+}

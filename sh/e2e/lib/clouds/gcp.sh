@@ -18,11 +18,48 @@ _GCP_INSTANCE_APP=""
 # _gcp_validate_env
 #
 # Check that the gcloud CLI is installed and credentials are valid.
-# Requires GCP_PROJECT to be set.
+# Requires GCP_PROJECT to be set. Loads GCP_PROJECT and GCP_ZONE from
+# ~/.config/spawn/gcp.json if not already in the environment.
 # Returns 0 on success, 1 on failure.
 # ---------------------------------------------------------------------------
 _gcp_validate_env() {
   local missing=0
+
+  # Load GCP_PROJECT and GCP_ZONE from ~/.config/spawn/gcp.json if not set.
+  # This allows the QA VM to configure the correct zone without env var exports.
+  local _gcp_config="${HOME}/.config/spawn/gcp.json"
+  if [ -f "${_gcp_config}" ]; then
+    if [ -z "${GCP_PROJECT:-}" ]; then
+      local _proj
+      if command -v jq >/dev/null 2>&1; then
+        _proj=$(jq -r '.GCP_PROJECT // "" | select(. != null)' "${_gcp_config}" 2>/dev/null)
+      else
+        _proj=$(_FILE="${_gcp_config}" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d.GCP_PROJECT || '');
+" 2>/dev/null)
+      fi
+      if [ -n "${_proj}" ]; then
+        export GCP_PROJECT="${_proj}"
+      fi
+    fi
+    if [ -z "${GCP_ZONE:-}" ]; then
+      local _zone
+      if command -v jq >/dev/null 2>&1; then
+        _zone=$(jq -r '.GCP_ZONE // "" | select(. != null)' "${_gcp_config}" 2>/dev/null)
+      else
+        _zone=$(_FILE="${_gcp_config}" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d.GCP_ZONE || '');
+" 2>/dev/null)
+      fi
+      if [ -n "${_zone}" ]; then
+        export GCP_ZONE="${_zone}"
+      fi
+    fi
+  fi
 
   if ! command -v gcloud >/dev/null 2>&1; then
     log_err "gcloud CLI not found. Install from https://cloud.google.com/sdk/docs/install"
@@ -158,24 +195,25 @@ _gcp_exec() {
     fi
   fi
 
-  # Base64-encode the command to prevent shell injection when passed as an
-  # SSH argument. The encoded string contains only [A-Za-z0-9+/=] characters,
-  # making it safe to embed in single quotes. Stdin is preserved for callers
-  # that pipe data into cloud_exec.
+  # Base64-encode the command and pipe it via stdin to avoid any shell
+  # interpolation on the remote side. This is structurally immune to
+  # injection regardless of the command content.
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
 
   # Validate base64 output contains only safe characters (defense-in-depth).
-  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption
-  # and ensures the value cannot break out of single quotes in the SSH command.
+  # Standard base64 only produces [A-Za-z0-9+/=]. This rejects any corruption.
   if ! printf '%s' "${encoded_cmd}" | grep -qE '^[A-Za-z0-9+/=]+$'; then
     log_err "Invalid base64 encoding of command for SSH exec"
     return 1
   fi
 
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  # Pass encoded command via stdin instead of shell interpolation.
+  # This completely avoids command injection — the remote side only sees
+  # stdin data, never an interpolated shell string.
+  printf '%s' "${encoded_cmd}" | ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "${ssh_user}@${_GCP_INSTANCE_IP}" "printf '%s' '${encoded_cmd}' | base64 -d | bash"
+      "${ssh_user}@${_GCP_INSTANCE_IP}" "base64 -d | bash"
 }
 
 # ---------------------------------------------------------------------------

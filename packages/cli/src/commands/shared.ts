@@ -31,7 +31,9 @@ export function handleCancel(): never {
 }
 
 async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
-  const s = p.spinner();
+  const s = p.spinner({
+    output: process.stderr,
+  });
   s.start(msg);
   const r = await asyncTryCatch(fn);
   s.stop(r.ok ? (doneMsg ?? msg.replace(/\.{3}$/, "")) : pc.red("Failed"));
@@ -160,6 +162,9 @@ export function findClosestKeyByNameOrKey(
 function resolveEntityKey(manifest: Manifest, input: string, kind: "agent" | "cloud"): string | null {
   const collection = getEntityCollection(manifest, kind);
   if (collection[input]) {
+    if (kind === "agent" && manifest.agents[input].disabled) {
+      return null;
+    }
     return input;
   }
   const keys = getEntityKeys(manifest, kind);
@@ -283,6 +288,13 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   const def = ENTITY_DEFS[kind];
   const collection = getEntityCollection(manifest, kind);
   if (collection[value]) {
+    if (kind === "agent" && manifest.agents[value].disabled) {
+      p.log.error(`${pc.bold(manifest.agents[value].name)} is temporarily disabled.`);
+      if (manifest.agents[value].disabled_reason) {
+        p.log.info(manifest.agents[value].disabled_reason);
+      }
+      return false;
+    }
     return true;
   }
 

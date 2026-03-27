@@ -267,7 +267,7 @@ RULES:
 3. When asked for a name with a default shown in [brackets], press Enter to accept
 4. When shown a selection menu (with arrows/highlights), press Enter to accept the default
 5. If you see "Try again? (Y/n)" or similar retry prompts, respond with "y"
-6. When you see "is ready" or "Starting agent", respond with <done>
+6. When you see "Starting agent..." or "setup completed successfully", respond with <done>
 7. If something is clearly broken and unrecoverable, respond with <fail:reason>
 8. If the terminal is still loading/processing, respond with <wait>
 

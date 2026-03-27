@@ -13,12 +13,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Install ShellCheck
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+          # Pin shellcheck v0.10.0 for reproducible CI — verifies SHA256 before install
+          SHELLCHECK_VERSION="0.10.0"
+          SHELLCHECK_SHA256="6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87"
+          TARBALL="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -sSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${TARBALL}" -o /tmp/${TARBALL}
+          echo "${SHELLCHECK_SHA256}  /tmp/${TARBALL}" | sha256sum -c
+          tar -xJf "/tmp/${TARBALL}" -C /tmp "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          sudo mv "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
 
       - name: Run ShellCheck on all bash scripts
         run: |
@@ -41,16 +47,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
 
       - name: Install dependencies
         run: bun install
 
       - name: Run Biome check (all packages)
-        run: bunx @biomejs/biome check packages/cli/src/ .claude/scripts/ .claude/skills/setup-spa/
+        run: bunx @biomejs/biome check packages/cli/src/ packages/shared/src/ .claude/scripts/ .claude/skills/setup-spa/
 
   macos-compat:
     name: macOS Compatibility
@@ -58,7 +64,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Run macOS compat linter
         run: bash sh/test/macos-compat.sh

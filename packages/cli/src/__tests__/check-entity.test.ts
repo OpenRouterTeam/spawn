@@ -1,7 +1,7 @@
 import type { Manifest } from "../manifest";
 
 import { beforeEach, describe, expect, it } from "bun:test";
-import { checkEntity } from "../commands/index.js";
+import { checkEntity, resolveAgentKey } from "../commands/index.js";
 
 /**
  * Tests for checkEntity (commands/shared.ts).
@@ -380,6 +380,76 @@ describe("checkEntity", () => {
     it("should not suggest cross-kind match for values far from any candidate", () => {
       expect(checkEntity(manifest, "zzzzzzz", "agent")).toBe(false);
       expect(checkEntity(manifest, "zzzzzzz", "cloud")).toBe(false);
+    });
+  });
+
+  // ── Disabled agents ─────────────────────────────────────────────────────
+
+  describe("disabled agents", () => {
+    let disabledManifest: Manifest;
+
+    beforeEach(() => {
+      disabledManifest = {
+        agents: {
+          claude: {
+            name: "Claude Code",
+            description: "AI coding assistant",
+            url: "https://claude.ai",
+            install: "npm install -g claude",
+            launch: "claude",
+            env: {
+              ANTHROPIC_API_KEY: "test",
+            },
+          },
+          cursor: {
+            name: "Cursor CLI",
+            description: "AI coding agent",
+            url: "https://cursor.com",
+            install: "curl https://cursor.com/install | bash",
+            launch: "agent",
+            env: {},
+            disabled: true,
+            disabled_reason: "Cursor CLI uses a proprietary protocol.",
+          },
+        },
+        clouds: {
+          sprite: {
+            name: "Sprite",
+            description: "Lightweight VMs",
+            price: "test",
+            url: "https://sprite.sh",
+            type: "vm",
+            auth: "SPRITE_TOKEN",
+            provision_method: "api",
+            exec_method: "ssh",
+            interactive_method: "ssh",
+          },
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+          "sprite/cursor": "implemented",
+        },
+      };
+    });
+
+    it("checkEntity returns false for a disabled agent", () => {
+      expect(checkEntity(disabledManifest, "cursor", "agent")).toBe(false);
+    });
+
+    it("checkEntity returns true for an enabled agent in the same manifest", () => {
+      expect(checkEntity(disabledManifest, "claude", "agent")).toBe(true);
+    });
+
+    it("resolveAgentKey returns null for a disabled agent", () => {
+      expect(resolveAgentKey(disabledManifest, "cursor")).toBeNull();
+    });
+
+    it("resolveAgentKey resolves an enabled agent normally", () => {
+      expect(resolveAgentKey(disabledManifest, "claude")).toBe("claude");
+    });
+
+    it("checkEntity still works for clouds even when agents are disabled", () => {
+      expect(checkEntity(disabledManifest, "sprite", "cloud")).toBe(true);
     });
   });
 

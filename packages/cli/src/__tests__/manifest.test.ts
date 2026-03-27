@@ -1,8 +1,8 @@
 import type { Manifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   _resetCacheForTesting,
@@ -171,14 +171,112 @@ describe("manifest", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    it("returns in-memory cache on second call without fetching", async () => {
-      const fetchMock = mock(async () => new Response(JSON.stringify(mockManifest)));
-      global.fetch = fetchMock;
-      await loadManifest();
-      const fetchCount = fetchMock.mock.calls.length;
-      await loadManifest();
-      expect(fetchMock.mock.calls.length).toBe(fetchCount);
+    it("falls back to stale cache when fetch fails", async () => {
+      const cacheDir = join(env.testDir, "spawn");
+      mkdirSync(cacheDir, {
+        recursive: true,
+      });
+      writeFileSync(join(cacheDir, "manifest.json"), JSON.stringify(mockManifest));
+
+      _resetCacheForTesting();
+      global.fetch = mock(
+        async () =>
+          new Response("error", {
+            status: 500,
+          }),
+      );
+
+      const m = await loadManifest(true);
+      expect(m.agents.claude).toBeDefined();
+      expect(isStaleCache()).toBe(true);
     });
+
+    it("throws when no cache and fetch fails", async () => {
+      _resetCacheForTesting();
+      global.fetch = mock(
+        async () =>
+          new Response("error", {
+            status: 500,
+          }),
+      );
+
+      const cacheFile = join(env.testDir, "spawn", "manifest.json");
+      if (existsSync(cacheFile)) {
+        rmSync(cacheFile);
+      }
+
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+    });
+
+    const invalidManifestCases: Array<{
+      label: string;
+      fetchImpl: () => Promise<Response>;
+    }> = [
+      {
+        label: "non-manifest shape",
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              not: "a manifest",
+            }),
+          ),
+      },
+      {
+        label: "string agents field",
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              agents: "claude",
+              clouds: {},
+              matrix: {},
+            }),
+          ),
+      },
+      {
+        label: "array clouds field",
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: [
+                "sprite",
+                "hetzner",
+              ],
+              matrix: {},
+            }),
+          ),
+      },
+      {
+        label: "numeric matrix field",
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: {},
+              matrix: 42,
+            }),
+          ),
+      },
+      {
+        label: "network error",
+        fetchImpl: async () => {
+          throw new Error("Network timeout");
+        },
+      },
+    ];
+
+    for (const { label, fetchImpl } of invalidManifestCases) {
+      it(`rejects invalid manifest (${label})`, async () => {
+        const consoleSpy = spyOn(console, "error").mockImplementation(() => {});
+        global.fetch = mock(fetchImpl);
+        const cacheFile = join(env.testDir, "spawn", "manifest.json");
+        if (existsSync(cacheFile)) {
+          rmSync(cacheFile);
+        }
+        await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
+        consoleSpy.mockRestore();
+      });
+    }
   });
 });
 

@@ -26,6 +26,7 @@ import {
   getServerNameFromEnv,
   jsonEscape,
   loadApiToken,
+  logDebug,
   logError,
   logInfo,
   logStep,
@@ -250,9 +251,13 @@ export async function ensureSshKey(): Promise<void> {
 
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
+    if (!fingerprint) {
+      logWarn(`Could not determine fingerprint for SSH key '${key.name}'`);
+      continue;
+    }
     const pubKey = readFileSync(key.pubPath, "utf-8").trim();
 
-    const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
+    const alreadyRegistered = sshKeys.some((k) => k.fingerprint === fingerprint);
 
     if (alreadyRegistered) {
       logInfo(`SSH key '${key.name}' already registered with Hetzner`);
@@ -834,21 +839,38 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
     {
       stdio: [
         "ignore",
-        "inherit",
-        "inherit",
+        "pipe",
+        "pipe",
       ],
     },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  const runResult = await asyncTryCatch(() => proc.exited);
+  // Drain both pipes to prevent buffer deadlocks, then await exit
+  const runResult = await asyncTryCatch(async () => {
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    return {
+      stdout,
+      stderr,
+      exitCode,
+    };
+  });
   clearTimeout(timer);
   if (!runResult.ok) {
     throw runResult.error;
   }
-  if (runResult.data !== 0) {
-    throw new Error(`run_server failed (exit ${runResult.data}): ${cmd}`);
+  if (runResult.data.exitCode !== 0) {
+    // Show captured stderr on failure for debugging
+    const stderr = runResult.data.stderr.trim();
+    if (stderr) {
+      logDebug(stderr);
+    }
+    throw new Error(`run_server failed (exit ${runResult.data.exitCode}): ${cmd}`);
   }
 }
 
@@ -925,7 +947,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' LC_ALL='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 

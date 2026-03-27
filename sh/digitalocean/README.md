@@ -52,6 +52,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/hermes.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/junie.sh)
 ```
 
+#### Cursor CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/cursor.sh)
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |

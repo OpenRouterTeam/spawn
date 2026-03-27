@@ -220,6 +220,7 @@ function reExecWithArgs(): void {
       env: {
         ...process.env,
         SPAWN_NO_UPDATE_CHECK: "1",
+        SPAWN_CLI_UPDATED: "1",
       },
     }),
   );
@@ -231,11 +232,21 @@ function reExecWithArgs(): void {
   }
 }
 
-function performAutoUpdate(latestVersion: string): void {
+function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
   printUpdateBanner(latestVersion);
 
   const installUrl = getInstallScriptUrl(SPAWN_CDN);
   const installCmd = getInstallCmd(SPAWN_CDN);
+
+  // When JSON output is active, redirect install script stdout to stderr to
+  // avoid polluting stdout with [spawn] install messages before the JSON result.
+  const installStdio: ExecFileSyncOptions["stdio"] = jsonOutput
+    ? [
+        "pipe",
+        process.stderr,
+        process.stderr,
+      ]
+    : "inherit";
 
   const updateResult = tryCatch(() => {
     // Fetch script bytes with curl (available on all modern platforms)
@@ -272,7 +283,7 @@ function performAutoUpdate(latestVersion: string): void {
             tmpFile,
           ],
           {
-            stdio: "inherit",
+            stdio: installStdio,
           },
         ),
       );
@@ -290,7 +301,7 @@ function performAutoUpdate(latestVersion: string): void {
           scriptContent,
         ],
         {
-          stdio: "inherit",
+          stdio: installStdio,
         },
       );
     }
@@ -318,8 +329,11 @@ function performAutoUpdate(latestVersion: string): void {
 /**
  * Check for updates and auto-update if available.
  * Caches successful checks for 1 hour to avoid blocking every run with network I/O.
+ *
+ * @param jsonOutput - When true, redirects install script stdout to stderr so
+ *   [spawn] install messages do not pollute structured JSON output on stdout.
  */
-export async function checkForUpdates(): Promise<void> {
+export async function checkForUpdates(jsonOutput = false): Promise<void> {
   // Skip in test environment
   if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
     return;
@@ -350,7 +364,7 @@ export async function checkForUpdates(): Promise<void> {
 
   // Auto-update if newer version is available
   if (compareVersions(VERSION, latestVersion)) {
-    const r = tryCatch(() => performAutoUpdate(latestVersion));
+    const r = tryCatch(() => performAutoUpdate(latestVersion, jsonOutput));
     if (!r.ok) {
       logWarn("Auto-update encountered an error");
       logDebug(getErrorMessage(r.error));

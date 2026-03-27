@@ -24,8 +24,10 @@ import {
 
 const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
 
-/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs. */
-const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "300", 10);
+/** Timeout for the `sprite create` API call (seconds). Prevents indefinite hangs.
+ * Raised from 300s to 600s to accommodate slower Sprite API responses in long
+ * E2E runs where HTTP timeouts were observed (net/http: Client.Timeout). #2934 */
+const CREATE_TIMEOUT_SECS = Number.parseInt(process.env.SPRITE_CREATE_TIMEOUT || "600", 10);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -84,10 +86,14 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
       break;
     }
 
-    // Only retry on transient network errors
-    if (/TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout/i.test(msg)) {
+    // Only retry on transient network errors and auth expiry (#2934)
+    if (
+      /TLS handshake timeout|connection closed|connection reset|connection refused|i\/o timeout|Client\.Timeout|request canceled|authentication failed/i.test(
+        msg,
+      )
+    ) {
       logWarn(`${desc}: Transient error, retrying (${attempt}/${maxRetries})...`);
-      await sleep(3000);
+      await sleep(3000 * attempt);
       continue;
     }
 
@@ -570,6 +576,12 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
   // Compute the parent directory in TypeScript to avoid shell interpolation
   const parentDir = posixDirname(normalizedRemote);
 
+  // 180s timeout — prevents indefinite hangs during tarball uploads in fast mode.
+  // Without this, large file uploads (e.g. 300MB openclaw tarball) or stalled
+  // Sprite connections can block the entire provisioning pipeline past the
+  // E2E provision timeout (720s), causing agent binary not-found failures.
+  const UPLOAD_TIMEOUT_MS = 180_000;
+
   await spriteRetry("sprite upload", async () => {
     // Upload the file to the temp path, then mkdir + mv using array args
     // to avoid shell string interpolation (command injection risk).
@@ -598,8 +610,13 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
     );
     // Drain stderr before awaiting exit to prevent pipe buffer deadlock
     const stderrText = new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
+    const uploadTimer = setTimeout(() => killWithTimeout(proc), UPLOAD_TIMEOUT_MS);
+    const uploadResult = await asyncTryCatch(() => proc.exited);
+    clearTimeout(uploadTimer);
+    if (!uploadResult.ok) {
+      throw new Error(`upload timed out for ${remotePath}`);
+    }
+    if (uploadResult.data !== 0) {
       throw new Error(`upload mkdir failed for ${remotePath}: ${await stderrText}`);
     }
 
@@ -626,8 +643,13 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
       },
     );
     const mvStderrText = new Response(mvProc.stderr).text();
-    const mvExitCode = await mvProc.exited;
-    if (mvExitCode !== 0) {
+    const mvTimer = setTimeout(() => killWithTimeout(mvProc), 60_000);
+    const mvResult = await asyncTryCatch(() => mvProc.exited);
+    clearTimeout(mvTimer);
+    if (!mvResult.ok) {
+      throw new Error(`upload mv timed out for ${remotePath}`);
+    }
+    if (mvResult.data !== 0) {
       throw new Error(`upload mv failed for ${remotePath}: ${await mvStderrText}`);
     }
   });

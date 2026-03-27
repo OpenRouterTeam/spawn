@@ -140,8 +140,7 @@ describe("getOrPromptApiKey", () => {
 
   it("throws after 3 failed OAuth + manual attempts", async () => {
     // Mock Bun.serve to fail (so OAuth flow returns null)
-    // biome-ignore lint: test mock
-    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+    const serveSpy = spyOn(Bun, "serve").mockImplementation(() => {
       throw new Error("port in use");
     });
     // Mock p.text to return empty (manual entry fails)
@@ -168,8 +167,7 @@ describe("getOrPromptApiKey", () => {
     process.env.SPAWN_ENABLED_STEPS = "github";
 
     // OAuth will fail, manual will fail => throws
-    // biome-ignore lint: test mock
-    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+    const serveSpy = spyOn(Bun, "serve").mockImplementation(() => {
       throw new Error("port in use");
     });
     textSpy.mockImplementation(async () => "");
@@ -208,8 +206,7 @@ describe("getOrPromptApiKey", () => {
 
   it("returns key from manual entry via prompt after OAuth fails", async () => {
     // Simulate OAuth failure via Bun.serve throwing
-    // biome-ignore lint: test mock
-    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+    const serveSpy = spyOn(Bun, "serve").mockImplementation(() => {
       throw new Error("port in use");
     });
     const validKey = "sk-or-v1-" + "f".repeat(64);
@@ -223,8 +220,7 @@ describe("getOrPromptApiKey", () => {
   });
 
   it("sets OPENROUTER_API_KEY in process.env on success from manual entry", async () => {
-    // biome-ignore lint: test mock
-    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+    const serveSpy = spyOn(Bun, "serve").mockImplementation(() => {
       throw new Error("port in use");
     });
     const validKey = "sk-or-v1-" + "e".repeat(64);
@@ -239,8 +235,7 @@ describe("getOrPromptApiKey", () => {
   });
 
   it("accepts non-standard key format when user confirms", async () => {
-    // biome-ignore lint: test mock
-    const serveSpy = spyOn(Bun, "serve" as never).mockImplementation(() => {
+    const serveSpy = spyOn(Bun, "serve").mockImplementation(() => {
       throw new Error("port in use");
     });
     let callCount = 0;

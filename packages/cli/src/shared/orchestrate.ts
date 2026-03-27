@@ -1,22 +1,31 @@
 // shared/orchestrate.ts — Shared orchestration pipeline for deploying agents
 // Each cloud implements CloudOrchestrator and calls runOrchestration().
 
-import type { VMConnection } from "../history.js";
+import type { SpawnRecord, VMConnection } from "../history.js";
 import type { CloudRunner } from "./agent-setup.js";
 import type { AgentConfig } from "./agents.js";
 import type { SshTunnelHandle } from "./ssh.js";
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { getErrorMessage } from "@openrouter/spawn-shared";
 import * as v from "valibot";
-import { generateSpawnId, saveLaunchCmd, saveMetadata, saveSpawnRecord } from "../history.js";
+import {
+  generateSpawnId,
+  mergeChildHistory,
+  SpawnRecordSchema,
+  saveLaunchCmd,
+  saveMetadata,
+  saveSpawnRecord,
+} from "../history.js";
 import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
-import { downloadTarballLocally, tryTarballInstall, uploadAndExtractTarball } from "./agent-tarball.js";
+import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
-import { getSpawnPreferencesPath } from "./paths.js";
+import { parseJsonWith } from "./parse.js";
+import { getSpawnCloudConfigPath, getSpawnPreferencesPath, getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatch } from "./result.js";
 import { isWindows } from "./shell.js";
+import { injectSpawnSkill } from "./spawn-skill.js";
 import { sleep, startSshTunnel } from "./ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys.js";
 import {
@@ -38,6 +47,28 @@ import {
 export const DOCKER_CONTAINER_NAME = "spawn-agent";
 /** Docker registry hosting spawn agent images. */
 export const DOCKER_REGISTRY = "ghcr.io/openrouterteam";
+
+/** Wrap a command to run inside the Docker container instead of the host. */
+function makeDockerExec(cmd: string): string {
+  if (!cmd || cmd.length === 0) {
+    throw new Error("makeDockerExec: command must be non-empty");
+  }
+  return `docker exec ${DOCKER_CONTAINER_NAME} bash -c ${shellQuote(cmd)}`;
+}
+
+/** Wrap a CloudRunner so all commands and uploads target the Docker container. */
+export function makeDockerRunner(hostRunner: CloudRunner): CloudRunner {
+  return {
+    runServer: (cmd: string, timeoutSecs?: number) => hostRunner.runServer(makeDockerExec(cmd), timeoutSecs),
+    uploadFile: async (localPath: string, remotePath: string) => {
+      await hostRunner.uploadFile(localPath, remotePath);
+      await hostRunner.runServer(
+        `docker cp ${shellQuote(remotePath)} ${DOCKER_CONTAINER_NAME}:${shellQuote(remotePath)}`,
+      );
+    },
+    downloadFile: hostRunner.downloadFile,
+  };
+}
 
 export interface CloudOrchestrator {
   cloudName: string;
@@ -87,6 +118,127 @@ function wrapWithRestartLoop(cmd: string): string {
   ].join("\n");
 }
 
+// ── Recursive spawn helpers ──────────────────────────────────────────────────
+
+/** Install the spawn CLI on a remote VM. */
+export async function installSpawnCli(runner: CloudRunner): Promise<void> {
+  logStep("Installing spawn CLI on VM...");
+  // Build PATH explicitly — non-interactive bash skips .bashrc (PS1 guard),
+  // and some platforms (Sprite) have a broken bun shim that finds via
+  // `command -v` but doesn't actually work. We prepend all known bun
+  // locations so the real binary is found first, then test `bun --version`
+  // (not just existence) and install bun fresh if it doesn't work.
+  const installCmd = [
+    'export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"',
+    'export PATH="$BUN_INSTALL/bin:$HOME/.local/bin:$HOME/.npm-global/bin:/.sprite/languages/bun/bin:/usr/local/bin:$PATH"',
+    'if ! bun --version >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash && export PATH="$HOME/.bun/bin:$PATH"; fi',
+    "curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash",
+  ].join("; ");
+  const result = await asyncTryCatch(() =>
+    withRetry("spawn CLI install", () => wrapSshCall(runner.runServer(installCmd)), 2, 5),
+  );
+  if (!result.ok) {
+    logWarn("Spawn CLI install failed — recursive spawning will not be available on this VM");
+  } else {
+    logInfo("Spawn CLI installed on VM");
+  }
+}
+
+/** Copy local cloud credentials to the remote VM for recursive spawning. */
+export async function delegateCloudCredentials(runner: CloudRunner): Promise<void> {
+  logStep("Delegating cloud credentials to VM...");
+
+  const filesToDelegate: {
+    localPath: string;
+    remotePath: string;
+  }[] = [];
+
+  // Delegate ALL cloud credentials so the child VM can spawn on any cloud,
+  // not just the one the parent is running on.
+  const cloudNames = [
+    "hetzner",
+    "digitalocean",
+    "aws",
+    "gcp",
+    "sprite",
+  ];
+  for (const cloud of cloudNames) {
+    const cloudConfigPath = getSpawnCloudConfigPath(cloud);
+    if (existsSync(cloudConfigPath)) {
+      filesToDelegate.push({
+        localPath: cloudConfigPath,
+        remotePath: `~/.config/spawn/${cloud}.json`,
+      });
+    }
+  }
+
+  // OpenRouter credentials (always needed for child spawns)
+  const orConfigPath = getSpawnCloudConfigPath("openrouter");
+  if (existsSync(orConfigPath)) {
+    filesToDelegate.push({
+      localPath: orConfigPath,
+      remotePath: "~/.config/spawn/openrouter.json",
+    });
+  }
+
+  if (filesToDelegate.length === 0) {
+    logWarn("No credentials to delegate — child spawns may require manual auth");
+    return;
+  }
+
+  // Ensure config dir exists on VM
+  const mkdirResult = await asyncTryCatch(() =>
+    runner.runServer("mkdir -p ~/.config/spawn && chmod 700 ~/.config/spawn"),
+  );
+  if (!mkdirResult.ok) {
+    logWarn("Could not create config directory on VM");
+    return;
+  }
+
+  for (const file of filesToDelegate) {
+    const content = readFileSync(file.localPath, "utf-8");
+    const b64 = Buffer.from(content).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
+      throw new Error("Unexpected characters in base64 output");
+    }
+    const writeResult = await asyncTryCatch(() =>
+      runner.runServer(`printf '%s' '${b64}' | base64 -d > ${file.remotePath} && chmod 600 ${file.remotePath}`),
+    );
+    if (!writeResult.ok) {
+      logWarn(`Could not delegate ${file.remotePath}`);
+    }
+  }
+
+  logInfo("Cloud credentials delegated to VM");
+}
+
+/** Get parent_id and depth fields for spawn records (set when running inside a child VM). */
+function getParentFields(): {
+  parent_id?: string;
+  depth?: number;
+} {
+  const parentId = process.env.SPAWN_PARENT_ID;
+  const depth = Number(process.env.SPAWN_DEPTH) || 0;
+  return parentId
+    ? {
+        parent_id: parentId,
+        depth,
+      }
+    : depth > 0
+      ? {
+          depth,
+        }
+      : {};
+}
+
+/** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
+export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
+  const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
+  envPairs.push(`SPAWN_PARENT_ID=${spawnId}`);
+  envPairs.push(`SPAWN_DEPTH=${currentDepth + 1}`);
+  envPairs.push("SPAWN_BETA=recursive");
+}
+
 /** Options for runOrchestration (used in tests to inject mock dependencies). */
 export interface OrchestrationOptions {
   tryTarball?: (runner: CloudRunner, agentName: string) => Promise<boolean>;
@@ -100,6 +252,7 @@ export interface OrchestrationOptions {
  */
 const PreferencesSchema = v.object({
   models: v.optional(v.record(v.string(), v.string())),
+  starPromptShownAt: v.optional(v.string()),
 });
 
 function loadPreferredModel(agentName: string): string | null {
@@ -173,6 +326,7 @@ export async function runOrchestration(
               name: spawnName,
             }
           : {}),
+        ...getParentFields(),
         connection: conn,
       });
       await cloud.waitForReady();
@@ -182,7 +336,7 @@ export async function runOrchestration(
     const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
 
     // These all run concurrently with server boot
-    const [bootResult, apiKeyResult, , , tarballResult] = await Promise.allSettled([
+    const [bootResult, apiKeyResult] = await Promise.allSettled([
       serverBootPromise,
       resolveApiKey(agentName, cloud.cloudName),
       cloud.checkAccountReady
@@ -195,7 +349,6 @@ export async function runOrchestration(
         : Promise.resolve({
             ok: true,
           }),
-      !cloud.skipAgentInstall && !agent.skipTarball ? downloadTarballLocally(agentName) : Promise.resolve(null),
     ]);
 
     // Server boot must succeed — retry if it failed
@@ -216,6 +369,7 @@ export async function runOrchestration(
               name: spawnName2,
             }
           : {}),
+        ...getParentFields(),
         connection,
       });
       await cloud.waitForReady();
@@ -239,19 +393,17 @@ export async function runOrchestration(
     if (modelId && agent.modelEnvVar) {
       envPairs.push(`${agent.modelEnvVar}=${modelId}`);
     }
+    if (betaFeatures.has("recursive")) {
+      appendRecursiveEnvVars(envPairs, spawnId);
+    }
     const envContent = generateEnvConfig(envPairs);
 
-    // Install agent — parallel tarball upload, fallback to remote, then live
+    // Install agent — remote tarball, fallback to live install
     if (cloud.skipAgentInstall) {
       logInfo("Snapshot boot — skipping agent install");
     } else {
       let installed = false;
-      const localTarball = tarballResult.status === "fulfilled" ? tarballResult.value : null;
-      if (localTarball) {
-        installed = await uploadAndExtractTarball(cloud.runner, localTarball.localPath);
-        localTarball.cleanup();
-      }
-      if (!installed && useTarball && !agent.skipTarball) {
+      if (useTarball && !agent.skipTarball) {
         const tarball = options?.tryTarball ?? tryTarballInstall;
         installed = await tarball(cloud.runner, agentName);
       }
@@ -325,6 +477,7 @@ export async function runOrchestration(
             name: spawnName,
           }
         : {}),
+      ...getParentFields(),
       connection,
     });
 
@@ -342,6 +495,9 @@ export async function runOrchestration(
     const envPairs = agent.envVars(apiKey);
     if (modelId && agent.modelEnvVar) {
       envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+    }
+    if (betaFeatures.has("recursive")) {
+      appendRecursiveEnvVars(envPairs, spawnId);
     }
     const envContent = generateEnvConfig(envPairs);
 
@@ -375,6 +531,9 @@ export async function runOrchestration(
 async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const isLocalWindows = cloud.cloudName === "local" && isWindows();
   const envSetupCmd = isLocalWindows
@@ -436,6 +595,20 @@ async function postInstall(
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
     await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+  }
+
+  // Spawn CLI + skill injection (recursive spawn)
+  // The "spawn" step is defaultOn when --beta recursive is active, so it should
+  // run when no explicit steps are selected (!enabledSteps) AND the beta flag is set.
+  const betaFeaturesPost = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+  if (
+    cloud.cloudName !== "local" &&
+    betaFeaturesPost.has("recursive") &&
+    (!enabledSteps || enabledSteps.has("spawn"))
+  ) {
+    await installSpawnCli(cloud.runner);
+    await delegateCloudCredentials(cloud.runner);
+    await injectSpawnSkill(cloud.runner, agentName);
   }
 
   // Pre-launch hooks (retry loop)
@@ -546,10 +719,20 @@ async function postInstall(
     if (tunnelHandle) {
       tunnelHandle.stop();
     }
+    if (cloud.cloudName !== "local") {
+      await pullChildHistory(cloud.runner, spawnId);
+    }
     process.exit(0);
   }
 
-  logStep("Starting agent...");
+  logStep("Provisioning complete. Connecting to agent session...");
+
+  // Reset terminal state before handing off to the interactive SSH session.
+  // @clack/prompts may have left the cursor hidden or set ANSI attributes
+  // (e.g. color, bold) that would corrupt the remote agent's TUI rendering.
+  if (process.stderr.isTTY) {
+    process.stderr.write("\x1b[?25h\x1b[0m");
+  }
 
   prepareStdinForHandoff();
 
@@ -585,5 +768,99 @@ async function postInstall(
   if (tunnelHandle) {
     tunnelHandle.stop();
   }
+
+  // Pull child's spawn history back to the parent for `spawn tree`
+  if (cloud.cloudName !== "local") {
+    await pullChildHistory(cloud.runner, spawnId);
+  }
+
   process.exit(exitCode);
+}
+
+/**
+ * Pull spawn history from a child VM and merge it into local history.
+ * First tells the child to recursively pull from ITS children via
+ * `spawn pull-history`, then downloads the child's history.json.
+ * This enables `spawn tree` to show the full recursive hierarchy.
+ */
+async function pullChildHistory(runner: CloudRunner, parentSpawnId: string): Promise<void> {
+  const result = await asyncTryCatch(async () => {
+    const tmpPath = `${getTmpDir()}/child-history-${parentSpawnId}.json`;
+
+    // Recursive pull: tell the child to pull from ALL its children first.
+    const recursePull = await asyncTryCatch(() =>
+      runner.runServer(
+        'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"; spawn pull-history 2>/dev/null || true',
+        120,
+      ),
+    );
+    if (!recursePull.ok) {
+      logDebug("Recursive history pull skipped");
+    }
+
+    // Copy the child's history to a temp location then download
+    const copyResult = await asyncTryCatch(() =>
+      runner.runServer(
+        "cp ~/.spawn/history.json /tmp/_spawn_history.json 2>/dev/null || cp ~/.config/spawn/history.json /tmp/_spawn_history.json 2>/dev/null || echo '{}'  > /tmp/_spawn_history.json",
+      ),
+    );
+    if (!copyResult.ok) {
+      return;
+    }
+
+    await runner.downloadFile("/tmp/_spawn_history.json", tmpPath);
+
+    const json = readFileSync(tmpPath, "utf-8");
+    const ChildHistorySchema = v.object({
+      version: v.optional(v.number()),
+      records: v.array(SpawnRecordSchema),
+    });
+    const parsed = parseJsonWith(json, ChildHistorySchema);
+    if (!parsed || parsed.records.length === 0) {
+      return;
+    }
+
+    const validRecords: SpawnRecord[] = [];
+    for (const r of parsed.records) {
+      if (r.id) {
+        validRecords.push({
+          id: r.id,
+          agent: r.agent,
+          cloud: r.cloud,
+          timestamp: r.timestamp,
+          ...(r.name
+            ? {
+                name: r.name,
+              }
+            : {}),
+          ...(r.parent_id
+            ? {
+                parent_id: r.parent_id,
+              }
+            : {}),
+          ...(r.depth !== undefined
+            ? {
+                depth: r.depth,
+              }
+            : {}),
+          ...(r.connection
+            ? {
+                connection: r.connection,
+              }
+            : {}),
+        });
+      }
+    }
+
+    if (validRecords.length > 0) {
+      mergeChildHistory(parentSpawnId, validRecords);
+      logInfo(`Pulled ${validRecords.length} spawn record(s) from child VM`);
+    }
+
+    tryCatch(() => unlinkSync(tmpPath));
+  });
+
+  if (!result.ok) {
+    logDebug(`Could not pull child history: ${getErrorMessage(result.error)}`);
+  }
 }

@@ -449,7 +449,9 @@ export async function checkAccountStatus(): Promise<void> {
       if (existingDroplets.ok) {
         const currentCount = existingDroplets.data.length;
         if (currentCount >= dropletLimit) {
-          const msg = `DigitalOcean droplet limit reached: ${currentCount}/${dropletLimit} droplets in use. Delete existing droplets or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase`;
+          // List existing droplet names to help operators identify which to delete
+          const dropletNames = existingDroplets.data.map((d) => (isString(d.name) ? d.name : "unknown")).join(", ");
+          const msg = `DigitalOcean droplet limit reached: ${currentCount}/${dropletLimit} droplets in use. Existing: [${dropletNames}]. Delete existing droplets at ${DO_DASHBOARD_URL} or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase`;
           logWarn(msg);
           if (process.env.SPAWN_NON_INTERACTIVE === "1") {
             throw new Error(msg);
@@ -913,6 +915,19 @@ const DROPLET_SIZES: DropletSize[] = [
 ];
 
 export const DEFAULT_DROPLET_SIZE = "s-2vcpu-2gb";
+
+/** Extract RAM in GB from a DO slug like "s-2vcpu-4gb" or "s-2vcpu-4gb-intel". Returns 0 if unparseable. */
+export function slugRamGb(slug: string): number {
+  const match = slug.match(/-(\d+)gb/);
+  return match ? Number(match[1]) : 0;
+}
+
+/** Agents that need more than the default 2GB RAM (e.g. openclaw-plugins OOMs on 2GB) */
+export const AGENT_MIN_SIZE: Record<string, string> = {
+  // s-2vcpu-4gb is used (not s-2vcpu-4gb-intel) because the intel variant
+  // is no longer available in nyc3 (the default E2E region). Both offer 2 vCPUs and 4GB RAM.
+  openclaw: "s-2vcpu-4gb",
+};
 
 // ─── Region Options ──────────────────────────────────────────────────────────
 
@@ -1478,7 +1493,7 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   }
   const serverIp = ip || _state.serverIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM='${term}' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
+  const fullCmd = `export TERM='${term}' LANG='C.UTF-8' PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${shellQuote(cmd)}`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = spawnInteractive([

@@ -37,7 +37,7 @@
       "license": "Proprietary",
       "created": "2025-02",
       "added": "2025-06",
-      "github_stars": 81306,
+      "github_stars": 81694,
       "stars_updated": "2026-03-23",
       "language": "Shell",
       "runtime": "node",
@@ -77,7 +77,7 @@
       "license": "MIT",
       "created": "2025-11",
       "added": "2025-11",
-      "github_stars": 330264,
+      "github_stars": 332099,
       "stars_updated": "2026-03-23",
       "language": "TypeScript",
       "runtime": "bun",
@@ -122,7 +122,7 @@
       "license": "Apache-2.0",
       "created": "2026-02",
       "added": "2025-12",
-      "github_stars": 28407,
+      "github_stars": 28521,
       "stars_updated": "2026-03-23",
       "language": "Rust",
       "runtime": "binary",
@@ -157,7 +157,7 @@
       "license": "Apache-2.0",
       "created": "2025-04",
       "added": "2025-07",
-      "github_stars": 66895,
+      "github_stars": 67099,
       "stars_updated": "2026-03-23",
       "language": "Rust",
       "runtime": "binary",
@@ -189,7 +189,7 @@
       "license": "MIT",
       "created": "2025-04",
       "added": "2025-08",
-      "github_stars": 128054,
+      "github_stars": 128767,
       "stars_updated": "2026-03-23",
       "language": "TypeScript",
       "runtime": "go",
@@ -223,7 +223,7 @@
       "license": "MIT",
       "created": "2025-03",
       "added": "2025-09",
-      "github_stars": 17063,
+      "github_stars": 17098,
       "stars_updated": "2026-03-23",
       "language": "TypeScript",
       "runtime": "node",
@@ -258,7 +258,7 @@
       "license": "MIT",
       "created": "2025-06",
       "added": "2026-02",
-      "github_stars": 10286,
+      "github_stars": 11368,
       "stars_updated": "2026-03-23",
       "language": "Python",
       "runtime": "python",
@@ -292,7 +292,7 @@
       "license": "Proprietary",
       "created": "2026-03",
       "added": "2026-03",
-      "github_stars": 112,
+      "github_stars": 114,
       "stars_updated": "2026-03-23",
       "language": "TypeScript",
       "runtime": "node",
@@ -303,6 +303,57 @@
         "terminal",
         "jetbrains",
         "byok"
+      ]
+    },
+    "cursor": {
+      "disabled": true,
+      "disabled_reason": "Cursor CLI uses a proprietary protocol (ConnectRPC) and validates API keys against Cursor's own servers. Cannot route through OpenRouter. Re-enable when Cursor adds BYOK/custom endpoint support for agent mode.",
+      "name": "Cursor CLI",
+      "description": "Cursor's terminal-based AI coding agent — autonomous coding with plan, agent, and ask modes",
+      "url": "https://cursor.com/cli",
+      "install": "curl https://cursor.com/install -fsS | bash",
+      "launch": "agent",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "CURSOR_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "config_files": {
+        "~/.cursor/cli-config.json": {
+          "version": 1,
+          "permissions": {
+            "allow": [
+              "Shell(*)",
+              "Read(*)",
+              "Write(*)",
+              "WebFetch(*)",
+              "Mcp(*)"
+            ],
+            "deny": []
+          }
+        }
+      },
+      "notes": "Works with OpenRouter via --endpoint flag pointing to openrouter.ai/api/v1 and CURSOR_API_KEY set to OpenRouter key. Binary installs to ~/.local/bin/agent.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/cursor.png",
+      "featured_cloud": [
+        "digitalocean",
+        "sprite"
+      ],
+      "creator": "Anysphere",
+      "repo": "anysphere/cursor",
+      "license": "Proprietary",
+      "created": "2025-01",
+      "added": "2026-03",
+      "github_stars": 10000,
+      "stars_updated": "2026-03-26",
+      "language": "TypeScript",
+      "runtime": "binary",
+      "category": "cli",
+      "tagline": "Cursor's AI coding agent — plan, build, and ship from the terminal",
+      "tags": [
+        "coding",
+        "terminal",
+        "agentic",
+        "cursor"
       ]
     }
   },
@@ -450,6 +501,12 @@
     "aws/junie": "implemented",
     "digitalocean/junie": "implemented",
     "gcp/junie": "implemented",
-    "sprite/junie": "implemented"
+    "sprite/junie": "implemented",
+    "local/cursor": "implemented",
+    "hetzner/cursor": "implemented",
+    "aws/cursor": "implemented",
+    "digitalocean/cursor": "implemented",
+    "gcp/cursor": "implemented",
+    "sprite/cursor": "implemented"
   }
 }

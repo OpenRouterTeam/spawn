@@ -143,7 +143,9 @@ export interface UpdateOptions {
 }
 
 export async function cmdUpdate(options?: UpdateOptions): Promise<void> {
-  const s = p.spinner();
+  const s = p.spinner({
+    output: process.stderr,
+  });
   s.start("Checking for updates...");
 
   const r = await asyncTryCatch(() => fetchRemoteVersion());

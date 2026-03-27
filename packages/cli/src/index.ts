@@ -15,6 +15,7 @@ import {
   cmdFeedback,
   cmdFix,
   cmdHelp,
+  cmdHistoryExport,
   cmdInteractive,
   cmdLast,
   cmdLink,
@@ -22,9 +23,11 @@ import {
   cmdListClear,
   cmdMatrix,
   cmdPick,
+  cmdPullHistory,
   cmdRun,
   cmdRunHeadless,
   cmdStatus,
+  cmdTree,
   cmdUninstall,
   cmdUpdate,
   findClosestKeyByNameOrKey,
@@ -127,7 +130,9 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
+    console.error(`    ${pc.cyan("--beta parallel")}     Parallelize server boot with setup prompts`);
     console.error(`    ${pc.cyan("--beta docker")}       Use Docker CE app image on Hetzner/GCP (faster boot)`);
+    console.error(`    ${pc.cyan("--beta recursive")}    Install spawn CLI on VM for recursive spawning`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -144,6 +149,10 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
     console.error(`    ${pc.cyan("-c, --cloud")}         Filter history by cloud`);
     console.error(`    ${pc.cyan("--clear")}             Clear all spawn history`);
+    console.error();
+    console.error(`  For ${pc.cyan("spawn delete")}:`);
+    console.error(`    ${pc.cyan("--name <name>")}       Filter by server name or ID`);
+    console.error(`    ${pc.cyan("--yes, -y")}           Skip confirmation (required for non-interactive)`);
     console.error();
     console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
     process.exit(1);
@@ -609,8 +618,16 @@ async function dispatchDeleteCommand(filteredArgs: string[]): Promise<void> {
     cmdHelp();
     return;
   }
-  const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
-  await cmdDelete(agentFilter, cloudFilter);
+  const args = filteredArgs.slice(1);
+  const forceYes = args.includes("--yes") || args.includes("-y");
+  let nameFilter: string | undefined;
+  const nameIdx = args.indexOf("--name");
+  if (nameIdx !== -1 && args[nameIdx + 1]) {
+    nameFilter = args[nameIdx + 1];
+  }
+  const cleanArgs = args.filter((a) => a !== "--yes" && a !== "-y" && a !== "--name" && a !== nameFilter);
+  const { agentFilter, cloudFilter } = parseListFilters(cleanArgs);
+  await cmdDelete(agentFilter, cloudFilter, nameFilter, forceYes);
 }
 
 /** Handle status/ps commands with --prune and --json flags */
@@ -719,7 +736,25 @@ async function dispatchCommand(
     return;
   }
 
+  if (cmd === "tree") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    const jsonFlag = filteredArgs.slice(1).includes("--json");
+    await cmdTree(jsonFlag);
+    return;
+  }
+  if (cmd === "pull-history") {
+    await cmdPullHistory();
+    return;
+  }
   if (LIST_COMMANDS.has(cmd)) {
+    // Handle "history export" subcommand
+    if (cmd === "history" && filteredArgs[1] === "export") {
+      cmdHistoryExport();
+      return;
+    }
     await dispatchListCommand(filteredArgs);
     return;
   }
@@ -799,7 +834,12 @@ async function main(): Promise<void> {
 
   const args = expandEqualsFlags(rawArgs);
 
-  await checkForUpdates();
+  // Pre-scan for --output json before checkForUpdates() so install script
+  // stdout can be redirected to stderr, preventing JSON output pollution.
+  const preOutputIdx = args.indexOf("--output");
+  const isJsonOutput = preOutputIdx !== -1 && args[preOutputIdx + 1] === "json";
+
+  await checkForUpdates(isJsonOutput);
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
 
@@ -852,16 +892,18 @@ async function main(): Promise<void> {
     "images",
     "parallel",
     "docker",
+    "recursive",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
       console.error("\nAvailable beta features:");
-      console.error(`  ${pc.cyan("tarball")}   Use pre-built tarball for agent installation`);
-      console.error(`  ${pc.cyan("images")}    Use pre-built DO marketplace images (faster boot)`);
-      console.error(`  ${pc.cyan("parallel")}  Parallelize server boot with setup prompts`);
-      console.error(`  ${pc.cyan("docker")}    Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("tarball")}     Use pre-built tarball for agent installation`);
+      console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
+      console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
+      console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
       process.exit(1);
     }
   }

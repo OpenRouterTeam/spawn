@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  getScriptFailureGuidance as _getScriptFailureGuidance,
-  getSignalGuidance as _getSignalGuidance,
-  buildRetryCommand,
-} from "../commands/index.js";
+import { buildRetryCommand, getScriptFailureGuidance, getSignalGuidance } from "../commands/index.js";
 
 /** Strip ANSI escape codes from a string so assertions work regardless of color support. */
 function stripAnsi(s: string): string {
@@ -11,17 +7,17 @@ function stripAnsi(s: string): string {
 }
 
 /** Wrapper that strips ANSI codes from all returned lines. */
-function getScriptFailureGuidance(...args: Parameters<typeof _getScriptFailureGuidance>): string[] {
-  return _getScriptFailureGuidance(...args).map(stripAnsi);
+function stripped_getScriptFailureGuidance(...args: Parameters<typeof getScriptFailureGuidance>): string[] {
+  return getScriptFailureGuidance(...args).map(stripAnsi);
 }
 
 /** Wrapper that strips ANSI codes from all returned lines. */
-function getSignalGuidance(...args: Parameters<typeof _getSignalGuidance>): string[] {
-  return _getSignalGuidance(...args).map(stripAnsi);
+function stripped_getSignalGuidance(...args: Parameters<typeof getSignalGuidance>): string[] {
+  return getSignalGuidance(...args).map(stripAnsi);
 }
 
 /**
- * Tests for getScriptFailureGuidance() in commands/run.ts.
+ * Tests for stripped_getScriptFailureGuidance() in commands/run.ts.
  *
  * This function maps exit codes from failed spawn scripts to user-facing
  * guidance strings. It was recently modified (PRs #450, #449) but has
@@ -33,7 +29,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 127 (command not found)", () => {
     it("should return guidance about missing commands with required tools and cloud name", () => {
-      const lines = getScriptFailureGuidance(127, "hetzner");
+      const lines = stripped_getScriptFailureGuidance(127, "hetzner");
       const joined = lines.join("\n");
       expect(lines[0]).toContain("command was not found");
       expect(joined).toContain("bash");
@@ -44,14 +40,14 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should embed a different cloud name when provided", () => {
-      const lines = getScriptFailureGuidance(127, "vultr");
+      const lines = stripped_getScriptFailureGuidance(127, "vultr");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn vultr");
       expect(joined).not.toContain("spawn hetzner");
     });
 
     it("should return exactly 3 guidance lines", () => {
-      const lines = getScriptFailureGuidance(127, "sprite");
+      const lines = stripped_getScriptFailureGuidance(127, "sprite");
       expect(lines).toHaveLength(3);
     });
   });
@@ -60,7 +56,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 126 (permission denied)", () => {
     it("should mention permission denied, causes, issue link, and return 4 lines", () => {
-      const lines = getScriptFailureGuidance(126, "sprite");
+      const lines = stripped_getScriptFailureGuidance(126, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("permission denied");
       expect(joined).toContain("could not be executed");
@@ -76,7 +72,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 1 (generic failure)", () => {
     it("should start with Common causes, mention credentials, and reference cloud name", () => {
-      const lines = getScriptFailureGuidance(1, "digital-ocean");
+      const lines = stripped_getScriptFailureGuidance(1, "digital-ocean");
       const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
       expect(joined).toContain("credentials");
@@ -84,7 +80,7 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should mention API error causes, provisioning failure, and return at least 4 lines", () => {
-      const lines = getScriptFailureGuidance(1, "sprite");
+      const lines = stripped_getScriptFailureGuidance(1, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("API error");
       expect(joined).toContain("quota");
@@ -97,7 +93,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("default case (unknown exit codes)", () => {
     it("should return common causes with credentials, rate limits, dependencies, and cloud name", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
+      const lines = stripped_getScriptFailureGuidance(42, "linode");
       const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
       expect(joined).toContain("credentials");
@@ -115,7 +111,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("null exit code", () => {
     it("should fall through to default case with credentials and cloud name", () => {
-      const lines = getScriptFailureGuidance(null, "sprite");
+      const lines = stripped_getScriptFailureGuidance(null, "sprite");
       const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
       expect(joined).toContain("credentials");
@@ -128,7 +124,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 130 (user interrupt)", () => {
     it("should mention Ctrl+C, interruption, orphaned server warning, and return 3 lines", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
+      const lines = stripped_getScriptFailureGuidance(130, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("Ctrl+C");
       expect(joined).toContain("interrupted");
@@ -142,7 +138,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 137 (killed)", () => {
     it("should mention killed, timeout/OOM, larger instance suggestion, and return 4 lines", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
+      const lines = stripped_getScriptFailureGuidance(137, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("killed");
       expect(joined).toContain("timeout");
@@ -157,7 +153,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 255 (SSH failure)", () => {
     it("should mention SSH failure, booting, firewall, termination, and return 4 lines", () => {
-      const lines = getScriptFailureGuidance(255, "sprite");
+      const lines = stripped_getScriptFailureGuidance(255, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("SSH connection failed");
       expect(joined).toContain("still booting");
@@ -172,7 +168,7 @@ describe("getScriptFailureGuidance", () => {
 
   describe("exit code 2 (shell syntax error)", () => {
     it("should mention syntax error, bug report link, and return 2 lines", () => {
-      const lines = getScriptFailureGuidance(2, "sprite");
+      const lines = stripped_getScriptFailureGuidance(2, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("Shell syntax or argument error");
       expect(joined).toContain("bug in the script");
@@ -190,7 +186,7 @@ describe("getScriptFailureGuidance", () => {
       const savedHC = process.env.HCLOUD_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
       delete process.env.HCLOUD_TOKEN;
-      const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
+      const lines = stripped_getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
       const joined = lines.join("\n");
       expect(joined).toContain("HCLOUD_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
@@ -205,7 +201,7 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should show generic setup hint for exit code 1 when no authHint", () => {
-      const lines = getScriptFailureGuidance(1, "hetzner");
+      const lines = stripped_getScriptFailureGuidance(1, "hetzner");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
       expect(joined).not.toContain("HCLOUD_TOKEN");
@@ -216,7 +212,7 @@ describe("getScriptFailureGuidance", () => {
       const savedDO = process.env.DIGITALOCEAN_ACCESS_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
       delete process.env.DIGITALOCEAN_ACCESS_TOKEN;
-      const lines = getScriptFailureGuidance(42, "digitalocean", "DIGITALOCEAN_ACCESS_TOKEN");
+      const lines = stripped_getScriptFailureGuidance(42, "digitalocean", "DIGITALOCEAN_ACCESS_TOKEN");
       const joined = lines.join("\n");
       expect(joined).toContain("DIGITALOCEAN_ACCESS_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
@@ -231,14 +227,14 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should show generic setup hint for default case when no authHint", () => {
-      const lines = getScriptFailureGuidance(42, "digitalocean");
+      const lines = stripped_getScriptFailureGuidance(42, "digitalocean");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn digitalocean");
       expect(joined).not.toContain("DIGITALOCEAN_ACCESS_TOKEN");
     });
 
     it("should handle multi-credential auth hint", () => {
-      const lines = getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
+      const lines = stripped_getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
       const joined = lines.join("\n");
       // Each credential var should be listed individually
       expect(joined).toContain("CONTABO_CLIENT_ID");
@@ -246,19 +242,19 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should not affect non-credential exit codes (130, 137, etc.)", () => {
-      const lines130 = getScriptFailureGuidance(130, "hetzner", "HCLOUD_TOKEN");
+      const lines130 = stripped_getScriptFailureGuidance(130, "hetzner", "HCLOUD_TOKEN");
       const joined130 = lines130.join("\n");
       expect(joined130).not.toContain("HCLOUD_TOKEN");
       expect(joined130).toContain("Ctrl+C");
 
-      const lines255 = getScriptFailureGuidance(255, "hetzner", "HCLOUD_TOKEN");
+      const lines255 = stripped_getScriptFailureGuidance(255, "hetzner", "HCLOUD_TOKEN");
       const joined255 = lines255.join("\n");
       expect(joined255).not.toContain("HCLOUD_TOKEN");
       expect(joined255).toContain("SSH");
     });
 
     it("should include setup instruction line for exit code 1 with authHint", () => {
-      const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
+      const lines = stripped_getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
       expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
@@ -266,7 +262,7 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should include setup instruction line for default case with authHint", () => {
-      const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
+      const lines = stripped_getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
       expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
@@ -278,23 +274,23 @@ describe("getScriptFailureGuidance", () => {
 
   describe("edge cases", () => {
     it("should handle exit code 0 as default case", () => {
-      const lines = getScriptFailureGuidance(0, "sprite");
+      const lines = stripped_getScriptFailureGuidance(0, "sprite");
       expect(lines[0]).toBe("Common causes:");
     });
 
     it("should handle negative exit code as default case", () => {
-      const lines = getScriptFailureGuidance(-1, "hetzner");
+      const lines = stripped_getScriptFailureGuidance(-1, "hetzner");
       expect(lines[0]).toBe("Common causes:");
     });
 
     it("should handle empty cloud name", () => {
-      const lines = getScriptFailureGuidance(127, "");
+      const lines = stripped_getScriptFailureGuidance(127, "");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn ");
     });
 
     it("should handle cloud name with special characters", () => {
-      const lines = getScriptFailureGuidance(1, "digital-ocean");
+      const lines = stripped_getScriptFailureGuidance(1, "digital-ocean");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn digital-ocean");
     });
@@ -304,14 +300,14 @@ describe("getScriptFailureGuidance", () => {
 
   describe("return type and structure", () => {
     it("should produce different output for each handled exit code", () => {
-      const result130 = getScriptFailureGuidance(130, "sprite");
-      const result137 = getScriptFailureGuidance(137, "sprite");
-      const result255 = getScriptFailureGuidance(255, "sprite");
-      const result127 = getScriptFailureGuidance(127, "sprite");
-      const result126 = getScriptFailureGuidance(126, "sprite");
-      const result2 = getScriptFailureGuidance(2, "sprite");
-      const result1 = getScriptFailureGuidance(1, "sprite");
-      const resultDefault = getScriptFailureGuidance(42, "sprite");
+      const result130 = stripped_getScriptFailureGuidance(130, "sprite");
+      const result137 = stripped_getScriptFailureGuidance(137, "sprite");
+      const result255 = stripped_getScriptFailureGuidance(255, "sprite");
+      const result127 = stripped_getScriptFailureGuidance(127, "sprite");
+      const result126 = stripped_getScriptFailureGuidance(126, "sprite");
+      const result2 = stripped_getScriptFailureGuidance(2, "sprite");
+      const result1 = stripped_getScriptFailureGuidance(1, "sprite");
+      const resultDefault = stripped_getScriptFailureGuidance(42, "sprite");
 
       const all = [
         result130,
@@ -336,7 +332,7 @@ describe("getScriptFailureGuidance", () => {
 describe("getSignalGuidance", () => {
   describe("SIGKILL", () => {
     it("should mention OOM killer, larger instance size, and cloud provider dashboard", () => {
-      const lines = getSignalGuidance("SIGKILL");
+      const lines = stripped_getSignalGuidance("SIGKILL");
       const joined = lines.join("\n");
       expect(joined).toContain("SIGKILL");
       expect(joined).toContain("Out of memory");
@@ -347,7 +343,7 @@ describe("getSignalGuidance", () => {
 
   describe("SIGTERM", () => {
     it("should mention process was terminated and server shutdown", () => {
-      const lines = getSignalGuidance("SIGTERM");
+      const lines = stripped_getSignalGuidance("SIGTERM");
       const joined = lines.join("\n");
       expect(joined).toContain("terminated");
       expect(joined).toContain("SIGTERM");
@@ -357,7 +353,7 @@ describe("getSignalGuidance", () => {
 
   describe("SIGINT", () => {
     it("should mention Ctrl+C and warn about orphaned servers", () => {
-      const lines = getSignalGuidance("SIGINT");
+      const lines = stripped_getSignalGuidance("SIGINT");
       const joined = lines.join("\n");
       expect(joined).toContain("Ctrl+C");
       expect(joined).toContain("cloud provider dashboard");
@@ -366,7 +362,7 @@ describe("getSignalGuidance", () => {
 
   describe("SIGHUP", () => {
     it("should mention terminal disconnection and suggest tmux/screen", () => {
-      const lines = getSignalGuidance("SIGHUP");
+      const lines = stripped_getSignalGuidance("SIGHUP");
       const joined = lines.join("\n");
       expect(joined).toContain("terminal connection");
       expect(joined).toContain("SIGHUP");
@@ -376,7 +372,7 @@ describe("getSignalGuidance", () => {
 
   describe("unknown signal", () => {
     it("should show the signal name for unknown signals", () => {
-      const lines = getSignalGuidance("SIGUSR1");
+      const lines = stripped_getSignalGuidance("SIGUSR1");
       const joined = lines.join("\n");
       expect(joined).toContain("SIGUSR1");
     });
@@ -384,10 +380,10 @@ describe("getSignalGuidance", () => {
 
   describe("signal output uniqueness", () => {
     it("should produce different output for each handled signal", () => {
-      const sigkill = getSignalGuidance("SIGKILL").join("\n");
-      const sigterm = getSignalGuidance("SIGTERM").join("\n");
-      const sigint = getSignalGuidance("SIGINT").join("\n");
-      const sighup = getSignalGuidance("SIGHUP").join("\n");
+      const sigkill = stripped_getSignalGuidance("SIGKILL").join("\n");
+      const sigterm = stripped_getSignalGuidance("SIGTERM").join("\n");
+      const sigint = stripped_getSignalGuidance("SIGINT").join("\n");
+      const sighup = stripped_getSignalGuidance("SIGHUP").join("\n");
       expect(sigkill).not.toBe(sigterm);
       expect(sigterm).not.toBe(sigint);
       expect(sigint).not.toBe(sighup);
@@ -489,7 +485,7 @@ describe("buildRetryCommand", () => {
 describe("dashboard URL in guidance", () => {
   describe("getScriptFailureGuidance with dashboardUrl", () => {
     it("should include dashboard URL for exit code 1 when provided", () => {
-      const lines = getScriptFailureGuidance(1, "hetzner", undefined, "https://console.hetzner.cloud/");
+      const lines = stripped_getScriptFailureGuidance(1, "hetzner", undefined, "https://console.hetzner.cloud/");
       const joined = lines.join("\n");
       expect(joined).toContain("https://console.hetzner.cloud/");
       expect(joined).toContain("dashboard");
@@ -520,13 +516,13 @@ describe("dashboard URL in guidance", () => {
         ],
       ];
       for (const [code, cloud, url] of cases) {
-        const joined = getScriptFailureGuidance(code, cloud, undefined, url).join("\n");
+        const joined = stripped_getScriptFailureGuidance(code, cloud, undefined, url).join("\n");
         expect(joined, `exit code ${code}`).toContain(url);
       }
     });
 
     it("should fall back to generic message when no dashboardUrl", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
+      const lines = stripped_getScriptFailureGuidance(130, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
       expect(joined).not.toContain("https://");
@@ -539,7 +535,7 @@ describe("dashboard URL in guidance", () => {
         255,
         2,
       ]) {
-        const lines = getScriptFailureGuidance(code, "hetzner", undefined, "https://console.hetzner.cloud/");
+        const lines = stripped_getScriptFailureGuidance(code, "hetzner", undefined, "https://console.hetzner.cloud/");
         const joined = lines.join("\n");
         expect(joined).not.toContain("https://console.hetzner.cloud/");
       }
@@ -548,7 +544,7 @@ describe("dashboard URL in guidance", () => {
 
   describe("getSignalGuidance with dashboardUrl", () => {
     it("should include dashboard URL for SIGKILL when provided", () => {
-      const lines = getSignalGuidance("SIGKILL", "https://console.hetzner.cloud/");
+      const lines = stripped_getSignalGuidance("SIGKILL", "https://console.hetzner.cloud/");
       const joined = lines.join("\n");
       expect(joined).toContain("https://console.hetzner.cloud/");
       expect(joined).toContain("dashboard");
@@ -565,20 +561,20 @@ describe("dashboard URL in guidance", () => {
           "https://cloud.digitalocean.com/",
         ],
       ] as const) {
-        const joined = getSignalGuidance(signal, url).join("\n");
+        const joined = stripped_getSignalGuidance(signal, url).join("\n");
         expect(joined, signal).toContain(url);
       }
     });
 
     it("should fall back to generic message when no dashboardUrl", () => {
-      const lines = getSignalGuidance("SIGKILL");
+      const lines = stripped_getSignalGuidance("SIGKILL");
       const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
       expect(joined).not.toContain("https://");
     });
 
     it("should not add dashboard URL for SIGHUP", () => {
-      const lines = getSignalGuidance("SIGHUP", "https://example.com");
+      const lines = stripped_getSignalGuidance("SIGHUP", "https://example.com");
       const joined = lines.join("\n");
       expect(joined).not.toContain("https://example.com");
     });

@@ -1,7 +1,7 @@
 // Barrel re-export — all command modules re-exported from this index.
 
-// delete.ts — cmdDelete
-export { cmdDelete } from "./delete.js";
+// delete.ts — cmdDelete, cascadeDelete
+export { cascadeDelete, cmdDelete } from "./delete.js";
 // feedback.ts — cmdFeedback
 export { cmdFeedback } from "./feedback.js";
 // fix.ts — cmdFix, fixSpawn, buildFixScript
@@ -22,10 +22,11 @@ export {
 export { cmdAgentInteractive, cmdInteractive } from "./interactive.js";
 // link.ts — cmdLink
 export { cmdLink } from "./link.js";
-// list.ts — cmdList, cmdLast, cmdListClear, history display
+// list.ts — cmdList, cmdLast, cmdListClear, cmdHistoryExport, history display
 export {
   buildRecordLabel,
   buildRecordSubtitle,
+  cmdHistoryExport,
   cmdLast,
   cmdList,
   cmdListClear,
@@ -33,6 +34,8 @@ export {
 } from "./list.js";
 // pick.ts — cmdPick
 export { cmdPick } from "./pick.js";
+// pull-history.ts — cmdPullHistory (recursive child history pull)
+export { cmdPullHistory } from "./pull-history.js";
 // run.ts — cmdRun, cmdRunHeadless, script failure guidance
 export {
   cmdRun,
@@ -68,6 +71,8 @@ export {
 } from "./shared.js";
 // status.ts — cmdStatus
 export { cmdStatus } from "./status.js";
+// tree.ts — cmdTree (recursive spawn tree view)
+export { cmdTree } from "./tree.js";
 // uninstall.ts — cmdUninstall
 export { cmdUninstall } from "./uninstall.js";
 // update.ts — cmdUpdate

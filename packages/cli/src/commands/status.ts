@@ -304,7 +304,9 @@ export async function cmdStatus(
   const goneRecords = results.filter((r) => r.liveState === "gone").map((r) => r.record);
 
   if (opts.prune && goneRecords.length > 0) {
-    const s = p.spinner();
+    const s = p.spinner({
+      output: process.stderr,
+    });
     s.start(`Pruning ${goneRecords.length} gone server${goneRecords.length !== 1 ? "s" : ""}...`);
     for (const record of goneRecords) {
       markRecordDeleted(record);

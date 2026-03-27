@@ -109,7 +109,7 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
-    "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash || true",
+    "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     "if ! command -v node >/dev/null 2>&1; then export N_PREFIX=$HOME/.n; curl --proto '=https' -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; export PATH=$N_PREFIX/bin:$PATH; fi",
@@ -146,20 +146,13 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
   }
 }`;
 
-  // Safety: base64 output only contains [A-Za-z0-9+/=] — never single quotes —
-  // so interpolating into a single-quoted shell string is safe.
-  const settingsB64 = Buffer.from(settingsJson).toString("base64");
-  if (!/^[A-Za-z0-9+/=]+$/.test(settingsB64)) {
-    throw new Error("Unexpected characters in base64 output");
-  }
+  // Upload settings via SCP — avoids base64 interpolation into shell commands.
+  await uploadConfigFile(runner, settingsJson, "$HOME/.claude/settings.json");
 
   // Build ~/.claude.json on the remote using $HOME so the workspace trust
   // entry uses the actual home directory path (e.g. /root, /home/user).
   // This pre-accepts the "Quick safety check" trust dialog for the home dir.
   const stateScript = [
-    "mkdir -p ~/.claude",
-    `printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json`,
-    "chmod 600 ~/.claude/settings.json",
     'printf \'{"hasCompletedOnboarding":true,"bypassPermissionsModeAccepted":true,"projects":{"%s":{"hasTrustDialogAccepted":true}}}\\n\' "$HOME" > ~/.claude.json',
     "chmod 600 ~/.claude.json",
     "touch ~/.claude/CLAUDE.md",
@@ -167,6 +160,61 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
 
   await runner.runServer(stateScript);
   logInfo("Claude Code configured");
+}
+
+// ─── Cursor CLI Config ────────────────────────────────────────────────────────
+
+async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+  logStep("Configuring Cursor CLI for OpenRouter...");
+
+  const configJson = `{
+  "version": 1,
+  "permissions": {
+    "allow": ["Shell(*)", "Read(*)", "Write(*)", "WebFetch(*)", "Mcp(*)"],
+    "deny": []
+  }
+}`;
+
+  // Spawn skill rule — injected into .cursor/rules/ so the agent knows
+  // it can provision child VMs via the spawn CLI.
+  const spawnRule = [
+    "---",
+    "description: Spawn CLI — provision child cloud VMs with AI coding agents",
+    "alwaysApply: true",
+    "---",
+    "",
+    "# Spawn — Create Child VMs",
+    "",
+    "You have the `spawn` CLI installed. Use it to provision cloud VMs with AI agents.",
+    "",
+    "## Usage",
+    "",
+    "```bash",
+    'spawn <agent> <cloud> --headless --output json --prompt "task description"',
+    "```",
+    "",
+    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie",
+    "## Clouds: hetzner, digitalocean, aws, gcp, sprite",
+    "",
+    "The command returns JSON with connection details. Use this to delegate subtasks",
+    "to specialized agents running on separate cloud VMs.",
+    "",
+  ].join("\n");
+
+  // Upload config files via SCP — avoids base64 interpolation into shell commands.
+  await uploadConfigFile(runner, configJson, "$HOME/.cursor/cli-config.json");
+  await uploadConfigFile(runner, spawnRule, "$HOME/.cursor/rules/spawn.mdc");
+  // Spawn rule should be world-readable (not sensitive)
+  await runner.runServer("chmod 644 ~/.cursor/rules/spawn.mdc");
+
+  // Persist PATH so agent binary is available (cursor installs to ~/.local/bin since 2026-03-25)
+  const pathScript = [
+    'grep -q ".local/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.bashrc',
+    'grep -q ".local/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.zshrc',
+  ].join(" && ");
+
+  await runner.runServer(pathScript);
+  logInfo("Cursor CLI configured");
 }
 
 // ─── GitHub Auth ─────────────────────────────────────────────────────────────
@@ -285,6 +333,7 @@ async function setupCodexConfig(runner: CloudRunner): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5.3-codex"
 model_provider = "openrouter"
+sandbox_mode = "danger-full-access"
 
 [model_providers.openrouter]
 name = "OpenRouter"
@@ -390,6 +439,9 @@ async function setupOpenclawConfig(
             model: {
               primary: modelId,
             },
+            sandbox: {
+              mode: "off",
+            },
           },
         },
       },
@@ -411,6 +463,15 @@ async function setupOpenclawConfig(
       logWarn("Custom model config failed (non-fatal)");
     }
   }
+
+  // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
+  // auto-detects it and runs agents inside containers, which hangs the session.
+  await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        "openclaw config set agents.defaults.sandbox.mode off >/dev/null",
+    ),
+  );
 
   // Configure browser via CLI (openclaw config set) — the supported way to set
   // browser options. Redirect stdout to suppress doctor warnings on each call.
@@ -454,7 +515,9 @@ async function setupOpenclawConfig(
           "openclaw config set channels.telegram.enabled true >/dev/null; " +
           `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
           "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
-          "openclaw config set channels.telegram.groupPolicy open >/dev/null",
+          "openclaw config set channels.telegram.groupPolicy open >/dev/null; " +
+          // Restrict config file permissions — it now contains the Telegram bot token
+          "chmod 600 ~/.openclaw/openclaw.json 2>/dev/null || true",
       ),
     );
     if (telegramResult.ok) {
@@ -541,6 +604,12 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
 
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(unitB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const script = [
     "source ~/.spawnrc 2>/dev/null",
@@ -608,6 +677,13 @@ async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promis
     "else",
     "  printf '\\n[shell]\\npolicy = \"allow_all\"\\n' >> config.toml",
     "fi",
+    // Force native runtime (no Docker) — zeroclaw auto-detects Docker and
+    // launches in a container otherwise, which hangs the interactive session.
+    'if grep -q "^\\[runtime\\]" config.toml 2>/dev/null; then',
+    "  sed -i 's/^adapter = .*/adapter = \"native\"/' config.toml",
+    "else",
+    "  printf '\\n[runtime]\\nadapter = \"native\"\\n' >> config.toml",
+    "fi",
   ].join("\n");
   await runner.runServer(patchScript);
   logInfo("ZeroClaw configured for autonomous operation");
@@ -637,7 +713,10 @@ const NPM_PREFIX_SETUP =
   'if ! [ -w "$(npm prefix -g 2>/dev/null || echo /usr/local)" ] || ' +
   '! printf "%s" ":${PATH}:" | grep -qF ":${_npm_gbin}:"; then ' +
   'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
-  'export PATH="$HOME/.npm-global/bin:$PATH"';
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
+  // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
+  'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -675,8 +754,9 @@ const KILOCODE_BINARY_VERIFY =
   '[ -d "$_kc_pkg" ] || _kc_pkg="$HOME/.npm-global/lib/node_modules/@kilocode/cli"; ' +
   'if [ -d "$_kc_pkg" ]; then ' +
   // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
   'echo "==> kilocode binary not found, re-running postinstall..."; ' +
-  'cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'cd ~ && cd "$_kc_pkg" && npm run postinstall 2>/dev/null || true; ' +
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "if command -v kilocode >/dev/null 2>&1 && kilocode --version >/dev/null 2>&1; then exit 0; fi; " +
   // Postinstall re-run didn't help — search for native binary in the package
@@ -694,6 +774,39 @@ const KILOCODE_BINARY_VERIFY =
   'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
   "command -v kilocode >/dev/null 2>&1 || " +
   '{ echo "WARNING: kilocode binary still not found after recovery attempts"; }; ' +
+  "}";
+
+/**
+ * Shell snippet that verifies the junie binary is actually available after
+ * npm install. @jetbrains/junie-cli uses a postinstall script that downloads a
+ * native binary. On some clouds (notably Sprite with flaky IPv6 routing), the
+ * postinstall can fail, leaving bin/index.js present but the native binary absent.
+ *
+ * This snippet:
+ * 1. Checks if `junie` is already working
+ * 2. If not, finds the npm package dir and re-runs the postinstall
+ * 3. Warns if still not found after recovery
+ */
+const JUNIE_BINARY_VERIFY =
+  "{ " +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  // Quick check: if junie already works, nothing to do
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  // Find the npm package directory
+  '_jn_pkg="$(npm prefix -g 2>/dev/null)/lib/node_modules/@jetbrains/junie-cli"; ' +
+  '[ -d "$_jn_pkg" ] || _jn_pkg="$HOME/.npm-global/lib/node_modules/@jetbrains/junie-cli"; ' +
+  'if [ -d "$_jn_pkg" ]; then ' +
+  // Re-run the postinstall script explicitly
+  // cd ~ first to avoid "current working directory was deleted" errors in bun/node
+  'echo "==> junie binary not found, re-running postinstall..."; ' +
+  'cd ~ && cd "$_jn_pkg" && npm run postinstall 2>/dev/null || true; ' +
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "if command -v junie >/dev/null 2>&1 && junie --version >/dev/null 2>&1; then exit 0; fi; " +
+  "fi; " +
+  // Final check
+  'export PATH="$HOME/.npm-global/bin:/usr/local/bin:$PATH"; ' +
+  "command -v junie >/dev/null 2>&1 || " +
+  '{ echo "WARNING: junie binary still not found after recovery attempts"; }; ' +
   "}";
 
 // ─── Auto-Update Service ─────────────────────────────────────────────────────
@@ -798,6 +911,15 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
   const timerB64 = Buffer.from(timerFile).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(unitB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(timerB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
 
   const script = [
     "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
@@ -966,6 +1088,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
+        "ZEROCLAW_RUNTIME=native",
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
@@ -993,8 +1116,12 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
-          300,
+          // Force git to use HTTPS instead of SSH for GitHub URLs — pip dependencies
+          // using git+ssh:// timeout on cloud VMs where outbound SSH is blocked/slow.
+          'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+            'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
+            "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
+          600,
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -1013,6 +1140,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
       updateCmd:
+        // Same SSH→HTTPS rewrite for auto-update runs
+        'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
+        'git config --global url."https://github.com/".insteadOf "git@github.com:" && ' +
         "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
     },
 
@@ -1024,7 +1154,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Junie",
-          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST}`,
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @jetbrains/junie-cli && ${NPM_GLOBAL_PATH_PERSIST} && ${JUNIE_BINARY_VERIFY}`,
         ),
       envVars: (apiKey) => [
         `JUNIE_OPENROUTER_API_KEY=${apiKey}`,
@@ -1034,6 +1164,28 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       updateCmd:
         'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
         "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
+    },
+
+    cursor: {
+      name: "Cursor CLI",
+      cloudInitTier: "minimal",
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Cursor CLI",
+          "curl https://cursor.com/install -fsS | bash && " +
+            'export PATH="$HOME/.local/bin:$PATH" && ' +
+            "agent --version",
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+        `CURSOR_API_KEY=${apiKey}`,
+      ],
+      configure: (apiKey) => setupCursorConfig(runner, apiKey),
+      launchCmd: () =>
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
+      updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };
 }

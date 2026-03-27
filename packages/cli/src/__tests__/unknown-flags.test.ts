@@ -89,6 +89,8 @@ describe("Unknown Flag Detection", () => {
         "--reauth",
         "--prune",
         "--json",
+        "--yes",
+        "-y",
       ];
       for (const flag of knownFlagsToTest) {
         expect(
@@ -228,6 +230,8 @@ describe("KNOWN_FLAGS completeness", () => {
       "--fast",
       "--user",
       "-u",
+      "--yes",
+      "-y",
     ];
     // Every flag in the expected list must exist in KNOWN_FLAGS.
     for (const flag of expected) {

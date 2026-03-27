@@ -38,6 +38,8 @@ export const KNOWN_FLAGS = new Set([
   "--fast",
   "--user",
   "-u",
+  "--yes",
+  "-y",
 ]);
 
 /** Return the first unknown flag in args, or null if all are known/positional */
