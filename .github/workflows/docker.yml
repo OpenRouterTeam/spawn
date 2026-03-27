@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        agent: [claude, codex, openclaw, opencode, kilocode, zeroclaw, hermes, junie]
+        agent: [claude, codex, cursor, openclaw, opencode, kilocode, zeroclaw, hermes, junie]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
