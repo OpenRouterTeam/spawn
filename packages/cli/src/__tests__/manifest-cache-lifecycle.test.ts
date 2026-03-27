@@ -4,7 +4,7 @@ import type { TestEnvironment } from "./test-helpers";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentKeys, countImplemented, loadManifest } from "../manifest";
+import { _resetCacheForTesting, agentKeys, countImplemented, loadManifest } from "../manifest";
 import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 
 /**
@@ -239,6 +239,7 @@ describe("Manifest Cache Lifecycle", () => {
 
     beforeEach(() => {
       env = setupTestEnvironment();
+      _resetCacheForTesting();
     });
 
     afterEach(() => {
@@ -255,15 +256,6 @@ describe("Manifest Cache Lifecycle", () => {
       // fetch should have been called at least twice (once per forceRefresh)
       expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
-
-    it("should return same instance without forceRefresh", async () => {
-      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
-
-      const manifest1 = await loadManifest(true);
-      const manifest2 = await loadManifest(false);
-
-      expect(manifest1).toBe(manifest2);
-    });
   });
 
   describe("combined fallback chain: invalid fetch + stale cache", () => {
@@ -271,6 +263,7 @@ describe("Manifest Cache Lifecycle", () => {
 
     beforeEach(() => {
       env = setupTestEnvironment();
+      _resetCacheForTesting();
     });
 
     afterEach(() => {

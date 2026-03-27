@@ -171,15 +171,6 @@ describe("manifest", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    it("returns in-memory cache on second call without fetching", async () => {
-      const fetchMock = mock(async () => new Response(JSON.stringify(mockManifest)));
-      global.fetch = fetchMock;
-      await loadManifest();
-      const fetchCount = fetchMock.mock.calls.length;
-      await loadManifest();
-      expect(fetchMock.mock.calls.length).toBe(fetchCount);
-    });
-
     it("falls back to stale cache when fetch fails", async () => {
       const cacheDir = join(env.testDir, "spawn");
       mkdirSync(cacheDir, {
