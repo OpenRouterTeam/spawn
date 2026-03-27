@@ -332,7 +332,7 @@
           }
         }
       },
-      "notes": "Works with OpenRouter via --endpoint flag pointing to openrouter.ai/api/v1 and CURSOR_API_KEY set to OpenRouter key. Binary installs to ~/.cursor/bin/agent.",
+      "notes": "Works with OpenRouter via --endpoint flag pointing to openrouter.ai/api/v1 and CURSOR_API_KEY set to OpenRouter key. Binary installs to ~/.local/bin/agent.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/cursor.png",
       "featured_cloud": [
         "digitalocean",
