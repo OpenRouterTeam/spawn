@@ -193,7 +193,7 @@ async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<
     'spawn <agent> <cloud> --headless --output json --prompt "task description"',
     "```",
     "",
-    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie, cursor",
+    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie",
     "## Clouds: hetzner, digitalocean, aws, gcp, sprite",
     "",
     "The command returns JSON with connection details. Use this to delegate subtasks",
