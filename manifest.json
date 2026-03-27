@@ -306,6 +306,8 @@
       ]
     },
     "cursor": {
+      "disabled": true,
+      "disabled_reason": "Cursor CLI uses a proprietary protocol (ConnectRPC) and validates API keys against Cursor's own servers. Cannot route through OpenRouter. Re-enable when Cursor adds BYOK/custom endpoint support for agent mode.",
       "name": "Cursor CLI",
       "description": "Cursor's terminal-based AI coding agent — autonomous coding with plan, agent, and ask modes",
       "url": "https://cursor.com/cli",
