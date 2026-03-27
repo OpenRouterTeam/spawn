@@ -71,18 +71,18 @@ jobs:
       - name: Generate variables file
         run: |
           jq -n \
-            --arg token "$DO_API_TOKEN" \
+            --arg token "$DIGITALOCEAN_ACCESS_TOKEN" \
             --arg agent "$AGENT_NAME" \
             --arg tier "$TIER" \
             --argjson install "$INSTALL_COMMANDS" \
             '{
-              do_api_token: $token,
+              digitalocean_access_token: $token,
               agent_name: $agent,
               cloud_init_tier: $tier,
               install_commands: $install
             }' > packer/auto.pkrvars.json
         env:
-          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DO_API_TOKEN }}
           AGENT_NAME: ${{ matrix.agent }}
           TIER: ${{ steps.config.outputs.tier }}
           INSTALL_COMMANDS: ${{ steps.config.outputs.install }}
@@ -96,7 +96,7 @@ jobs:
         if: cancelled()
         run: |
           # Filter by spawn-packer tag to avoid destroying builder droplets from other workflows
-          DROPLET_IDS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+          DROPLET_IDS=$(curl -s -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
             "https://api.digitalocean.com/v2/droplets?per_page=200&tag_name=spawn-packer" \
             | jq -r '.droplets[].id')
 
@@ -107,28 +107,28 @@ jobs:
 
           for ID in $DROPLET_IDS; do
             echo "Destroying orphaned builder droplet: ${ID}"
-            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            curl -s -X DELETE -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
               "https://api.digitalocean.com/v2/droplets/${ID}" || true
           done
         env:
-          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DO_API_TOKEN }}
 
       - name: Cleanup old snapshots
         if: success()
         run: |
           PREFIX="spawn-${AGENT_NAME}-"
-          SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+          SNAPSHOTS=$(curl -s -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
             "https://api.digitalocean.com/v2/images?private=true&per_page=100" \
             | jq -r --arg prefix "$PREFIX" \
               '[.images[] | select(.name | startswith($prefix))] | sort_by(.created_at) | reverse | .[1:] | .[].id')
 
           for ID in $SNAPSHOTS; do
             echo "Deleting old snapshot: ${ID}"
-            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            curl -s -X DELETE -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
               "https://api.digitalocean.com/v2/images/${ID}" || true
           done
         env:
-          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DO_API_TOKEN }}
           AGENT_NAME: ${{ matrix.agent }}
 
       - name: Submit to DO Marketplace
@@ -162,7 +162,7 @@ jobs:
           HTTP_CODE=$(curl -s -o /tmp/mp-response.json -w "%{http_code}" \
             -X PATCH \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
             -d "$(jq -n \
               --arg reason "Nightly rebuild — $(date -u '+%Y-%m-%d')" \
               --argjson imageId "$IMG_ID" \
@@ -177,6 +177,6 @@ jobs:
                  exit 1 ;;
           esac
         env:
-          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DO_API_TOKEN }}
           AGENT_NAME: ${{ matrix.agent }}
           MARKETPLACE_APP_IDS: ${{ secrets.MARKETPLACE_APP_IDS }}

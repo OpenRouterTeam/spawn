@@ -171,7 +171,7 @@ export OPENROUTER_API_KEY=sk-or-v1-xxxxx
 # Cloud-specific credentials (varies by provider)
 # Note: Sprite uses `sprite login` for authentication
 export HCLOUD_TOKEN=...           # For Hetzner
-export DO_API_TOKEN=...           # For DigitalOcean
+export DIGITALOCEAN_ACCESS_TOKEN=...  # For DigitalOcean
 
 # Run non-interactively
 spawn claude hetzner
@@ -223,7 +223,7 @@ If spawn fails to install, try these steps:
 2. **Set credentials via environment variables** before launching:
    ```powershell
    $env:OPENROUTER_API_KEY = "sk-or-v1-xxxxx"
-   $env:DO_API_TOKEN = "dop_v1_xxxxx"      # For DigitalOcean
+   $env:DIGITALOCEAN_ACCESS_TOKEN = "dop_v1_xxxxx"  # For DigitalOcean
    $env:HCLOUD_TOKEN = "xxxxx"              # For Hetzner
    spawn openclaw digitalocean
    ```
