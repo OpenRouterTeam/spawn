@@ -725,7 +725,7 @@ async function postInstall(
     process.exit(0);
   }
 
-  logStep("Starting agent...");
+  logStep("Provisioning complete. Connecting to agent session...");
 
   // Reset terminal state before handing off to the interactive SSH session.
   // @clack/prompts may have left the cursor hidden or set ANSI attributes
