@@ -449,7 +449,9 @@ export async function checkAccountStatus(): Promise<void> {
       if (existingDroplets.ok) {
         const currentCount = existingDroplets.data.length;
         if (currentCount >= dropletLimit) {
-          const msg = `DigitalOcean droplet limit reached: ${currentCount}/${dropletLimit} droplets in use. Delete existing droplets or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase`;
+          // List existing droplet names to help operators identify which to delete
+          const dropletNames = existingDroplets.data.map((d) => (isString(d.name) ? d.name : "unknown")).join(", ");
+          const msg = `DigitalOcean droplet limit reached: ${currentCount}/${dropletLimit} droplets in use. Existing: [${dropletNames}]. Delete existing droplets at ${DO_DASHBOARD_URL} or request a limit increase at https://cloud.digitalocean.com/account/team/droplet_limit_increase`;
           logWarn(msg);
           if (process.env.SPAWN_NON_INTERACTIVE === "1") {
             throw new Error(msg);

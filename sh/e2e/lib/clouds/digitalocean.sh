@@ -366,6 +366,7 @@ EOF
 # Queries the DigitalOcean account to determine available droplet capacity.
 # Subtracts non-e2e droplets from the account limit so parallel test runs
 # don't fail due to pre-existing droplets consuming quota slots.
+# Returns 0 when no capacity is available so the caller can skip the cloud.
 # Falls back to 3 if the API is unavailable.
 # ---------------------------------------------------------------------------
 _digitalocean_max_parallel() {
@@ -375,7 +376,8 @@ _digitalocean_max_parallel() {
   _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | grep -o '"id":[0-9]*' | wc -l | tr -d ' ') || { printf '3'; return 0; }
   _available=$(( _limit - _existing ))
   if [ "${_available}" -lt 1 ]; then
-    printf '1'
+    log_warn "DigitalOcean droplet limit reached: ${_existing}/${_limit} droplets in use (0 available)"
+    printf '0'
   else
     printf '%d' "${_available}"
   fi
