@@ -48,5 +48,11 @@
     "install": [
       "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @jetbrains/junie-cli"
     ]
+  },
+  "cursor": {
+    "tier": "minimal",
+    "install": [
+      "curl -fsSL https://cursor.com/install | bash || [ -f /root/.local/bin/cursor ]"
+    ]
   }
 }
