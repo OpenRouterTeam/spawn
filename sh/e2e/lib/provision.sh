@@ -378,7 +378,7 @@ _ensure_agent_binary() {
   # PATH includes all common binary locations for detection.
   local bin_name=""
   local install_cmd=""
-  local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$HOME/.cursor/bin:/usr/local/bin:$PATH"'
+  local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH"'
 
   case "${agent}" in
     claude)
