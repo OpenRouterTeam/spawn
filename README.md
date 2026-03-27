@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**9 agents. 6 clouds. 54 working combinations. Zero config.**
+**8 agents. 6 clouds. 48 working combinations. Zero config.**
 
 ## Install
 
@@ -330,7 +330,6 @@ If an agent fails to install or launch on a cloud:
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Junie**](https://www.jetbrains.com/junie/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Cursor CLI**](https://cursor.com/cli) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works
 
