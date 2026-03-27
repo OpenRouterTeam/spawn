@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**8 agents. 6 clouds. 48 working combinations. Zero config.**
+**9 agents. 6 clouds. 54 working combinations. Zero config.**
 
 ## Install
 
@@ -81,6 +81,7 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn delete` | Interactively select and destroy a cloud server |
 | `spawn delete -a <agent>` | Filter servers to delete by agent |
 | `spawn delete -c <cloud>` | Filter servers to delete by cloud |
+| `spawn delete --name <name> --yes` | Headless delete by name (no prompts) |
 | `spawn status` | Show live state of cloud servers |
 | `spawn status -a <agent>` | Filter status by agent |
 | `spawn status -c <cloud>` | Filter status by cloud |
@@ -329,6 +330,7 @@ If an agent fails to install or launch on a cloud:
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Junie**](https://www.jetbrains.com/junie/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**Cursor CLI**](https://cursor.com/cli) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works
 
