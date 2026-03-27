@@ -117,7 +117,7 @@ async function pullFromChild(ip: string, user: string, parentSpawnId: string, ss
     const sshBase = [
       "ssh",
       "-o",
-      "StrictHostKeyChecking=no",
+      "StrictHostKeyChecking=accept-new",
       "-o",
       "ConnectTimeout=10",
       "-o",

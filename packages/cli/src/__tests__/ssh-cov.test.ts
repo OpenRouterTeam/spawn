@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe("SSH constants", () => {
   it("SSH_BASE_OPTS has required non-interactive options", () => {
-    expect(SSH_BASE_OPTS).toContain("StrictHostKeyChecking=no");
+    expect(SSH_BASE_OPTS).toContain("StrictHostKeyChecking=accept-new");
     expect(SSH_BASE_OPTS).toContain("BatchMode=yes");
   });
 
