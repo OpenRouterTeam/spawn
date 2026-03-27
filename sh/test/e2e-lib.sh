@@ -185,10 +185,10 @@ result=$(get_agent_timeout "hermes")
 assert_eq "get_agent_timeout hermes (env override)" "500" "${result}"
 unset AGENT_TIMEOUT_hermes
 
-# Non-numeric env var ignored
+# Non-numeric env var ignored — falls through to built-in hermes default (3600), not global
 export AGENT_TIMEOUT_hermes="not-a-number"
 result=$(get_agent_timeout "hermes")
-assert_eq "get_agent_timeout hermes (non-numeric ignored)" "${AGENT_TIMEOUT}" "${result}"
+assert_eq "get_agent_timeout hermes (non-numeric ignored)" "3600" "${result}"
 unset AGENT_TIMEOUT_hermes
 
 # --- Numeric validation (constants) ---
