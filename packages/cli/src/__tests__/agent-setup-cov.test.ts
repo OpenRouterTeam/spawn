@@ -148,34 +148,12 @@ describe("createCloudAgents", () => {
     expect(runner.uploadFile).toHaveBeenCalled();
   });
 
-  it("openclaw agent envVars include OPENROUTER_API_KEY", () => {
-    const envVars = result.agents.openclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("ANTHROPIC_BASE_URL"))).toBe(true);
-  });
-
   it("openclaw agent has tunnel config", () => {
     const openclaw = result.agents.openclaw;
     expect(openclaw.tunnel).toBeDefined();
     expect(openclaw.tunnel?.remotePort).toBe(18789);
     const url = openclaw.tunnel?.browserUrl(8080);
     expect(url).toContain("localhost:8080");
-  });
-
-  it("zeroclaw agent envVars include ZEROCLAW_PROVIDER", () => {
-    const envVars = result.agents.zeroclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("ZEROCLAW_PROVIDER=openrouter"))).toBe(true);
-  });
-
-  it("zeroclaw agent configure calls runServer", async () => {
-    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
-    expect(runner.runServer).toHaveBeenCalled();
-  });
-
-  it("hermes agent envVars include OPENAI_BASE_URL", () => {
-    const envVars = result.agents.hermes.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENAI_BASE_URL"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("HERMES_YOLO_MODE"))).toBe(true);
   });
 
   it("hermes agent configure removes YOLO mode when not enabled", async () => {
@@ -199,14 +177,60 @@ describe("createCloudAgents", () => {
     expect(runner.runServer).not.toHaveBeenCalled();
   });
 
-  it("kilocode agent envVars include KILO_PROVIDER_TYPE", () => {
-    const envVars = result.agents.kilocode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("KILO_PROVIDER_TYPE=openrouter"))).toBe(true);
+  it("agent envVars include provider-specific env vars", () => {
+    const cases: Array<
+      [
+        string,
+        string[],
+      ]
+    > = [
+      [
+        "openclaw",
+        [
+          "OPENROUTER_API_KEY",
+          "ANTHROPIC_BASE_URL",
+        ],
+      ],
+      [
+        "zeroclaw",
+        [
+          "ZEROCLAW_PROVIDER=openrouter",
+        ],
+      ],
+      [
+        "hermes",
+        [
+          "OPENAI_BASE_URL",
+          "HERMES_YOLO_MODE",
+        ],
+      ],
+      [
+        "kilocode",
+        [
+          "KILO_PROVIDER_TYPE=openrouter",
+        ],
+      ],
+      [
+        "opencode",
+        [
+          "OPENROUTER_API_KEY",
+        ],
+      ],
+    ];
+    for (const [agent, expectedVars] of cases) {
+      const envVars = result.agents[agent].envVars("sk-or-v1-test");
+      for (const expected of expectedVars) {
+        expect(
+          envVars.some((v: string) => v.includes(expected)),
+          `${agent} envVars should include ${expected}`,
+        ).toBe(true);
+      }
+    }
   });
 
-  it("opencode agent envVars include OPENROUTER_API_KEY", () => {
-    const envVars = result.agents.opencode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
+  it("zeroclaw agent configure calls runServer", async () => {
+    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
+    expect(runner.runServer).toHaveBeenCalled();
   });
 
   it("all agents have launchCmd returning non-empty string", () => {
