@@ -415,7 +415,7 @@ _ensure_agent_binary() {
       ;;
     cursor)
       bin_name="agent"
-      install_cmd="curl https://cursor.com/install -fsS | bash"
+      install_cmd="curl --proto '=https' -fsSL https://cursor.com/install | bash"
       ;;
     *)
       log_warn "No binary check defined for agent: ${agent}"
