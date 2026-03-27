@@ -24,6 +24,7 @@ bun test src/__tests__/manifest.test.ts
 
 ### Commands: happy paths
 - `cmdrun-happy-path.test.ts` — Successful download, history recording, env var passing
+- `pull-history.test.ts` — `cmdPullHistory`, `parseAndMergeChildHistory`: child spawn history import and deduplication
 - `cmd-interactive.test.ts` — Interactive agent/cloud selection flow
 - `cmd-listing-output.test.ts` — `cmdMatrix`, `cmdAgents`, `cmdClouds` output formatting
 - `cmdlast.test.ts` — `cmdLast`: history display and resumption
@@ -131,6 +132,8 @@ bun test src/__tests__/manifest.test.ts
 
 ### Shared helpers
 - `shared-helpers.test.ts` — `generateEnvConfig`, `hasStatus`, `toObjectArray`, `toRecord`
+- `spawn-skill.test.ts` — `getSpawnSkillPath`, `getSkillContent`, `injectSpawnSkill`, `isAppendMode`: skill injection per agent
+- `star-prompt.test.ts` — `maybeShowStarPrompt`: returning-user detection, 30-day cooldown, preference persistence
 
 ### OAuth and auth
 - `oauth-code-validation.test.ts` — `OAUTH_CODE_REGEX` format validation
@@ -138,6 +141,7 @@ bun test src/__tests__/manifest.test.ts
 
 ### History (extended)
 - `history-spawn-id.test.ts` — Unique spawn IDs, `saveVmConnection`/`saveLaunchCmd` by spawnId, concurrent spawn isolation
+- `recursive-spawn.test.ts` — `findDescendants`, `cmdTree`, `mergeChildHistory`, `exportHistory`: recursive child spawn tracking and tree output
 
 ### Manifest (extended)
 - `icon-integrity.test.ts` — Icon file existence and format validation
