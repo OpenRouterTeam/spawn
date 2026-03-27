@@ -57,6 +57,8 @@ jobs:
             arch: arm64
           - agent: claude
             arch: arm64
+          - agent: cursor
+            arch: arm64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
@@ -99,7 +101,7 @@ jobs:
           echo "==> Installing agent..."
 
           # Allowed domains for curl/wget downloads (official agent vendor domains)
-          ALLOWED_DOMAINS="claude.ai|opencode.ai|raw.githubusercontent.com|registry.npmjs.org|crates.io|github.com|dl.google.com"
+          ALLOWED_DOMAINS="claude.ai|cursor.com|opencode.ai|raw.githubusercontent.com|registry.npmjs.org|crates.io|github.com|dl.google.com"
 
           CMD_COUNT=$(jq -r --arg a "${AGENT_NAME}" '.[$a].install | length' packer/agents.json)
           i=0
