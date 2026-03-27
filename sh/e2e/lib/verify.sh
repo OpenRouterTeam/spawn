@@ -327,6 +327,11 @@ input_test_junie() {
   return 0
 }
 
+input_test_cursor() {
+  log_warn "cursor is TUI-only — skipping input test"
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # run_input_test AGENT APP_NAME
 #
@@ -354,6 +359,7 @@ run_input_test() {
     kilocode)  input_test_kilocode          ;;
     hermes)    input_test_hermes            ;;
     junie)     input_test_junie            ;;
+    cursor)    input_test_cursor           ;;
     *)
       log_err "Unknown agent for input test: ${agent}"
       return 1
@@ -743,6 +749,40 @@ verify_junie() {
   return "${failures}"
 }
 
+verify_cursor() {
+  local app="$1"
+  local failures=0
+
+  # Binary check — cursor installs to ~/.cursor/bin/agent
+  log_step "Checking cursor binary..."
+  if cloud_exec "${app}" "PATH=\$HOME/.cursor/bin:\$HOME/.bun/bin:\$PATH command -v agent" >/dev/null 2>&1; then
+    log_ok "cursor (agent) binary found"
+  else
+    log_err "cursor (agent) binary not found"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: CURSOR_API_KEY
+  log_step "Checking cursor env (CURSOR_API_KEY)..."
+  if cloud_exec "${app}" "grep -q CURSOR_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "CURSOR_API_KEY present in .spawnrc"
+  else
+    log_err "CURSOR_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENROUTER_API_KEY
+  log_step "Checking cursor env (OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  return "${failures}"
+}
+
 # ---------------------------------------------------------------------------
 # verify_agent AGENT APP_NAME
 #
@@ -772,6 +812,7 @@ verify_agent() {
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;
     hermes)    verify_hermes "${app}"    || agent_failures=$? ;;
     junie)     verify_junie "${app}"    || agent_failures=$? ;;
+    cursor)    verify_cursor "${app}"   || agent_failures=$? ;;
     *)
       log_err "Unknown agent: ${agent}"
       return 1

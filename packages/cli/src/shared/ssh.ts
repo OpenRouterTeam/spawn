@@ -11,7 +11,7 @@ import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js"
 /** Base SSH options shared across all clouds (array form for Bun.spawn). */
 export const SSH_BASE_OPTS: string[] = [
   "-o",
-  "StrictHostKeyChecking=no",
+  "StrictHostKeyChecking=accept-new",
   "-o",
   "UserKnownHostsFile=/dev/null",
   "-o",
