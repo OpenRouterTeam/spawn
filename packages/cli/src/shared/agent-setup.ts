@@ -207,10 +207,10 @@ async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<
   // Spawn rule should be world-readable (not sensitive)
   await runner.runServer("chmod 644 ~/.cursor/rules/spawn.mdc");
 
-  // Persist PATH so agent binary is available
+  // Persist PATH so agent binary is available (cursor installs to ~/.local/bin since 2026-03-25)
   const pathScript = [
-    'grep -q ".cursor/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.bashrc',
-    'grep -q ".cursor/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.zshrc',
+    'grep -q ".local/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.bashrc',
+    'grep -q ".local/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.zshrc',
   ].join(" && ");
 
   await runner.runServer(pathScript);
@@ -1175,7 +1175,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           runner,
           "Cursor CLI",
           "curl https://cursor.com/install -fsS | bash && " +
-            'export PATH="$HOME/.cursor/bin:$PATH" && ' +
+            'export PATH="$HOME/.local/bin:$PATH" && ' +
             "agent --version",
         ),
       envVars: (apiKey) => [
@@ -1184,8 +1184,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey) => setupCursorConfig(runner, apiKey),
       launchCmd: () =>
-        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cursor/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
-      updateCmd: 'export PATH="$HOME/.cursor/bin:$PATH"; agent update',
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
+      updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };
 }

@@ -753,9 +753,9 @@ verify_cursor() {
   local app="$1"
   local failures=0
 
-  # Binary check — cursor installs to ~/.cursor/bin/agent
+  # Binary check — cursor installs to ~/.local/bin/agent (since 2026-03-25)
   log_step "Checking cursor binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.cursor/bin:\$HOME/.bun/bin:\$PATH command -v agent" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.cursor/bin:\$HOME/.bun/bin:\$PATH command -v agent" >/dev/null 2>&1; then
     log_ok "cursor (agent) binary found"
   else
     log_err "cursor (agent) binary not found"
