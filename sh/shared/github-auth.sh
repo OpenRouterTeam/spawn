@@ -39,7 +39,14 @@ _install_gh_brew() {
 _install_gh_apt() {
     # Use sudo only when not already root (some cloud containers run as root)
     local SUDO=""
-    if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
+    if [[ "$(id -u)" -ne 0 ]]; then
+        if command -v sudo >/dev/null 2>&1; then
+            SUDO="sudo"
+        else
+            log_error "This script requires sudo or root privileges to install gh via apt"
+            return 1
+        fi
+    fi
 
     log_info "Adding GitHub CLI APT repository..."
     curl -fsSL --proto '=https' https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -58,7 +65,14 @@ _install_gh_apt() {
 # Install gh via DNF (Fedora/RHEL)
 _install_gh_dnf() {
     local SUDO=""
-    if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
+    if [[ "$(id -u)" -ne 0 ]]; then
+        if command -v sudo >/dev/null 2>&1; then
+            SUDO="sudo"
+        else
+            log_error "This script requires sudo or root privileges to install gh via dnf"
+            return 1
+        fi
+    fi
     ${SUDO} dnf install -y gh || {
         log_error "Failed to install gh via dnf"
         return 1
