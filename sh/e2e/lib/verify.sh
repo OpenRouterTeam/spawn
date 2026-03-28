@@ -168,19 +168,20 @@ input_test_codex() {
 _openclaw_ensure_gateway() {
   local app="$1"
   log_step "Ensuring openclaw gateway is running on :18789..."
-  # Port check: ss works on all modern Linux; /dev/tcp works on macOS/some bash.
+  # Port check is defined as a remote function — never stored as shell code in a local variable.
+  # ss works on all modern Linux; /dev/tcp works on macOS/some bash.
   # Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so ss must come first.
-  local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
-    if ${port_check}; then \
+    _check_port_18789() { ss -tln 2>/dev/null | grep -q ':18789 ' || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; }; \
+    if _check_port_18789; then \
       echo 'Gateway already running'; \
     else \
       _oc_bin=\$(command -v openclaw) || exit 1; \
       if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
       else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
       elapsed=0; _gw_up=0; while [ \$elapsed -lt 180 ]; do \
-        if ${port_check}; then echo 'Gateway started'; _gw_up=1; break; fi; \
+        if _check_port_18789; then echo 'Gateway started'; _gw_up=1; break; fi; \
         sleep 1; elapsed=\$((elapsed + 1)); \
       done; \
       if [ \$_gw_up -eq 0 ]; then echo 'Gateway failed to start after 180s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi; \
@@ -194,16 +195,16 @@ _openclaw_ensure_gateway() {
 _openclaw_restart_gateway() {
   local app="$1"
   log_step "Restarting openclaw gateway..."
-  local port_check_r='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
+    _check_port_18789() { ss -tln 2>/dev/null | grep -q ':18789 ' || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; }; \
     _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' ') && \
     kill \"\$_gw_pid\" 2>/dev/null; sleep 2; \
     _oc_bin=\$(command -v openclaw) || exit 1; \
     if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
     else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
     elapsed=0; _gw_up=0; while [ \$elapsed -lt 180 ]; do \
-      if ${port_check_r}; then echo 'Gateway restarted'; _gw_up=1; break; fi; \
+      if _check_port_18789; then echo 'Gateway restarted'; _gw_up=1; break; fi; \
       sleep 1; elapsed=\$((elapsed + 1)); \
     done; \
     if [ \$_gw_up -eq 0 ]; then echo 'Gateway restart failed after 180s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi" >/dev/null 2>&1
@@ -496,13 +497,13 @@ verify_openclaw() {
 # ---------------------------------------------------------------------------
 _openclaw_verify_gateway_resilience() {
   local app="$1"
-  local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
 
   # Step 1: Confirm gateway is currently running
   log_step "Gateway resilience: checking gateway is running..."
   if ! cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
-    ${port_check}" >/dev/null 2>&1; then
+    _check_port_18789() { ss -tln 2>/dev/null | grep -q ':18789 ' || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; }; \
+    _check_port_18789" >/dev/null 2>&1; then
     log_warn "Gateway not running — skipping resilience test"
     return 0
   fi
@@ -519,7 +520,9 @@ _openclaw_verify_gateway_resilience() {
   sleep 2
 
   # Confirm it's actually down
-  if cloud_exec "${app}" "${port_check}" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "\
+    _check_port_18789() { ss -tln 2>/dev/null | grep -q ':18789 ' || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; }; \
+    _check_port_18789" >/dev/null 2>&1; then
     log_warn "Gateway resilience: port still open after kill — process may not have died"
   else
     log_ok "Gateway resilience: gateway confirmed dead"
@@ -535,8 +538,9 @@ _openclaw_verify_gateway_resilience() {
   local recovered
   recovered=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
+    _check_port_18789() { ss -tln 2>/dev/null | grep -q ':18789 ' || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; }; \
     elapsed=0; while [ \$elapsed -lt 60 ]; do \
-      if ${port_check}; then echo 'recovered'; exit 0; fi; \
+      if _check_port_18789; then echo 'recovered'; exit 0; fi; \
       sleep 1; elapsed=\$((elapsed + 1)); \
     done; echo 'timeout'" 2>&1) || true
 
