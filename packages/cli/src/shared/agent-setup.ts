@@ -299,6 +299,9 @@ export async function offerGithubAuth(runner: CloudRunner, explicitlyRequested?:
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
   if (githubToken) {
     const tokenB64 = Buffer.from(githubToken).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(tokenB64)) {
+      throw new Error("Unexpected characters in base64 output");
+    }
     ghCmd = `export GITHUB_TOKEN=$(printf '%s' ${shellQuote(tokenB64)} | base64 -d) && ${ghCmd}`;
   }
 
