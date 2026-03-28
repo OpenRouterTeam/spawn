@@ -21,8 +21,9 @@ async function main() {
 
   const agent = resolveAgent(agentName);
 
-  // Warn about security implications of installing agents locally
-  if (process.env.SPAWN_NON_INTERACTIVE !== "1") {
+  // Warn about security implications of installing OpenClaw locally
+  // (OpenClaw has browser access and broader system control than other agents)
+  if (agentName === "openclaw" && process.env.SPAWN_NON_INTERACTIVE !== "1") {
     process.stderr.write("\n");
     logWarn("⚠  Local installation warning");
     logWarn(`   This will install ${agent.name} directly on your machine.`);
