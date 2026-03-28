@@ -9,7 +9,7 @@ import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
-import { generateCsrfState, OAUTH_CSS } from "../shared/oauth.js";
+import { generateCodeChallenge, generateCodeVerifier, generateCsrfState, OAUTH_CSS } from "../shared/oauth.js";
 import { parseJsonObj } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import {
@@ -64,7 +64,8 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 
 // OAuth application credentials — embedded in the binary, same pattern as gh CLI and doctl.
 //
-// Why the client_secret is here and why that's acceptable:
+// SECURITY DESIGN NOTE (see also: #2596, #3076):
+// The client_secret is intentionally embedded. This is NOT a vulnerability:
 //   1. DigitalOcean's token exchange endpoint REQUIRES client_secret — their OAuth
 //      implementation does not support PKCE-only public client flows (as of 2026-03).
 //   2. Open-source CLI tools are "public clients" (RFC 6749 §2.1) — any secret
@@ -77,19 +78,22 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
 //      gcloud (Google), and az (Azure).
 //
+// Mitigation: We send PKCE parameters (code_challenge, code_verifier) alongside
+// client_secret as defense-in-depth ("opportunistic PKCE"). If DigitalOcean begins
+// honoring PKCE, the flow gains protection against authorization code interception
+// without any code changes. The client_secret remains required until DO supports
+// PKCE-only public client flows.
+//
 // Override: Set DO_CLIENT_SECRET env var to use your own OAuth app secret instead
 // of the bundled default (useful for organizations with custom DO OAuth apps).
 //
-// TODO: PKCE migration — monitor and migrate when DigitalOcean adds support.
+// TODO: PKCE-only migration — drop client_secret when DigitalOcean adds support.
 //   Last checked: 2026-03 — PKCE without client_secret returns 401 invalid_request.
 //   Check status: POST to /v1/oauth/token with code_verifier but WITHOUT client_secret.
-//   If it succeeds, migrate using this checklist:
-//     1. Add code_verifier/code_challenge (S256) generation to tryDoOAuth()
-//     2. Include code_challenge + code_challenge_method in the authorize URL params
-//     3. Include code_verifier in the token exchange POST body
-//     4. Remove DO_CLIENT_SECRET constant and all client_secret params from token requests
-//     5. Remove client_secret from tryRefreshDoToken() refresh request body
-//     6. Update this comment to reflect the new PKCE-only flow
+//   If it succeeds, complete the migration:
+//     1. Remove DO_CLIENT_SECRET constant and all client_secret params from token requests
+//     2. Remove client_secret from tryRefreshDoToken() refresh request body
+//     3. Update this comment to reflect the new PKCE-only flow
 //   Re-check every 6 months or when DigitalOcean announces OAuth/API updates.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
 const DO_CLIENT_SECRET =
@@ -547,6 +551,8 @@ async function tryDoOAuth(): Promise<string | null> {
   }
 
   const csrfState = generateCsrfState();
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
   let oauthCode: string | null = null;
   let oauthDenied = false;
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -648,6 +654,10 @@ async function tryDoOAuth(): Promise<string | null> {
     response_type: "code",
     scope: DO_SCOPES,
     state: csrfState,
+    // Opportunistic PKCE (S256) — defense-in-depth alongside client_secret.
+    // DO may silently ignore these until they add PKCE support.
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
   const authUrl = `${DO_OAUTH_AUTHORIZE}?${authParams.toString()}`;
 
@@ -687,6 +697,7 @@ async function tryDoOAuth(): Promise<string | null> {
       client_id: DO_CLIENT_ID,
       client_secret: DO_CLIENT_SECRET,
       redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
     });
 
     const resp = await fetch(DO_OAUTH_TOKEN, {
