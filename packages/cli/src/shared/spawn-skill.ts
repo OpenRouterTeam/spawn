@@ -24,37 +24,35 @@ const SKILL_BODY = `# Spawn — Create Child VMs
 
 You have the \`spawn\` CLI installed. Use it to provision cloud VMs with AI agents.
 
-## Usage
+## Provision a Child VM
 
 \`\`\`bash
 spawn <agent> <cloud> --headless --output json --prompt "task description"
 \`\`\`
 
-## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie
-## Clouds: hetzner, digitalocean, aws, gcp, sprite
-
-## Example
-
-\`\`\`bash
-spawn claude hetzner --headless --output json --prompt "Implement the auth module"
-\`\`\`
+**Agents:** claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie
+**Clouds:** hetzner, digitalocean, aws, gcp, sprite
 
 Returns JSON: \`{"status":"success","ip_address":"...","ssh_user":"root","server_id":"..."}\`
 
-## Running a prompt on a child VM
+## Running Prompts on Child VMs
 
-**--headless only provisions the VM — it does NOT run the prompt on it.**
-To actually execute work on the child, SSH in and run the agent:
+\`--headless\` only provisions — to run work on the child, SSH in with \`bash -lc\`:
 
 \`\`\`bash
-ssh -o StrictHostKeyChecking=accept-new root@<ip_address> '~/.local/bin/claude --print "your prompt"'
+# Claude Code (use -p, NOT --print or --headless)
+ssh -o StrictHostKeyChecking=accept-new root@<ip> "bash -lc 'claude -p --dangerously-skip-permissions \\"your prompt\\"'"
+
+# Codex CLI
+ssh -o StrictHostKeyChecking=accept-new root@<ip> "bash -lc 'codex --quiet \\"your prompt\\"'"
 \`\`\`
 
-### Known gotchas — do NOT waste time rediscovering these:
-- Agent binaries are at \`~/.local/bin/\`, NOT on the default PATH. Always use the full path: \`~/.local/bin/claude\`, \`~/.local/bin/codex\`, etc.
-- Claude Code blocks \`--dangerously-skip-permissions\` as root. Use \`--print\` for one-shot prompts instead — it works as root and returns the response directly.
-- Do NOT try to create a non-root user to work around root restrictions — it requires copying config files (\`.claude.json\`, \`.claude/settings.json\`, env vars) and is fragile. Just use \`--print\`.
-- For long-running tasks, use \`spawn delete --name <name> --yes\` to clean up when done.
+### IMPORTANT — do NOT waste tokens rediscovering these:
+- **Always use \`bash -lc\`** — agent binaries are in \`~/.local/bin/\` which is only on PATH in login shells
+- **Claude uses \`-p\`** for non-interactive output (NOT \`--print\`, NOT \`--headless\`)
+- **Add \`--dangerously-skip-permissions\`** to skip approval prompts on child VMs
+- **Never try \`which claude\` or \`find\`** to locate binaries — they are always at \`~/.local/bin/<agent>\`
+- **Never create non-root users** to work around permission issues — just use \`-p\`
 
 ## Managing Children
 
@@ -78,7 +76,7 @@ You have the \`spawn\` CLI for creating child cloud VMs with AI agents.
 Use \`spawn <agent> <cloud> --headless --output json --prompt "task"\` to delegate work.
 Available agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie.
 Cloud credentials are pre-configured. Run \`spawn list --json\` to see children.
-Note: --headless only provisions the VM. To run a prompt, SSH in: \`ssh root@<ip> '~/.local/bin/<agent> --print "prompt"'\`.
+\`--headless\` only provisions. To run a prompt on the child: \`ssh root@<ip> "bash -lc 'claude -p --dangerously-skip-permissions \\"prompt\\"'"\`. Always use \`bash -lc\` (binaries are in ~/.local/bin/).
 `;
 
 // ─── Agent config ───────────────────────────────────────────────────────────
