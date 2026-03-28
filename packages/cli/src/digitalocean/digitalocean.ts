@@ -1455,17 +1455,17 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 
 export async function downloadFile(remotePath: string, localPath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
+  const expandedRemote = remotePath.replace(/^\$HOME\//, "~/");
+  const normalizedRemote = validateRemotePath(expandedRemote, /^[a-zA-Z0-9/_.~-]+$/);
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
 
   const proc = Bun.spawn(
     [
       "scp",
       ...SSH_BASE_OPTS,
       ...keyOpts,
-      `root@${serverIp}:${expandedPath}`,
+      `root@${serverIp}:${normalizedRemote}`,
       localPath,
     ],
     {
