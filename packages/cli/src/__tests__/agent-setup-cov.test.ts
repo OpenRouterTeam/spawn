@@ -246,6 +246,7 @@ describe("createCloudAgents", () => {
       expect([
         "minimal",
         "node",
+        "bun",
         "full",
       ]).toContain(agent.cloudInitTier);
     }
