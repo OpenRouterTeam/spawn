@@ -78,22 +78,33 @@ provision_agent() {
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
     # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
-    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility.
+    # Uses parameter expansion for macOS bash 3.2 compatibility (no BASH_REMATCH).
     # Positive whitelist: only variables actually emitted by cloud_headless_env
     # functions are allowed. This prevents injection of arbitrary env vars.
     _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION SPRITE_NAME SPRITE_ORG "
     while IFS= read -r _env_line; do
-      # Skip lines that don't look like export VAR="VALUE"
+      # Only process well-formed export VAR="VALUE" lines (strict case filter)
       case "${_env_line}" in
-        export\ *=*) ;;
+        export\ [A-Za-z_]*=\"*\") ;;
         *) continue ;;
       esac
-      # Extract variable name and value using sed
-      _env_name=$(printf '%s' "${_env_line}" | sed -n 's/^export  *\([A-Za-z_][A-Za-z0-9_]*\)="\(.*\)"$/\1/p')
-      _env_val=$(printf '%s' "${_env_line}" | sed -n 's/^export  *\([A-Za-z_][A-Za-z0-9_]*\)="\(.*\)"$/\2/p')
-      if [ -z "${_env_name}" ]; then
+      # Extract variable name via parameter expansion (POSIX, no regex engine).
+      # Strip the 'export ' prefix, then take everything before the first '='.
+      _env_rest="${_env_line#export }"
+      _env_name="${_env_rest%%=*}"
+      # Strip leading/trailing whitespace from name
+      _env_name=$(printf '%s' "${_env_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      # Validate name: must be a valid shell identifier (letters, digits, underscores)
+      case "${_env_name}" in
+        [A-Za-z_]*) ;;
+        *) continue ;;
+      esac
+      if printf '%s' "${_env_name}" | grep -qE '[^A-Za-z0-9_]'; then
         continue
       fi
+      # Extract value: everything after the first '="' and before the trailing '"'
+      _env_val="${_env_rest#*=\"}"
+      _env_val="${_env_val%\"}"
       # Only allow whitelisted variable names (positive match)
       case "${_ALLOWED_HEADLESS_VARS}" in
         *" ${_env_name} "*) ;;
@@ -107,7 +118,7 @@ provision_agent() {
       # check makes the security intent clear and catches dangerous patterns
       # even if the whitelist regex below is ever relaxed.
       case "${_env_val}" in
-        *'$'*|*'`'*|*'\\'*)
+        *'$'*|*'`'*|*\\*)
           log_err "SECURITY: Dangerous characters in env value for ${_env_name} — rejecting"
           continue
           ;;
