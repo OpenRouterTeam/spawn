@@ -221,7 +221,7 @@ describe("cmdPullHistory", () => {
   });
 
   it("skips servers without connection info", async () => {
-    const spy = spyOn(historyModule, "getActiveServers").mockReturnValue([
+    const activeSpy = spyOn(historyModule, "getActiveServers").mockReturnValue([
       {
         id: "test-1",
         agent: "claude",
@@ -229,13 +229,16 @@ describe("cmdPullHistory", () => {
         timestamp: "2026-03-26T00:00:00Z",
       },
     ]);
-    // Should not throw — just skips the record with no connection
+    const spawnSpy = spyOn(Bun, "spawn");
     await cmdPullHistory();
-    spy.mockRestore();
+    // No SSH connection should have been attempted for a record with no connection info
+    expect(spawnSpy).not.toHaveBeenCalled();
+    activeSpy.mockRestore();
+    spawnSpy.mockRestore();
   });
 
   it("skips servers with missing ip", async () => {
-    const spy = spyOn(historyModule, "getActiveServers").mockReturnValue([
+    const activeSpy = spyOn(historyModule, "getActiveServers").mockReturnValue([
       {
         id: "test-2",
         agent: "claude",
@@ -247,7 +250,11 @@ describe("cmdPullHistory", () => {
         },
       },
     ]);
+    const spawnSpy = spyOn(Bun, "spawn");
     await cmdPullHistory();
-    spy.mockRestore();
+    // No SSH connection should have been attempted for a record with empty IP
+    expect(spawnSpy).not.toHaveBeenCalled();
+    activeSpy.mockRestore();
+    spawnSpy.mockRestore();
   });
 });

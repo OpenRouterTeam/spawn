@@ -157,26 +157,42 @@ describe("handleBillingError", () => {
 });
 
 describe("showNonBillingError", () => {
-  let stderrSpy: ReturnType<typeof spyOn>;
-
-  beforeEach(() => {
-    stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
-  });
-
-  afterEach(() => {
-    stderrSpy.mockRestore();
-  });
-
-  it("does not throw", () => {
+  it("logs each cause and the billing URL", () => {
     const deps = createMockDeps();
-    expect(() => {
-      showNonBillingError(
-        hetznerBilling,
-        [
-          "Server limit reached for your account",
-        ],
-        deps,
-      );
-    }).not.toThrow();
+    showNonBillingError(
+      hetznerBilling,
+      [
+        "Server limit reached for your account",
+      ],
+      deps,
+    );
+    expect(deps.logWarn).toHaveBeenCalledWith("Possible causes:");
+    expect(deps.logWarn).toHaveBeenCalledWith("  - Server limit reached for your account");
+    expect(deps.logInfo).toHaveBeenCalledWith("Dashboard: https://console.hetzner.cloud/");
+  });
+
+  it("skips billing URL line when billingUrl is empty", () => {
+    const deps = createMockDeps();
+    const noBillingUrl = {
+      billingUrl: "",
+      setupSteps: [],
+      errorPatterns: [],
+    };
+    showNonBillingError(
+      noBillingUrl,
+      [
+        "Some cause",
+      ],
+      deps,
+    );
+    expect(deps.logWarn).toHaveBeenCalledWith("Possible causes:");
+    expect(deps.logInfo).not.toHaveBeenCalled();
+  });
+
+  it("skips cause header when causes array is empty", () => {
+    const deps = createMockDeps();
+    showNonBillingError(hetznerBilling, [], deps);
+    expect(deps.logWarn).not.toHaveBeenCalled();
+    expect(deps.logInfo).toHaveBeenCalledWith("Dashboard: https://console.hetzner.cloud/");
   });
 });
