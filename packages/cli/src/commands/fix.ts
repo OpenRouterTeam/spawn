@@ -8,6 +8,7 @@ import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateConnectionIP, validateIdentifier, validateServerIdentifier, validateUsername } from "../security.js";
+import { loadSavedOpenRouterKey } from "../shared/oauth.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import { SSH_INTERACTIVE_OPTS } from "../shared/ssh.js";
@@ -174,6 +175,21 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
     p.log.error(`Unknown agent: ${pc.bold(record.agent)}`);
     p.log.info("This spawn may have been created with an agent that no longer exists.");
     return;
+  }
+
+  // Ensure OPENROUTER_API_KEY is available before building the fix script.
+  // The normal provisioning flow uses getOrPromptApiKey() which loads from
+  // ~/.config/spawn/openrouter.json. buildFixScript() resolves env templates
+  // from process.env, so we must populate it here to avoid injecting empty keys.
+  if (!process.env.OPENROUTER_API_KEY) {
+    const savedKey = loadSavedOpenRouterKey();
+    if (savedKey) {
+      process.env.OPENROUTER_API_KEY = savedKey;
+    } else {
+      p.log.error("No OpenRouter API key found.");
+      p.log.info("Set OPENROUTER_API_KEY in your environment, or run a new spawn to authenticate via OAuth.");
+      return;
+    }
   }
 
   // Build the remote fix script
