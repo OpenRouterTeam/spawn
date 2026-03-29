@@ -209,12 +209,12 @@ describe("getScriptFailureGuidance", () => {
 
     it("should show specific env var name and setup hint for default case when authHint is provided", () => {
       const savedOR = process.env.OPENROUTER_API_KEY;
-      const savedDO = process.env.DO_API_TOKEN;
+      const savedDO = process.env.DIGITALOCEAN_ACCESS_TOKEN;
       delete process.env.OPENROUTER_API_KEY;
-      delete process.env.DO_API_TOKEN;
-      const lines = stripped_getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
+      delete process.env.DIGITALOCEAN_ACCESS_TOKEN;
+      const lines = stripped_getScriptFailureGuidance(42, "digitalocean", "DIGITALOCEAN_ACCESS_TOKEN");
       const joined = lines.join("\n");
-      expect(joined).toContain("DO_API_TOKEN");
+      expect(joined).toContain("DIGITALOCEAN_ACCESS_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
       expect(joined).toContain("spawn digitalocean");
       expect(joined).toContain("setup");
@@ -222,7 +222,7 @@ describe("getScriptFailureGuidance", () => {
         process.env.OPENROUTER_API_KEY = savedOR;
       }
       if (savedDO !== undefined) {
-        process.env.DO_API_TOKEN = savedDO;
+        process.env.DIGITALOCEAN_ACCESS_TOKEN = savedDO;
       }
     });
 
@@ -230,7 +230,7 @@ describe("getScriptFailureGuidance", () => {
       const lines = stripped_getScriptFailureGuidance(42, "digitalocean");
       const joined = lines.join("\n");
       expect(joined).toContain("spawn digitalocean");
-      expect(joined).not.toContain("DO_API_TOKEN");
+      expect(joined).not.toContain("DIGITALOCEAN_ACCESS_TOKEN");
     });
 
     it("should handle multi-credential auth hint", () => {
