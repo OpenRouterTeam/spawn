@@ -14,7 +14,7 @@ You have the `spawn` CLI installed. Use it to provision cloud VMs with AI agents
 spawn <agent> <cloud> --headless --output json --prompt "task description"
 ```
 
-**Agents:** claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie
+**Agents:** claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie, cursor
 **Clouds:** hetzner, digitalocean, aws, gcp, sprite
 
 Returns JSON: `{"status":"success","ip_address":"...","ssh_user":"root","server_id":"..."}`
