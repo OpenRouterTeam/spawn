@@ -285,7 +285,7 @@ export function hasSavedOpenRouterKey(): boolean {
 }
 
 /** Load a previously saved OpenRouter API key from ~/.config/spawn/openrouter.json. */
-function loadSavedOpenRouterKey(): string | null {
+export function loadSavedOpenRouterKey(): string | null {
   const result = tryCatch(() => {
     const configPath = getSpawnCloudConfigPath("openrouter");
     const data = parseJsonObj(readFileSync(configPath, "utf-8"));
