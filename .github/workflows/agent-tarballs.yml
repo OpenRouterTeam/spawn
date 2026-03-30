@@ -49,8 +49,6 @@ jobs:
         # Native-binary agents need ARM builds too.
         # npm-based agents (codex, openclaw, kilocode) are arch-independent — x86_64 only.
         include:
-          - agent: zeroclaw
-            arch: arm64
           - agent: opencode
             arch: arm64
           - agent: hermes
