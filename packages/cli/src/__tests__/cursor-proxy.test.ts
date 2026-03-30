@@ -228,29 +228,29 @@ describe("AgentServerMessage encoding", () => {
 
 describe("ModelDetails encoding", () => {
   it("encodes model with all required fields", () => {
-    const model = bmd("claude-4-sonnet", "Claude Sonnet 4");
+    const model = bmd("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6");
     const strings: string[] = [];
     xstr(model, strings);
-    expect(strings).toContain("claude-4-sonnet");
-    expect(strings).toContain("Claude Sonnet 4");
+    expect(strings).toContain("anthropic/claude-sonnet-4-6");
+    expect(strings).toContain("Claude Sonnet 4.6");
   });
 
   it("encodes model list response", () => {
     const models = [
       [
-        "claude-4-sonnet",
-        "Claude 4",
+        "anthropic/claude-sonnet-4-6",
+        "Claude Sonnet 4.6",
       ],
       [
-        "gpt-4o",
-        "GPT-4o",
+        "openai/gpt-5.4",
+        "GPT-5.4",
       ],
     ];
     const response = Buffer.concat(models.map(([id, name]) => em(1, bmd(id, name))));
     const strings: string[] = [];
     xstr(response, strings);
-    expect(strings).toContain("claude-4-sonnet");
-    expect(strings).toContain("gpt-4o");
+    expect(strings).toContain("anthropic/claude-sonnet-4-6");
+    expect(strings).toContain("openai/gpt-5.4");
   });
 });
 
