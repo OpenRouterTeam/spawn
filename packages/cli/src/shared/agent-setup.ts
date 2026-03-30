@@ -1128,6 +1128,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
+        "CURSOR_API_KEY=spawn-proxy",
       ],
       configure: () => setupCursorProxy(runner),
       preLaunch: () => startCursorProxy(runner),
