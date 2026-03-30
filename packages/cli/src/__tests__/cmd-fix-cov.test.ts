@@ -151,29 +151,6 @@ describe("fixSpawn (additional coverage)", () => {
     });
     expect(clack.logStep).toHaveBeenCalledWith(expect.stringContaining("1.2.3.4"));
   });
-});
-
-// ── Tests: fixSpawn success message ──────────────────────────────────────────
-// (error paths are covered in cmd-fix.test.ts; this covers the exact success message)
-
-describe("fixSpawn connection edge cases", () => {
-  let savedApiKey: string | undefined;
-
-  beforeEach(() => {
-    savedApiKey = process.env.OPENROUTER_API_KEY;
-    process.env.OPENROUTER_API_KEY = "sk-or-test-fix-key";
-    clack.logError.mockReset();
-    clack.logSuccess.mockReset();
-    clack.logStep.mockReset();
-  });
-
-  afterEach(() => {
-    if (savedApiKey === undefined) {
-      delete process.env.OPENROUTER_API_KEY;
-    } else {
-      process.env.OPENROUTER_API_KEY = savedApiKey;
-    }
-  });
 
   it("shows success when fix script succeeds", async () => {
     const mockRunner = mock(async () => true);
