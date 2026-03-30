@@ -189,7 +189,6 @@ describe("validateLaunchCmd", () => {
       "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
       "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
       "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
-      "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
       "source ~/.spawnrc 2>/dev/null; hermes",
       "claude",
       "aider",
