@@ -408,7 +408,7 @@
       "description": "Cloud servers (account + payment method required)",
       "url": "https://www.digitalocean.com/",
       "type": "api",
-      "auth": "DO_API_TOKEN",
+      "auth": "DIGITALOCEAN_ACCESS_TOKEN",
       "provision_method": "POST /v2/droplets with user_data",
       "exec_method": "ssh root@IP",
       "interactive_method": "ssh -t root@IP",

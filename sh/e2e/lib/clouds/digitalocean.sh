@@ -4,10 +4,18 @@
 # Implements the standard cloud driver interface (_digitalocean_*) for
 # provisioning and managing DigitalOcean droplets in the E2E test suite.
 #
-# Requires: DO_API_TOKEN, jq, ssh
+# Accepts: DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN
 # API: https://api.digitalocean.com/v2
 # SSH user: root
 set -eo pipefail
+
+# ── Resolve DigitalOcean token (canonical > alternate > legacy) ───────────
+if [ -n "${DIGITALOCEAN_ACCESS_TOKEN:-}" ]; then
+  DO_API_TOKEN="${DIGITALOCEAN_ACCESS_TOKEN}"
+elif [ -n "${DIGITALOCEAN_API_TOKEN:-}" ]; then
+  DO_API_TOKEN="${DIGITALOCEAN_API_TOKEN}"
+fi
+export DO_API_TOKEN
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -19,7 +27,7 @@ _DO_DEFAULT_REGION="nyc3"
 # ---------------------------------------------------------------------------
 # _do_curl_auth [curl-args...]
 #
-# Wrapper around curl that passes the DO_API_TOKEN via a temp config file
+# Wrapper around curl that passes the token via a temp config file
 # instead of a command-line -H flag. This keeps the token out of `ps` output.
 # All arguments are forwarded to curl.
 # ---------------------------------------------------------------------------
@@ -37,19 +45,19 @@ _do_curl_auth() {
 # ---------------------------------------------------------------------------
 # _digitalocean_validate_env
 #
-# Validates that DO_API_TOKEN is set and the DigitalOcean API is reachable
-# with valid credentials.
+# Validates that a DigitalOcean token is set and the API is reachable.
+# Accepts DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN.
 # Returns 0 on success, 1 on failure.
 # ---------------------------------------------------------------------------
 _digitalocean_validate_env() {
   if [ -z "${DO_API_TOKEN:-}" ]; then
-    log_err "DO_API_TOKEN is not set"
+    log_err "DigitalOcean token is not set (set DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN)"
     return 1
   fi
 
   if ! _do_curl_auth -sf \
     "${_DO_API}/account" >/dev/null 2>&1; then
-    log_err "DigitalOcean API authentication failed — check DO_API_TOKEN"
+    log_err "DigitalOcean API authentication failed — check your token"
     return 1
   fi
 
