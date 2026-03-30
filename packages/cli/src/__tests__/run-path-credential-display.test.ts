@@ -68,7 +68,7 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
         price: "test",
         url: "https://digitalocean.com",
         type: "api",
-        auth: "DO_API_TOKEN",
+        auth: "DIGITALOCEAN_ACCESS_TOKEN",
         provision_method: "api",
         exec_method: "ssh root@IP",
         interactive_method: "ssh -t root@IP",
@@ -138,6 +138,8 @@ describe("prioritizeCloudsByCredentials", () => {
     // Save and clear credential env vars
     for (const v of [
       "HCLOUD_TOKEN",
+      "DIGITALOCEAN_ACCESS_TOKEN",
+      "DIGITALOCEAN_API_TOKEN",
       "DO_API_TOKEN",
       "UPCLOUD_USERNAME",
       "UPCLOUD_PASSWORD",
@@ -191,7 +193,7 @@ describe("prioritizeCloudsByCredentials", () => {
 
   it("should move multiple credential clouds to front", () => {
     process.env.HCLOUD_TOKEN = "test-token";
-    process.env.DO_API_TOKEN = "test-do-token";
+    process.env.DIGITALOCEAN_ACCESS_TOKEN = "test-do-token";
     const manifest = makeManifest();
     const clouds = [
       "upcloud",
@@ -290,7 +292,7 @@ describe("prioritizeCloudsByCredentials", () => {
 
   it("should preserve relative order within each group", () => {
     process.env.HCLOUD_TOKEN = "token";
-    process.env.DO_API_TOKEN = "token";
+    process.env.DIGITALOCEAN_ACCESS_TOKEN = "token";
     const manifest = makeManifest();
     // Input order: digitalocean before hetzner (both have creds)
     const clouds = [
@@ -331,7 +333,7 @@ describe("prioritizeCloudsByCredentials", () => {
 
   it("should count all credential clouds correctly with all set", () => {
     process.env.HCLOUD_TOKEN = "t1";
-    process.env.DO_API_TOKEN = "t2";
+    process.env.DIGITALOCEAN_ACCESS_TOKEN = "t2";
     process.env.UPCLOUD_USERNAME = "u";
     process.env.UPCLOUD_PASSWORD = "p";
     const manifest = makeManifest();
@@ -349,5 +351,31 @@ describe("prioritizeCloudsByCredentials", () => {
     // sprite and localcloud should be at the end
     expect(result.sortedClouds.slice(3)).toContain("sprite");
     expect(result.sortedClouds.slice(3)).toContain("localcloud");
+  });
+
+  it("should recognize legacy DO_API_TOKEN as alias for DIGITALOCEAN_ACCESS_TOKEN", () => {
+    process.env.DO_API_TOKEN = "legacy-token";
+    const manifest = makeManifest();
+    const clouds = [
+      "digitalocean",
+      "hetzner",
+    ];
+    const result = prioritizeCloudsByCredentials(clouds, manifest);
+
+    expect(result.credCount).toBe(1);
+    expect(result.sortedClouds[0]).toBe("digitalocean");
+  });
+
+  it("should recognize DIGITALOCEAN_API_TOKEN as alias for DIGITALOCEAN_ACCESS_TOKEN", () => {
+    process.env.DIGITALOCEAN_API_TOKEN = "alt-token";
+    const manifest = makeManifest();
+    const clouds = [
+      "digitalocean",
+      "hetzner",
+    ];
+    const result = prioritizeCloudsByCredentials(clouds, manifest);
+
+    expect(result.credCount).toBe(1);
+    expect(result.sortedClouds[0]).toBe("digitalocean");
   });
 });

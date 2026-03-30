@@ -47,8 +47,8 @@ describe("parseAuthEnvVars", () => {
     });
 
     it("should extract env var starting with letter followed by digits", () => {
-      expect(parseAuthEnvVars("DO_API_TOKEN")).toEqual([
-        "DO_API_TOKEN",
+      expect(parseAuthEnvVars("DIGITALOCEAN_ACCESS_TOKEN")).toEqual([
+        "DIGITALOCEAN_ACCESS_TOKEN",
       ]);
     });
   });
