@@ -35,8 +35,8 @@ source "digitalocean" "spawn" {
   api_token    = var.digitalocean_access_token
   image        = "ubuntu-24-04-x64"
   region       = "sfo3"
-  # 2 GB RAM needed — Claude's native installer and zeroclaw's Rust build
-  # get OOM-killed on s-1vcpu-1gb. Snapshots built here work on all sizes.
+  # 2 GB RAM needed — Claude's native installer gets OOM-killed on
+  # s-1vcpu-1gb. Snapshots built here work on all sizes.
   size         = "s-2vcpu-2gb"
   ssh_username = "root"
 
