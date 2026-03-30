@@ -1132,7 +1132,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: () => setupCursorProxy(runner),
       preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
-        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh --trust',
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
       updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };
