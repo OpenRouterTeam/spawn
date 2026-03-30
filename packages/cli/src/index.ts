@@ -1071,6 +1071,24 @@ async function main(): Promise<void> {
   }
 
   // Validate headless-incompatible flags
+  if (effectiveHeadless && dryRun) {
+    if (outputFormat === "json") {
+      console.log(
+        JSON.stringify({
+          status: "error",
+          error_code: "VALIDATION_ERROR",
+          error_message:
+            "--dry-run is not yet supported with --headless. Use --dry-run (interactive) or --headless (execution) separately.",
+        }),
+      );
+    } else {
+      console.error(pc.red("Error: --dry-run is not yet supported with --headless"));
+      console.error(
+        `\nUse ${pc.cyan("--dry-run")} for an interactive preview, or ${pc.cyan("--headless")} for unattended execution.`,
+      );
+    }
+    process.exit(3);
+  }
 
   checkUnknownFlags(filteredArgs);
 
