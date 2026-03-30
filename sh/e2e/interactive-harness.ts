@@ -9,7 +9,7 @@
 // Required env:
 //   ANTHROPIC_API_KEY   — For the AI driver (Claude Haiku)
 //   OPENROUTER_API_KEY  — Injected into spawn for the agent
-//   Cloud credentials   — HCLOUD_TOKEN, DO_API_TOKEN, AWS_ACCESS_KEY_ID, etc.
+//   Cloud credentials   — HCLOUD_TOKEN, DIGITALOCEAN_ACCESS_TOKEN, AWS_ACCESS_KEY_ID, etc.
 //
 // Outputs JSON to stdout: { success: boolean, duration: number, transcript: string, uxIssues?: UxIssue[] }
 
@@ -47,7 +47,7 @@ function buildCredentialHints(): string {
   const hetzner = process.env.HCLOUD_TOKEN ?? "";
   if (hetzner) creds.push(`Hetzner token: ${hetzner}`);
 
-  const doToken = process.env.DO_API_TOKEN ?? "";
+  const doToken = process.env.DIGITALOCEAN_ACCESS_TOKEN ?? process.env.DIGITALOCEAN_API_TOKEN ?? process.env.DO_API_TOKEN ?? "";
   if (doToken) creds.push(`DigitalOcean token: ${doToken}`);
 
   const awsKey = process.env.AWS_ACCESS_KEY_ID ?? "";
@@ -79,6 +79,8 @@ function redactSecrets(text: string): string {
   const secrets = [
     process.env.OPENROUTER_API_KEY,
     process.env.HCLOUD_TOKEN,
+    process.env.DIGITALOCEAN_ACCESS_TOKEN,
+    process.env.DIGITALOCEAN_API_TOKEN,
     process.env.DO_API_TOKEN,
     process.env.AWS_ACCESS_KEY_ID,
     process.env.AWS_SECRET_ACCESS_KEY,
