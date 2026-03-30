@@ -92,7 +92,7 @@ process.stdout.write(d.GCP_ZONE || '');
 # ---------------------------------------------------------------------------
 _gcp_headless_env() {
   local app="$1"
-  # local agent="$2"  # unused but part of the interface
+  # $2 = agent (unused but part of the interface)
 
   printf 'export GCP_INSTANCE_NAME="%s"\n' "${app}"
   printf 'export GCP_PROJECT="%s"\n' "${GCP_PROJECT:-}"

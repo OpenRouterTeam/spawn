@@ -129,7 +129,7 @@ _sprite_validate_env() {
 # ---------------------------------------------------------------------------
 _sprite_headless_env() {
   local app="$1"
-  # local agent="$2"  # unused but part of the interface
+  # $2 = agent (unused but part of the interface)
 
   printf 'export SPRITE_NAME="%s"\n' "${app}"
   if [ -n "${_SPRITE_ORG}" ]; then
