@@ -657,10 +657,10 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
 
 /** Download a file from the remote sprite by catting it to stdout. */
 export async function downloadFileSprite(remotePath: string, localPath: string): Promise<void> {
-  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
+  const expandedRemote = remotePath.replace(/^\$HOME\//, "~/");
+  const normalizedRemote = validateRemotePath(expandedRemote, /^[a-zA-Z0-9/_.~-]+$/);
 
   const spriteCmd = getSpriteCmd()!;
-  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
 
   await spriteRetry("sprite download", async () => {
     const proc = Bun.spawn(
@@ -672,7 +672,7 @@ export async function downloadFileSprite(remotePath: string, localPath: string):
         _state.name,
         "--",
         "cat",
-        expandedPath,
+        normalizedRemote,
       ],
       {
         stdio: [
