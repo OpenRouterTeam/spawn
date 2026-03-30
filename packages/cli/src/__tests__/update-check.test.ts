@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import fs from "node:fs";
 import path from "node:path";
 import { tryCatch } from "@openrouter/spawn-shared";
+import pkg from "../../package.json";
 
 // ── Test Helpers ───────────────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ describe("update-check", () => {
     });
 
     it("should not update when up to date", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response(`${pkg.version}\n`)));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock executor to prevent actual commands
@@ -396,7 +397,7 @@ describe("update-check", () => {
       // Write an old timestamp (2 hours ago)
       writeUpdateChecked(Date.now() - 2 * 60 * 60 * 1000);
 
-      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response(`${pkg.version}\n`)));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -407,7 +408,7 @@ describe("update-check", () => {
     });
 
     it("should write cache file after successful version fetch", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response(`${pkg.version}\n`)));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { checkForUpdates } = await import("../update-check.js");
