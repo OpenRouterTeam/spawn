@@ -151,6 +151,7 @@ describe("cmdStatus", () => {
 
     await cmdStatus({
       json: true,
+      probe: async () => true,
     });
     expect(fetchedUrls.some((u) => u.includes("hetzner.cloud/v1/servers/12345"))).toBe(true);
   });
@@ -193,6 +194,7 @@ describe("cmdStatus", () => {
 
     await cmdStatus({
       json: true,
+      probe: async () => true,
     });
     expect(fetchedUrls.some((u) => u.includes("digitalocean.com/v2/droplets/99999"))).toBe(true);
   });
@@ -415,10 +417,189 @@ describe("cmdStatus", () => {
       return new Response(JSON.stringify(mockManifest));
     });
 
-    await cmdStatus();
+    await cmdStatus({
+      probe: async () => true,
+    });
 
     const infoCalls = clack.logInfo.mock.calls.map((c: unknown[]) => String(c[0]));
     // Should mention running servers and spawn list
     expect(infoCalls.some((msg: string) => msg.includes("running"))).toBe(true);
+  });
+
+  // ── Agent probe tests ───────────────────────────────────────────────────
+
+  it("probes running server and reports agent_alive true in JSON", async () => {
+    writeHistory(testDir, [
+      {
+        id: "probe-live",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          cloud: "hetzner",
+          server_id: "12345",
+        },
+      },
+    ]);
+    writeCloudConfig("hetzner", {
+      api_key: "test-token",
+    });
+
+    _resetCacheForTesting();
+    global.fetch = mock(async (url: string | URL | Request) => {
+      const u = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
+      if (u.includes("hetzner.cloud")) {
+        return new Response(
+          JSON.stringify({
+            server: {
+              status: "running",
+            },
+          }),
+        );
+      }
+      return new Response(JSON.stringify(mockManifest));
+    });
+
+    await cmdStatus({
+      json: true,
+      probe: async () => true,
+    });
+
+    const output = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    const parsed = JSON.parse(output);
+    expect(parsed[0].agent_alive).toBe(true);
+  });
+
+  it("probes running server and reports agent_alive false in JSON", async () => {
+    writeHistory(testDir, [
+      {
+        id: "probe-down",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          cloud: "hetzner",
+          server_id: "12345",
+        },
+      },
+    ]);
+    writeCloudConfig("hetzner", {
+      api_key: "test-token",
+    });
+
+    _resetCacheForTesting();
+    global.fetch = mock(async (url: string | URL | Request) => {
+      const u = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
+      if (u.includes("hetzner.cloud")) {
+        return new Response(
+          JSON.stringify({
+            server: {
+              status: "running",
+            },
+          }),
+        );
+      }
+      return new Response(JSON.stringify(mockManifest));
+    });
+
+    await cmdStatus({
+      json: true,
+      probe: async () => false,
+    });
+
+    const output = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    const parsed = JSON.parse(output);
+    expect(parsed[0].agent_alive).toBe(false);
+  });
+
+  it("does not probe gone servers — agent_alive is null", async () => {
+    writeHistory(testDir, [
+      {
+        id: "probe-gone",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          cloud: "hetzner",
+          server_id: "12345",
+        },
+      },
+    ]);
+    writeCloudConfig("hetzner", {
+      api_key: "test-token",
+    });
+
+    let probeCalled = false;
+    _resetCacheForTesting();
+    global.fetch = mock(async (url: string | URL | Request) => {
+      const u = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
+      if (u.includes("hetzner.cloud")) {
+        return new Response("Not Found", {
+          status: 404,
+        });
+      }
+      return new Response(JSON.stringify(mockManifest));
+    });
+
+    await cmdStatus({
+      json: true,
+      probe: async () => {
+        probeCalled = true;
+        return true;
+      },
+    });
+
+    expect(probeCalled).toBe(false);
+    const output = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    const parsed = JSON.parse(output);
+    expect(parsed[0].agent_alive).toBeNull();
+  });
+
+  it("shows unreachable warning when probe fails in table mode", async () => {
+    writeHistory(testDir, [
+      {
+        id: "probe-warn",
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: new Date().toISOString(),
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          cloud: "hetzner",
+          server_id: "12345",
+        },
+      },
+    ]);
+    writeCloudConfig("hetzner", {
+      api_key: "test-token",
+    });
+
+    _resetCacheForTesting();
+    global.fetch = mock(async (url: string | URL | Request) => {
+      const u = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
+      if (u.includes("hetzner.cloud")) {
+        return new Response(
+          JSON.stringify({
+            server: {
+              status: "running",
+            },
+          }),
+        );
+      }
+      return new Response(JSON.stringify(mockManifest));
+    });
+
+    await cmdStatus({
+      probe: async () => false,
+    });
+
+    const infoCalls = clack.logInfo.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(infoCalls.some((msg: string) => msg.includes("unreachable"))).toBe(true);
   });
 });
