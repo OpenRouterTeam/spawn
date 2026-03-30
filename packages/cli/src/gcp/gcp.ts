@@ -1028,10 +1028,9 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     logError(`Invalid local path: ${localPath}`);
     throw new Error("Invalid local path");
   }
-  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
+  const expandedRemote = remotePath.replace(/^\$HOME\//, "~/");
+  const normalizedRemote = validateRemotePath(expandedRemote, /^[a-zA-Z0-9/_.~-]+$/);
   const username = resolveUsername();
-  // Expand $HOME on remote side
-  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -1040,7 +1039,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       ...SSH_BASE_OPTS,
       ...keyOpts,
       localPath,
-      `${username}@${_state.serverIp}:${expandedPath}`,
+      `${username}@${_state.serverIp}:${normalizedRemote}`,
     ],
     {
       stdio: [
@@ -1067,9 +1066,9 @@ export async function downloadFile(remotePath: string, localPath: string): Promi
     logError(`Invalid local path: ${localPath}`);
     throw new Error("Invalid local path");
   }
-  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
+  const expandedRemote = remotePath.replace(/^\$HOME\//, "~/");
+  const normalizedRemote = validateRemotePath(expandedRemote, /^[a-zA-Z0-9/_.~-]+$/);
   const username = resolveUsername();
-  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
@@ -1077,7 +1076,7 @@ export async function downloadFile(remotePath: string, localPath: string): Promi
       "scp",
       ...SSH_BASE_OPTS,
       ...keyOpts,
-      `${username}@${_state.serverIp}:${expandedPath}`,
+      `${username}@${_state.serverIp}:${normalizedRemote}`,
       localPath,
     ],
     {
