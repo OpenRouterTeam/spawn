@@ -7,6 +7,7 @@ import type { Result } from "./ui.js";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import { setupCursorProxy, startCursorProxy } from "./cursor-proxy.js";
 import { getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { validateRemotePath } from "./ssh.js";
@@ -163,59 +164,6 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
 }
 
 // ─── Cursor CLI Config ────────────────────────────────────────────────────────
-
-async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
-  logStep("Configuring Cursor CLI for OpenRouter...");
-
-  const configJson = `{
-  "version": 1,
-  "permissions": {
-    "allow": ["Shell(*)", "Read(*)", "Write(*)", "WebFetch(*)", "Mcp(*)"],
-    "deny": []
-  }
-}`;
-
-  // Spawn skill rule — injected into .cursor/rules/ so the agent knows
-  // it can provision child VMs via the spawn CLI.
-  const spawnRule = [
-    "---",
-    "description: Spawn CLI — provision child cloud VMs with AI coding agents",
-    "alwaysApply: true",
-    "---",
-    "",
-    "# Spawn — Create Child VMs",
-    "",
-    "You have the `spawn` CLI installed. Use it to provision cloud VMs with AI agents.",
-    "",
-    "## Usage",
-    "",
-    "```bash",
-    'spawn <agent> <cloud> --headless --output json --prompt "task description"',
-    "```",
-    "",
-    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie",
-    "## Clouds: hetzner, digitalocean, aws, gcp, sprite",
-    "",
-    "The command returns JSON with connection details. Use this to delegate subtasks",
-    "to specialized agents running on separate cloud VMs.",
-    "",
-  ].join("\n");
-
-  // Upload config files via SCP — avoids base64 interpolation into shell commands.
-  await uploadConfigFile(runner, configJson, "$HOME/.cursor/cli-config.json");
-  await uploadConfigFile(runner, spawnRule, "$HOME/.cursor/rules/spawn.mdc");
-  // Spawn rule should be world-readable (not sensitive)
-  await runner.runServer("chmod 644 ~/.cursor/rules/spawn.mdc");
-
-  // Persist PATH so agent binary is available (cursor installs to ~/.local/bin since 2026-03-25)
-  const pathScript = [
-    'grep -q ".local/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.bashrc',
-    'grep -q ".local/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.local/bin:$PATH"\\n\' >> ~/.zshrc',
-  ].join(" && ");
-
-  await runner.runServer(pathScript);
-  logInfo("Cursor CLI configured");
-}
 
 // ─── GitHub Auth ─────────────────────────────────────────────────────────────
 
@@ -1168,7 +1116,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
 
     cursor: {
       name: "Cursor CLI",
-      cloudInitTier: "minimal",
+      cloudInitTier: "bun",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
@@ -1180,11 +1128,12 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
-        `CURSOR_API_KEY=${apiKey}`,
+        "CURSOR_API_KEY=spawn-proxy",
       ],
-      configure: (apiKey) => setupCursorConfig(runner, apiKey),
+      configure: () => setupCursorProxy(runner),
+      preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
-        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
       updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };

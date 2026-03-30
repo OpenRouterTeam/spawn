@@ -259,7 +259,7 @@ describe("digitalocean/getServerIp", () => {
     );
     const { getServerIp } = await import("../digitalocean/digitalocean");
     // Need to set the token state
-    process.env.DO_API_TOKEN = "test-token";
+    process.env.DIGITALOCEAN_ACCESS_TOKEN = "test-token";
     // getServerIp calls doApi which uses internal state token - need to set via ensureDoToken
     // But doApi will use _state.token. Since we can't easily set _state, we test the 404 path
     // by mocking fetch to always return 404

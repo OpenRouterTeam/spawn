@@ -306,16 +306,13 @@
       ]
     },
     "cursor": {
-      "disabled": true,
-      "disabled_reason": "Cursor CLI uses a proprietary protocol (ConnectRPC) and validates API keys against Cursor's own servers. Cannot route through OpenRouter. Re-enable when Cursor adds BYOK/custom endpoint support for agent mode.",
       "name": "Cursor CLI",
       "description": "Cursor's terminal-based AI coding agent — autonomous coding with plan, agent, and ask modes",
       "url": "https://cursor.com/cli",
       "install": "curl https://cursor.com/install -fsS | bash",
       "launch": "agent",
       "env": {
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
-        "CURSOR_API_KEY": "${OPENROUTER_API_KEY}"
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "config_files": {
         "~/.cursor/cli-config.json": {
@@ -332,7 +329,7 @@
           }
         }
       },
-      "notes": "Works with OpenRouter via --endpoint flag pointing to openrouter.ai/api/v1 and CURSOR_API_KEY set to OpenRouter key. Binary installs to ~/.local/bin/agent.",
+      "notes": "Routes through OpenRouter via a local ConnectRPC-to-REST translation proxy (Caddy + Node.js). The proxy intercepts Cursor's proprietary protobuf protocol, translates to OpenAI-compatible API calls, and streams responses back. Binary installs to ~/.local/bin/agent.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/cursor.png",
       "featured_cloud": [
         "digitalocean",
@@ -411,7 +408,7 @@
       "description": "Cloud servers (account + payment method required)",
       "url": "https://www.digitalocean.com/",
       "type": "api",
-      "auth": "DO_API_TOKEN",
+      "auth": "DIGITALOCEAN_ACCESS_TOKEN",
       "provision_method": "POST /v2/droplets with user_data",
       "exec_method": "ssh root@IP",
       "interactive_method": "ssh -t root@IP",
