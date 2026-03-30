@@ -73,7 +73,7 @@ _digitalocean_validate_env() {
 # ---------------------------------------------------------------------------
 _digitalocean_headless_env() {
   local app="$1"
-  # local agent="$2"  # unused but part of the interface
+  # $2 = agent (unused but part of the interface)
 
   printf 'export DO_DROPLET_NAME="%s"\n' "${app}"
   printf 'export DO_DROPLET_SIZE="%s"\n' "${DO_DROPLET_SIZE:-${_DO_DEFAULT_SIZE}}"
