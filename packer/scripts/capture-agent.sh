@@ -13,9 +13,9 @@ fi
 
 # Validate agent name against allowed list to prevent injection
 case "${AGENT_NAME}" in
-  openclaw|codex|kilocode|claude|opencode|zeroclaw|hermes|junie) ;;
+  openclaw|codex|kilocode|claude|opencode|hermes|junie) ;;
   *)
-    printf 'Error: Invalid agent name: %s\nAllowed: openclaw, codex, kilocode, claude, opencode, zeroclaw, hermes, junie\n' "${AGENT_NAME}" >&2
+    printf 'Error: Invalid agent name: %s\nAllowed: openclaw, codex, kilocode, claude, opencode, hermes, junie\n' "${AGENT_NAME}" >&2
     exit 1
     ;;
 esac
@@ -43,9 +43,6 @@ case "${AGENT_NAME}" in
     ;;
   opencode)
     echo "/root/.opencode/" >> "${PATHS_FILE}"
-    ;;
-  zeroclaw)
-    echo "/root/.cargo/bin/zeroclaw" >> "${PATHS_FILE}"
     ;;
   hermes)
     echo "/root/.local/bin/hermes" >> "${PATHS_FILE}"

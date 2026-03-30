@@ -24,12 +24,6 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/openclaw.sh)
 ```
 
-#### ZeroClaw
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/zeroclaw.sh)
-```
-
 #### Codex CLI
 
 ```bash
