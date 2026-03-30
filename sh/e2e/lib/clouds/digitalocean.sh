@@ -384,7 +384,7 @@ _digitalocean_max_parallel() {
   _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | grep -o '"id":[0-9]*' | wc -l | tr -d ' ') || { printf '3'; return 0; }
   _available=$(( _limit - _existing ))
   if [ "${_available}" -lt 1 ]; then
-    log_warn "DigitalOcean droplet limit reached: ${_existing}/${_limit} droplets in use (0 available)"
+    log_warn "DigitalOcean droplet limit reached: ${_existing}/${_limit} droplets in use (0 available)" >&2
     printf '0'
   else
     printf '%d' "${_available}"
