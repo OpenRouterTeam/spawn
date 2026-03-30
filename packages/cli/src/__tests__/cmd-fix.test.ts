@@ -194,11 +194,23 @@ describe("buildFixScript", () => {
 // ── Tests: fixSpawn (DI for SSH runner) ─────────────────────────────────────
 
 describe("fixSpawn", () => {
+  let savedApiKey: string | undefined;
+
   beforeEach(() => {
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or-test-fix-key";
     clack.logError.mockReset();
     clack.logSuccess.mockReset();
     clack.logInfo.mockReset();
     clack.logStep.mockReset();
+  });
+
+  afterEach(() => {
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
   });
 
   it("shows error for record without connection info", async () => {
@@ -309,6 +321,7 @@ describe("fixSpawn", () => {
 describe("cmdFix", () => {
   let testDir: string;
   let savedSpawnHome: string | undefined;
+  let savedApiKey: string | undefined;
   let processExitSpy: ReturnType<typeof spyOn>;
 
   function writeHistory(records: SpawnRecord[]) {
@@ -328,6 +341,8 @@ describe("cmdFix", () => {
     });
     savedSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = testDir;
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or-test-fix-key";
     clack.logError.mockReset();
     clack.logSuccess.mockReset();
     clack.logInfo.mockReset();
@@ -338,6 +353,11 @@ describe("cmdFix", () => {
 
   afterEach(() => {
     process.env.SPAWN_HOME = savedSpawnHome;
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
     processExitSpy.mockRestore();
     if (existsSync(testDir)) {
       rmSync(testDir, {

@@ -10,7 +10,7 @@
 
 import type { SpawnRecord } from "../history";
 
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { tryCatch } from "@openrouter/spawn-shared";
 import { createMockManifest, mockClackPrompts } from "./test-helpers";
 
@@ -51,11 +51,23 @@ function makeRecord(overrides: Partial<SpawnRecord> = {}): SpawnRecord {
 // ── Tests: fixSpawn edge cases ──────────────────────────────────────────────
 
 describe("fixSpawn (additional coverage)", () => {
+  let savedApiKey: string | undefined;
+
   beforeEach(() => {
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or-test-fix-key";
     clack.logError.mockReset();
     clack.logInfo.mockReset();
     clack.logSuccess.mockReset();
     clack.logStep.mockReset();
+  });
+
+  afterEach(() => {
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
   });
 
   it("shows error for invalid server_name in connection", async () => {
@@ -145,10 +157,22 @@ describe("fixSpawn (additional coverage)", () => {
 // (error paths are covered in cmd-fix.test.ts; this covers the exact success message)
 
 describe("fixSpawn connection edge cases", () => {
+  let savedApiKey: string | undefined;
+
   beforeEach(() => {
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or-test-fix-key";
     clack.logError.mockReset();
     clack.logSuccess.mockReset();
     clack.logStep.mockReset();
+  });
+
+  afterEach(() => {
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
   });
 
   it("shows success when fix script succeeds", async () => {
