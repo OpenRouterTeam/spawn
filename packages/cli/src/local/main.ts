@@ -67,7 +67,7 @@ async function main() {
 
   const cloud: CloudOrchestrator = {
     cloudName: "local",
-    cloudLabel: useSandbox ? "local machine (sandboxed)" : "local machine",
+    cloudLabel: useSandbox ? "local (sandboxed)" : "local",
     skipAgentInstall: false,
     runner: useSandbox ? makeDockerRunner(baseRunner) : baseRunner,
     async authenticate() {},
