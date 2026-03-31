@@ -6,10 +6,19 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import * as p from "@clack/prompts";
 import { getErrorMessage } from "@openrouter/spawn-shared";
-import { runOrchestration } from "../shared/orchestrate.js";
+import { makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logWarn } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
-import { downloadFile, interactiveSession, runLocal, uploadFile } from "./local.js";
+import {
+  cleanupContainer,
+  dockerInteractiveSession,
+  downloadFile,
+  ensureDocker,
+  interactiveSession,
+  pullAndStartContainer,
+  runLocal,
+  uploadFile,
+} from "./local.js";
 
 async function main() {
   const agentName = process.argv[2];
@@ -21,9 +30,18 @@ async function main() {
 
   const agent = resolveAgent(agentName);
 
+  // Check if --beta sandbox is active
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+  const useSandbox = betaFeatures.includes("sandbox");
+
+  // If sandboxed, ensure Docker is installed (auto-install if missing)
+  if (useSandbox) {
+    await ensureDocker();
+  }
+
   // Warn about security implications of installing OpenClaw locally
-  // (OpenClaw has browser access and broader system control than other agents)
-  if (agentName === "openclaw" && process.env.SPAWN_NON_INTERACTIVE !== "1") {
+  // (skip warning in sandbox mode — the container provides isolation)
+  if (agentName === "openclaw" && !useSandbox && process.env.SPAWN_NON_INTERACTIVE !== "1") {
     process.stderr.write("\n");
     logWarn("⚠  Local installation warning");
     logWarn(`   This will install ${agent.name} directly on your machine.`);
@@ -41,14 +59,17 @@ async function main() {
     }
   }
 
+  const baseRunner = {
+    runServer: runLocal,
+    uploadFile: async (l: string, r: string) => uploadFile(l, r),
+    downloadFile: async (r: string, l: string) => downloadFile(r, l),
+  };
+
   const cloud: CloudOrchestrator = {
     cloudName: "local",
-    cloudLabel: "local machine",
-    runner: {
-      runServer: runLocal,
-      uploadFile: async (l: string, r: string) => uploadFile(l, r),
-      downloadFile: async (r: string, l: string) => downloadFile(r, l),
-    },
+    cloudLabel: useSandbox ? "local machine (sandboxed)" : "local machine",
+    skipAgentInstall: false,
+    runner: useSandbox ? makeDockerRunner(baseRunner) : baseRunner,
     async authenticate() {},
     async promptSize() {},
     async createServer(_name: string) {
@@ -73,9 +94,19 @@ async function main() {
       );
       return new TextDecoder().decode(result.stdout).trim() || "local";
     },
-    async waitForReady() {},
-    interactiveSession,
+    async waitForReady() {
+      if (useSandbox) {
+        await pullAndStartContainer(agentName);
+        cloud.skipAgentInstall = true;
+      }
+    },
+    interactiveSession: useSandbox ? dockerInteractiveSession : interactiveSession,
   };
+
+  // Clean up sandbox container on exit
+  if (useSandbox) {
+    process.on("exit", cleanupContainer);
+  }
 
   await runOrchestration(cloud, agent, agentName);
 }
