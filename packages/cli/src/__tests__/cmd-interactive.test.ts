@@ -279,7 +279,6 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      expect(mockIntro).toHaveBeenCalled();
       const introArg = mockIntro.mock.calls[0]?.[0] ?? "";
       expect(introArg).toContain("spawn");
     });
@@ -345,7 +344,6 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      expect(mockOutro).toHaveBeenCalled();
       const outroArg = mockOutro.mock.calls[0]?.[0] ?? "";
       expect(outroArg).toContain("spawn script");
     });

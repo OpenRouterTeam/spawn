@@ -204,8 +204,6 @@ describe("cmdUpdate", () => {
       runUpdate: updateFn,
     });
 
-    // consoleSpy (console.log) should have been called
-    expect(consoleSpy).toHaveBeenCalled();
     expect(clack.logInfo).toHaveBeenCalledWith(expect.stringContaining("Run spawn again"));
   });
 
@@ -220,7 +218,10 @@ describe("cmdUpdate", () => {
       runUpdate: updateFn,
     });
 
-    // Should show the install command
-    expect(consoleSpy).toHaveBeenCalled();
+    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Auto-update failed"));
+    const allLoggedLines = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0] ?? ""));
+    expect(allLoggedLines.some((line: string) => line.includes("install.sh") || line.includes("install.ps1"))).toBe(
+      true,
+    );
   });
 });
