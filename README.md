@@ -139,7 +139,7 @@ spawn claude hetzner --fast
 What `--fast` does:
 - **Parallel boot**: server creation runs concurrently with API key prompt and account checks
 - **Tarballs**: installs agents from pre-built tarballs instead of live install
-- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, ZeroClaw, Hermes), skips the package install wait since the base OS already has what's needed
+- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, Hermes), skips the package install wait since the base OS already has what's needed
 - **Snapshots**: uses pre-built cloud images when available (Hetzner, DigitalOcean)
 
 #### Beta Features
