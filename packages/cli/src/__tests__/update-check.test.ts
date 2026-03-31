@@ -119,7 +119,6 @@ describe("update-check", () => {
       await checkForUpdates();
 
       // Should have printed update message to stderr
-      expect(consoleErrorSpy).toHaveBeenCalled();
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Update available");
       expect(output).toContain("99.0.0");
@@ -181,7 +180,6 @@ describe("update-check", () => {
       await checkForUpdates();
 
       // Should have printed error message
-      expect(consoleErrorSpy).toHaveBeenCalled();
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Auto-update failed");
 
