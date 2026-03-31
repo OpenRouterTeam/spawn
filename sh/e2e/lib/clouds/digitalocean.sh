@@ -381,7 +381,7 @@ _digitalocean_max_parallel() {
   local _account_json _limit _existing _available
   _account_json=$(_do_curl_auth -sf "${_DO_API}/account" 2>/dev/null) || { printf '3'; return 0; }
   _limit=$(printf '%s' "${_account_json}" | grep -o '"droplet_limit":[0-9]*' | grep -o '[0-9]*$') || { printf '3'; return 0; }
-  _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | grep -o '"id":[0-9]*' | wc -l | tr -d ' ') || { printf '3'; return 0; }
+  _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | jq -r '.droplets | length' 2>/dev/null) || { printf '3'; return 0; }
   _available=$(( _limit - _existing ))
   if [ "${_available}" -lt 1 ]; then
     log_warn "DigitalOcean droplet limit reached: ${_existing}/${_limit} droplets in use (0 available)" >&2
