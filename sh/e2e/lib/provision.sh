@@ -275,11 +275,6 @@ CLOUD_ENV
         printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
       } >> "${env_tmp}"
       ;;
-    zeroclaw)
-      {
-        printf 'export ZEROCLAW_PROVIDER=%q\n' "openrouter"
-      } >> "${env_tmp}"
-      ;;
     hermes)
       {
         printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
@@ -392,10 +387,6 @@ _ensure_agent_binary() {
     codex)
       bin_name="codex"
       install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global @openai/codex"
-      ;;
-    zeroclaw)
-      bin_name="zeroclaw"
-      install_cmd="curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
       ;;
     opencode)
       bin_name="opencode"

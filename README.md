@@ -46,8 +46,8 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
 | `spawn <agent> <cloud> --zone <zone>` | Set zone/region for the cloud |
 | `spawn <agent> <cloud> --size <type>` | Set instance size/type for the cloud |
-| `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
-| `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
+| `spawn <agent> <cloud> --prompt "text"` | Non-interactive with prompt (or `-p`) |
+| `spawn <agent> <cloud> --prompt-file <file>` | Prompt from file (or `-f`) |
 | `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
 | `spawn <agent> <cloud> --output json` | Headless mode with structured JSON on stdout |
 | `spawn <agent> <cloud> --model <id>` | Set the model ID (overrides agent default) |
@@ -139,7 +139,7 @@ spawn claude hetzner --fast
 What `--fast` does:
 - **Parallel boot**: server creation runs concurrently with API key prompt and account checks
 - **Tarballs**: installs agents from pre-built tarballs instead of live install
-- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, ZeroClaw, Hermes), skips the package install wait since the base OS already has what's needed
+- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, Hermes), skips the package install wait since the base OS already has what's needed
 - **Snapshots**: uses pre-built cloud images when available (Hetzner, DigitalOcean)
 
 #### Beta Features
@@ -206,7 +206,7 @@ export OPENROUTER_API_KEY=sk-or-v1-xxxxx
 # Cloud-specific credentials (varies by provider)
 # Note: Sprite uses `sprite login` for authentication
 export HCLOUD_TOKEN=...           # For Hetzner
-export DO_API_TOKEN=...           # For DigitalOcean
+export DIGITALOCEAN_ACCESS_TOKEN=...  # For DigitalOcean
 
 # Run non-interactively
 spawn claude hetzner
@@ -258,7 +258,7 @@ If spawn fails to install, try these steps:
 2. **Set credentials via environment variables** before launching:
    ```powershell
    $env:OPENROUTER_API_KEY = "sk-or-v1-xxxxx"
-   $env:DO_API_TOKEN = "dop_v1_xxxxx"      # For DigitalOcean
+   $env:DIGITALOCEAN_ACCESS_TOKEN = "dop_v1_xxxxx"  # For DigitalOcean
    $env:HCLOUD_TOKEN = "xxxxx"              # For Hetzner
    spawn openclaw digitalocean
    ```
@@ -324,12 +324,12 @@ If an agent fails to install or launch on a cloud:
 |---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**ZeroClaw**](https://github.com/zeroclaw-labs/zeroclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenCode**](https://github.com/sst/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Junie**](https://www.jetbrains.com/junie/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**Cursor CLI**](https://cursor.com/cli) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works
 

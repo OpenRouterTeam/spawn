@@ -35,7 +35,6 @@ const MARKETPLACE_IMAGES: Record<string, string> = {
   openclaw: "openrouter-spawnopenclaw",
   opencode: "openrouter-spawnopencode",
   kilocode: "openrouter-spawnkilocode",
-  zeroclaw: "openrouter-spawnzeroclaw",
   hermes: "openrouter-spawnhermes",
   junie: "openrouter-spawnjunie",
 };

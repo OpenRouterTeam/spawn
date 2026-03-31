@@ -285,7 +285,7 @@ export async function runOrchestration(
 
   // Skip cloud-init for minimal-tier agents when using tarballs or snapshots.
   // Ubuntu 24.04 base images already have curl + git, so minimal agents (claude,
-  // opencode, zeroclaw, hermes) don't need the cloud-init package install step.
+  // opencode, hermes) don't need the cloud-init package install step.
   // This saves ~30-60s by just waiting for SSH instead of polling for cloud-init completion.
   if (
     cloud.cloudName !== "local" &&

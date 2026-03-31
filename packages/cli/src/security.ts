@@ -406,7 +406,7 @@ export function validateLaunchCmd(cmd: string): void {
       "Invalid launch command in history: invalid agent invocation\n\n" +
         `Command: "${cmd}"\n` +
         `Rejected segment: "${lastSegment}"\n\n` +
-        "The final segment must be a simple binary name (e.g., 'claude', 'zeroclaw agent').\n\n" +
+        "The final segment must be a simple binary name (e.g., 'claude', 'hermes').\n\n" +
         "Your spawn history file may be corrupted or tampered with.\n" +
         `To fix: run 'spawn list --clear' to reset history`,
     );

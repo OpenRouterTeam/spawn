@@ -666,14 +666,14 @@ async function tryDoOAuth(): Promise<string | null> {
   if (oauthDenied) {
     logError("OAuth authorization was denied by the user");
     logError("Alternative: Use a manual API token instead");
-    logError("  export DO_API_TOKEN=dop_v1_...");
+    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
     return null;
   }
 
   if (!oauthCode) {
     logError("OAuth authentication timed out after 120 seconds");
     logError("Alternative: Use a manual API token instead");
-    logError("  export DO_API_TOKEN=dop_v1_...");
+    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
     return null;
   }
 
@@ -729,15 +729,22 @@ async function tryDoOAuth(): Promise<string | null> {
 
 /** Returns true if browser OAuth was triggered (so caller can delay before next OAuth). */
 export async function ensureDoToken(): Promise<boolean> {
-  // 1. Env var
-  if (process.env.DO_API_TOKEN) {
-    _state.token = process.env.DO_API_TOKEN.trim();
+  // 1. Env var (DIGITALOCEAN_ACCESS_TOKEN > DIGITALOCEAN_API_TOKEN > DO_API_TOKEN)
+  const envToken =
+    process.env.DIGITALOCEAN_ACCESS_TOKEN ?? process.env.DIGITALOCEAN_API_TOKEN ?? process.env.DO_API_TOKEN;
+  if (envToken) {
+    const envVarName = process.env.DIGITALOCEAN_ACCESS_TOKEN
+      ? "DIGITALOCEAN_ACCESS_TOKEN"
+      : process.env.DIGITALOCEAN_API_TOKEN
+        ? "DIGITALOCEAN_API_TOKEN"
+        : "DO_API_TOKEN";
+    _state.token = envToken.trim();
     if (await testDoToken()) {
       logInfo("Using DigitalOcean API token from environment");
       await saveTokenToConfig(_state.token);
       return false;
     }
-    logWarn("DO_API_TOKEN from environment is invalid");
+    logWarn(`${envVarName} from environment is invalid`);
     _state.token = "";
   }
 
@@ -776,7 +783,7 @@ export async function ensureDoToken(): Promise<boolean> {
 
   // 3. Try OAuth browser flow
   // Show payment method reminder for first-time users (no saved config, no env token)
-  if (!saved && !process.env.DO_API_TOKEN) {
+  if (!saved && !envToken) {
     process.stderr.write("\n");
     logWarn("DigitalOcean requires a payment method before you can create servers.");
     logWarn("If you haven't added one yet, visit: https://cloud.digitalocean.com/account/billing");
@@ -1448,17 +1455,17 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 
 export async function downloadFile(remotePath: string, localPath: string, ip?: string): Promise<void> {
   const serverIp = ip || _state.serverIp;
-  const normalizedRemote = validateRemotePath(remotePath, /^[a-zA-Z0-9/_.~$-]+$/);
+  const expandedRemote = remotePath.replace(/^\$HOME\//, "~/");
+  const normalizedRemote = validateRemotePath(expandedRemote, /^[a-zA-Z0-9/_.~-]+$/);
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const expandedPath = normalizedRemote.replace(/^\$HOME/, "~");
 
   const proc = Bun.spawn(
     [
       "scp",
       ...SSH_BASE_OPTS,
       ...keyOpts,
-      `root@${serverIp}:${expandedPath}`,
+      `root@${serverIp}:${normalizedRemote}`,
       localPath,
     ],
     {

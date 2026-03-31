@@ -58,6 +58,7 @@ export {
   getImplementedClouds,
   hasCloudCli,
   hasCloudCredentials,
+  isAuthEnvVarSet,
   isInteractiveTTY,
   levenshtein,
   loadManifestWithSpinner,

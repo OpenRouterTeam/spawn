@@ -274,40 +274,6 @@ input_test_openclaw() {
   return 1
 }
 
-input_test_zeroclaw() {
-  local app="$1"
-
-  _validate_timeout || return 1
-
-  log_step "Running input test for zeroclaw..."
-  # Base64-encode the prompt and stage it to a remote temp file.
-  # Use -m/--message for non-interactive single-message mode (not -p which is --provider).
-  local encoded_prompt
-  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64 | tr -d '\n')
-  _validate_base64 "${encoded_prompt}" || return 1
-  _stage_prompt_remotely "${app}" "${encoded_prompt}"
-  _stage_timeout_remotely "${app}" "${INPUT_TEST_TIMEOUT}"
-
-  local output
-  # The prompt and timeout are read from staged temp files — no interpolation in this command.
-  output=$(cloud_exec "${app}" "\
-    source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
-    _TIMEOUT=\$(cat /tmp/.e2e-timeout); \
-    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-    timeout \"\$_TIMEOUT\" zeroclaw agent -m \"\$PROMPT\"" 2>&1) || true
-
-  if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
-    log_ok "zeroclaw input test — marker found in response"
-    return 0
-  else
-    log_err "zeroclaw input test — marker '${INPUT_TEST_MARKER}' not found in response"
-    log_err "Response (last 5 lines):"
-    printf '%s\n' "${output}" | tail -5 >&2
-    return 1
-  fi
-}
-
 input_test_opencode() {
   log_warn "opencode is TUI-only — skipping input test"
   return 0
@@ -355,7 +321,6 @@ run_input_test() {
     claude)    input_test_claude "${app}"    ;;
     codex)     input_test_codex "${app}"     ;;
     openclaw)  input_test_openclaw "${app}"  ;;
-    zeroclaw)  input_test_zeroclaw "${app}"  ;;
     opencode)  input_test_opencode          ;;
     kilocode)  input_test_kilocode          ;;
     hermes)    input_test_hermes            ;;
@@ -555,40 +520,6 @@ _openclaw_verify_gateway_resilience() {
       tail -10 /tmp/openclaw-gateway.log 2>/dev/null || true" 2>&1 | tail -15 >&2
     return 1
   fi
-}
-
-verify_zeroclaw() {
-  local app="$1"
-  local failures=0
-
-  # Binary check (may be in ~/.local/bin or ~/.cargo/bin depending on install method)
-  log_step "Checking zeroclaw binary..."
-  if cloud_exec "${app}" "export PATH=\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH; source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
-    log_ok "zeroclaw binary found"
-  else
-    log_err "zeroclaw binary not found"
-    failures=$((failures + 1))
-  fi
-
-  # Env check: ZEROCLAW_PROVIDER
-  log_step "Checking zeroclaw env (ZEROCLAW_PROVIDER)..."
-  if cloud_exec "${app}" "grep -q ZEROCLAW_PROVIDER ~/.spawnrc" >/dev/null 2>&1; then
-    log_ok "ZEROCLAW_PROVIDER present in .spawnrc"
-  else
-    log_err "ZEROCLAW_PROVIDER not found in .spawnrc"
-    failures=$((failures + 1))
-  fi
-
-  # Env check: provider is openrouter
-  log_step "Checking zeroclaw uses openrouter..."
-  if cloud_exec "${app}" "grep ZEROCLAW_PROVIDER ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
-    log_ok "ZEROCLAW_PROVIDER set to openrouter"
-  else
-    log_err "ZEROCLAW_PROVIDER not set to openrouter"
-    failures=$((failures + 1))
-  fi
-
-  return "${failures}"
 }
 
 verify_codex() {
@@ -810,7 +741,6 @@ verify_agent() {
   case "${agent}" in
     claude)    verify_claude "${app}"    || agent_failures=$? ;;
     openclaw)  verify_openclaw "${app}"  || agent_failures=$? ;;
-    zeroclaw)  verify_zeroclaw "${app}"  || agent_failures=$? ;;
     codex)     verify_codex "${app}"     || agent_failures=$? ;;
     opencode)  verify_opencode "${app}"  || agent_failures=$? ;;
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;

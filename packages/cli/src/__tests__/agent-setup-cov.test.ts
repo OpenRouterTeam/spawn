@@ -192,12 +192,6 @@ describe("createCloudAgents", () => {
         ],
       ],
       [
-        "zeroclaw",
-        [
-          "ZEROCLAW_PROVIDER=openrouter",
-        ],
-      ],
-      [
         "hermes",
         [
           "OPENAI_BASE_URL",
@@ -226,11 +220,6 @@ describe("createCloudAgents", () => {
         ).toBe(true);
       }
     }
-  });
-
-  it("zeroclaw agent configure calls runServer", async () => {
-    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
-    expect(runner.runServer).toHaveBeenCalled();
   });
 
   it("all agents have launchCmd returning non-empty string", () => {

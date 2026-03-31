@@ -1073,23 +1073,6 @@ async function main(): Promise<void> {
     process.exit(3);
   }
 
-  // Validate headless-incompatible flags
-  if (effectiveHeadless && dryRun) {
-    if (outputFormat === "json") {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          error_code: "VALIDATION_ERROR",
-          error_message: "--headless and --dry-run cannot be used together",
-        }),
-      );
-    } else {
-      console.error(pc.red("Error: --headless and --dry-run cannot be used together"));
-      console.error(`\nUse ${pc.cyan("--dry-run")} for previewing, or ${pc.cyan("--headless")} for execution.`);
-    }
-    process.exit(3);
-  }
-
   checkUnknownFlags(filteredArgs);
 
   const cmd = filteredArgs[0];
