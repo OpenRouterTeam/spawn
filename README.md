@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**9 agents. 6 clouds. 54 working combinations. Zero config.**
+**8 agents. 6 clouds. 48 working combinations. Zero config.**
 
 ## Install
 
@@ -139,7 +139,7 @@ spawn claude hetzner --fast
 What `--fast` does:
 - **Parallel boot**: server creation runs concurrently with API key prompt and account checks
 - **Tarballs**: installs agents from pre-built tarballs instead of live install
-- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, ZeroClaw, Hermes), skips the package install wait since the base OS already has what's needed
+- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, Hermes), skips the package install wait since the base OS already has what's needed
 - **Snapshots**: uses pre-built cloud images when available (Hetzner, DigitalOcean)
 
 #### Beta Features
@@ -324,7 +324,6 @@ If an agent fails to install or launch on a cloud:
 |---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**ZeroClaw**](https://github.com/zeroclaw-labs/zeroclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenCode**](https://github.com/sst/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

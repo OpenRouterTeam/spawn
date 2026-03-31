@@ -219,7 +219,7 @@ describe("prioritizeCloudsByCredentials", () => {
 
     expect(result.hintOverrides["hetzner"]).toContain("credentials detected");
     expect(result.hintOverrides["hetzner"]).toContain("test");
-    expect(result.hintOverrides["digitalocean"]).toBeDefined();
+    expect(result.hintOverrides["digitalocean"]).toContain("Simple cloud hosting");
   });
 
   it("should handle multi-var auth (both vars must be set)", () => {

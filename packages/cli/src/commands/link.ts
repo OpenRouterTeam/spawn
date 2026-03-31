@@ -66,7 +66,6 @@ function defaultSshCommand(host: string, user: string, keyOpts: string[], cmd: s
 const KNOWN_AGENTS = [
   "claude",
   "openclaw",
-  "zeroclaw",
   "codex",
   "opencode",
   "kilocode",
@@ -79,7 +78,7 @@ type KnownAgent = (typeof KNOWN_AGENTS)[number];
 function detectAgent(host: string, user: string, keyOpts: string[], runCmd: SshCommandFn): string | null {
   // First: check running processes
   const psCmd =
-    "ps aux 2>/dev/null | grep -oE 'claude(-code)?|openclaw|zeroclaw|codex|opencode|kilocode|hermes|junie' | grep -v grep | head -1 || true";
+    "ps aux 2>/dev/null | grep -oE 'claude(-code)?|openclaw|codex|opencode|kilocode|hermes|junie' | grep -v grep | head -1 || true";
   const psOut = runCmd(host, user, keyOpts, psCmd);
   if (psOut) {
     const match = KNOWN_AGENTS.find((b: KnownAgent) => psOut.includes(b));

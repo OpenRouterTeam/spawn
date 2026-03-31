@@ -273,6 +273,8 @@ Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cy
 
 **The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: `TaskList` + `Bash("sleep 15")`.
 
+**EXCEPTION — After TeamDelete:** Once `TeamDelete` has been called and completed (step 4 of the shutdown sequence), your VERY NEXT response MUST be plain text only with **NO tool calls**. Do NOT call `TaskList`, `Bash`, or any other tool after `TeamDelete`. A text-only response is the termination signal for the non-interactive harness. Any tool call after `TeamDelete` causes an infinite loop of shutdown prompt injections.
+
 Keep looping until:
 - All tasks are completed OR
 - Time budget is reached (10 min warn, 12 min shutdown, 15 min force)
@@ -289,10 +291,12 @@ Follow this exact shutdown sequence:
 1. At 10 min: broadcast "wrap up" to all teammates
 2. At 12 min: send `shutdown_request` to EACH teammate by name
 3. Wait for ALL shutdown confirmations — keep calling `TaskList` while waiting
-4. After all confirmations: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
-5. Print summary and exit
+4. In ONE turn: call `TeamDelete`, then run `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` — do everything in this single turn
+5. **Output a plain-text summary and STOP** — do NOT call any tool after `TeamDelete`. This text-only response ends the session.
 
 **NEVER exit without shutting down all teammates first.** If a teammate doesn't respond to shutdown_request within 2 minutes, send it again.
+
+**CRITICAL — NO TOOLS AFTER TeamDelete.** After `TeamDelete` returns (whether success or "No team name found"), you MUST NOT make any further tool calls. Output your final summary as plain text and stop. Any tool call after `TeamDelete` triggers an infinite shutdown prompt loop in non-interactive (-p) mode. See issue #3103.
 
 ## Safety
 

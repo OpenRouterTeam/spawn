@@ -23,10 +23,6 @@ describe("getSpawnSkillPath", () => {
       "~/.openclaw/skills/spawn/SKILL.md",
     ],
     [
-      "zeroclaw",
-      "~/.zeroclaw/workspace/AGENTS.md",
-    ],
-    [
       "opencode",
       "~/.config/opencode/AGENTS.md",
     ],
@@ -67,7 +63,6 @@ describe("isAppendMode", () => {
       "claude",
       "codex",
       "openclaw",
-      "zeroclaw",
       "opencode",
       "kilocode",
       "junie",
@@ -85,7 +80,6 @@ describe("getSkillContent", () => {
     "claude",
     "codex",
     "openclaw",
-    "zeroclaw",
     "opencode",
     "kilocode",
     "hermes",
@@ -114,7 +108,6 @@ describe("getSkillContent", () => {
   }
 
   for (const agent of [
-    "zeroclaw",
     "opencode",
     "kilocode",
     "junie",
@@ -184,7 +177,6 @@ describe("injectSpawnSkill", () => {
       "claude",
       "codex",
       "openclaw",
-      "zeroclaw",
       "opencode",
       "kilocode",
       "hermes",

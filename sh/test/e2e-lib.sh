@@ -106,8 +106,8 @@ result=$(make_app_name "openclaw")
 assert_match "make_app_name openclaw (aws)" '^e2e-aws-openclaw-[0-9]+$' "${result}"
 
 ACTIVE_CLOUD="sprite"
-result=$(make_app_name "zeroclaw")
-assert_match "make_app_name zeroclaw (sprite)" '^e2e-sprite-zeroclaw-[0-9]+$' "${result}"
+result=$(make_app_name "codex")
+assert_match "make_app_name codex (sprite)" '^e2e-sprite-codex-[0-9]+$' "${result}"
 
 # Reset
 ACTIVE_CLOUD=""

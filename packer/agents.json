@@ -30,13 +30,6 @@
       "mkdir -p ~/.npm-global/bin && npm install -g --prefix ~/.npm-global @kilocode/cli"
     ]
   },
-  "zeroclaw": {
-    "tier": "minimal",
-    "install": [
-      "if [ ! -f /swapfile ]; then fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile; fi",
-      "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
-    ]
-  },
   "hermes": {
     "tier": "minimal",
     "install": [

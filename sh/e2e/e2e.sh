@@ -230,7 +230,7 @@ run_single_agent() {
   # Per-agent timeout: run provision/verify/input_test in a subshell with a
   # wall-clock timeout. This prevents any single step from hanging indefinitely
   # and ensures a result file is always written (pass, fail, or timeout).
-  # Fixes #2714: sprite-zeroclaw and digitalocean-opencode stalling with no result.
+  # Fixes #2714: digitalocean-opencode stalling with no result.
   # ---------------------------------------------------------------------------
   local effective_agent_timeout
   effective_agent_timeout=$(get_agent_timeout "${agent}")
