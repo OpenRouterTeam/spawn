@@ -40,6 +40,7 @@ export const KNOWN_FLAGS = new Set([
   "-u",
   "--yes",
   "-y",
+  "--flat",
 ]);
 
 /** Return the first unknown flag in args, or null if all are known/positional */
