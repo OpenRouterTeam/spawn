@@ -156,8 +156,9 @@ spawn claude gcp --beta tarball --beta parallel
 | `images` | Use pre-built cloud images/snapshots (faster boot) |
 | `parallel` | Parallelize server boot with setup prompts |
 | `recursive` | Install spawn CLI on VM so it can spawn child VMs |
+| `sandbox` | Run local agents in a Docker container (sandboxed) |
 
-`--fast` enables `tarball`, `images`, and `parallel` (not `recursive`).
+`--fast` enables `tarball`, `images`, and `parallel` (not `recursive` or `sandbox`).
 
 #### Recursive Spawn
 
@@ -185,6 +186,27 @@ spawn tree
 Tear down an entire tree:
 ```bash
 spawn delete --cascade <id>    # Delete a VM and all its children
+```
+
+#### Sandboxed Local
+
+Use `--beta sandbox` to run local agents inside a Docker container instead of directly on your machine:
+
+```bash
+spawn claude local --beta sandbox
+```
+
+What this does:
+- **Pulls the agent's Docker image** from `ghcr.io/openrouterteam/spawn-<agent>`
+- **Runs the agent in a container** with filesystem, network, and process isolation
+- **Auto-installs Docker** if not present (OrbStack on macOS, docker.io on Linux)
+- **Cleans up the container** automatically when the session ends
+
+In the interactive picker, `--beta sandbox` adds a "Local Machine (Sandboxed)" option alongside the regular "Local Machine":
+
+```bash
+spawn --beta sandbox           # Interactive picker shows both local options
+spawn openclaw local --beta sandbox   # Direct launch, sandboxed
 ```
 
 ### Without the CLI
