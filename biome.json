@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["packages/**/*.ts"]
+    "includes": ["packages/**/*.ts", ".claude/**/*.ts"]
   },
   "formatter": {
     "enabled": true,
@@ -99,6 +99,12 @@
             "noUnusedFunctionParameters": "off"
           }
         }
+      }
+    },
+    {
+      "includes": [".claude/**"],
+      "linter": {
+        "enabled": false
       }
     }
   ],
