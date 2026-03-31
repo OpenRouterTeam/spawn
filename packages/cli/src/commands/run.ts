@@ -21,7 +21,7 @@ import { asyncTryCatch, isFileError, tryCatch, tryCatchIf } from "../shared/resu
 import { getLocalShell, isWindows } from "../shared/shell.js";
 import { maybeShowStarPrompt } from "../shared/star-prompt.js";
 import { logError, logInfo, logStep, prepareStdinForHandoff, toKebabCase } from "../shared/ui.js";
-import { maybePromptLocalSandbox, promptSetupOptions, promptSpawnName } from "./interactive.js";
+import { promptSetupOptions, promptSpawnName } from "./interactive.js";
 import { handleRecordAction } from "./list.js";
 import {
   buildRetryCommand,
@@ -1207,9 +1207,6 @@ export async function cmdRun(
   }
 
   await preflightCredentialCheck(manifest, cloud);
-
-  // Offer sandboxed mode when running locally with Docker available
-  await maybePromptLocalSandbox(cloud);
 
   // Skip setup prompt if steps already set via --steps or --config
   if (!process.env.SPAWN_ENABLED_STEPS) {

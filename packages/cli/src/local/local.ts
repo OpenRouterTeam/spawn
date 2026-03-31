@@ -181,7 +181,7 @@ export async function pullAndStartContainer(agentName: string): Promise<void> {
   await runLocal(`docker pull ${image}`);
 
   logStep("Starting agent container...");
-  await runLocal(`docker run -d --name ${DOCKER_CONTAINER_NAME} --memory=4g --cpus=2 ${image}`);
+  await runLocal(`docker run -d --name ${DOCKER_CONTAINER_NAME} ${image}`);
   logInfo("Agent container running");
 }
 

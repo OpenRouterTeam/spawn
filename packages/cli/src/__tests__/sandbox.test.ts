@@ -153,7 +153,7 @@ describe("pullAndStartContainer", () => {
     const runCmd = spawnCalls[1][0][2];
     expect(runCmd).toContain("docker run -d");
     expect(runCmd).toContain("--name spawn-agent");
-    expect(runCmd).toContain("--memory=4g");
+    expect(runCmd).toContain("ghcr.io/openrouterteam/spawn-claude:latest");
 
     syncSpy.mockRestore();
     spawnSpy.mockRestore();

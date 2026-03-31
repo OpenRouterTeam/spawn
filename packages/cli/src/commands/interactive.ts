@@ -3,7 +3,6 @@ import type { Manifest } from "../manifest.js";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
-import { isDockerAvailable } from "../local/local.js";
 import { agentKeys } from "../manifest.js";
 import { getAgentOptionalSteps } from "../shared/agents.js";
 import { hasSavedOpenRouterKey } from "../shared/oauth.js";
@@ -79,20 +78,50 @@ function getAndValidateCloudChoices(
   };
 }
 
-// Prompt user to select a cloud with arrow-key navigation
+// Prompt user to select a cloud with arrow-key navigation.
+// When --beta sandbox is active and "local" is in the list, injects a
+// "Local Machine (Sandboxed)" option right after "Local Machine".
 async function selectCloud(
   manifest: Manifest,
   cloudList: string[],
   hintOverrides: Record<string, string>,
 ): Promise<string> {
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+  const sandboxEnabled = betaFeatures.includes("sandbox");
+
+  const options = mapToSelectOptions(cloudList, manifest.clouds, hintOverrides);
+
+  // Inject sandbox option next to "local" when --beta sandbox is set
+  if (sandboxEnabled && cloudList.includes("local")) {
+    const localIdx = options.findIndex((o) => o.value === "local");
+    if (localIdx !== -1) {
+      options[localIdx].hint = "No isolation — runs on your machine";
+      options.splice(localIdx + 1, 0, {
+        value: "local-sandbox",
+        label: "Local Machine (Sandboxed)",
+        hint: "Runs in a Docker container",
+      });
+    }
+  }
+
   const cloudChoice = await p.select({
     message: "Select a cloud",
-    options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
+    options,
     initialValue: cloudList[0],
   });
   if (p.isCancel(cloudChoice)) {
     handleCancel();
   }
+
+  // Map synthetic "local-sandbox" back to "local" and ensure sandbox beta is set
+  if (cloudChoice === "local-sandbox") {
+    const existing = process.env.SPAWN_BETA ?? "";
+    if (!existing.split(",").includes("sandbox")) {
+      process.env.SPAWN_BETA = existing ? `${existing},sandbox` : "sandbox";
+    }
+    return "local";
+  }
+
   return cloudChoice;
 }
 
@@ -215,53 +244,7 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
   return stepSet;
 }
 
-/**
- * If cloud is "local" and Docker is available, prompt the user to choose
- * between running directly or in a sandboxed Docker container.
- * Appends "sandbox" to SPAWN_BETA when the user picks sandboxed mode.
- */
-async function maybePromptLocalSandbox(cloud: string): Promise<void> {
-  if (cloud !== "local") {
-    return;
-  }
-
-  // Already opted in via --beta sandbox
-  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
-  if (betaFeatures.includes("sandbox")) {
-    return;
-  }
-
-  // Only show the picker if Docker is available
-  if (!isDockerAvailable()) {
-    return;
-  }
-
-  const mode = await p.select({
-    message: "How would you like to run locally?",
-    options: [
-      {
-        value: "direct",
-        label: "Direct",
-        hint: "No isolation — runs on your machine",
-      },
-      {
-        value: "sandbox",
-        label: "Sandboxed",
-        hint: "Runs in a Docker container",
-      },
-    ],
-    initialValue: "direct",
-  });
-  if (p.isCancel(mode)) {
-    handleCancel();
-  }
-  if (mode === "sandbox") {
-    const existing = process.env.SPAWN_BETA ?? "";
-    process.env.SPAWN_BETA = existing ? `${existing},sandbox` : "sandbox";
-  }
-}
-
-export { getAndValidateCloudChoices, maybePromptLocalSandbox, promptSetupOptions, promptSpawnName, selectCloud };
+export { getAndValidateCloudChoices, promptSetupOptions, promptSpawnName, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
@@ -299,9 +282,6 @@ export async function cmdInteractive(): Promise<void> {
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
-
-  // Offer sandboxed mode when running locally with Docker available
-  await maybePromptLocalSandbox(cloudChoice);
 
   await preflightCredentialCheck(manifest, cloudChoice);
 
@@ -356,9 +336,6 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
-
-  // Offer sandboxed mode when running locally with Docker available
-  await maybePromptLocalSandbox(cloudChoice);
 
   if (dryRun) {
     showDryRunPreview(manifest, resolvedAgent, cloudChoice, prompt);
