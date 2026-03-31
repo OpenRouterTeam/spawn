@@ -401,7 +401,6 @@ describe("recursive spawn", () => {
 
       await cmdTree();
 
-      expect(logInfoSpy).toHaveBeenCalled();
       const calls = logInfoSpy.mock.calls.map((args) => String(args[0]));
       expect(calls.some((msg) => msg.includes("No spawn history found"))).toBe(true);
       logInfoSpy.mockRestore();
