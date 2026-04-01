@@ -42,6 +42,27 @@ export interface CloudRunner {
   downloadFile(remotePath: string, localPath: string): Promise<void>;
 }
 
+// ─── Script template validation ────────────────────────────────────────────
+
+/**
+ * Validate that a script template string does not contain JS template
+ * interpolation patterns (`${...}`) before it is base64-encoded for shell
+ * injection into systemd units or remote commands.
+ *
+ * Defense-in-depth: the scripts are currently static string arrays joined
+ * with `\n`, so they should never contain interpolation markers. This guard
+ * catches future regressions where a developer might accidentally introduce
+ * template literal interpolation before encoding.
+ *
+ * Note: backticks alone are allowed (used in markdown content for skill
+ * files), but `${` is always rejected as it indicates JS interpolation.
+ */
+export function validateScriptTemplate(script: string, label: string): void {
+  if (/\$\{/.test(script)) {
+    throw new Error(`Script template "${label}" contains \${} interpolation — refusing to encode`);
+  }
+}
+
 // ─── Install helpers ────────────────────────────────────────────────────────
 
 async function installAgent(
@@ -550,6 +571,9 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "WantedBy=multi-user.target",
   ].join("\n");
 
+  validateScriptTemplate(wrapperScript, "gateway-wrapper");
+  validateScriptTemplate(unitFile, "gateway-unit");
+
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
@@ -810,6 +834,10 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
     "[Install]",
     "WantedBy=timers.target",
   ].join("\n");
+
+  validateScriptTemplate(wrapperScript, "auto-update-wrapper");
+  validateScriptTemplate(unitFile, "auto-update-unit");
+  validateScriptTemplate(timerFile, "auto-update-timer");
 
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
