@@ -204,3 +204,63 @@ describe("sandbox mode", () => {
     expect(betaFeatures.includes("tarball")).toBe(true);
   });
 });
+
+// ─── sandbox runner isolation ───────────────────────────────────────────────
+
+describe("sandbox agent runner isolation", () => {
+  it("agent.configure() uses Docker runner, not host runner, when sandbox is active", async () => {
+    const { createCloudAgents } = await import("../shared/agent-setup");
+    const { makeDockerRunner } = await import("../shared/orchestrate");
+
+    const hostCommands: string[] = [];
+    const hostRunner = {
+      runServer: async (cmd: string) => {
+        hostCommands.push(cmd);
+      },
+      uploadFile: async (_l: string, _r: string) => {},
+      downloadFile: async (_r: string, _l: string) => {},
+    };
+
+    // Create agents with Docker-wrapped runner (as sandbox mode does)
+    const dockerRunner = makeDockerRunner(hostRunner);
+    const { resolveAgent: resolve } = createCloudAgents(dockerRunner);
+    const agent = resolve("claude");
+
+    // Run configure — it should use the Docker runner
+    if (agent.configure) {
+      await agent.configure("test-key");
+    }
+
+    // All commands from configure should go through docker exec
+    const nonDockerCmds = hostCommands.filter((cmd) => !cmd.includes("docker"));
+    expect(nonDockerCmds).toEqual([]);
+
+    // At least one command should contain "docker exec" or "docker cp"
+    const dockerCmds = hostCommands.filter((cmd) => cmd.includes("docker exec") || cmd.includes("docker cp"));
+    expect(dockerCmds.length).toBeGreaterThan(0);
+  });
+
+  it("agent.configure() uses host runner directly without sandbox", async () => {
+    const { createCloudAgents } = await import("../shared/agent-setup");
+
+    const hostCommands: string[] = [];
+    const hostRunner = {
+      runServer: async (cmd: string) => {
+        hostCommands.push(cmd);
+      },
+      uploadFile: async (_l: string, _r: string) => {},
+      downloadFile: async (_r: string, _l: string) => {},
+    };
+
+    const { resolveAgent: resolve } = createCloudAgents(hostRunner);
+    const agent = resolve("claude");
+
+    if (agent.configure) {
+      await agent.configure("test-key");
+    }
+
+    // Without sandbox, commands run directly (no docker wrapping)
+    const dockerCmds = hostCommands.filter((cmd) => cmd.includes("docker exec"));
+    expect(dockerCmds).toEqual([]);
+  });
+});
