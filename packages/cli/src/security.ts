@@ -553,6 +553,18 @@ export function validateTunnelPort(port: string): void {
   }
 }
 
+/**
+ * Strip ASCII control characters from a string for safe terminal display.
+ * Removes characters 0x00-0x1F and 0x7F, preserving tab (0x09) and newline (0x0A).
+ * SECURITY-CRITICAL: Prevents ANSI escape sequence injection in error messages.
+ *
+ * @param s - The string to sanitize
+ * @returns The string with control characters removed
+ */
+export function stripControlChars(s: string): string {
+  return s.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+}
+
 // Sensitive path patterns that should never be read as prompt files
 // These protect credentials and system files from accidental exfiltration
 const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{
@@ -629,6 +641,16 @@ export function validatePromptFilePath(filePath: string): void {
       "Prompt file path is required when using --prompt-file.\n\n" +
         "Example:\n" +
         "  spawn <agent> <cloud> --prompt-file instructions.txt",
+    );
+  }
+
+  // Reject paths containing control characters (ANSI escape sequences, null bytes, etc.)
+  // These can cause terminal injection when displayed in error messages.
+  if (/[\x00-\x08\x0B-\x1F\x7F]/.test(filePath)) {
+    throw new Error(
+      "Prompt file path contains control characters (e.g., ANSI escape sequences).\n\n" +
+        "File paths must be plain text without terminal control codes.\n" +
+        "Check that the path was entered correctly.",
     );
   }
 
