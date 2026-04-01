@@ -305,6 +305,39 @@
         "byok"
       ]
     },
+    "pi": {
+      "name": "Pi",
+      "description": "Minimal terminal coding agent — multi-provider, tree-structured sessions, and TypeScript extensions",
+      "url": "https://pi.dev",
+      "install": "npm install -g @mariozechner/pi-coding-agent",
+      "launch": "pi",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter as a provider via OPENROUTER_API_KEY. The CLI command is 'pi'. Config lives in ~/.pi/agent/. Also known as shittycodingagent.ai.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/pi.png",
+      "featured_cloud": [
+        "digitalocean",
+        "sprite"
+      ],
+      "creator": "Mario Zechner",
+      "repo": "badlogic/pi-mono",
+      "license": "MIT",
+      "created": "2025-06",
+      "added": "2026-04",
+      "github_stars": 29800,
+      "stars_updated": "2026-04-01",
+      "language": "TypeScript",
+      "runtime": "node",
+      "category": "cli",
+      "tagline": "Minimal terminal coding harness — multi-provider, extensible, tree sessions",
+      "tags": [
+        "coding",
+        "terminal",
+        "agent",
+        "extensible"
+      ]
+    },
     "cursor": {
       "name": "Cursor CLI",
       "description": "Cursor's terminal-based AI coding agent — autonomous coding with plan, agent, and ask modes",
@@ -499,6 +532,12 @@
     "digitalocean/junie": "implemented",
     "gcp/junie": "implemented",
     "sprite/junie": "implemented",
+    "local/pi": "implemented",
+    "hetzner/pi": "implemented",
+    "aws/pi": "implemented",
+    "digitalocean/pi": "implemented",
+    "gcp/pi": "implemented",
+    "sprite/pi": "implemented",
     "local/cursor": "implemented",
     "hetzner/cursor": "implemented",
     "aws/cursor": "implemented",

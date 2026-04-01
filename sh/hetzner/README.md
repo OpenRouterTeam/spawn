@@ -58,6 +58,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/junie.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/cursor.sh)
 ```
 
+#### Pi
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/pi.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

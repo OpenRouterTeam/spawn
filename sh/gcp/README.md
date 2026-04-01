@@ -60,6 +60,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/junie.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/cursor.sh)
 ```
 
+#### Pi
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/pi.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

@@ -16,6 +16,7 @@ Last verified: 2026-03-13
 | Hermes | _(provider default)_ | `OPENAI_BASE_URL=https://openrouter.ai/api/v1` + `OPENAI_API_KEY` — model selection handled by Hermes |
 | Junie | _(provider default)_ | `JUNIE_OPENROUTER_API_KEY` — model selection handled by Junie natively |
 | Cursor CLI | _(provider default)_ | `--endpoint https://openrouter.ai/api/v1` + `CURSOR_API_KEY` — model selection via `--model` flag or `/model` in-session |
+| Pi | _(provider default)_ | `OPENROUTER_API_KEY` — model selection via `/model` in-session |
 
 ## When to update
 

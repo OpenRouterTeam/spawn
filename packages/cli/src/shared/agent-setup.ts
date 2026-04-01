@@ -1114,6 +1114,25 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
     },
 
+    pi: {
+      name: "Pi",
+      cloudInitTier: "node",
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Pi",
+          `cd "$HOME" && ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @mariozechner/pi-coding-agent && ${NPM_GLOBAL_PATH_PERSIST}`,
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi",
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
+        "npm install -g ${_NPM_G_FLAGS:-} @mariozechner/pi-coding-agent@latest",
+    },
+
     cursor: {
       name: "Cursor CLI",
       cloudInitTier: "bun",

@@ -129,6 +129,11 @@ const AGENT_SKILLS: Record<string, SkillConfig> = {
     content: SKILL_BODY,
     append: false,
   },
+  pi: {
+    remotePath: "~/.pi/agent/skills/spawn/SKILL.md",
+    content: SKILL_BODY,
+    append: false,
+  },
 };
 
 /** Get the remote target path for a given agent's spawn skill file. */
