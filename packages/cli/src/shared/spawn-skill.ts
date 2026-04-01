@@ -4,7 +4,7 @@
 
 import type { CloudRunner } from "./agent-setup.js";
 
-import { wrapSshCall } from "./agent-setup.js";
+import { validateScriptTemplate, wrapSshCall } from "./agent-setup.js";
 import { asyncTryCatchIf, isOperationalError } from "./result.js";
 import { logInfo, logWarn } from "./ui.js";
 
@@ -157,6 +157,8 @@ export async function injectSpawnSkill(runner: CloudRunner, agentName: string): 
     logWarn(`No spawn skill file for agent: ${agentName}`);
     return;
   }
+
+  validateScriptTemplate(config.content, `spawn-skill-${agentName}`);
 
   const b64 = Buffer.from(config.content).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
