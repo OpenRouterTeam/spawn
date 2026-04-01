@@ -68,31 +68,129 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
 // ─── Docker Sandbox ─────────────────────────────────────────────────────────
 
-/** Check whether Docker (or OrbStack) is available on the host. */
+/** Check whether the Docker daemon is running and responsive. */
 export function isDockerAvailable(): boolean {
-  const result = Bun.spawnSync(
-    [
-      "docker",
-      "info",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "ignore",
-        "ignore",
+  return (
+    Bun.spawnSync(
+      [
+        "docker",
+        "info",
       ],
-    },
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
   );
-  return result.exitCode === 0;
 }
 
-/** Install Docker if not present, or exit with guidance if install fails. */
+/** Check whether the docker binary exists (installed but daemon may be stopped). */
+function isDockerInstalled(): boolean {
+  return (
+    Bun.spawnSync(
+      [
+        "which",
+        "docker",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
+  );
+}
+
+/** Try to start the Docker daemon and wait up to 30s for it to respond. */
+function startAndWaitForDocker(isMac: boolean): void {
+  if (isMac) {
+    logStep("Starting OrbStack...");
+    Bun.spawnSync(
+      [
+        "open",
+        "-a",
+        "OrbStack",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    );
+  } else {
+    logStep("Starting Docker daemon...");
+    const hasSudo =
+      Bun.spawnSync(
+        [
+          "which",
+          "sudo",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "ignore",
+            "ignore",
+          ],
+        },
+      ).exitCode === 0;
+    if (hasSudo) {
+      Bun.spawnSync(
+        [
+          "sudo",
+          "systemctl",
+          "start",
+          "docker",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "inherit",
+            "inherit",
+          ],
+        },
+      );
+    }
+  }
+
+  // Wait up to 30s for the daemon to be ready
+  logStep("Waiting for Docker daemon...");
+  for (let i = 0; i < 30; i++) {
+    if (isDockerAvailable()) {
+      logInfo("Docker is ready");
+      return;
+    }
+    Bun.sleepSync(1000);
+  }
+  logInfo("Docker daemon did not start within 30s.");
+  if (isMac) {
+    logInfo("Open OrbStack.app manually, then retry.");
+  }
+  process.exit(1);
+}
+
+/** Ensure Docker is installed and the daemon is running. Installs and starts if needed. */
 export async function ensureDocker(): Promise<void> {
+  // Fast path: daemon already running
   if (isDockerAvailable()) {
     return;
   }
 
   const isMac = process.platform === "darwin";
+
+  // Docker binary exists but daemon not running — just start it
+  if (isDockerInstalled()) {
+    startAndWaitForDocker(isMac);
+    return;
+  }
+
+  // Not installed at all — install first
   if (isMac) {
     logStep("Docker not found — installing OrbStack...");
     const result = Bun.spawnSync(
@@ -150,11 +248,8 @@ export async function ensureDocker(): Promise<void> {
     }
   }
 
-  // Verify Docker works after install
-  if (!isDockerAvailable()) {
-    logInfo("Docker installed but not responding. You may need to start the Docker daemon.");
-    process.exit(1);
-  }
+  // Start the daemon after fresh install
+  startAndWaitForDocker(isMac);
 }
 
 /** Pull the agent Docker image and start a container. */

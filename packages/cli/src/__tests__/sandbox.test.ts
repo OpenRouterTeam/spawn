@@ -72,7 +72,7 @@ describe("ensureDocker", () => {
     spy.mockRestore();
   });
 
-  it("attempts brew install on macOS when docker unavailable", async () => {
+  it("attempts brew install on macOS when docker not installed", async () => {
     const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     Object.defineProperty(process, "platform", {
       value: "darwin",
@@ -82,19 +82,7 @@ describe("ensureDocker", () => {
     let callCount = 0;
     const spy = spyOn(Bun, "spawnSync").mockImplementation((..._args: unknown[]) => {
       callCount++;
-      // First call: docker info → fail, second: brew install → succeed, third: docker info → succeed
-      if (callCount === 1) {
-        return {
-          exitCode: 1,
-          stdout: new Uint8Array(),
-          stderr: new Uint8Array(),
-          success: false,
-          signalCode: null,
-          resourceUsage: undefined,
-          pid: 1234,
-        } satisfies ReturnType<typeof Bun.spawnSync>;
-      }
-      return {
+      const ok = {
         exitCode: 0,
         stdout: new Uint8Array(),
         stderr: new Uint8Array(),
@@ -103,15 +91,36 @@ describe("ensureDocker", () => {
         resourceUsage: undefined,
         pid: 1234,
       } satisfies ReturnType<typeof Bun.spawnSync>;
+      const fail = {
+        exitCode: 1,
+        stdout: new Uint8Array(),
+        stderr: new Uint8Array(),
+        success: false,
+        signalCode: null,
+        resourceUsage: undefined,
+        pid: 1234,
+      } satisfies ReturnType<typeof Bun.spawnSync>;
+      // 1: docker info → fail, 2: which docker → fail (not installed),
+      // 3: brew install → ok, 4: open -a OrbStack → ok, 5: docker info → ok
+      if (callCount <= 2) {
+        return fail;
+      }
+      return ok;
     });
 
     await ensureDocker();
 
-    // Second call should be brew install orbstack
-    expect(spy.mock.calls[1][0]).toEqual([
+    // Call 1: docker info, 2: which docker, 3: brew install orbstack
+    expect(spy.mock.calls[2][0]).toEqual([
       "brew",
       "install",
       "orbstack",
+    ]);
+    // Call 4: open -a OrbStack (starts daemon)
+    expect(spy.mock.calls[3][0]).toEqual([
+      "open",
+      "-a",
+      "OrbStack",
     ]);
 
     spy.mockRestore();
