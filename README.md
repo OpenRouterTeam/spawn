@@ -46,8 +46,8 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
 | `spawn <agent> <cloud> --zone <zone>` | Set zone/region for the cloud |
 | `spawn <agent> <cloud> --size <type>` | Set instance size/type for the cloud |
-| `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
-| `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
+| `spawn <agent> <cloud> --prompt "text"` | Non-interactive with prompt (or `-p`) |
+| `spawn <agent> <cloud> --prompt-file <file>` | Prompt from file (or `-f`) |
 | `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
 | `spawn <agent> <cloud> --output json` | Headless mode with structured JSON on stdout |
 | `spawn <agent> <cloud> --model <id>` | Set the model ID (overrides agent default) |
@@ -139,7 +139,7 @@ spawn claude hetzner --fast
 What `--fast` does:
 - **Parallel boot**: server creation runs concurrently with API key prompt and account checks
 - **Tarballs**: installs agents from pre-built tarballs instead of live install
-- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, ZeroClaw, Hermes), skips the package install wait since the base OS already has what's needed
+- **Skip cloud-init**: for lightweight agents (Claude, OpenCode, Hermes), skips the package install wait since the base OS already has what's needed
 - **Snapshots**: uses pre-built cloud images when available (Hetzner, DigitalOcean)
 
 #### Beta Features
@@ -156,8 +156,9 @@ spawn claude gcp --beta tarball --beta parallel
 | `images` | Use pre-built cloud images/snapshots (faster boot) |
 | `parallel` | Parallelize server boot with setup prompts |
 | `recursive` | Install spawn CLI on VM so it can spawn child VMs |
+| `sandbox` | Run local agents in a Docker container (sandboxed) |
 
-`--fast` enables `tarball`, `images`, and `parallel` (not `recursive`).
+`--fast` enables `tarball`, `images`, and `parallel` (not `recursive` or `sandbox`).
 
 #### Recursive Spawn
 
@@ -187,6 +188,27 @@ Tear down an entire tree:
 spawn delete --cascade <id>    # Delete a VM and all its children
 ```
 
+#### Sandboxed Local
+
+Use `--beta sandbox` to run local agents inside a Docker container instead of directly on your machine:
+
+```bash
+spawn claude local --beta sandbox
+```
+
+What this does:
+- **Pulls the agent's Docker image** from `ghcr.io/openrouterteam/spawn-<agent>`
+- **Runs the agent in a container** with filesystem, network, and process isolation
+- **Auto-installs Docker** if not present (OrbStack on macOS, docker.io on Linux)
+- **Cleans up the container** automatically when the session ends
+
+In the interactive picker, `--beta sandbox` adds a "Local Machine (Sandboxed)" option alongside the regular "Local Machine":
+
+```bash
+spawn --beta sandbox           # Interactive picker shows both local options
+spawn openclaw local --beta sandbox   # Direct launch, sandboxed
+```
+
 ### Without the CLI
 
 Every combination works as a one-liner — no install required:
@@ -206,7 +228,7 @@ export OPENROUTER_API_KEY=sk-or-v1-xxxxx
 # Cloud-specific credentials (varies by provider)
 # Note: Sprite uses `sprite login` for authentication
 export HCLOUD_TOKEN=...           # For Hetzner
-export DO_API_TOKEN=...           # For DigitalOcean
+export DIGITALOCEAN_ACCESS_TOKEN=...  # For DigitalOcean
 
 # Run non-interactively
 spawn claude hetzner
@@ -258,7 +280,7 @@ If spawn fails to install, try these steps:
 2. **Set credentials via environment variables** before launching:
    ```powershell
    $env:OPENROUTER_API_KEY = "sk-or-v1-xxxxx"
-   $env:DO_API_TOKEN = "dop_v1_xxxxx"      # For DigitalOcean
+   $env:DIGITALOCEAN_ACCESS_TOKEN = "dop_v1_xxxxx"  # For DigitalOcean
    $env:HCLOUD_TOKEN = "xxxxx"              # For Hetzner
    spawn openclaw digitalocean
    ```
@@ -324,7 +346,6 @@ If an agent fails to install or launch on a cloud:
 |---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**ZeroClaw**](https://github.com/zeroclaw-labs/zeroclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenCode**](https://github.com/sst/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

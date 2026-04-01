@@ -25,9 +25,15 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
   let warnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    // Save and clear DO_API_TOKEN
-    savedEnv["DO_API_TOKEN"] = process.env.DO_API_TOKEN;
-    delete process.env.DO_API_TOKEN;
+    // Save and clear all accepted DigitalOcean token env vars
+    for (const v of [
+      "DIGITALOCEAN_ACCESS_TOKEN",
+      "DIGITALOCEAN_API_TOKEN",
+      "DO_API_TOKEN",
+    ]) {
+      savedEnv[v] = process.env[v];
+      delete process.env[v];
+    }
 
     // Fail OAuth connectivity check → tryDoOAuth returns null immediately
     globalThis.fetch = mock(() => Promise.reject(new Error("Network unreachable")));
@@ -73,7 +79,25 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
     expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
   });
 
-  it("does NOT show payment warning when DO_API_TOKEN env var is set", async () => {
+  it("does NOT show payment warning when DIGITALOCEAN_ACCESS_TOKEN env var is set", async () => {
+    process.env.DIGITALOCEAN_ACCESS_TOKEN = "dop_v1_invalid_env_token";
+
+    await expect(ensureDoToken()).rejects.toThrow();
+
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
+  });
+
+  it("does NOT show payment warning when DIGITALOCEAN_API_TOKEN env var is set", async () => {
+    process.env.DIGITALOCEAN_API_TOKEN = "dop_v1_invalid_env_token";
+
+    await expect(ensureDoToken()).rejects.toThrow();
+
+    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
+  });
+
+  it("does NOT show payment warning when legacy DO_API_TOKEN env var is set", async () => {
     process.env.DO_API_TOKEN = "dop_v1_invalid_env_token";
 
     await expect(ensureDoToken()).rejects.toThrow();

@@ -31,7 +31,7 @@ Cloud credentials are stored in `~/.config/spawn/{cloud}.json` (loaded by `sh/sh
 
 For each cloud with a fixture directory, check if its required env vars are set:
 - **hetzner**: `HCLOUD_TOKEN`
-- **digitalocean**: `DO_API_TOKEN`
+- **digitalocean**: `DIGITALOCEAN_ACCESS_TOKEN`
 - **aws**: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`
 
 Skip clouds where credentials are missing (log which ones).
@@ -53,11 +53,11 @@ curl -s -H "Authorization: Bearer ${HCLOUD_TOKEN}" "https://api.hetzner.cloud/v1
 curl -s -H "Authorization: Bearer ${HCLOUD_TOKEN}" "https://api.hetzner.cloud/v1/locations"
 ```
 
-### DigitalOcean (needs DO_API_TOKEN)
+### DigitalOcean (needs DIGITALOCEAN_ACCESS_TOKEN)
 ```bash
-curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com/v2/account/keys"
-curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com/v2/sizes"
-curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com/v2/regions"
+curl -s -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/account/keys"
+curl -s -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/sizes"
+curl -s -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/regions"
 ```
 
 For any other cloud directories found, read their TypeScript module in `packages/cli/src/{cloud}/` to discover the API base URL and auth pattern, then call equivalent GET-only endpoints.

@@ -78,20 +78,50 @@ function getAndValidateCloudChoices(
   };
 }
 
-// Prompt user to select a cloud with arrow-key navigation
+// Prompt user to select a cloud with arrow-key navigation.
+// When --beta sandbox is active and "local" is in the list, injects a
+// "Local Machine (Sandboxed)" option right after "Local Machine".
 async function selectCloud(
   manifest: Manifest,
   cloudList: string[],
   hintOverrides: Record<string, string>,
 ): Promise<string> {
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
+  const sandboxEnabled = betaFeatures.includes("sandbox");
+
+  const options = mapToSelectOptions(cloudList, manifest.clouds, hintOverrides);
+
+  // Inject sandbox option next to "local" when --beta sandbox is set
+  if (sandboxEnabled && cloudList.includes("local")) {
+    const localIdx = options.findIndex((o) => o.value === "local");
+    if (localIdx !== -1) {
+      options[localIdx].hint = "No isolation — runs on your machine";
+      options.splice(localIdx + 1, 0, {
+        value: "local-sandbox",
+        label: "Local Machine (Sandboxed)",
+        hint: "Runs in a Docker container",
+      });
+    }
+  }
+
   const cloudChoice = await p.select({
     message: "Select a cloud",
-    options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
+    options,
     initialValue: cloudList[0],
   });
   if (p.isCancel(cloudChoice)) {
     handleCancel();
   }
+
+  // Map synthetic "local-sandbox" back to "local" and ensure sandbox beta is set
+  if (cloudChoice === "local-sandbox") {
+    const existing = process.env.SPAWN_BETA ?? "";
+    if (!existing.split(",").includes("sandbox")) {
+      process.env.SPAWN_BETA = existing ? `${existing},sandbox` : "sandbox";
+    }
+    return "local";
+  }
+
   return cloudChoice;
 }
 

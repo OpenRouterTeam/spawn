@@ -62,7 +62,7 @@ Do NOT add agents speculatively. Only add one if there's **real community buzz**
 Agents that ship compiled binaries (Rust, Go, etc.) need separate ARM (aarch64) tarball builds. npm-based agents are arch-independent and only need x86_64 builds. When adding a new agent:
 - If it installs via `npm install -g` → x86_64 tarball only (Node handles arch)
 - If it installs a pre-compiled binary (curl download, cargo install, go install) → add an ARM entry in `.github/workflows/agent-tarballs.yml` matrix `include` section
-- Current native binary agents needing ARM: zeroclaw (Rust), opencode (Go), hermes, claude
+- Current native binary agents needing ARM: opencode (Go), hermes, claude
 
 To add: same steps as before (manifest.json entry, matrix entries, implement on 1+ cloud, README).
 

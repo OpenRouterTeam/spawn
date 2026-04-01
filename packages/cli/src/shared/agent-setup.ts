@@ -592,51 +592,6 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   logInfo("OpenClaw gateway started");
 }
 
-// ─── ZeroClaw Config ─────────────────────────────────────────────────────────
-
-async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
-  logStep("Configuring ZeroClaw for autonomous operation...");
-
-  // Remove any pre-existing config (e.g. from Docker image extraction) before
-  // running onboard, which generates a fresh config with the correct API key.
-  await runner.runServer("rm -f ~/.zeroclaw/config.toml");
-
-  // Run onboard first to set up provider/key
-  await runner.runServer(
-    `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
-  );
-
-  // Patch autonomy settings in-place. `zeroclaw onboard` already generates
-  // [security] and [shell] sections — so we sed the values instead of
-  // appending duplicate sections.
-  const patchScript = [
-    "cd ~/.zeroclaw",
-    // Update existing security values (or append section if missing)
-    'if grep -q "^\\[security\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^autonomy = .*/autonomy = \"full\"/' config.toml",
-    "  sed -i 's/^supervised = .*/supervised = false/' config.toml",
-    "  sed -i 's/^allow_destructive = .*/allow_destructive = true/' config.toml",
-    "else",
-    "  printf '\\n[security]\\nautonomy = \"full\"\\nsupervised = false\\nallow_destructive = true\\n' >> config.toml",
-    "fi",
-    // Update existing shell policy (or append section if missing)
-    'if grep -q "^\\[shell\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^policy = .*/policy = \"allow_all\"/' config.toml",
-    "else",
-    "  printf '\\n[shell]\\npolicy = \"allow_all\"\\n' >> config.toml",
-    "fi",
-    // Force native runtime (no Docker) — zeroclaw auto-detects Docker and
-    // launches in a container otherwise, which hangs the interactive session.
-    'if grep -q "^\\[runtime\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^adapter = .*/adapter = \"native\"/' config.toml",
-    "else",
-    "  printf '\\n[runtime]\\nadapter = \"native\"\\n' >> config.toml",
-    "fi",
-  ].join("\n");
-  await runner.runServer(patchScript);
-  logInfo("ZeroClaw configured for autonomous operation");
-}
-
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 function openCodeInstallCmd(): string {
@@ -894,10 +849,6 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
 
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
-// Last zeroclaw release that shipped Linux prebuilt binaries (v0.1.9a has none).
-// Used for direct binary install to avoid a Rust source build timeout.
-const ZEROCLAW_PREBUILT_TAG = "v0.1.7-beta.30";
-
 function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
     claude: {
@@ -1011,50 +962,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "npm install -g ${_NPM_G_FLAGS:-} @kilocode/cli@latest",
     },
 
-    zeroclaw: {
-      name: "ZeroClaw",
-      cloudInitTier: "minimal",
-      modelEnvVar: "ZEROCLAW_MODEL",
-      preProvision: detectGithubAuth,
-      install: async () => {
-        // Direct binary install from pinned release (v0.1.9a "latest" has no assets,
-        // causing the bootstrap --prefer-prebuilt path to 404-fail and fall back to
-        // a Rust source build that exceeds the 600s install timeout).
-        const directInstallCmd =
-          `_ZC_ARCH="$(uname -m)"; ` +
-          `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
-          `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
-          `else echo "Unsupported arch: $_ZC_ARCH" >&2; exit 1; fi; ` +
-          `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/download/${ZEROCLAW_PREBUILT_TAG}/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
-          `_ZC_TMP="$(mktemp -d)"; ` +
-          `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
-          `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
-          `{ mkdir -p "$HOME/.local/bin" && install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw"; } && ` +
-          `rm -rf "$_ZC_TMP"`;
-        await installAgent(runner, "ZeroClaw", directInstallCmd, 120);
-      },
-      envVars: (apiKey) => [
-        `OPENROUTER_API_KEY=${apiKey}`,
-        "ZEROCLAW_PROVIDER=openrouter",
-        "ZEROCLAW_RUNTIME=native",
-      ],
-      configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
-      launchCmd: () =>
-        "export PATH=$HOME/.local/bin:$HOME/.cargo/bin:$PATH; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
-      updateCmd:
-        'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; ' +
-        `_ZC_ARCH="$(uname -m)"; ` +
-        `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
-        `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
-        "else exit 1; fi; " +
-        `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/latest/download/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
-        `_ZC_TMP="$(mktemp -d)"; ` +
-        `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
-        `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
-        `install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw" && ` +
-        `rm -rf "$_ZC_TMP"`,
-    },
-
     hermes: {
       name: "Hermes Agent",
       cloudInitTier: "minimal",
@@ -1147,11 +1054,12 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
+        "CURSOR_API_KEY=spawn-proxy",
       ],
       configure: () => setupCursorProxy(runner),
       preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
-        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh --trust',
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
       updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };

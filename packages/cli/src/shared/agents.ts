@@ -24,7 +24,7 @@ export interface AgentConfig {
   name: string;
   /** Default model ID passed to configure() (no interactive prompt — override via MODEL_ID env var). */
   modelDefault?: string;
-  /** Env var name for setting the model on the remote (e.g. ZEROCLAW_MODEL, LLM_MODEL). */
+  /** Env var name for setting the model on the remote (e.g. KILOCODE_MODEL, LLM_MODEL). */
   modelEnvVar?: string;
   /** Pre-provision hook (runs before server creation, e.g., prompt for GitHub auth). */
   preProvision?: () => Promise<void>;

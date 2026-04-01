@@ -132,6 +132,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
     console.error(`    ${pc.cyan("--beta parallel")}     Parallelize server boot with setup prompts`);
     console.error(`    ${pc.cyan("--beta docker")}       Use Docker CE app image on Hetzner/GCP (faster boot)`);
+    console.error(`    ${pc.cyan("--beta sandbox")}      Run local agents in a Docker container (sandboxed)`);
     console.error(`    ${pc.cyan("--beta recursive")}    Install spawn CLI on VM for recursive spawning`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
@@ -893,6 +894,7 @@ async function main(): Promise<void> {
     "parallel",
     "docker",
     "recursive",
+    "sandbox",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
@@ -903,6 +905,7 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
       console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
       console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("sandbox")}     Run local agents in a Docker container (sandboxed)`);
       console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
       process.exit(1);
     }
@@ -1066,23 +1069,6 @@ async function main(): Promise<void> {
       console.error(
         `\n${pc.cyan("--custom")} enables interactive pickers, but ${pc.cyan("--headless")} disables all prompts.`,
       );
-    }
-    process.exit(3);
-  }
-
-  // Validate headless-incompatible flags
-  if (effectiveHeadless && dryRun) {
-    if (outputFormat === "json") {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          error_code: "VALIDATION_ERROR",
-          error_message: "--headless and --dry-run cannot be used together",
-        }),
-      );
-    } else {
-      console.error(pc.red("Error: --headless and --dry-run cannot be used together"));
-      console.error(`\nUse ${pc.cyan("--dry-run")} for previewing, or ${pc.cyan("--headless")} for execution.`);
     }
     process.exit(3);
   }
