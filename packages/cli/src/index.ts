@@ -317,19 +317,24 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
 
 /** Print a descriptive error for a failed prompt file read and exit */
 function handlePromptFileError(promptFile: string, err: unknown): never {
+  // SECURITY: Strip control characters to prevent terminal injection via crafted paths.
+  // validatePromptFilePath() rejects these early, but this is defense-in-depth for
+  // error paths that run before validation (e.g., stat failures).
+  // Inline the same regex from security.ts to avoid async import in a sync function.
+  const safePath = promptFile.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
   const errObj = toRecord(err);
   const code = isString(errObj?.code) ? errObj.code : "";
   if (code === "ENOENT") {
-    console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
+    console.error(pc.red(`Prompt file not found: ${pc.bold(safePath)}`));
     console.error("\nCheck the path and try again.");
   } else if (code === "EACCES") {
-    console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
+    console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(safePath)}`));
+    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${safePath}`)}`);
   } else if (code === "EISDIR") {
-    console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
+    console.error(pc.red(`'${safePath}' is a directory, not a file.`));
     console.error("\nProvide a path to a text file containing your prompt.");
   } else {
-    console.error(pc.red(`Error reading prompt file '${promptFile}': ${getErrorMessage(err)}`));
+    console.error(pc.red(`Error reading prompt file '${safePath}': ${getErrorMessage(err)}`));
   }
   process.exit(1);
 }

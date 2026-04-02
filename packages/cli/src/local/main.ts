@@ -6,6 +6,7 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import * as p from "@clack/prompts";
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import { createCloudAgents } from "../shared/agent-setup.js";
 import { makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logWarn } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
@@ -28,11 +29,22 @@ async function main() {
     process.exit(1);
   }
 
-  const agent = resolveAgent(agentName);
-
   // Check if --beta sandbox is active
   const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",");
   const useSandbox = betaFeatures.includes("sandbox");
+
+  const baseRunner = {
+    runServer: runLocal,
+    uploadFile: async (l: string, r: string) => uploadFile(l, r),
+    downloadFile: async (r: string, l: string) => downloadFile(r, l),
+  };
+
+  // When sandboxed, recreate agents with the Docker-wrapped runner so that
+  // agent.configure() / agent.install() closures execute inside the container
+  // instead of writing config files directly to the host filesystem.
+  const agent = useSandbox
+    ? createCloudAgents(makeDockerRunner(baseRunner)).resolveAgent(agentName)
+    : resolveAgent(agentName);
 
   // If sandboxed, ensure Docker is installed (auto-install if missing)
   if (useSandbox) {
@@ -58,12 +70,6 @@ async function main() {
       process.exit(0);
     }
   }
-
-  const baseRunner = {
-    runServer: runLocal,
-    uploadFile: async (l: string, r: string) => uploadFile(l, r),
-    downloadFile: async (r: string, l: string) => downloadFile(r, l),
-  };
 
   const cloud: CloudOrchestrator = {
     cloudName: "local",

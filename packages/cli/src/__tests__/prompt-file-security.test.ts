@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { validatePromptFilePath, validatePromptFileStats } from "../security.js";
+import { stripControlChars, validatePromptFilePath, validatePromptFileStats } from "../security.js";
 
 describe("validatePromptFilePath", () => {
   it("should accept normal text file paths", () => {
@@ -157,6 +157,45 @@ describe("validatePromptFilePath", () => {
       symlinkSync(safeFile, symlink);
       expect(() => validatePromptFilePath(symlink)).not.toThrow();
     });
+  });
+
+  it("should reject paths containing ANSI escape sequences", () => {
+    expect(() => validatePromptFilePath("\x1b[2J\x1b[Hfake.txt")).toThrow("control characters");
+    expect(() => validatePromptFilePath("file\x1b[31mred.txt")).toThrow("control characters");
+  });
+
+  it("should reject paths containing null bytes", () => {
+    expect(() => validatePromptFilePath("file\x00.txt")).toThrow("control characters");
+  });
+
+  it("should reject paths containing other control characters", () => {
+    expect(() => validatePromptFilePath("file\x07bell.txt")).toThrow("control characters");
+    expect(() => validatePromptFilePath("file\x08backspace.txt")).toThrow("control characters");
+    expect(() => validatePromptFilePath("file\x7Fdel.txt")).toThrow("control characters");
+  });
+});
+
+describe("stripControlChars", () => {
+  it("should strip ANSI escape sequences", () => {
+    expect(stripControlChars("\x1b[2J\x1b[Hfake.txt")).toBe("[2J[Hfake.txt");
+  });
+
+  it("should strip null bytes", () => {
+    expect(stripControlChars("file\x00.txt")).toBe("file.txt");
+  });
+
+  it("should strip bell, backspace, and DEL", () => {
+    expect(stripControlChars("file\x07\x08\x7F.txt")).toBe("file.txt");
+  });
+
+  it("should preserve tabs and newlines", () => {
+    expect(stripControlChars("line1\nline2\ttab")).toBe("line1\nline2\ttab");
+  });
+
+  it("should return normal strings unchanged", () => {
+    expect(stripControlChars("/tmp/prompt.txt")).toBe("/tmp/prompt.txt");
+    expect(stripControlChars("")).toBe("");
+    expect(stripControlChars("hello world")).toBe("hello world");
   });
 });
 
