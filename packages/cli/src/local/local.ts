@@ -73,6 +73,22 @@ export async function runLocal(cmd: string): Promise<void> {
   }
 }
 
+/** Run a command locally using an argument array (no shell interpretation). */
+export async function runLocalArgs(args: ReadonlyArray<string>): Promise<void> {
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
+    env: process.env,
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`Command failed (exit ${exitCode}): ${args.join(" ")}`);
+  }
+}
+
 // ─── File Operations ─────────────────────────────────────────────────────────
 
 /** Copy a file locally, expanding ~ in the destination path. */
@@ -314,10 +330,21 @@ export async function pullAndStartContainer(agentName: string): Promise<void> {
 
   const image = `${DOCKER_REGISTRY}/spawn-${agentName}:latest`;
   logStep(`Pulling Docker image ${image}...`);
-  await runLocal(`docker pull ${image}`);
+  await runLocalArgs([
+    "docker",
+    "pull",
+    image,
+  ]);
 
   logStep("Starting agent container...");
-  await runLocal(`docker run -d --name ${DOCKER_CONTAINER_NAME} ${image}`);
+  await runLocalArgs([
+    "docker",
+    "run",
+    "-d",
+    "--name",
+    DOCKER_CONTAINER_NAME,
+    image,
+  ]);
   logInfo("Agent container running");
 }
 

@@ -3,7 +3,7 @@ import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 mockClackPrompts();
 
-import { cleanupContainer, ensureDocker, isDockerAvailable, pullAndStartContainer } from "../local/local";
+import { cleanupContainer, ensureDocker, isDockerAvailable, pullAndStartContainer, runLocalArgs } from "../local/local";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ describe("pullAndStartContainer", () => {
   it("cleans up stale container, pulls image, and starts new container", async () => {
     // Mock spawnSync for cleanup call
     const syncSpy = mockSpawnSync(0);
-    // Mock Bun.spawn for runLocal calls
+    // Mock Bun.spawn for runLocalArgs calls (array-based, no shell)
     const spawnSpy = mockBunSpawn(0);
 
     await pullAndStartContainer("claude");
@@ -149,22 +149,73 @@ describe("pullAndStartContainer", () => {
       "spawn-agent",
     ]);
 
-    // Bun.spawn calls: docker pull, docker run
+    // Bun.spawn calls: docker pull, docker run (array args, no shell)
     const spawnCalls = spawnSpy.mock.calls;
     expect(spawnCalls.length).toBe(2);
 
-    // Pull command
-    const pullCmd = spawnCalls[0][0][2];
-    expect(pullCmd).toContain("docker pull");
-    expect(pullCmd).toContain("ghcr.io/openrouterteam/spawn-claude:latest");
+    // Pull command — passed as array directly, not through a shell
+    expect(spawnCalls[0][0]).toEqual([
+      "docker",
+      "pull",
+      "ghcr.io/openrouterteam/spawn-claude:latest",
+    ]);
 
-    // Run command
-    const runCmd = spawnCalls[1][0][2];
-    expect(runCmd).toContain("docker run -d");
-    expect(runCmd).toContain("--name spawn-agent");
-    expect(runCmd).toContain("ghcr.io/openrouterteam/spawn-claude:latest");
+    // Run command — passed as array directly, not through a shell
+    expect(spawnCalls[1][0]).toEqual([
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "spawn-agent",
+      "ghcr.io/openrouterteam/spawn-claude:latest",
+    ]);
 
     syncSpy.mockRestore();
+    spawnSpy.mockRestore();
+  });
+});
+
+// ─── runLocalArgs ──────────────────────────────────────────────────────────
+
+describe("runLocalArgs", () => {
+  it("spawns command with array args (no shell interpretation)", async () => {
+    const spawnSpy = mockBunSpawn(0);
+    await runLocalArgs([
+      "echo",
+      "hello",
+      "world",
+    ]);
+    expect(spawnSpy.mock.calls[0][0]).toEqual([
+      "echo",
+      "hello",
+      "world",
+    ]);
+    spawnSpy.mockRestore();
+  });
+
+  it("throws on non-zero exit code", async () => {
+    const spawnSpy = mockBunSpawn(1);
+    expect(
+      runLocalArgs([
+        "false",
+      ]),
+    ).rejects.toThrow("Command failed (exit 1): false");
+    spawnSpy.mockRestore();
+  });
+
+  it("does not interpret shell metacharacters in arguments", async () => {
+    const spawnSpy = mockBunSpawn(0);
+    await runLocalArgs([
+      "echo",
+      "$(whoami)",
+      "; rm -rf /",
+    ]);
+    // Args are passed directly, not through a shell
+    expect(spawnSpy.mock.calls[0][0]).toEqual([
+      "echo",
+      "$(whoami)",
+      "; rm -rf /",
+    ]);
     spawnSpy.mockRestore();
   });
 });
