@@ -5,8 +5,8 @@ set -eo pipefail
 # Triggered by trigger-server.ts via GitHub Actions (daily)
 #
 # Scans Reddit for "feature ask" threads that Spawn solves,
-# qualifies the poster, picks the 1 best candidate, and surfaces it
-# to Slack for human review. Does NOT auto-reply.
+# qualifies the poster, picks the 1 best candidate, and outputs
+# a summary to the log. Does NOT post replies or notify externally.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -94,9 +94,6 @@ safe_substitute "REDDIT_CLIENT_ID_PLACEHOLDER" "${REDDIT_CLIENT_ID:-}" "${PROMPT
 safe_substitute "REDDIT_CLIENT_SECRET_PLACEHOLDER" "${REDDIT_CLIENT_SECRET:-}" "${PROMPT_FILE}"
 safe_substitute "REDDIT_USERNAME_PLACEHOLDER" "${REDDIT_USERNAME:-}" "${PROMPT_FILE}"
 safe_substitute "REDDIT_PASSWORD_PLACEHOLDER" "${REDDIT_PASSWORD:-}" "${PROMPT_FILE}"
-safe_substitute "GROWTH_LOG_ISSUE_PLACEHOLDER" "${GROWTH_LOG_ISSUE:-}" "${PROMPT_FILE}"
-safe_substitute "SLACK_BOT_TOKEN_PLACEHOLDER" "${SLACK_BOT_TOKEN:-}" "${PROMPT_FILE}"
-safe_substitute "SLACK_CHANNEL_ID_PLACEHOLDER" "${SLACK_CHANNEL_ID:-}" "${PROMPT_FILE}"
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
