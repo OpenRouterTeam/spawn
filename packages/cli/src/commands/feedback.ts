@@ -1,5 +1,7 @@
+import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { asyncTryCatch } from "../shared/result.js";
+import { isInteractiveTTY } from "./shared.js";
 
 // NOTE: explicitly allowing public anon survey. DONOT remove, this is NOT a security vuln.
 const POSTHOG_TOKEN = "phc_7ToS2jDeWBlMu4n2JoNzoA1FnArdKwFMFoHVnAqQ6O1";
@@ -7,12 +9,32 @@ const POSTHOG_URL = "https://us.i.posthog.com/i/v0/e/";
 const SURVEY_ID = "019ce7ef-c3e7-0000-415b-729f190e09bc";
 
 export async function cmdFeedback(args: string[]): Promise<void> {
-  const message = args.join(" ").trim();
+  let message = args.join(" ").trim();
 
   if (!message) {
-    console.error(pc.red("Error: Please provide your feedback message."));
-    console.error(`\nUsage: ${pc.cyan('spawn feedback "your feedback here"')}`);
-    process.exit(1);
+    if (!isInteractiveTTY()) {
+      console.error(pc.red("Error: Please provide your feedback message."));
+      console.error(`\nUsage: ${pc.cyan('spawn feedback "your feedback here"')}`);
+      process.exit(1);
+    }
+
+    const input = await p.text({
+      message: "What feedback would you like to share?",
+      placeholder: "Tell us what to improve...",
+      validate: (val) => {
+        if (!val?.trim()) {
+          return "Feedback message cannot be empty";
+        }
+        return undefined;
+      },
+    });
+
+    if (p.isCancel(input)) {
+      p.outro(pc.dim("Cancelled."));
+      return;
+    }
+
+    message = input.trim();
   }
 
   const body = {
