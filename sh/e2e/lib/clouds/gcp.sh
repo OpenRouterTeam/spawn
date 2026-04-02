@@ -80,6 +80,18 @@ process.stdout.write(d.GCP_ZONE || '');
     return 1
   fi
 
+  # Check if billing is enabled on the project. Without billing, instance
+  # creation always fails — skip early so the orchestrator reports "skipped"
+  # instead of failing every agent individually. See #3091.
+  local _billing_enabled
+  _billing_enabled=$(gcloud billing projects describe "${GCP_PROJECT}" \
+    --format="value(billingEnabled)" 2>/dev/null || true)
+  if [ "${_billing_enabled}" = "False" ]; then
+    log_err "Billing is disabled on GCP project '${GCP_PROJECT}' — cannot create instances"
+    log_err "Re-enable billing at: https://console.cloud.google.com/billing/linkedaccount?project=${GCP_PROJECT}"
+    return 1
+  fi
+
   log_ok "GCP credentials validated (project: ${GCP_PROJECT}, zone: ${GCP_ZONE:-us-central1-a})"
   return 0
 }
