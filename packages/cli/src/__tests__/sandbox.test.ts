@@ -3,7 +3,15 @@ import { mockBunSpawn, mockClackPrompts } from "./test-helpers";
 
 mockClackPrompts();
 
-import { cleanupContainer, ensureDocker, isDockerAvailable, pullAndStartContainer, runLocalArgs } from "../local/local";
+import {
+  cleanupContainer,
+  ensureDocker,
+  isDockerAvailable,
+  pullAndStartContainer,
+  runLocalArgs,
+  validateAgentName,
+  validateLocalPath,
+} from "../local/local";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -313,5 +321,72 @@ describe("sandbox agent runner isolation", () => {
     // Without sandbox, commands run directly (no docker wrapping)
     const dockerCmds = hostCommands.filter((cmd) => cmd.includes("docker exec"));
     expect(dockerCmds).toEqual([]);
+  });
+});
+
+// ─── validateAgentName ─────────────────────────────────────────────────────
+
+describe("validateAgentName", () => {
+  it("accepts valid lowercase alphanumeric names", () => {
+    expect(validateAgentName("claude")).toBe("claude");
+    expect(validateAgentName("codex-cli")).toBe("codex-cli");
+    expect(validateAgentName("open-code")).toBe("open-code");
+    expect(validateAgentName("agent123")).toBe("agent123");
+  });
+
+  it("rejects empty string", () => {
+    expect(() => validateAgentName("")).toThrow("must not be empty");
+  });
+
+  it("rejects names with uppercase characters", () => {
+    expect(() => validateAgentName("Claude")).toThrow("must match");
+  });
+
+  it("rejects names with shell metacharacters", () => {
+    expect(() => validateAgentName("claude;rm -rf /")).toThrow("must match");
+    expect(() => validateAgentName("agent$(whoami)")).toThrow("must match");
+    expect(() => validateAgentName("agent`id`")).toThrow("must match");
+  });
+
+  it("rejects names with path traversal", () => {
+    expect(() => validateAgentName("../etc/passwd")).toThrow("must match");
+    expect(() => validateAgentName("agent/../../root")).toThrow("must match");
+  });
+
+  it("rejects names with spaces", () => {
+    expect(() => validateAgentName("my agent")).toThrow("must match");
+  });
+});
+
+// ─── validateLocalPath ─────────────────────────────────────────────────────
+
+describe("validateLocalPath", () => {
+  it("accepts normal absolute paths", () => {
+    const result = validateLocalPath("/tmp/file.txt");
+    expect(result).toBe("/tmp/file.txt");
+  });
+
+  it("expands ~ to home directory", () => {
+    const home = process.env.HOME ?? "";
+    const result = validateLocalPath("~/file.txt");
+    expect(result).toBe(`${home}/file.txt`);
+  });
+
+  it("expands $HOME to home directory", () => {
+    const home = process.env.HOME ?? "";
+    const result = validateLocalPath("$HOME/file.txt");
+    expect(result).toBe(`${home}/file.txt`);
+  });
+
+  it("rejects paths with .. traversal", () => {
+    expect(() => validateLocalPath("/home/user/../../../etc/passwd")).toThrow("path traversal");
+  });
+
+  it("rejects $HOME with .. traversal", () => {
+    expect(() => validateLocalPath("$HOME/../etc/passwd")).toThrow("path traversal");
+  });
+
+  it("rejects ~ with .. traversal", () => {
+    expect(() => validateLocalPath("~/../etc/shadow")).toThrow("path traversal");
   });
 });
