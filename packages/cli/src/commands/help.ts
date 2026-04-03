@@ -29,7 +29,7 @@ function getHelpUsageSection(): string {
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
   spawn list --flat                  Show flat list (disable tree view)
   spawn list --json                  Output history as JSON
-  spawn list --clear                 Clear all spawn history
+  spawn list --clear                 Clear all spawn history (requires --yes non-interactively)
   spawn delete                       Delete a previously spawned server (aliases: rm, destroy, kill)
   spawn delete -a <agent>            Filter servers by agent
   spawn delete -c <cloud>            Filter servers by cloud
