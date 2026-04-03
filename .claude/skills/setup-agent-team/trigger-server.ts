@@ -80,12 +80,7 @@ let nextRunId = 1;
 
 /** Timing-safe auth check — prevents timing side-channel attacks on TRIGGER_SECRET */
 function isAuthed(req: Request): boolean {
-  const given = req.headers.get("Authorization") ?? "";
-  const expected = `Bearer ${TRIGGER_SECRET}`;
-  if (given.length !== expected.length) {
-    return false;
-  }
-  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  return isAuthedWith(req, TRIGGER_SECRET);
 }
 
 /** Allowed values for the reason query parameter */
@@ -186,6 +181,81 @@ function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
+const REPLY_SCRIPT = resolve(SKILL_DIR, "reply.sh");
+const REPLY_SECRET = process.env.REPLY_SECRET ?? TRIGGER_SECRET;
+
+/** Check auth against a given secret (timing-safe). */
+function isAuthedWith(req: Request, secret: string): boolean {
+  const given = req.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${secret}`;
+  if (given.length !== expected.length) {
+    return false;
+  }
+  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}
+
+/**
+ * Handle POST /reply — post a comment to Reddit via reply.sh.
+ * This is synchronous: it waits for reply.sh to finish and returns the result.
+ */
+async function handleReply(req: Request): Promise<Response> {
+  if (!isAuthedWith(req, REPLY_SECRET)) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+
+  const obj = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
+  const postId = obj && typeof obj.postId === "string" ? obj.postId : "";
+  const replyText = obj && typeof obj.replyText === "string" ? obj.replyText : "";
+
+  if (!postId || !replyText) {
+    return Response.json({ error: "postId and replyText are required" }, { status: 400 });
+  }
+
+  // Validate postId format (Reddit fullname: t1_, t3_, etc.)
+  if (!/^t[1-6]_[a-z0-9]+$/i.test(postId)) {
+    return Response.json({ error: "invalid postId format" }, { status: 400 });
+  }
+
+  console.log(`[trigger] Reply request: postId=${postId}, replyText=${replyText.slice(0, 80)}...`);
+
+  const proc = Bun.spawn(["bash", REPLY_SCRIPT], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      POST_ID: postId,
+      REPLY_TEXT: replyText,
+    },
+  });
+
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    console.error(`[trigger] reply.sh failed (exit=${exitCode}): ${stderr}`);
+    return Response.json({ error: "reply failed", stderr: stderr.slice(0, 500) }, { status: 502 });
+  }
+
+  // Parse reply.sh JSON output
+  try {
+    const result = JSON.parse(stdout.trim());
+    console.log(`[trigger] Reply posted: ${JSON.stringify(result)}`);
+    return Response.json(result);
+  } catch {
+    return Response.json({ ok: true, raw: stdout.trim() });
+  }
+}
+
 /**
  * Spawn the target script and return immediately with a JSON response.
  * Script stdout/stderr are piped to the server console (journalctl).
@@ -276,6 +346,13 @@ const server = Bun.serve({
         shuttingDown,
         runs: activeRuns,
       });
+    }
+
+    if (req.method === "POST" && url.pathname === "/reply") {
+      if (shuttingDown) {
+        return Response.json({ error: "server is shutting down" }, { status: 503 });
+      }
+      return handleReply(req);
     }
 
     if (req.method === "POST" && url.pathname === "/trigger") {
