@@ -35,8 +35,16 @@ describe("getSpawnSkillPath", () => {
       "~/.hermes/SOUL.md",
     ],
     [
+      "cursor",
+      "~/.cursor/rules/spawn.md",
+    ],
+    [
       "junie",
       "~/.junie/AGENTS.md",
+    ],
+    [
+      "pi",
+      "~/.pi/agent/skills/spawn/SKILL.md",
     ],
   ];
 
@@ -65,7 +73,9 @@ describe("isAppendMode", () => {
       "openclaw",
       "opencode",
       "kilocode",
+      "cursor",
       "junie",
+      "pi",
     ];
     for (const agent of overwriteAgents) {
       expect(isAppendMode(agent), `agent "${agent}"`).toBe(false);
@@ -83,7 +93,9 @@ describe("getSkillContent", () => {
     "opencode",
     "kilocode",
     "hermes",
+    "cursor",
     "junie",
+    "pi",
   ];
 
   for (const agent of agents) {
@@ -110,7 +122,9 @@ describe("getSkillContent", () => {
   for (const agent of [
     "opencode",
     "kilocode",
+    "cursor",
     "junie",
+    "pi",
   ]) {
     it(`${agent} content is plain markdown (no YAML frontmatter)`, () => {
       const content = getSkillContent(agent);
@@ -180,7 +194,9 @@ describe("injectSpawnSkill", () => {
       "opencode",
       "kilocode",
       "hermes",
+      "cursor",
       "junie",
+      "pi",
     ];
     for (const agent of agents) {
       let capturedCmd = "";
