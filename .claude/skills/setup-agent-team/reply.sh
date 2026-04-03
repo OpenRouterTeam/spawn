@@ -28,13 +28,16 @@ if [[ -z "${REDDIT_CLIENT_ID:-}" || -z "${REDDIT_CLIENT_SECRET:-}" || -z "${REDD
 fi
 
 # Use bun to authenticate + post comment (avoids shell escaping issues with reply text)
-exec bun -e "
-const clientId = process.env.REDDIT_CLIENT_ID;
-const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-const username = process.env.REDDIT_USERNAME;
-const password = process.env.REDDIT_PASSWORD;
-const postId = process.env.POST_ID;
-const replyText = process.env.REPLY_TEXT;
+# Write script to temp file so credentials stay in env vars, not visible in ps output
+REPLY_SCRIPT=$(mktemp /tmp/reply-XXXXXX.ts)
+chmod 0600 "${REPLY_SCRIPT}"
+cat > "${REPLY_SCRIPT}" <<'EOSCRIPT'
+const clientId = process.env.REDDIT_CLIENT_ID!;
+const clientSecret = process.env.REDDIT_CLIENT_SECRET!;
+const username = process.env.REDDIT_USERNAME!;
+const password = process.env.REDDIT_PASSWORD!;
+const postId = process.env.POST_ID!;
+const replyText = process.env.REPLY_TEXT!;
 
 const auth = Buffer.from(clientId + ':' + clientSecret).toString('base64');
 const userAgent = 'spawn-growth:v1.0.0 (by /u/' + username + ')';
@@ -82,7 +85,6 @@ if (!commentRes.ok) {
 const commentData = await commentRes.json();
 
 // Extract the comment URL from Reddit's response
-const things = commentData?.jquery?.flat?.() ?? [];
 const commentThing = commentData?.json?.data?.things?.[0]?.data;
 const commentId = commentThing?.id ?? commentThing?.name ?? '';
 const commentPermalink = commentThing?.permalink ?? '';
@@ -93,4 +95,8 @@ console.log(JSON.stringify({
   commentId,
   commentUrl,
 }));
-"
+EOSCRIPT
+
+cleanup_reply() { rm -f "${REPLY_SCRIPT}" 2>/dev/null || true; }
+trap cleanup_reply EXIT
+exec bun run "${REPLY_SCRIPT}"

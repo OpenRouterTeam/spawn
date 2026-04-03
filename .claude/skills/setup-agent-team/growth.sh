@@ -80,6 +80,7 @@ claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code upd
 log "Launching growth cycle..."
 
 PROMPT_FILE=$(mktemp /tmp/growth-prompt-XXXXXX.md)
+chmod 0600 "${PROMPT_FILE}"
 PROMPT_TEMPLATE="${SCRIPT_DIR}/growth-prompt.md"
 
 if [[ ! -f "$PROMPT_TEMPLATE" ]]; then
@@ -98,7 +99,7 @@ safe_substitute "REDDIT_PASSWORD_PLACEHOLDER" "${REDDIT_PASSWORD:-}" "${PROMPT_F
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
 # Run claude in background
-claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet >> "${LOG_FILE}" 2>&1 &
+claude -p - --dangerously-skip-permissions --model sonnet < "${PROMPT_FILE}" >> "${LOG_FILE}" 2>&1 &
 CLAUDE_PID=$!
 log "Claude started (pid=${CLAUDE_PID})"
 
@@ -159,7 +160,7 @@ if [[ -n "${SPA_TRIGGER_URL:-}" && -n "${SPA_TRIGGER_SECRET:-}" ]]; then
         -X POST "${SPA_TRIGGER_URL}/candidate" \
         -H "Authorization: Bearer ${SPA_TRIGGER_SECRET}" \
         -H "Content-Type: application/json" \
-        -d "${CANDIDATE_JSON}" \
+        --data-binary @- <<< "${CANDIDATE_JSON}" \
         --max-time 30) || HTTP_STATUS="000"
     log "SPA response: HTTP ${HTTP_STATUS}"
 else
