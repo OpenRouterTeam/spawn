@@ -355,6 +355,12 @@ _gcp_cleanup_stale() {
     instance_name=$(printf '%s' "${entry}" | awk '{print $1}')
     instance_zone_url=$(printf '%s' "${entry}" | awk '{print $2}')
 
+    if ! _gcp_validate_instance_name "${instance_name}"; then
+      log_warn "Skipping ${instance_name} — invalid name format"
+      skipped=$((skipped + 1))
+      continue
+    fi
+
     # Extract zone name from full URL (zones/us-central1-a -> us-central1-a)
     local instance_zone
     instance_zone=$(printf '%s' "${instance_zone_url}" | sed 's|.*/||')
