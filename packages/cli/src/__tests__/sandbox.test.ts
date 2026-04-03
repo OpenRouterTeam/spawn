@@ -5,9 +5,12 @@ mockClackPrompts();
 
 import {
   cleanupContainer,
+  dockerInteractiveSession,
   ensureDocker,
+  interactiveSession,
   isDockerAvailable,
   pullAndStartContainer,
+  runLocal,
   runLocalArgs,
   validateAgentName,
   validateLocalPath,
@@ -225,6 +228,55 @@ describe("runLocalArgs", () => {
       "; rm -rf /",
     ]);
     spawnSpy.mockRestore();
+  });
+});
+
+// ─── runLocal command validation ────────────────────────────────────────────
+
+describe("runLocal", () => {
+  it("rejects empty command", async () => {
+    await expect(runLocal("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects null byte in command", async () => {
+    await expect(runLocal("echo\x00hello")).rejects.toThrow("Invalid command");
+  });
+
+  it("runs shell command and resolves on success", async () => {
+    const spawnSpy = mockBunSpawn(0);
+    await runLocal("echo hello");
+    expect(spawnSpy).toHaveBeenCalled();
+    spawnSpy.mockRestore();
+  });
+
+  it("throws on non-zero exit code", async () => {
+    const spawnSpy = mockBunSpawn(1);
+    await expect(runLocal("failing-cmd")).rejects.toThrow("Command failed");
+    spawnSpy.mockRestore();
+  });
+});
+
+// ─── interactiveSession command validation ──────────────────────────────────
+
+describe("local/interactiveSession", () => {
+  it("rejects empty command", async () => {
+    await expect(interactiveSession("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects null byte in command", async () => {
+    await expect(interactiveSession("echo\x00hi")).rejects.toThrow("Invalid command");
+  });
+});
+
+// ─── dockerInteractiveSession command validation ────────────────────────────
+
+describe("dockerInteractiveSession", () => {
+  it("rejects empty command", async () => {
+    await expect(dockerInteractiveSession("")).rejects.toThrow("Invalid command");
+  });
+
+  it("rejects null byte in command", async () => {
+    await expect(dockerInteractiveSession("echo\x00hi")).rejects.toThrow("Invalid command");
   });
 });
 
