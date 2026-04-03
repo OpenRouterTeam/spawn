@@ -1,17 +1,64 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
 import { copyFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY } from "../shared/orchestrate.js";
 import { getUserHome } from "../shared/paths.js";
 import { getLocalShell } from "../shared/shell.js";
 import { spawnInteractive } from "../shared/ssh.js";
 import { logInfo, logStep } from "../shared/ui.js";
 
+// ─── Validation ─────────────────────────────────────────────────────────────
+
+/** Allowed pattern for agent names: lowercase alphanumeric and hyphens only. */
+const AGENT_NAME_PATTERN = /^[a-z0-9-]+$/;
+
+/**
+ * Validate an agent name to prevent command injection in shell operations.
+ * Agent names must match /^[a-z0-9-]+$/.
+ */
+export function validateAgentName(name: string): string {
+  if (!name) {
+    throw new Error("Invalid agent name: must not be empty");
+  }
+  if (!AGENT_NAME_PATTERN.test(name)) {
+    throw new Error(`Invalid agent name: must match [a-z0-9-]+, got: ${name}`);
+  }
+  return name;
+}
+
+/**
+ * Validate a local file path to prevent path traversal attacks.
+ * Rejects paths containing ".." segments after expansion.
+ */
+export function validateLocalPath(filePath: string): string {
+  const home = getUserHome();
+  // Expand ~ and $HOME before resolving
+  const expanded = filePath.replace(/^\$HOME/, home).replace(/^~/, home);
+  // Reject raw ".." before normalize (catches crafted paths)
+  if (expanded.includes("..")) {
+    throw new Error(`Invalid path: path traversal detected ("..") in: ${filePath}`);
+  }
+  const resolved = resolve(expanded);
+  // Defense in depth: check resolved path for ".."
+  if (resolved.includes("..")) {
+    throw new Error(`Invalid path: path traversal detected ("..") in resolved: ${resolved}`);
+  }
+  return resolved;
+}
+
 // ─── Execution ───────────────────────────────────────────────────────────────
+
+/** Validate a command string: must be non-empty and free of null bytes. */
+function validateCommand(cmd: string): void {
+  if (!cmd || cmd.includes("\0")) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
+}
 
 /** Run a shell command locally and wait for it to finish. */
 export async function runLocal(cmd: string): Promise<void> {
+  validateCommand(cmd);
   const [shell, flag] = getLocalShell();
   const proc = Bun.spawn(
     [
@@ -34,30 +81,47 @@ export async function runLocal(cmd: string): Promise<void> {
   }
 }
 
+/** Run a command locally using an argument array (no shell interpretation). */
+export async function runLocalArgs(args: ReadonlyArray<string>): Promise<void> {
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
+    env: process.env,
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`Command failed (exit ${exitCode}): ${args.join(" ")}`);
+  }
+}
+
 // ─── File Operations ─────────────────────────────────────────────────────────
 
 /** Copy a file locally, expanding ~ in the destination path. */
 export function uploadFile(localPath: string, remotePath: string): void {
-  const expanded = remotePath.replace(/^~/, getUserHome());
-  mkdirSync(dirname(expanded), {
+  const validated = validateLocalPath(remotePath);
+  mkdirSync(dirname(validated), {
     recursive: true,
   });
-  copyFileSync(localPath, expanded);
+  copyFileSync(localPath, validated);
 }
 
 /** Copy a file locally (reverse direction), expanding ~ and $HOME in the source path. */
 export function downloadFile(remotePath: string, localPath: string): void {
-  const expanded = remotePath.replace(/^\$HOME/, getUserHome()).replace(/^~/, getUserHome());
+  const validated = validateLocalPath(remotePath);
   mkdirSync(dirname(localPath), {
     recursive: true,
   });
-  copyFileSync(expanded, localPath);
+  copyFileSync(validated, localPath);
 }
 
 // ─── Interactive Session ─────────────────────────────────────────────────────
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
+  validateCommand(cmd);
   const [shell, flag] = getLocalShell();
   return spawnInteractive([
     shell,
@@ -254,6 +318,8 @@ export async function ensureDocker(): Promise<void> {
 
 /** Pull the agent Docker image and start a container. */
 export async function pullAndStartContainer(agentName: string): Promise<void> {
+  validateAgentName(agentName);
+
   // Clean up any stale container (ignore errors)
   Bun.spawnSync(
     [
@@ -273,27 +339,37 @@ export async function pullAndStartContainer(agentName: string): Promise<void> {
 
   const image = `${DOCKER_REGISTRY}/spawn-${agentName}:latest`;
   logStep(`Pulling Docker image ${image}...`);
-  await runLocal(`docker pull ${image}`);
+  await runLocalArgs([
+    "docker",
+    "pull",
+    image,
+  ]);
 
   logStep("Starting agent container...");
-  await runLocal(`docker run -d --name ${DOCKER_CONTAINER_NAME} ${image}`);
+  await runLocalArgs([
+    "docker",
+    "run",
+    "-d",
+    "--name",
+    DOCKER_CONTAINER_NAME,
+    image,
+  ]);
   logInfo("Agent container running");
 }
 
 /** Launch an interactive session inside the Docker container. */
-export function dockerInteractiveSession(cmd: string): Promise<number> {
-  return Promise.resolve(
-    spawnInteractive([
-      "docker",
-      "exec",
-      "-it",
-      DOCKER_CONTAINER_NAME,
-      "bash",
-      "-l",
-      "-c",
-      cmd,
-    ]),
-  );
+export async function dockerInteractiveSession(cmd: string): Promise<number> {
+  validateCommand(cmd);
+  return spawnInteractive([
+    "docker",
+    "exec",
+    "-it",
+    DOCKER_CONTAINER_NAME,
+    "bash",
+    "-l",
+    "-c",
+    cmd,
+  ]);
 }
 
 /** Remove the sandbox container (best-effort, for cleanup). */

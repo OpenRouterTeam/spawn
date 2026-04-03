@@ -15,6 +15,27 @@ _GCP_INSTANCE_IP=""
 _GCP_INSTANCE_APP=""
 
 # ---------------------------------------------------------------------------
+# _gcp_validate_instance_name NAME
+#
+# Validate that a GCP instance name contains only safe characters.
+# GCP requires: lowercase letters, digits, and hyphens; must start with a
+# letter and not end with a hyphen; max 63 chars.
+# Returns 0 on valid, 1 on invalid.
+# ---------------------------------------------------------------------------
+_gcp_validate_instance_name() {
+  local name="$1"
+  if [ -z "${name}" ]; then
+    log_err "Instance name is empty"
+    return 1
+  fi
+  if ! printf '%s' "${name}" | grep -qE '^[a-z][a-z0-9-]{0,61}[a-z0-9]$'; then
+    log_err "Invalid GCP instance name: ${name} (must match [a-z][a-z0-9-]*[a-z0-9], max 63 chars)"
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # _gcp_validate_env
 #
 # Check that the gcloud CLI is installed and credentials are valid.
@@ -80,6 +101,18 @@ process.stdout.write(d.GCP_ZONE || '');
     return 1
   fi
 
+  # Check if billing is enabled on the project. Without billing, instance
+  # creation always fails — skip early so the orchestrator reports "skipped"
+  # instead of failing every agent individually. See #3091.
+  local _billing_enabled
+  _billing_enabled=$(gcloud billing projects describe "${GCP_PROJECT}" \
+    --format="value(billingEnabled)" 2>/dev/null || true)
+  if [ "${_billing_enabled}" = "False" ]; then
+    log_err "Billing is disabled on GCP project '${GCP_PROJECT}' — cannot create instances"
+    log_err "Re-enable billing at: https://console.cloud.google.com/billing/linkedaccount?project=${GCP_PROJECT}"
+    return 1
+  fi
+
   log_ok "GCP credentials validated (project: ${GCP_PROJECT}, zone: ${GCP_ZONE:-us-central1-a})"
   return 0
 }
@@ -93,6 +126,7 @@ process.stdout.write(d.GCP_ZONE || '');
 _gcp_headless_env() {
   local app="$1"
   # $2 = agent (unused but part of the interface)
+  _gcp_validate_instance_name "${app}" || return 1
 
   printf 'export GCP_INSTANCE_NAME="%s"\n' "${app}"
   printf 'export GCP_PROJECT="%s"\n' "${GCP_PROJECT:-}"
@@ -115,6 +149,7 @@ _gcp_provision_verify() {
   local log_dir="$2"
   local zone="${GCP_ZONE:-us-central1-a}"
   local project="${GCP_PROJECT:-}"
+  _gcp_validate_instance_name "${app}" || return 1
 
   # Check instance exists
   if ! gcloud compute instances describe "${app}" \
@@ -162,6 +197,7 @@ _gcp_exec() {
   local app="$1"
   local cmd="$2"
   local ssh_user="${GCP_SSH_USER:-$(whoami)}"
+  _gcp_validate_instance_name "${app}" || return 1
 
   # Validate SSH user contains only safe characters (defense-in-depth)
   if ! printf '%s' "${ssh_user}" | grep -qE '^[a-zA-Z0-9._-]+$'; then
@@ -226,6 +262,7 @@ _gcp_teardown() {
   local app="$1"
   local zone="${GCP_ZONE:-us-central1-a}"
   local project="${GCP_PROJECT:-}"
+  _gcp_validate_instance_name "${app}" || return 1
 
   # Try reading zone/project from metadata file
   if [ -n "${LOG_DIR:-}" ] && [ -f "${LOG_DIR}/${app}.meta" ]; then
@@ -317,6 +354,12 @@ _gcp_cleanup_stale() {
     local instance_zone_url
     instance_name=$(printf '%s' "${entry}" | awk '{print $1}')
     instance_zone_url=$(printf '%s' "${entry}" | awk '{print $2}')
+
+    if ! _gcp_validate_instance_name "${instance_name}"; then
+      log_warn "Skipping ${instance_name} — invalid name format"
+      skipped=$((skipped + 1))
+      continue
+    fi
 
     # Extract zone name from full URL (zones/us-central1-a -> us-central1-a)
     local instance_zone

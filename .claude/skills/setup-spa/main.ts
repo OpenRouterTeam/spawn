@@ -5,11 +5,13 @@ import type { ActionsBlock, ContextBlock, KnownBlock, SectionBlock } from "@slac
 import type { Block } from "@slack/types";
 import type { ToolCall } from "./helpers";
 
+import { timingSafeEqual } from "node:crypto";
 import { isString, toRecord } from "@openrouter/spawn-shared";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
 import {
   downloadSlackFile,
+  findCandidate,
   findThread,
   formatToolStats,
   markdownToRichTextBlocks,
@@ -20,7 +22,9 @@ import {
   ResultSchema,
   runCleanupIfDue,
   stripMention,
+  updateCandidateStatus,
   updateThread,
+  upsertCandidate,
   upsertThread,
 } from "./helpers";
 
@@ -31,6 +35,11 @@ type SlackClient = InstanceType<typeof App>["client"];
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN ?? "";
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN ?? "";
 const GITHUB_REPO = process.env.GITHUB_REPO ?? "OpenRouterTeam/spawn";
+const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
+const GROWTH_TRIGGER_URL = process.env.GROWTH_TRIGGER_URL ?? "";
+const GROWTH_REPLY_SECRET = process.env.GROWTH_REPLY_SECRET ?? "";
+const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID ?? "";
+const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT ?? "3100", 10);
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -967,6 +976,470 @@ app.action("cancel_run", async ({ ack, payload }) => {
   }
 });
 
+// --- growth_approve: post draft reply to Reddit ---
+app.action("growth_approve", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord(
+    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
+  );
+  const postId = payload && isString(payload.value) ? payload.value : "";
+  if (!postId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const candidate = findCandidate(db, postId);
+  if (!candidate) return;
+
+  if (candidate.status !== "pending") {
+    await client.chat.postMessage({
+      channel: candidate.slackChannel ?? "",
+      thread_ts: candidate.slackTs ?? undefined,
+      text: `:warning: Already handled (${candidate.status}${candidate.actionedBy ? ` by <@${candidate.actionedBy}>` : ""})`,
+    }).catch(() => {});
+    return;
+  }
+
+  updateCandidateStatus(db, postId, { status: "approved", actionedBy: userId });
+
+  // POST to growth VM to send the Reddit reply
+  if (!GROWTH_TRIGGER_URL) {
+    await client.chat.postMessage({
+      channel: candidate.slackChannel ?? "",
+      thread_ts: candidate.slackTs ?? undefined,
+      text: ":x: GROWTH_TRIGGER_URL not configured — cannot post to Reddit",
+    }).catch(() => {});
+    return;
+  }
+
+  try {
+    const res = await fetch(`${GROWTH_TRIGGER_URL}/reply`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ postId: candidate.postId, replyText: candidate.draftReply }),
+    });
+
+    const result = toRecord(await res.json().catch(() => null));
+    if (res.ok && result && result.ok) {
+      const commentUrl = isString(result.commentUrl) ? result.commentUrl : "";
+      updateCandidateStatus(db, postId, {
+        status: "posted",
+        actionedBy: userId,
+        postedReply: candidate.draftReply,
+        redditCommentUrl: commentUrl,
+      });
+      // Update the Slack message — replace buttons with confirmation
+      if (candidate.slackChannel && candidate.slackTs) {
+        await replaceButtonsWithStatus(
+          client,
+          candidate.slackChannel,
+          candidate.slackTs,
+          `:white_check_mark: Posted by <@${userId}>${commentUrl ? ` — <${commentUrl}|view comment>` : ""}`,
+        );
+      }
+    } else {
+      const errMsg = isString(result?.error) ? result.error : `HTTP ${res.status}`;
+      updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+      await client.chat.postMessage({
+        channel: candidate.slackChannel ?? "",
+        thread_ts: candidate.slackTs ?? undefined,
+        text: `:x: Reddit reply failed: ${errMsg}`,
+      }).catch(() => {});
+    }
+  } catch (err) {
+    updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+    await client.chat.postMessage({
+      channel: candidate.slackChannel ?? "",
+      thread_ts: candidate.slackTs ?? undefined,
+      text: `:x: Reddit reply failed: ${err instanceof Error ? err.message : String(err)}`,
+    }).catch(() => {});
+  }
+});
+
+// --- growth_edit: open modal with draft reply for editing ---
+app.action("growth_edit", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord(
+    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
+  );
+  const postId = payload && isString(payload.value) ? payload.value : "";
+  if (!postId) return;
+
+  const triggerId = "trigger_id" in body && isString(body.trigger_id) ? body.trigger_id : "";
+  if (!triggerId) return;
+
+  const candidate = findCandidate(db, postId);
+  if (!candidate) return;
+
+  if (candidate.status !== "pending") {
+    return; // already handled
+  }
+
+  await client.views.open({
+    trigger_id: triggerId,
+    view: {
+      type: "modal",
+      callback_id: "growth_edit_submit",
+      private_metadata: postId,
+      title: { type: "plain_text", text: "Edit Reply" },
+      submit: { type: "plain_text", text: "Post to Reddit" },
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*<${candidate.permalink.startsWith("http") ? candidate.permalink : `https://reddit.com${candidate.permalink}`}|${candidate.title}>*\nr/${candidate.subreddit}`,
+          },
+        },
+        {
+          type: "input",
+          block_id: "reply_block",
+          label: { type: "plain_text", text: "Reply text" },
+          element: {
+            type: "plain_text_input",
+            action_id: "reply_text",
+            multiline: true,
+            initial_value: candidate.draftReply,
+          },
+        },
+      ],
+    },
+  }).catch(() => {});
+});
+
+// --- growth_edit_submit: modal submitted with edited reply ---
+app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
+  await ack();
+  const postId = view.private_metadata;
+  if (!postId) return;
+
+  const candidate = findCandidate(db, postId);
+  if (!candidate || candidate.status !== "pending") return;
+
+  const replyBlock = toRecord(view.state?.values?.reply_block?.reply_text);
+  const editedReply = replyBlock && isString(replyBlock.value) ? replyBlock.value : "";
+  if (!editedReply) return;
+
+  const userId = toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+
+  updateCandidateStatus(db, postId, { status: "approved", actionedBy: userId });
+
+  if (!GROWTH_TRIGGER_URL) return;
+
+  try {
+    const res = await fetch(`${GROWTH_TRIGGER_URL}/reply`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ postId: candidate.postId, replyText: editedReply }),
+    });
+
+    const result = toRecord(await res.json().catch(() => null));
+    if (res.ok && result && result.ok) {
+      const commentUrl = isString(result.commentUrl) ? result.commentUrl : "";
+      updateCandidateStatus(db, postId, {
+        status: "posted",
+        actionedBy: userId,
+        postedReply: editedReply,
+        redditCommentUrl: commentUrl,
+      });
+      if (candidate.slackChannel && candidate.slackTs) {
+        await replaceButtonsWithStatus(
+          client,
+          candidate.slackChannel,
+          candidate.slackTs,
+          `:white_check_mark: Posted (edited) by <@${userId}>${commentUrl ? ` — <${commentUrl}|view comment>` : ""}`,
+        );
+      }
+    } else {
+      updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+      if (candidate.slackChannel && candidate.slackTs) {
+        await client.chat.postMessage({
+          channel: candidate.slackChannel,
+          thread_ts: candidate.slackTs,
+          text: `:x: Reddit reply failed: ${isString(result?.error) ? result.error : `HTTP ${res.status}`}`,
+        }).catch(() => {});
+      }
+    }
+  } catch {
+    updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+  }
+});
+
+// --- growth_skip: skip this candidate ---
+app.action("growth_skip", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord(
+    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
+  );
+  const postId = payload && isString(payload.value) ? payload.value : "";
+  if (!postId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const candidate = findCandidate(db, postId);
+  if (!candidate || candidate.status !== "pending") return;
+
+  updateCandidateStatus(db, postId, { status: "skipped", actionedBy: userId });
+
+  if (candidate.slackChannel && candidate.slackTs) {
+    await replaceButtonsWithStatus(
+      client,
+      candidate.slackChannel,
+      candidate.slackTs,
+      `:no_entry_sign: Skipped by <@${userId}>`,
+    );
+  }
+});
+
+/** Replace the actions block in a candidate card with a status context line. */
+async function replaceButtonsWithStatus(
+  client: SlackClient,
+  channel: string,
+  ts: string,
+  statusText: string,
+): Promise<void> {
+  try {
+    // Fetch the current message to get its blocks
+    const result = await client.conversations.history({
+      channel,
+      latest: ts,
+      inclusive: true,
+      limit: 1,
+    });
+    const msg = result.messages?.[0];
+    if (!msg) return;
+
+    const blocks = Array.isArray(msg.blocks) ? msg.blocks : [];
+    // Replace the actions block with a context block showing the status
+    const updatedBlocks = blocks
+      .filter((b: Record<string, unknown>) => b.type !== "actions")
+      .concat({
+        type: "context",
+        elements: [{ type: "mrkdwn", text: statusText }],
+      });
+
+    await client.chat.update({
+      channel,
+      ts,
+      text: statusText,
+      blocks: updatedBlocks,
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+// #endregion
+
+// #region Growth candidate HTTP server
+
+/** Valibot schema for incoming candidate JSON from growth agent. */
+const CandidatePayloadSchema = v.object({
+  found: v.boolean(),
+  title: v.optional(v.string()),
+  url: v.optional(v.string()),
+  permalink: v.optional(v.string()),
+  subreddit: v.optional(v.string()),
+  postId: v.optional(v.string()),
+  upvotes: v.optional(v.number()),
+  numComments: v.optional(v.number()),
+  postedAgo: v.optional(v.string()),
+  whatTheyAsked: v.optional(v.string()),
+  whySpawnFits: v.optional(v.string()),
+  posterQualification: v.optional(v.string()),
+  relevanceScore: v.optional(v.number()),
+  draftReply: v.optional(v.string()),
+  postsScanned: v.optional(v.number()),
+});
+
+/** Timing-safe auth for the HTTP trigger endpoint. */
+function isHttpAuthed(req: Request): boolean {
+  if (!TRIGGER_SECRET) return false;
+  const given = req.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${TRIGGER_SECRET}`;
+  if (given.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}
+
+/** Post a Block Kit candidate card to Slack and store in DB. */
+async function postCandidateCard(
+  client: SlackClient,
+  candidate: v.InferOutput<typeof CandidatePayloadSchema>,
+): Promise<Response> {
+  const channel = SLACK_CHANNEL_ID;
+  if (!channel) {
+    return Response.json({ error: "SLACK_CHANNEL_ID not configured" }, { status: 500 });
+  }
+
+  if (!candidate.found) {
+    // No candidate — post brief summary
+    const scanText = candidate.postsScanned
+      ? `Growth scan complete — scanned ${candidate.postsScanned} posts, no candidates today.`
+      : "Growth scan complete — no candidates today.";
+    await client.chat.postMessage({
+      channel,
+      text: scanText,
+      blocks: [
+        { type: "context", elements: [{ type: "mrkdwn", text: scanText }] },
+      ],
+    }).catch(() => {});
+    return Response.json({ ok: true, action: "no_candidate" });
+  }
+
+  // Candidate found — build Block Kit card
+  const title = candidate.title ?? "Untitled";
+  const url = candidate.url ?? `https://reddit.com${candidate.permalink ?? ""}`;
+  const postId = candidate.postId ?? "";
+  const subreddit = candidate.subreddit ?? "";
+  const upvotes = candidate.upvotes ?? 0;
+  const numComments = candidate.numComments ?? 0;
+  const postedAgo = candidate.postedAgo ?? "";
+  const draftReply = candidate.draftReply ?? "";
+
+  const blocks: (KnownBlock | Block)[] = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "Reddit Growth — Candidate Found", emoji: true },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*<${url}|${title}>*\nr/${subreddit} | ${upvotes} upvotes | ${numComments} comments | ${postedAgo}`,
+      },
+    },
+  ];
+
+  if (candidate.whatTheyAsked) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*What they asked:*\n${candidate.whatTheyAsked}` },
+    });
+  }
+
+  if (candidate.whySpawnFits) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Why Spawn fits:*\n${candidate.whySpawnFits}` },
+    });
+  }
+
+  if (candidate.posterQualification) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Poster signals:*\n${candidate.posterQualification}` },
+    });
+  }
+
+  if (draftReply) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Draft reply:*\n>${draftReply.replace(/\n/g, "\n>")}` },
+    });
+  }
+
+  if (candidate.relevanceScore !== undefined) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `Relevance: ${candidate.relevanceScore}/10` }],
+    });
+  }
+
+  // Action buttons
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Approve", emoji: true },
+        style: "primary",
+        action_id: "growth_approve",
+        value: postId,
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Edit", emoji: true },
+        action_id: "growth_edit",
+        value: postId,
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Skip", emoji: true },
+        style: "danger",
+        action_id: "growth_skip",
+        value: postId,
+      },
+    ],
+  });
+
+  const msg = await client.chat.postMessage({
+    channel,
+    text: `Reddit Growth — ${title}`,
+    blocks,
+  });
+
+  // Store candidate in DB
+  upsertCandidate(db, {
+    postId,
+    permalink: candidate.permalink ?? "",
+    title,
+    subreddit,
+    draftReply,
+    slackChannel: channel,
+    slackTs: msg.ts ?? undefined,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  });
+
+  return Response.json({ ok: true, action: "posted", ts: msg.ts });
+}
+
+/** Start the HTTP server for growth candidate ingestion. */
+function startHttpServer(client: SlackClient): void {
+  if (!TRIGGER_SECRET) {
+    console.log("[spa] TRIGGER_SECRET not set — HTTP server disabled");
+    return;
+  }
+
+  Bun.serve({
+    port: HTTP_PORT,
+    async fetch(req) {
+      const url = new URL(req.url);
+
+      if (req.method === "GET" && url.pathname === "/health") {
+        return Response.json({ status: "ok" });
+      }
+
+      if (req.method === "POST" && url.pathname === "/candidate") {
+        if (!isHttpAuthed(req)) {
+          return Response.json({ error: "unauthorized" }, { status: 401 });
+        }
+
+        let body: unknown;
+        try {
+          body = await req.json();
+        } catch {
+          return Response.json({ error: "invalid JSON" }, { status: 400 });
+        }
+
+        const parsed = v.safeParse(CandidatePayloadSchema, body);
+        if (!parsed.success) {
+          return Response.json({ error: "invalid payload", issues: parsed.issues }, { status: 400 });
+        }
+
+        return postCandidateCard(client, parsed.output);
+      }
+
+      return Response.json({ error: "not found" }, { status: 404 });
+    },
+  });
+
+  console.log(`[spa] HTTP server listening on port ${HTTP_PORT}`);
+}
+
 // #endregion
 
 // #region Graceful shutdown
@@ -1002,6 +1475,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
   }
 
   await app.start();
+  startHttpServer(app.client);
   console.log(`[spa] Running (any channel + DMs, repo=${GITHUB_REPO})`);
 })();
 

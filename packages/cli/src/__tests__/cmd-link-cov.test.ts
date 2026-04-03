@@ -42,12 +42,12 @@ const SSH_DETECT_CLOUD_HETZNER = (_host: string, _user: string, _keys: string[],
 };
 
 const SSH_DETECT_AGENT_VIA_WHICH = (_host: string, _user: string, _keys: string[], cmd: string) => {
-  // ps aux returns nothing, but which finds the binary
+  // ps aux returns nothing, but command -v finds the binary
   if (cmd.includes("ps aux")) {
     return null;
   }
-  if (cmd.includes("which")) {
-    return "/usr/local/bin/claude\nclaude";
+  if (cmd === "command -v claude") {
+    return "/usr/local/bin/claude";
   }
   return null;
 };
