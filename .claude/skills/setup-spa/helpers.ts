@@ -149,6 +149,23 @@ export function openDb(path?: string): Database {
       PRIMARY KEY (channel, thread_ts)
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS candidates (
+      post_id            TEXT PRIMARY KEY,
+      permalink          TEXT NOT NULL,
+      title              TEXT NOT NULL,
+      subreddit          TEXT NOT NULL,
+      draft_reply        TEXT NOT NULL,
+      slack_channel      TEXT,
+      slack_ts           TEXT,
+      status             TEXT NOT NULL DEFAULT 'pending',
+      actioned_by        TEXT,
+      actioned_at        TEXT,
+      posted_reply       TEXT,
+      reddit_comment_url TEXT,
+      created_at         TEXT NOT NULL
+    )
+  `);
   if (!path) {
     migrateFromJson(db);
   }
@@ -233,6 +250,122 @@ export function updateThread(
       mergedPrUrls ? JSON.stringify(mergedPrUrls) : null,
       channel,
       threadTs,
+    ],
+  );
+}
+
+// #region Candidates — Reddit growth pipeline
+
+/** A Reddit growth candidate tracked for approval. */
+export interface CandidateRow {
+  postId: string;
+  permalink: string;
+  title: string;
+  subreddit: string;
+  draftReply: string;
+  slackChannel?: string;
+  slackTs?: string;
+  status: "pending" | "approved" | "posted" | "skipped" | "error";
+  actionedBy?: string;
+  actionedAt?: string;
+  postedReply?: string;
+  redditCommentUrl?: string;
+  createdAt: string;
+}
+
+/** Raw SQLite row shape for candidates. */
+interface RawCandidate {
+  post_id: string;
+  permalink: string;
+  title: string;
+  subreddit: string;
+  draft_reply: string;
+  slack_channel: string | null;
+  slack_ts: string | null;
+  status: string;
+  actioned_by: string | null;
+  actioned_at: string | null;
+  posted_reply: string | null;
+  reddit_comment_url: string | null;
+  created_at: string;
+}
+
+function rowToCandidate(r: RawCandidate): CandidateRow {
+  return {
+    postId: r.post_id,
+    permalink: r.permalink,
+    title: r.title,
+    subreddit: r.subreddit,
+    draftReply: r.draft_reply,
+    slackChannel: r.slack_channel ?? undefined,
+    slackTs: r.slack_ts ?? undefined,
+    status: r.status === "approved" || r.status === "posted" || r.status === "skipped" || r.status === "error"
+      ? r.status
+      : "pending",
+    actionedBy: r.actioned_by ?? undefined,
+    actionedAt: r.actioned_at ?? undefined,
+    postedReply: r.posted_reply ?? undefined,
+    redditCommentUrl: r.reddit_comment_url ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Insert or update a candidate. On conflict (same post_id), updates Slack coordinates. */
+export function upsertCandidate(db: Database, candidate: CandidateRow): void {
+  db.run(
+    `INSERT INTO candidates (post_id, permalink, title, subreddit, draft_reply, slack_channel, slack_ts, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (post_id) DO UPDATE SET
+       slack_channel = excluded.slack_channel,
+       slack_ts      = excluded.slack_ts`,
+    [
+      candidate.postId,
+      candidate.permalink,
+      candidate.title,
+      candidate.subreddit,
+      candidate.draftReply,
+      candidate.slackChannel ?? null,
+      candidate.slackTs ?? null,
+      candidate.status,
+      candidate.createdAt,
+    ],
+  );
+}
+
+/** Look up a candidate by Reddit post ID. */
+export function findCandidate(db: Database, postId: string): CandidateRow | undefined {
+  const row = db
+    .query<RawCandidate, [string]>("SELECT * FROM candidates WHERE post_id = ?")
+    .get(postId);
+  return row ? rowToCandidate(row) : undefined;
+}
+
+/** Update a candidate's status and related fields after an action. */
+export function updateCandidateStatus(
+  db: Database,
+  postId: string,
+  update: {
+    status: CandidateRow["status"];
+    actionedBy?: string;
+    postedReply?: string;
+    redditCommentUrl?: string;
+  },
+): void {
+  db.run(
+    `UPDATE candidates SET
+       status             = ?,
+       actioned_by        = ?,
+       actioned_at        = ?,
+       posted_reply       = ?,
+       reddit_comment_url = ?
+     WHERE post_id = ?`,
+    [
+      update.status,
+      update.actionedBy ?? null,
+      new Date().toISOString(),
+      update.postedReply ?? null,
+      update.redditCommentUrl ?? null,
+      postId,
     ],
   );
 }

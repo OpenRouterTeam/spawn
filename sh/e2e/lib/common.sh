@@ -5,7 +5,7 @@ set -eo pipefail
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-ALL_AGENTS="claude openclaw codex opencode kilocode hermes junie cursor"
+ALL_AGENTS="claude openclaw codex opencode kilocode hermes junie cursor pi"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-720}"
 INSTALL_WAIT="${INSTALL_WAIT:-600}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
