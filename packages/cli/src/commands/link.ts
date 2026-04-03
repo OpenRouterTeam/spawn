@@ -435,7 +435,11 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
         ...keyOpts,
         `${sshUser}@${ip}`,
       ];
-      spawnInteractive(sshArgs);
+      const exitCode = spawnInteractive(sshArgs);
+      if (exitCode !== 0) {
+        p.log.warn(`SSH exited with code ${exitCode}. The server is still linked.`);
+        p.log.info(`Try manually: ${pc.cyan(`ssh ${sshUser}@${ip}`)}`);
+      }
     }
   }
 
