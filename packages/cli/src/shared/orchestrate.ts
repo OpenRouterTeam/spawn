@@ -231,6 +231,24 @@ function getParentFields(): {
       : {};
 }
 
+/** Build and persist a SpawnRecord for a newly-created server. */
+function recordSpawn(spawnId: string, agentName: string, cloudName: string, connection: VMConnection): void {
+  const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+  saveSpawnRecord({
+    id: spawnId,
+    agent: agentName,
+    cloud: cloudName,
+    timestamp: new Date().toISOString(),
+    ...(spawnName
+      ? {
+          name: spawnName,
+        }
+      : {}),
+    ...getParentFields(),
+    connection,
+  });
+}
+
 /** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
 export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
   const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
@@ -315,20 +333,7 @@ export async function runOrchestration(
 
     const serverBootPromise = (async () => {
       const conn = await cloud.createServer(serverName);
-      const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName
-          ? {
-              name: spawnName,
-            }
-          : {}),
-        ...getParentFields(),
-        connection: conn,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, conn);
       await cloud.waitForReady();
       return conn;
     })();
@@ -358,20 +363,7 @@ export async function runOrchestration(
       // User chose to retry — fall through to sequential path which has full retry loops
       // (Re-running the concurrent path would re-prompt for API key, etc.)
       const connection = await cloud.createServer(serverName);
-      const spawnName2 = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName2
-          ? {
-              name: spawnName2,
-            }
-          : {}),
-        ...getParentFields(),
-        connection,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, connection);
       await cloud.waitForReady();
     }
 
@@ -466,20 +458,7 @@ export async function runOrchestration(
       logError(getErrorMessage(r.error));
       await retryOrQuit("Retry server creation?");
     }
-    const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-    saveSpawnRecord({
-      id: spawnId,
-      agent: agentName,
-      cloud: cloud.cloudName,
-      timestamp: new Date().toISOString(),
-      ...(spawnName
-        ? {
-            name: spawnName,
-          }
-        : {}),
-      ...getParentFields(),
-      connection,
-    });
+    recordSpawn(spawnId, agentName, cloud.cloudName, connection);
 
     // 6. Wait for readiness (retry loop)
     for (;;) {
