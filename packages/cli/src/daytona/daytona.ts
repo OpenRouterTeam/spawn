@@ -2,8 +2,10 @@
 
 import type { CloudInstance, VMConnection } from "../history.js";
 
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { Daytona, DaytonaNotFoundError } from "@daytonaio/sdk";
+import { isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import {
   validateConnectionIP,
@@ -15,7 +17,7 @@ import {
 import { parseJsonWith } from "../shared/parse.js";
 import { getSpawnCloudConfigPath } from "../shared/paths.js";
 import { asyncTryCatch } from "../shared/result.js";
-import { SSH_INTERACTIVE_OPTS, spawnInteractive, validateRemotePath } from "../shared/ssh.js";
+import { SSH_INTERACTIVE_OPTS, validateRemotePath } from "../shared/ssh.js";
 import {
   getServerNameFromEnv,
   jsonEscape,
@@ -23,6 +25,7 @@ import {
   logInfo,
   logStep,
   logWarn,
+  prepareStdinForHandoff,
   prompt,
   promptSpawnNameShared,
   selectFromList,
@@ -75,7 +78,13 @@ const DaytonaConfigFileSchema = v.object({
 const DAYTONA_SSH_HOST = "ssh.app.daytona.io";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/dashboard/sandboxes";
 const DAYTONA_SIGNED_PREVIEW_DEFAULT_SECONDS = 3600;
+const DAYTONA_AUTO_UPDATE_SESSION_ID = "spawn-auto-update";
+const OPENCLAW_DASHBOARD_PORT = 18789;
+const OPENCLAW_DASHBOARD_PAIR_LOG_PATH = "/tmp/openclaw-dashboard-pair.log";
+const OPENCLAW_DASHBOARD_PAIR_POLL_ATTEMPTS = 45;
+const OPENCLAW_DASHBOARD_PAIR_POLL_INTERVAL_SECONDS = 2;
 const DAYTONA_ALLOWED_METADATA_KEYS = new Set([
+  "auto_update_enabled",
   "tunnel_remote_port",
   "tunnel_browser_url_template",
 ]);
@@ -493,6 +502,114 @@ function formatProcessCommand(cmd: string): string {
   return `bash -lc ${shellQuote(cmd)}`;
 }
 
+function buildAutoUpdateScript(agentName: string, updateCmd: string): string {
+  return [
+    "#!/bin/bash",
+    "set -eo pipefail",
+    'LOGFILE="$HOME/.spawn-auto-update.log"',
+    "",
+    'log() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$LOGFILE"; }',
+    "",
+    '[ -f "$HOME/.spawnrc" ] && source "$HOME/.spawnrc" 2>/dev/null',
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH"',
+    "",
+    'log "Auto-update session started; first run in 15 minutes"',
+    "sleep 900",
+    "",
+    "while true; do",
+    '  [ -f "$HOME/.spawnrc" ] && source "$HOME/.spawnrc" 2>/dev/null',
+    '  export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$PATH"',
+    "",
+    '  log "Updating system packages"',
+    "  if command -v apt-get >/dev/null 2>&1; then",
+    "    export DEBIAN_FRONTEND=noninteractive",
+    `    sudo flock -w 300 /var/lib/dpkg/lock-frontend apt-get update -qq >> "$LOGFILE" 2>&1 || log "apt-get update failed (non-fatal)"`,
+    `    sudo flock -w 300 /var/lib/dpkg/lock-frontend apt-get upgrade -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" >> "$LOGFILE" 2>&1 || log "apt-get upgrade failed (non-fatal)"`,
+    '    sudo apt-get autoremove -y -qq >> "$LOGFILE" 2>&1 || true',
+    '    log "System packages updated"',
+    "  fi",
+    "",
+    `  log "Starting ${agentName} update"`,
+    `  if ( ${updateCmd} ) >> "$LOGFILE" 2>&1; then`,
+    `    log "${agentName} update completed successfully"`,
+    "  else",
+    "    _exit=$?",
+    `    log "${agentName} update failed (exit code $_exit)"`,
+    "  fi",
+    "",
+    '  log "Sleeping for 6 hours"',
+    "  sleep 21600",
+    "done",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Install and start Daytona auto-update as a background SDK process session.
+ */
+export async function setupAutoUpdateSession(agentName: string, updateCmd: string): Promise<void> {
+  if (!_state.sandboxId) {
+    throw new Error("No Daytona sandbox is active");
+  }
+
+  await setupAutoUpdateSessionForSandbox(_state.sandboxId, agentName, updateCmd);
+}
+
+/**
+ * Install and start Daytona auto-update as a background SDK process session.
+ */
+export async function setupAutoUpdateSessionForSandbox(
+  sandboxId: string,
+  agentName: string,
+  updateCmd: string,
+  quiet = false,
+): Promise<void> {
+  if (!sandboxId) {
+    throw new Error("No Daytona sandbox is active");
+  }
+
+  if (!quiet) {
+    logStep("Setting up Daytona auto-update session...");
+  }
+
+  const sandbox = await ensureSandboxStarted(sandboxId);
+  const remotePath = `${await getSandboxHomeDir(sandbox.id)}/.spawn-auto-update.sh`;
+  const script = buildAutoUpdateScript(agentName, updateCmd);
+
+  await sandbox.fs.uploadFile(Buffer.from(script), remotePath);
+  await sandbox.process.executeCommand(
+    formatProcessCommand(`chmod 700 ${shellQuote(remotePath)}`),
+    undefined,
+    undefined,
+    30,
+  );
+
+  const sessions = await sandbox.process.listSessions();
+  if (sessions.some((session) => session.sessionId === DAYTONA_AUTO_UPDATE_SESSION_ID)) {
+    if (!quiet) {
+      logInfo("Daytona auto-update session already running");
+    }
+    return;
+  }
+
+  await sandbox.process.createSession(DAYTONA_AUTO_UPDATE_SESSION_ID);
+  const command = await sandbox.process.executeSessionCommand(
+    DAYTONA_AUTO_UPDATE_SESSION_ID,
+    {
+      command: formatProcessCommand(remotePath),
+      runAsync: true,
+    },
+    30,
+  );
+  if (!command.cmdId) {
+    throw new Error("Failed to start Daytona auto-update session");
+  }
+
+  if (!quiet) {
+    logInfo("Daytona auto-update session started");
+  }
+}
+
 /**
  * Run a non-interactive command inside the active Daytona sandbox.
  */
@@ -596,6 +713,74 @@ export async function buildInteractiveSshArgs(sandboxId: string, remoteCmd?: str
   return args;
 }
 
+function getPtySize(): {
+  cols: number;
+  rows: number;
+} {
+  return {
+    cols: process.stdout.columns || 120,
+    rows: process.stdout.rows || 30,
+  };
+}
+
+async function runInteractivePty(sandboxId: string, cmd: string): Promise<number> {
+  const sandbox = await ensureSandboxStarted(sandboxId);
+  const decoder = new TextDecoder();
+  const { cols, rows } = getPtySize();
+  const pty = await sandbox.process.createPty({
+    id: `spawn-${randomUUID()}`,
+    cols,
+    rows,
+    envs: {
+      TERM: process.env.TERM || "xterm-256color",
+      COLORTERM: process.env.COLORTERM || "truecolor",
+      LANG: process.env.LANG || "en_US.UTF-8",
+    },
+    onData: (data) => {
+      process.stdout.write(
+        decoder.decode(data, {
+          stream: true,
+        }),
+      );
+    },
+  });
+
+  const onResize = () => {
+    const nextSize = getPtySize();
+    void pty.resize(nextSize.cols, nextSize.rows);
+  };
+  const onInput = (data: Buffer | string) => {
+    void pty.sendInput(isString(data) ? data : new Uint8Array(data));
+  };
+
+  prepareStdinForHandoff();
+  process.on("SIGWINCH", onResize);
+  process.stdin.on("data", onInput);
+  process.stdin.resume();
+  process.stdin.setRawMode?.(true);
+  const result = await asyncTryCatch(async () => {
+    await pty.sendInput(`exec bash -lc ${shellQuote(cmd)}\n`);
+    return pty.wait();
+  });
+
+  process.stdin.off("data", onInput);
+  process.off("SIGWINCH", onResize);
+  process.stdin.setRawMode?.(false);
+  process.stdin.pause();
+  await asyncTryCatch(() => pty.disconnect());
+  process.stdout.write(decoder.decode());
+
+  if (!result.ok) {
+    throw result.error;
+  }
+
+  return result.data.exitCode ?? 1;
+}
+
+export async function runInteractiveDaytonaCommand(sandboxId: string, cmd: string): Promise<number> {
+  return runInteractivePty(sandboxId, cmd);
+}
+
 /**
  * Open an interactive SSH session into the active Daytona sandbox.
  */
@@ -604,7 +789,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
     throw new Error("No Daytona sandbox is active");
   }
 
-  const exitCode = spawnInteractive(await buildInteractiveSshArgs(_state.sandboxId, cmd));
+  const exitCode = await runInteractivePty(_state.sandboxId, cmd);
   process.stderr.write("\n");
   logWarn(`Session ended. Your sandbox '${_state.sandboxId}' may still be running.`);
   logWarn(`Manage or delete it in the Daytona dashboard: ${DAYTONA_DASHBOARD_URL}`);
@@ -723,7 +908,103 @@ export async function getSignedPreviewBrowserUrl(
   }
   const sandbox = await ensureSandboxStarted(targetId);
   const preview = await sandbox.getSignedPreviewUrl(remotePort, expiresInSeconds);
+  await prepareOpenClawPreviewAccess(targetId, remotePort, preview.url, urlSuffix);
   return preview.url + urlSuffix;
+}
+
+function isOpenClawPreview(remotePort: number, urlSuffix: string): boolean {
+  return remotePort === OPENCLAW_DASHBOARD_PORT && urlSuffix.includes("#token=");
+}
+
+async function prepareOpenClawPreviewAccess(
+  sandboxId: string,
+  remotePort: number,
+  previewUrl: string,
+  urlSuffix: string,
+): Promise<void> {
+  if (!isOpenClawPreview(remotePort, urlSuffix)) {
+    return;
+  }
+
+  await allowOpenClawPreviewOrigin(sandboxId, previewUrl);
+  await armOpenClawDashboardPairingWatcher(sandboxId);
+}
+
+/** Allow the exact Daytona preview origin for OpenClaw's control UI before opening the dashboard.
+ *  OpenClaw rejects browser origins it does not recognize, so Daytona's signed preview host
+ *  must be appended on demand rather than during initial setup when the preview host is unknown. */
+async function allowOpenClawPreviewOrigin(sandboxId: string, previewUrl: string): Promise<void> {
+  const previewOrigin = new URL(previewUrl).origin;
+  const escapedOrigin = JSON.stringify(previewOrigin);
+  const patchConfigCmd = [
+    "node -e",
+    shellQuote(
+      `
+const fs = require("node:fs");
+const path = process.env.HOME + "/.openclaw/openclaw.json";
+const config = JSON.parse(fs.readFileSync(path, "utf8"));
+const gateway = config.gateway ?? (config.gateway = {});
+const controlUi = gateway.controlUi ?? (gateway.controlUi = {});
+const allowedOrigins = Array.isArray(controlUi.allowedOrigins) ? controlUi.allowedOrigins : [];
+if (!allowedOrigins.includes(${escapedOrigin})) {
+  allowedOrigins.push(${escapedOrigin});
+}
+controlUi.allowedOrigins = allowedOrigins;
+fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\\n", { mode: 0o600 });
+      `.trim(),
+    ),
+  ].join(" ");
+
+  await runDaytonaCommand(sandboxId, patchConfigCmd, 30);
+}
+
+/** Auto-approve the first remote browser pairing request for the OpenClaw dashboard.
+ *  Daytona preview URLs are remote origins, so OpenClaw correctly requires one-time
+ *  device approval for a new browser profile. Spawn arms a short-lived watcher right
+ *  before opening the dashboard so the user does not have to approve that request manually. */
+async function armOpenClawDashboardPairingWatcher(sandboxId: string): Promise<void> {
+  const sandbox = await ensureSandboxStarted(sandboxId);
+  const remotePath = `${await getSandboxHomeDir(sandbox.id)}/.spawn-openclaw-dashboard-pair.sh`;
+  const watcherScript = buildOpenClawDashboardPairingWatcherScript();
+
+  await sandbox.fs.uploadFile(Buffer.from(watcherScript), remotePath);
+  await sandbox.process.executeCommand(
+    formatProcessCommand(`chmod 700 ${shellQuote(remotePath)}`),
+    undefined,
+    undefined,
+    30,
+  );
+
+  const launchWatcherCmd = `nohup ${shellQuote(remotePath)} > ${shellQuote(OPENCLAW_DASHBOARD_PAIR_LOG_PATH)} 2>&1 < /dev/null &`;
+  await sandbox.process.executeCommand(formatProcessCommand(launchWatcherCmd), undefined, undefined, 30);
+}
+
+function buildOpenClawDashboardPairingWatcherScript(): string {
+  return [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    "",
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
+    "",
+    `for _attempt in $(seq 1 ${OPENCLAW_DASHBOARD_PAIR_POLL_ATTEMPTS}); do`,
+    '  _devices_json="$(openclaw devices list --json 2>/dev/null)" || { sleep ' +
+      `${OPENCLAW_DASHBOARD_PAIR_POLL_INTERVAL_SECONDS}; continue; }`,
+    '  _request_id="$(printf "%s" "$_devices_json" | node -e ' +
+      `"const fs = require('node:fs'); ` +
+      "const data = JSON.parse(fs.readFileSync(0, 'utf8')); " +
+      "const request = data.pending?.find((entry) => entry.clientId === 'openclaw-control-ui' && entry.clientMode === 'webchat' && entry.role === 'operator' && Array.isArray(entry.scopes) && entry.scopes.includes('operator.pairing')); " +
+      'if (request?.requestId) process.stdout.write(request.requestId);"' +
+      ' 2>/dev/null)"',
+    '  if [ -n "$_request_id" ]; then',
+    '    openclaw devices approve "$_request_id"',
+    "    exit 0",
+    "  fi",
+    `  sleep ${OPENCLAW_DASHBOARD_PAIR_POLL_INTERVAL_SECONDS}`,
+    "done",
+    "",
+    "exit 0",
+    "",
+  ].join("\n");
 }
 
 /**
@@ -808,5 +1089,12 @@ export function validateDaytonaConnection(connection: VMConnection): void {
   }
   if (metadata.tunnel_browser_url_template !== undefined) {
     validateTunnelUrl(metadata.tunnel_browser_url_template);
+  }
+  if (
+    metadata.auto_update_enabled !== undefined &&
+    metadata.auto_update_enabled !== "0" &&
+    metadata.auto_update_enabled !== "1"
+  ) {
+    throw new Error(`Invalid Daytona auto-update metadata value: ${metadata.auto_update_enabled}`);
   }
 }

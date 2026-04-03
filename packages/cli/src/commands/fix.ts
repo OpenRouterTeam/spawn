@@ -212,9 +212,12 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
 
   if (conn.cloud === "daytona" && conn.server_id) {
     p.log.step(`Fixing ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(label)}...`);
+    const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
     const { ensureDaytonaAuthenticated, runDaytonaFixScript } = await import("../daytona/daytona.js");
     await ensureDaytonaAuthenticated();
 
+    // Daytona already has first-class file/process APIs, so the fix flow stays inside
+    // the SDK instead of piping the script over SSH stdin like the VM providers do.
     const fixResult = await asyncTryCatch(() => runDaytonaFixScript(conn.server_id!, script));
     if (!fixResult.ok) {
       p.log.error(`Fix failed: ${getErrorMessage(fixResult.error)}`);
@@ -227,6 +230,9 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
       p.log.error("Fix script exited with an error. Check the output above for details.");
       return;
     }
+
+    // Recreate the background updater if this record originally opted into it.
+    await ensureDaytonaAutoUpdate(conn, record.agent);
 
     p.log.success(`${pc.bold(agentName)} fixed successfully!`);
     p.log.info(`Reconnect: ${pc.cyan("spawn last")}`);

@@ -57,6 +57,8 @@ async function openDaytonaDashboard(connection: VMConnection): Promise<boolean> 
 
   const template = metadata?.tunnel_browser_url_template;
   const urlSuffix = template ? template.replace("http://localhost:__PORT__", "") : "";
+
+  // Daytona exposes web UIs through signed preview URLs instead of a local SSH tunnel.
   const { getSignedPreviewBrowserUrl } = await import("../daytona/daytona.js");
   const url = await getSignedPreviewBrowserUrl(connection.server_id, Number.parseInt(remotePort, 10), urlSuffix);
   openBrowser(url);
@@ -64,7 +66,7 @@ async function openDaytonaDashboard(connection: VMConnection): Promise<boolean> 
 }
 
 /** Connect to an existing VM via SSH */
-export async function cmdConnect(connection: VMConnection): Promise<void> {
+export async function cmdConnect(connection: VMConnection, agentKey?: string): Promise<void> {
   const validateDaytona = connection.cloud === "daytona" ? await import("../daytona/daytona.js") : null;
 
   // SECURITY: Validate all connection parameters before use
@@ -108,6 +110,13 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
   }
 
   if (connection.cloud === "daytona" && connection.server_id) {
+    if (agentKey) {
+      const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
+
+      // Daytona auto-update runs as an SDK-managed background session, so reconnects
+      // need to re-arm it after a sandbox stop/start cycle.
+      await ensureDaytonaAutoUpdate(connection, agentKey);
+    }
     p.log.step(`Connecting to Daytona sandbox ${pc.bold(connection.server_name || connection.server_id)}...`);
     const { buildInteractiveSshArgs } = await import("../daytona/daytona.js");
     const args = await buildInteractiveSshArgs(connection.server_id);
@@ -229,18 +238,24 @@ export async function cmdEnterAgent(
   }
 
   if (connection.cloud === "daytona" && connection.server_id) {
+    const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
+
+    // Reconnects are the earliest reliable point to restore Daytona's background
+    // updater after the sandbox has been restarted.
+    await ensureDaytonaAutoUpdate(connection, agentKey);
+
+    // Open the preview URL before entering the shell because Daytona dashboards are
+    // exposed via signed URLs, not via the SSH tunnel flow used by VM clouds.
     await openDaytonaDashboard(connection);
     p.log.step(
       `Entering ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(connection.server_name || connection.server_id)}...`,
     );
-    const { buildInteractiveSshArgs } = await import("../daytona/daytona.js");
-    const args = await buildInteractiveSshArgs(connection.server_id, remoteCmd);
-    return runInteractiveCommand(
-      args[0],
-      args.slice(1),
-      `Failed to enter ${agentName}`,
-      `spawn enter ${connection.server_name || connection.server_id}`,
-    );
+    const { runInteractiveDaytonaCommand } = await import("../daytona/daytona.js");
+    const exitCode = await runInteractiveDaytonaCommand(connection.server_id, remoteCmd);
+    if (exitCode !== 0) {
+      throw new Error(`Failed to enter ${agentName} with exit code ${exitCode}`);
+    }
+    return;
   }
 
   // Re-establish SSH tunnel for web dashboard if tunnel metadata was persisted at spawn time

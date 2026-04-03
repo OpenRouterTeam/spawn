@@ -104,6 +104,8 @@ async function assertValidDaytonaRecords(records: SpawnRecord[]): Promise<void> 
 
   const { validateDaytonaConnection } = await import("../daytona/daytona.js");
   for (const record of daytonaRecords) {
+    // Daytona records carry provider-specific metadata and are consumed through
+    // signed previews / on-demand SSH, so fail fast on any malformed history entry.
     validateDaytonaConnection(record.connection!);
   }
 }
@@ -478,6 +480,8 @@ async function handleGoneServer(record: SpawnRecord, cloud: string): Promise<"de
 async function refreshConnectionIp(record: SpawnRecord): Promise<"ok" | "gone" | "skip"> {
   const conn = record.connection;
   if (!conn?.cloud || conn.cloud === "local" || conn.cloud === "sprite" || conn.cloud === "daytona" || conn.deleted) {
+    // Daytona reconnects are keyed by sandbox id. There is no stable public VM IP
+    // to refresh the way there is for the SSH-backed clouds.
     return "skip";
   }
 
@@ -703,7 +707,7 @@ export async function handleRecordAction(
   }
 
   if (action === "reconnect") {
-    const reconnectResult = await asyncTryCatch(() => cmdConnect(conn));
+    const reconnectResult = await asyncTryCatch(() => cmdConnect(conn, selected.agent));
     if (!reconnectResult.ok) {
       p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);
 

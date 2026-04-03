@@ -17,6 +17,7 @@ import {
   promptSandboxSize,
   promptSpawnName,
   runServer,
+  setupAutoUpdateSession,
   uploadFile,
   waitForReady,
 } from "./daytona.js";
@@ -54,6 +55,9 @@ async function main() {
       await waitForReady();
     },
     interactiveSession,
+    async setupAutoUpdate(agentName: string, updateCmd: string) {
+      await setupAutoUpdateSession(agentName, updateCmd);
+    },
     async getSignedPreviewUrl(remotePort: number, urlSuffix?: string, expiresInSeconds?: number) {
       return getSignedPreviewBrowserUrl(undefined, remotePort, urlSuffix, expiresInSeconds);
     },

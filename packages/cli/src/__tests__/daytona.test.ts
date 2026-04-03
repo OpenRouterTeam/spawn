@@ -317,6 +317,22 @@ describe("daytona/daytona", () => {
     });
   });
 
+  it("prepares OpenClaw preview access before returning the signed URL", async () => {
+    const sandbox = new MockSandbox("sb-openclaw-preview", "openclaw-preview");
+    sandbox.previewBaseUrl = "https://preview.daytona.test/base";
+    mockState.sandboxes.set(sandbox.id, sandbox);
+
+    const url = await daytona.getSignedPreviewBrowserUrl("sb-openclaw-preview", 18789, "/#token=test", 1200);
+
+    expect(url).toBe("https://preview.daytona.test/base/18789/#token=test");
+    expect(sandbox.uploadCalls).toHaveLength(1);
+    expect(sandbox.uploadCalls[0].destination).toBe("/home/daytona/.spawn-openclaw-dashboard-pair.sh");
+    expect(sandbox.processCalls).toHaveLength(3);
+    expect(sandbox.processCalls[0].command).toContain("allowedOrigins");
+    expect(sandbox.processCalls[1].command).toContain("chmod 700");
+    expect(sandbox.processCalls[2].command).toContain("nohup");
+  });
+
   it("forwards process timeouts and rejects non-zero command exits", async () => {
     const sandbox = new MockSandbox("sb-command", "command-test");
     sandbox.commandResponses.push({

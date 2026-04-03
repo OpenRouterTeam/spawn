@@ -92,6 +92,8 @@ export interface CloudOrchestrator {
   };
   /** Return a browser URL for signed-preview style dashboard access. */
   getSignedPreviewUrl?(remotePort: number, urlSuffix?: string, expiresInSeconds?: number): Promise<string>;
+  /** Install a provider-native auto-update mechanism when the shared systemd timer does not apply. */
+  setupAutoUpdate?(agentName: string, updateCmd: string): Promise<void>;
 }
 
 /**
@@ -597,10 +599,29 @@ async function postInstall(
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
     if (cloud.cloudName === "daytona") {
-      logInfo("Auto-update unavailable on Daytona — skipping");
+      // Daytona reconnects need to know whether they should recreate the provider-native
+      // background updater after a sandbox stop/start cycle.
+      saveMetadata(
+        {
+          auto_update_enabled: "1",
+        },
+        spawnId,
+      );
+    }
+    if (cloud.setupAutoUpdate) {
+      await cloud.setupAutoUpdate(agentName, agent.updateCmd);
     } else {
       await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
     }
+  } else if (cloud.cloudName === "daytona" && agent.updateCmd) {
+    // Persist the disabled state too so reconnect paths can distinguish "not configured"
+    // from "configured earlier but the sandbox session was lost".
+    saveMetadata(
+      {
+        auto_update_enabled: "0",
+      },
+      spawnId,
+    );
   }
 
   // Spawn CLI + skill injection (recursive spawn)
