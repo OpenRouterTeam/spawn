@@ -87,13 +87,11 @@ function detectAgent(host: string, user: string, keyOpts: string[], runCmd: SshC
     }
   }
 
-  // Second: check installed binaries
-  const whichCmd = KNOWN_AGENTS.map((b) => `(which ${b} 2>/dev/null && echo ${b})`).join(" || ");
-  const whichOut = runCmd(host, user, keyOpts, whichCmd);
-  if (whichOut) {
-    const match = KNOWN_AGENTS.find((b: KnownAgent) => whichOut.includes(b));
-    if (match) {
-      return match;
+  // Second: check installed binaries — one SSH call per agent to avoid shell injection
+  for (const agent of KNOWN_AGENTS) {
+    const whichOut = runCmd(host, user, keyOpts, `command -v ${agent}`);
+    if (whichOut) {
+      return agent;
     }
   }
 
