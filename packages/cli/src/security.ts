@@ -657,14 +657,9 @@ export function validatePromptFilePath(filePath: string): void {
   // Normalize the path to resolve .. and textual tricks
   let resolved = resolve(filePath);
 
-  // Follow symlinks to validate the real target path, not the symlink name.
-  // Without this, a symlink like `innocent.txt -> ~/.ssh/id_rsa` would bypass
-  // sensitive path checks because the resolved string wouldn't match patterns.
-  if (existsSync(resolved)) {
-    resolved = realpathSync(resolved);
-  }
-
-  // Check against sensitive path patterns
+  // Check against sensitive path patterns BEFORE any filesystem calls.
+  // On macOS, lstat("/etc/master.passwd") throws EACCES before we can check
+  // the pattern, so we must validate the textual path first.
   for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
     if (pattern.test(resolved)) {
       throw new Error(
@@ -675,6 +670,27 @@ export function validatePromptFilePath(filePath: string): void {
           `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
           "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt",
       );
+    }
+  }
+
+  // Follow symlinks to validate the real target path, not the symlink name.
+  // Without this, a symlink like `innocent.txt -> ~/.ssh/id_rsa` would bypass
+  // sensitive path checks because the resolved string wouldn't match patterns.
+  if (existsSync(resolved)) {
+    resolved = realpathSync(resolved);
+
+    // Re-check after symlink resolution — the real path may be sensitive
+    for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
+      if (pattern.test(resolved)) {
+        throw new Error(
+          `Security check failed: cannot use '${filePath}' as a prompt file.\n\n` +
+            `This path points to ${description}.\n` +
+            "Prompt contents are sent to the agent and may be logged or stored remotely.\n\n" +
+            "For security, use a plain text file instead:\n" +
+            `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
+            "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt",
+        );
+      }
     }
   }
 }
