@@ -1,4 +1,4 @@
-import type { ToolCall } from "./helpers";
+import type { CandidateRow, ToolCall } from "./helpers";
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { toRecord } from "@openrouter/spawn-shared";
@@ -7,6 +7,7 @@ import {
   downloadSlackFile,
   extractMarkdownTables,
   extractToolHint,
+  findCandidate,
   findThread,
   formatToolHistory,
   formatToolStats,
@@ -21,6 +22,8 @@ import {
   parseStreamEvent,
   plainTextFallback,
   stripMention,
+  updateCandidateStatus,
+  upsertCandidate,
   upsertThread,
 } from "./helpers";
 
@@ -1046,3 +1049,95 @@ describe("markdownTableToSlackBlock", () => {
     expect(block?.rows[1][2].text).toBe("");
   });
 });
+
+// #region Candidate DB tests
+
+function makeCandidate(overrides: Partial<CandidateRow> = {}): CandidateRow {
+  return {
+    postId: "t3_abc123",
+    permalink: "/r/SelfHosted/comments/abc123/test",
+    title: "How to run coding agents on cloud?",
+    subreddit: "SelfHosted",
+    draftReply: "check out spawn, it does exactly this. disclosure: i help build this",
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+describe("candidates table", () => {
+  it("upsertCandidate and findCandidate round-trip", () => {
+    const db = openDb(":memory:");
+    const candidate = makeCandidate();
+    upsertCandidate(db, candidate);
+    const found = findCandidate(db, "t3_abc123");
+    expect(found).toBeTruthy();
+    expect(found?.postId).toBe("t3_abc123");
+    expect(found?.title).toBe("How to run coding agents on cloud?");
+    expect(found?.subreddit).toBe("SelfHosted");
+    expect(found?.draftReply).toContain("spawn");
+    expect(found?.status).toBe("pending");
+    db.close();
+  });
+
+  it("findCandidate returns undefined for missing post", () => {
+    const db = openDb(":memory:");
+    expect(findCandidate(db, "t3_nonexistent")).toBeUndefined();
+    db.close();
+  });
+
+  it("upsertCandidate updates Slack coordinates on conflict", () => {
+    const db = openDb(":memory:");
+    upsertCandidate(db, makeCandidate());
+    upsertCandidate(db, makeCandidate({ slackChannel: "C123", slackTs: "1234.5678" }));
+    const found = findCandidate(db, "t3_abc123");
+    expect(found?.slackChannel).toBe("C123");
+    expect(found?.slackTs).toBe("1234.5678");
+    db.close();
+  });
+
+  it("updateCandidateStatus changes status and sets actioned fields", () => {
+    const db = openDb(":memory:");
+    upsertCandidate(db, makeCandidate());
+    updateCandidateStatus(db, "t3_abc123", {
+      status: "posted",
+      actionedBy: "U789",
+      postedReply: "the actual reply text",
+      redditCommentUrl: "https://reddit.com/r/SelfHosted/comments/abc123/test/def456",
+    });
+    const found = findCandidate(db, "t3_abc123");
+    expect(found?.status).toBe("posted");
+    expect(found?.actionedBy).toBe("U789");
+    expect(found?.actionedAt).toBeTruthy();
+    expect(found?.postedReply).toBe("the actual reply text");
+    expect(found?.redditCommentUrl).toContain("def456");
+    db.close();
+  });
+
+  it("updateCandidateStatus to skipped", () => {
+    const db = openDb(":memory:");
+    upsertCandidate(db, makeCandidate());
+    updateCandidateStatus(db, "t3_abc123", {
+      status: "skipped",
+      actionedBy: "U111",
+    });
+    const found = findCandidate(db, "t3_abc123");
+    expect(found?.status).toBe("skipped");
+    expect(found?.actionedBy).toBe("U111");
+    db.close();
+  });
+
+  it("updateCandidateStatus to error", () => {
+    const db = openDb(":memory:");
+    upsertCandidate(db, makeCandidate());
+    updateCandidateStatus(db, "t3_abc123", {
+      status: "error",
+      actionedBy: "U222",
+    });
+    const found = findCandidate(db, "t3_abc123");
+    expect(found?.status).toBe("error");
+    db.close();
+  });
+});
+
+// #endregion

@@ -158,6 +158,29 @@ Draft reply:
 === END CANDIDATE ===
 ```
 
+**IMPORTANT: After the human-readable summary above, you MUST also print a machine-readable JSON block.** This is how the automation pipeline picks up your findings. Print it exactly like this (with the `json:candidate` marker):
+
+````
+```json:candidate
+{
+  "found": true,
+  "title": "{post_title}",
+  "url": "https://reddit.com{permalink}",
+  "permalink": "{permalink}",
+  "subreddit": "{subreddit}",
+  "postId": "{thing fullname, e.g. t3_abc123}",
+  "upvotes": {score},
+  "numComments": {num_comments},
+  "postedAgo": "{time_ago}",
+  "whatTheyAsked": "{brief summary}",
+  "whySpawnFits": "{1-2 sentences}",
+  "posterQualification": "{signals found}",
+  "relevanceScore": {score_out_of_10},
+  "draftReply": "{the draft reply text}"
+}
+```
+````
+
 **If no candidates found:**
 
 ```
@@ -167,6 +190,14 @@ Scored 7+: 0
 No candidates this cycle.
 === END SCAN ===
 ```
+
+And the machine-readable JSON:
+
+````
+```json:candidate
+{"found": false, "postsScanned": {total}}
+```
+````
 
 ## Safety rules
 

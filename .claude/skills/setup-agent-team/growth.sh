@@ -136,3 +136,32 @@ if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
 else
     log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi
+
+# --- Extract candidate JSON and POST to SPA ---
+CANDIDATE_JSON=""
+
+# Extract the json:candidate block from the log (between ```json:candidate and ```)
+if [[ -f "${LOG_FILE}" ]]; then
+    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${LOG_FILE}" | tail -1)
+fi
+
+if [[ -z "${CANDIDATE_JSON}" ]]; then
+    log "No json:candidate block found in output"
+    CANDIDATE_JSON='{"found":false}'
+fi
+
+log "Candidate JSON: ${CANDIDATE_JSON}"
+
+# POST to SPA if SPA_TRIGGER_URL is configured
+if [[ -n "${SPA_TRIGGER_URL:-}" && -n "${SPA_TRIGGER_SECRET:-}" ]]; then
+    log "Posting candidate to SPA at ${SPA_TRIGGER_URL}/candidate"
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST "${SPA_TRIGGER_URL}/candidate" \
+        -H "Authorization: Bearer ${SPA_TRIGGER_SECRET}" \
+        -H "Content-Type: application/json" \
+        -d "${CANDIDATE_JSON}" \
+        --max-time 30) || HTTP_STATUS="000"
+    log "SPA response: HTTP ${HTTP_STATUS}"
+else
+    log "SPA_TRIGGER_URL or SPA_TRIGGER_SECRET not set, skipping Slack notification"
+fi
