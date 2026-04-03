@@ -49,8 +49,16 @@ export function validateLocalPath(filePath: string): string {
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
+/** Validate a command string: must be non-empty and free of null bytes. */
+function validateCommand(cmd: string): void {
+  if (!cmd || cmd.includes("\0")) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
+}
+
 /** Run a shell command locally and wait for it to finish. */
 export async function runLocal(cmd: string): Promise<void> {
+  validateCommand(cmd);
   const [shell, flag] = getLocalShell();
   const proc = Bun.spawn(
     [
@@ -113,6 +121,7 @@ export function downloadFile(remotePath: string, localPath: string): void {
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
+  validateCommand(cmd);
   const [shell, flag] = getLocalShell();
   return spawnInteractive([
     shell,
@@ -349,19 +358,18 @@ export async function pullAndStartContainer(agentName: string): Promise<void> {
 }
 
 /** Launch an interactive session inside the Docker container. */
-export function dockerInteractiveSession(cmd: string): Promise<number> {
-  return Promise.resolve(
-    spawnInteractive([
-      "docker",
-      "exec",
-      "-it",
-      DOCKER_CONTAINER_NAME,
-      "bash",
-      "-l",
-      "-c",
-      cmd,
-    ]),
-  );
+export async function dockerInteractiveSession(cmd: string): Promise<number> {
+  validateCommand(cmd);
+  return spawnInteractive([
+    "docker",
+    "exec",
+    "-it",
+    DOCKER_CONTAINER_NAME,
+    "bash",
+    "-l",
+    "-c",
+    cmd,
+  ]);
 }
 
 /** Remove the sandbox container (best-effort, for cleanup). */
