@@ -90,6 +90,8 @@ export interface CloudOrchestrator {
     host: string;
     user: string;
   };
+  /** Return a browser URL for signed-preview style dashboard access. */
+  getSignedPreviewUrl?(remotePort: number, urlSuffix?: string, expiresInSeconds?: number): Promise<string>;
 }
 
 /**
@@ -623,10 +625,12 @@ async function postInstall(
     }
   }
 
-  // SSH tunnel for web dashboard
+  // Web dashboard access
   let tunnelHandle: SshTunnelHandle | undefined;
   if (agent.tunnel) {
     const tunnelCfg = agent.tunnel; // capture for closure (TS can't narrow across async boundaries)
+    const templateUrl = tunnelCfg.browserUrl?.(0);
+
     if (cloud.getConnectionInfo) {
       const getConnInfo = cloud.getConnectionInfo; // capture for closure
       const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
@@ -648,6 +652,15 @@ async function postInstall(
       if (!tunnelResult.ok) {
         logWarn("Web dashboard tunnel failed — use the TUI instead");
       }
+    } else if (cloud.getSignedPreviewUrl) {
+      const previewResult = await asyncTryCatchIf(isOperationalError, async () => {
+        const urlSuffix = templateUrl ? templateUrl.replace("http://localhost:0", "") : undefined;
+        const url = await cloud.getSignedPreviewUrl!(tunnelCfg.remotePort, urlSuffix, 3600);
+        openBrowser(url);
+      });
+      if (!previewResult.ok) {
+        logWarn("Web dashboard preview failed — use the TUI instead");
+      }
     } else if (cloud.cloudName === "local") {
       if (agent.tunnel.browserUrl) {
         const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
@@ -660,11 +673,8 @@ async function postInstall(
     const tunnelMeta: Record<string, string> = {
       tunnel_remote_port: String(agent.tunnel.remotePort),
     };
-    if (agent.tunnel.browserUrl) {
-      const templateUrl = agent.tunnel.browserUrl(0);
-      if (templateUrl) {
-        tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
-      }
+    if (templateUrl) {
+      tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
     }
     saveMetadata(tunnelMeta, spawnId);
   }

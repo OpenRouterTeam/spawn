@@ -74,6 +74,12 @@ async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
       await ensureSpriteCli();
       await ensureSpriteAuthenticated();
       break;
+    case "daytona": {
+      const { ensureDaytonaAuthenticated, validateDaytonaConnection } = await import("../daytona/daytona.js");
+      validateDaytonaConnection(conn);
+      await ensureDaytonaAuthenticated();
+      break;
+    }
     default:
       break;
   }
@@ -174,6 +180,18 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
         await ensureSpriteCli();
         await ensureSpriteAuthenticated();
         await spriteDestroyServer(id);
+      });
+
+    case "daytona":
+      return tryDelete(async () => {
+        const {
+          destroyServer: daytonaDestroyServer,
+          ensureDaytonaAuthenticated,
+          validateDaytonaConnection,
+        } = await import("../daytona/daytona.js");
+        validateDaytonaConnection(conn);
+        await ensureDaytonaAuthenticated();
+        await daytonaDestroyServer(id);
       });
 
     default:
