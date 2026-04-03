@@ -85,7 +85,7 @@ async function installAgent(
 /**
  * Upload a config file to the remote machine via a temp file and mv.
  */
-async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
+export async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
   const safePath = validateRemotePath(remotePath);
 
   const tmpFile = join(getTmpDir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);

@@ -62,10 +62,39 @@ export interface CloudDef {
   icon?: string;
 }
 
+/** MCP server configuration (matches Claude Code settings.json mcpServers format). */
+export interface McpServerConfig {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+/** Per-agent skill configuration. */
+export interface SkillAgentConfig {
+  mcp_config?: McpServerConfig;
+  /** Whether this skill is pre-selected in the picker for this agent. */
+  default: boolean;
+}
+
+/** A skill that can be pre-installed on a remote VM. */
+export interface SkillDef {
+  name: string;
+  description: string;
+  type: "mcp";
+  /** npm package name (for display/reference). */
+  package?: string;
+  /** Env vars required by this skill (shown as hints in picker). */
+  env_vars?: string[];
+  /** Per-agent installation config. Only agents listed here support this skill. */
+  agents: Record<string, SkillAgentConfig>;
+}
+
 export interface Manifest {
   agents: Record<string, AgentDef>;
   clouds: Record<string, CloudDef>;
   matrix: Record<string, string>;
+  /** Skill catalog — MCP servers and tools that can be pre-installed on VMs. */
+  skills?: Record<string, SkillDef>;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────

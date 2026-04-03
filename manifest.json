@@ -492,5 +492,123 @@
     "digitalocean/cursor": "implemented",
     "gcp/cursor": "implemented",
     "sprite/cursor": "implemented"
+  },
+  "skills": {
+    "github-mcp": {
+      "name": "GitHub",
+      "description": "PRs, issues, repos, search via GitHub API",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-github",
+      "env_vars": ["GITHUB_TOKEN"],
+      "agents": {
+        "claude": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+          },
+          "default": true
+        },
+        "cursor": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+          },
+          "default": true
+        }
+      }
+    },
+    "playwright-mcp": {
+      "name": "Playwright",
+      "description": "Browser automation — navigate, click, screenshot, scrape",
+      "type": "mcp",
+      "package": "@anthropic-ai/mcp-server-playwright",
+      "agents": {
+        "claude": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
+          },
+          "default": true
+        },
+        "cursor": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
+          },
+          "default": true
+        }
+      }
+    },
+    "fetch-mcp": {
+      "name": "Fetch",
+      "description": "HTTP requests — fetch web pages, APIs, and files",
+      "type": "mcp",
+      "package": "@anthropic-ai/mcp-server-fetch",
+      "agents": {
+        "claude": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@anthropic-ai/mcp-server-fetch"]
+          },
+          "default": false
+        },
+        "cursor": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@anthropic-ai/mcp-server-fetch"]
+          },
+          "default": false
+        }
+      }
+    },
+    "context7": {
+      "name": "Context7",
+      "description": "Library docs lookup — up-to-date documentation in context",
+      "type": "mcp",
+      "package": "@upstash/context7-mcp",
+      "agents": {
+        "claude": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp"]
+          },
+          "default": false
+        },
+        "cursor": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp"]
+          },
+          "default": false
+        }
+      }
+    },
+    "postgres-mcp": {
+      "name": "PostgreSQL",
+      "description": "Database access — query, inspect schema, manage tables",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-postgres",
+      "env_vars": ["DATABASE_URL"],
+      "agents": {
+        "claude": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-postgres"],
+            "env": { "DATABASE_URL": "${DATABASE_URL}" }
+          },
+          "default": false
+        },
+        "cursor": {
+          "mcp_config": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-postgres"],
+            "env": { "DATABASE_URL": "${DATABASE_URL}" }
+          },
+          "default": false
+        }
+      }
+    }
   }
 }
