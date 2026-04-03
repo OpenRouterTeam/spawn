@@ -157,6 +157,7 @@ spawn claude gcp --beta tarball --beta parallel
 | `parallel` | Parallelize server boot with setup prompts |
 | `recursive` | Install spawn CLI on VM so it can spawn child VMs |
 | `sandbox` | Run local agents in a Docker container (sandboxed) |
+| `skills` | Pre-install MCP servers and tools on the VM |
 
 `--fast` enables `tarball`, `images`, and `parallel` (not `recursive` or `sandbox`).
 
@@ -207,6 +208,31 @@ In the interactive picker, `--beta sandbox` adds a "Local Machine (Sandboxed)" o
 ```bash
 spawn --beta sandbox           # Interactive picker shows both local options
 spawn openclaw local --beta sandbox   # Direct launch, sandboxed
+```
+
+#### Skills
+
+Use `--beta skills` to pre-install MCP servers on the remote VM during setup:
+
+```bash
+spawn claude digitalocean --beta skills
+```
+
+A skills picker appears after setup options, letting you choose which MCP servers to install:
+
+| Skill | Package | Default |
+|-------|---------|---------|
+| GitHub | `@modelcontextprotocol/server-github` | Yes |
+| Playwright | `@anthropic-ai/mcp-server-playwright` | Yes |
+| Fetch | `@anthropic-ai/mcp-server-fetch` | No |
+| Context7 | `@upstash/context7-mcp` | No |
+| PostgreSQL | `@modelcontextprotocol/server-postgres` | No |
+
+Currently supported for **Claude Code** and **Cursor** agents. Skills requiring env vars (e.g. `GITHUB_TOKEN`) will prompt during setup.
+
+For headless use:
+```bash
+SPAWN_SELECTED_SKILLS=github-mcp,playwright-mcp spawn claude hetzner
 ```
 
 ### Without the CLI
