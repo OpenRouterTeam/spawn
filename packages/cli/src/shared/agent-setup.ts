@@ -548,7 +548,11 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "#!/bin/bash",
     'source "$HOME/.spawnrc" 2>/dev/null',
     'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
-    "exec openclaw gateway",
+    "while true; do",
+    "  openclaw gateway",
+    '  echo "openclaw gateway exited, restarting in 5s" >> /tmp/openclaw-gateway.log',
+    "  sleep 5",
+    "done",
   ].join("\n");
 
   // __USER__ and __HOME__ are sed-substituted at deploy time
@@ -586,11 +590,12 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   const script = [
     "source ~/.spawnrc 2>/dev/null",
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
-    "if command -v systemctl >/dev/null 2>&1; then",
+    "printf '%s' '" + wrapperB64 + "' | base64 -d > /tmp/openclaw-gateway-wrapper.tmp",
+    "chmod +x /tmp/openclaw-gateway-wrapper.tmp",
+    "if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then",
     '  _sudo=""',
     '  [ "$(id -u)" != "0" ] && _sudo="sudo"',
-    "  printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/openclaw-gateway-wrapper > /dev/null",
-    "  $_sudo chmod +x /usr/local/bin/openclaw-gateway-wrapper",
+    "  $_sudo mv /tmp/openclaw-gateway-wrapper.tmp /usr/local/bin/openclaw-gateway-wrapper",
     "  printf '%s' '" + unitB64 + "' | base64 -d > /tmp/openclaw-gateway.unit.tmp",
     '  sed -i "s|__USER__|$(whoami)|;s|__HOME__|$HOME|" /tmp/openclaw-gateway.unit.tmp',
     "  $_sudo mv /tmp/openclaw-gateway.unit.tmp /etc/systemd/system/openclaw-gateway.service",
@@ -601,13 +606,13 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     '  [ "$(id -u)" != "0" ] && _cron_restart="sudo systemctl restart openclaw-gateway"',
     '  (crontab -l 2>/dev/null | grep -v openclaw-gateway; echo "0 * * * * nc -z 127.0.0.1 18789 2>/dev/null || $_cron_restart >> /tmp/openclaw-gateway.log 2>&1") | crontab - 2>/dev/null || true',
     "else",
-    '  _oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }',
+    "  mv /tmp/openclaw-gateway-wrapper.tmp /tmp/openclaw-gateway-wrapper",
     `  if ${portCheck}; then echo "Gateway already running"; exit 0; fi`,
-    '  if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null &',
-    '  else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi',
+    "  if command -v setsid >/dev/null 2>&1; then setsid /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null &",
+    "  else nohup /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
     "fi",
     "elapsed=0; while [ $elapsed -lt 300 ]; do",
-    `  if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi`,
+    `  if ${portCheck}; then echo "Gateway ready after $elapsed sec"; exit 0; fi`,
     "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
     "done",
     'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1',
@@ -644,6 +649,22 @@ const NPM_PREFIX_SETUP =
   // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
   // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
   'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
+
+/**
+ * Validator-safe npm setup for base64-encoded helper scripts.
+ *
+ * setupAutoUpdate() rejects `${...}` inside encoded script templates, so the
+ * auto-update path needs a shell snippet that avoids brace expansion while
+ * still preserving the same prefix and PATH behavior as installs.
+ */
+const NPM_AUTO_UPDATE_SETUP =
+  '_NPM_G_FLAGS=""; ' +
+  '_npm_prefix="$(npm prefix -g 2>/dev/null || echo /usr/local)"; ' +
+  '_npm_gbin="$_npm_prefix/bin"; ' +
+  'if ! [ -w "$_npm_prefix" ] || ! printf "%s" ":$PATH:" | grep -qF ":$_npm_gbin:"; then ' +
+  'mkdir -p "$HOME/.npm-global/bin"; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  'case " $NODE_OPTIONS " in *" --dns-result-order=ipv4first "*) ;; *) export NODE_OPTIONS="$NODE_OPTIONS --dns-result-order=ipv4first" ;; esac';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -853,7 +874,7 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   }
 
   const script = [
-    "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
+    "if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then exit 0; fi",
     '_sudo=""',
     '[ "$(id -u)" != "0" ] && _sudo="sudo"',
     "printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-auto-update > /dev/null",
@@ -869,7 +890,7 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
 
   const result = await asyncTryCatch(() => runner.runServer(script));
   if (result.ok) {
-    logInfo("Agent auto-update service installed (runs every 6 hours)");
+    logInfo("Agent auto-update setup completed");
   } else {
     logWarn("Auto-update setup failed (non-fatal, agent still works)");
   }
@@ -916,9 +937,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @openai/codex@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @openai/codex@latest",
     },
 
     openclaw: (() => {
@@ -950,9 +969,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
-        updateCmd:
-          'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-          "npm install -g ${_NPM_G_FLAGS:-} openclaw@latest",
+        updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS openclaw@latest",
       };
     })(),
 
@@ -985,9 +1002,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @kilocode/cli@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @kilocode/cli@latest",
     },
 
     hermes: {
@@ -1044,9 +1059,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @jetbrains/junie-cli@latest",
     },
 
     pi: {
@@ -1063,9 +1076,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @mariozechner/pi-coding-agent@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @mariozechner/pi-coding-agent@latest",
     },
 
     cursor: {

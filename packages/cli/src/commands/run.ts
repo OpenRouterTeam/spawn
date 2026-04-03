@@ -831,6 +831,18 @@ function headlessError(
   process.exit(exitCode);
 }
 
+/**
+ * Resolve a trusted local Spawn checkout path for SPAWN_CLI_DIR.
+ *
+ * On macOS, `/tmp` commonly resolves to `/private/tmp`, so compare against
+ * the checkout's real path instead of the raw env var spelling.
+ */
+function resolveTrustedCliDir(cliDir: string): string {
+  const resolvedCliDir = path.resolve(cliDir);
+  const realCliDir = tryCatchIf(isFileError, () => fs.realpathSync(resolvedCliDir));
+  return realCliDir.ok ? realCliDir.data : resolvedCliDir;
+}
+
 /** Run a script in headless mode (all output to stderr, no interactive session) */
 function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<number> {
   validateScriptContent(script);
@@ -1006,7 +1018,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     if (cliDir) {
       const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
       if (!hasBadChars(resolvedCloud) && !hasBadChars(resolvedAgent)) {
-        const resolvedCliDir = path.resolve(cliDir);
+        const resolvedCliDir = resolveTrustedCliDir(cliDir);
         const candidatePath = path.join(resolvedCliDir, "packages", "cli", "src", resolvedCloud, "main.ts");
         const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
         if (realResult.ok) {
@@ -1071,7 +1083,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
       const safeAgent = !hasBadChars(resolvedAgent);
 
       if (safeCloud && safeAgent) {
-        const resolvedCliDir = path.resolve(cliDir);
+        const resolvedCliDir = resolveTrustedCliDir(cliDir);
         const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
         const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
         if (realResult.ok) {

@@ -596,7 +596,11 @@ async function postInstall(
 
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
-    await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    if (cloud.cloudName === "daytona") {
+      logInfo("Auto-update unavailable on Daytona — skipping");
+    } else {
+      await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    }
   }
 
   // Spawn CLI + skill injection (recursive spawn)

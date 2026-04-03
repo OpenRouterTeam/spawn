@@ -672,8 +672,10 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
+    SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
+    SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
     case "${LOG_DIR}" in
-      /tmp/spawn-e2e.*)
+      "${SAFE_TMP_ROOT}"/spawn-e2e.*)
         rm -rf "${LOG_DIR}"
         ;;
       *)
@@ -708,7 +710,9 @@ fi
 export E2E_FAST_MODE="${FAST_MODE}"
 
 # Create temp log directory
-LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/spawn-e2e.XXXXXX")
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
+LOG_DIR=$(mktemp -d "${TMP_ROOT}/spawn-e2e.XXXXXX")
 export LOG_DIR
 log_info "Log directory: ${LOG_DIR}"
 

@@ -276,36 +276,36 @@ export async function ensureDaytonaAuthenticated(): Promise<void> {
 }
 
 function resolveSandboxSizeFromEnv(): SandboxSize | null {
-  const sizeId = process.env.DAYTONA_SANDBOX_SIZE;
-  if (sizeId) {
-    const matched = SANDBOX_SIZES.find((size) => size.id === sizeId);
-    if (!matched) {
-      throw new Error(`Invalid DAYTONA_SANDBOX_SIZE: ${sizeId}`);
-    }
-    return matched;
-  }
-
   const cpu = process.env.DAYTONA_CPU;
   const memory = process.env.DAYTONA_MEMORY;
   const disk = process.env.DAYTONA_DISK;
-  if (!cpu && !memory && !disk) {
+  if (cpu || memory || disk) {
+    const parsedCpu = Number.parseInt(cpu || String(DEFAULT_SANDBOX_SIZE.cpu), 10);
+    const parsedMemory = Number.parseInt(memory || String(DEFAULT_SANDBOX_SIZE.memory), 10);
+    const parsedDisk = Number.parseInt(disk || String(DEFAULT_SANDBOX_SIZE.disk), 10);
+    if (!Number.isInteger(parsedCpu) || !Number.isInteger(parsedMemory) || !Number.isInteger(parsedDisk)) {
+      throw new Error("DAYTONA_CPU, DAYTONA_MEMORY, and DAYTONA_DISK must be integers");
+    }
+
+    return {
+      id: "custom",
+      cpu: parsedCpu,
+      memory: parsedMemory,
+      disk: parsedDisk,
+      label: `${parsedCpu} vCPU · ${parsedMemory} GiB RAM · ${parsedDisk} GiB disk`,
+    };
+  }
+
+  const sizeId = process.env.DAYTONA_SANDBOX_SIZE;
+  if (!sizeId) {
     return null;
   }
 
-  const parsedCpu = Number.parseInt(cpu || String(DEFAULT_SANDBOX_SIZE.cpu), 10);
-  const parsedMemory = Number.parseInt(memory || String(DEFAULT_SANDBOX_SIZE.memory), 10);
-  const parsedDisk = Number.parseInt(disk || String(DEFAULT_SANDBOX_SIZE.disk), 10);
-  if (!Number.isInteger(parsedCpu) || !Number.isInteger(parsedMemory) || !Number.isInteger(parsedDisk)) {
-    throw new Error("DAYTONA_CPU, DAYTONA_MEMORY, and DAYTONA_DISK must be integers");
+  const matched = SANDBOX_SIZES.find((size) => size.id === sizeId);
+  if (!matched) {
+    throw new Error(`Invalid DAYTONA_SANDBOX_SIZE: ${sizeId}`);
   }
-
-  return {
-    id: "custom",
-    cpu: parsedCpu,
-    memory: parsedMemory,
-    disk: parsedDisk,
-    label: `${parsedCpu} vCPU · ${parsedMemory} GiB RAM · ${parsedDisk} GiB disk`,
-  };
+  return matched;
 }
 
 /**
