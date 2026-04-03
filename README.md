@@ -212,13 +212,15 @@ spawn openclaw local --beta sandbox   # Direct launch, sandboxed
 
 #### Skills
 
-Use `--beta skills` to pre-install MCP servers on the remote VM during setup:
+Use `--beta skills` to pre-install MCP servers and instruction skills on the remote VM during setup:
 
 ```bash
 spawn claude digitalocean --beta skills
 ```
 
-A skills picker appears after setup options, letting you choose which MCP servers to install:
+A skills picker appears after setup options, letting you choose what to install:
+
+**MCP Servers** (Claude Code, Cursor):
 
 | Skill | Package | Default |
 |-------|---------|---------|
@@ -228,11 +230,20 @@ A skills picker appears after setup options, letting you choose which MCP server
 | Context7 | `@upstash/context7-mcp` | No |
 | PostgreSQL | `@modelcontextprotocol/server-postgres` | No |
 
-Currently supported for **Claude Code** and **Cursor** agents. Skills requiring env vars (e.g. `GITHUB_TOKEN`) will prompt during setup.
+**Instruction Skills** (Claude Code, OpenClaw, Codex):
+
+| Skill | Description | Default |
+|-------|-------------|---------|
+| Git Workflow | Branching, conventional commits, PR workflow | Yes |
+| Web Search | Search the web, fetch URLs, extract content | Yes |
+| Docker | Container management, compose, best practices | No |
+| Deploy | Deploy via SSH, Docker, pm2, systemd | No |
+
+Skills requiring env vars (e.g. `GITHUB_TOKEN`) will prompt during setup.
 
 For headless use:
 ```bash
-SPAWN_SELECTED_SKILLS=github-mcp,playwright-mcp spawn claude hetzner
+SPAWN_SELECTED_SKILLS=github-mcp,git-workflow,web-search spawn claude hetzner
 ```
 
 ### Without the CLI

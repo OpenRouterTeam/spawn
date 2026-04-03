@@ -141,34 +141,56 @@ export async function installSkills(
     return;
   }
 
-  // Collect MCP configs for this agent
+  // Separate MCP and instruction skills
   const mcpServers: Record<string, McpServerConfig> = {};
+  const instructionSkills: Array<{
+    id: string;
+    path: string;
+    content: string;
+  }> = [];
+
   for (const skillId of skillIds) {
     const def = manifest.skills[skillId];
     if (!def) {
       continue;
     }
     const agentConfig = def.agents[agentName];
-    if (!agentConfig?.mcp_config) {
+    if (!agentConfig) {
       continue;
     }
-    // Use skill ID as the MCP server name (e.g. "github-mcp")
-    mcpServers[skillId] = agentConfig.mcp_config;
+
+    if (def.type === "mcp" && agentConfig.mcp_config) {
+      mcpServers[skillId] = agentConfig.mcp_config;
+    } else if (def.type === "instruction" && agentConfig.instruction_path && def.content) {
+      instructionSkills.push({
+        id: skillId,
+        path: agentConfig.instruction_path,
+        content: def.content,
+      });
+    }
   }
 
-  if (Object.keys(mcpServers).length === 0) {
+  const totalCount = Object.keys(mcpServers).length + instructionSkills.length;
+  if (totalCount === 0) {
     return;
   }
 
-  logStep(`Installing ${Object.keys(mcpServers).length} skill(s)...`);
+  logStep(`Installing ${totalCount} skill(s)...`);
 
-  if (agentName === "claude") {
-    await installClaudeMcpServers(runner, mcpServers);
-  } else if (agentName === "cursor") {
-    await installCursorMcpServers(runner, mcpServers);
-  } else {
-    logWarn(`Skills not yet supported for agent: ${agentName}`);
-    return;
+  // Install MCP skills
+  if (Object.keys(mcpServers).length > 0) {
+    if (agentName === "claude") {
+      await installClaudeMcpServers(runner, mcpServers);
+    } else if (agentName === "cursor") {
+      await installCursorMcpServers(runner, mcpServers);
+    } else {
+      logWarn(`MCP skills not supported for agent: ${agentName}`);
+    }
+  }
+
+  // Install instruction skills (SKILL.md files)
+  for (const skill of instructionSkills) {
+    await injectInstructionSkill(runner, skill.id, skill.path, skill.content);
   }
 
   logInfo(`Skills installed: ${skillIds.join(", ")}`);
@@ -220,4 +242,28 @@ async function installCursorMcpServers(runner: CloudRunner, servers: Record<stri
   };
 
   await uploadConfigFile(runner, JSON.stringify(config, null, 2), "$HOME/.cursor/mcp.json");
+}
+
+/** Inject an instruction skill (SKILL.md) onto the remote VM via base64 encoding. */
+async function injectInstructionSkill(
+  runner: CloudRunner,
+  skillId: string,
+  remotePath: string,
+  content: string,
+): Promise<void> {
+  const b64 = Buffer.from(content).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
+    logWarn(`Skill ${skillId}: unexpected characters in base64 output, skipping`);
+    return;
+  }
+
+  const remoteDir = remotePath.slice(0, remotePath.lastIndexOf("/"));
+  const cmd = `mkdir -p ${remoteDir} && printf '%s' '${b64}' | base64 -d > ${remotePath} && chmod 644 ${remotePath}`;
+
+  const result = await asyncTryCatch(() => runner.runServer(cmd));
+  if (result.ok) {
+    logInfo(`Skill injected: ${remotePath}`);
+  } else {
+    logWarn(`Skill ${skillId} injection failed — agent will work without it`);
+  }
 }

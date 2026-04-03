@@ -72,6 +72,8 @@ export interface McpServerConfig {
 /** Per-agent skill configuration. */
 export interface SkillAgentConfig {
   mcp_config?: McpServerConfig;
+  /** Remote path for instruction-type skills (e.g. ~/.openclaw/skills/git-workflow/SKILL.md). */
+  instruction_path?: string;
   /** Whether this skill is pre-selected in the picker for this agent. */
   default: boolean;
 }
@@ -80,9 +82,11 @@ export interface SkillAgentConfig {
 export interface SkillDef {
   name: string;
   description: string;
-  type: "mcp";
-  /** npm package name (for display/reference). */
+  type: "mcp" | "instruction";
+  /** npm package name (for MCP-type skills). */
   package?: string;
+  /** YAML frontmatter + markdown content (for instruction-type skills). */
+  content?: string;
   /** Env vars required by this skill (shown as hints in picker). */
   env_vars?: string[];
   /** Per-agent installation config. Only agents listed here support this skill. */
