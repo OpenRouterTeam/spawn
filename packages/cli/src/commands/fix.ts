@@ -181,6 +181,8 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
 
   // --- Phase 6: Verify agent binary ---
   const binaryName = (agentManifest.launch ?? record.agent).split(/\s+/)[0];
+  // SECURITY: validate binaryName before use in shell command — launch field comes from manifest
+  validateIdentifier(binaryName, "Agent binary name");
   const verifyResult = await asyncTryCatch(() => runner.runServer(`command -v ${binaryName} >/dev/null 2>&1`));
   if (!verifyResult.ok) {
     logWarn(`Agent binary '${binaryName}' not found in PATH after fix`);
