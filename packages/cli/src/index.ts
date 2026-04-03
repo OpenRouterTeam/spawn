@@ -969,6 +969,18 @@ async function main(): Promise<void> {
       if (config.setup?.github_token && !process.env.GITHUB_TOKEN) {
         process.env.GITHUB_TOKEN = config.setup.github_token;
       }
+      if (config.prompt && !process.env.SPAWN_PROMPT) {
+        process.env.SPAWN_PROMPT = config.prompt;
+      }
+      // Map credentials to env vars (snake_case key → UPPER_CASE env var)
+      if (config.credentials) {
+        for (const [key, value] of Object.entries(config.credentials)) {
+          const envVar = key.toUpperCase();
+          if (!process.env[envVar]) {
+            process.env[envVar] = value;
+          }
+        }
+      }
     }
   }
 

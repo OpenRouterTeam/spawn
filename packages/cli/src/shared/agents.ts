@@ -48,6 +48,8 @@ export interface AgentConfig {
   tunnel?: TunnelConfig;
   /** Shell command to update the agent to its latest version (used by auto-update timer). */
   updateCmd?: string;
+  /** Build a shell command to run the agent non-interactively with a prompt (headless mode). */
+  promptCmd?: (prompt: string) => string;
 }
 
 /** Configuration for SSH-tunneling a remote port to localhost. */

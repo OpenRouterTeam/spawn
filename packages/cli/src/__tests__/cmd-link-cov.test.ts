@@ -57,6 +57,7 @@ const SSH_DETECT_AGENT_VIA_WHICH = (_host: string, _user: string, _keys: string[
 describe("cmdLink (additional coverage)", () => {
   let testDir: string;
   let savedSpawnHome: string | undefined;
+  let savedApiKey: string | undefined;
   let processExitSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
@@ -66,6 +67,8 @@ describe("cmdLink (additional coverage)", () => {
     });
     savedSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = testDir;
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
 
     confirmValue = true;
     selectValue = "claude";
@@ -85,6 +88,11 @@ describe("cmdLink (additional coverage)", () => {
 
   afterEach(() => {
     process.env.SPAWN_HOME = savedSpawnHome;
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
     processExitSpy.mockRestore();
     if (existsSync(testDir)) {
       rmSync(testDir, {

@@ -34,6 +34,7 @@ const SSH_DETECT_CLAUDE = (_host: string, _user: string, _keys: string[], cmd: s
 describe("cmdLink", () => {
   let testDir: string;
   let savedSpawnHome: string | undefined;
+  let savedApiKey: string | undefined;
   let processExitSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
@@ -43,6 +44,9 @@ describe("cmdLink", () => {
     });
     savedSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = testDir;
+    // Ensure agent setup is skipped in tests (no API key = no SSH calls)
+    savedApiKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
 
     clack.logError.mockReset();
     clack.logSuccess.mockReset();
@@ -59,6 +63,11 @@ describe("cmdLink", () => {
 
   afterEach(() => {
     process.env.SPAWN_HOME = savedSpawnHome;
+    if (savedApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedApiKey;
+    }
     processExitSpy.mockRestore();
     if (existsSync(testDir)) {
       rmSync(testDir, {

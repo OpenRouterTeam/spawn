@@ -104,6 +104,13 @@ async function selectCloud(
     }
   }
 
+  // "Link existing server" — always the last option
+  options.push({
+    value: "link",
+    label: "Link Existing Server",
+    hint: "bring your own — register & set up a server you already have",
+  });
+
   const cloudChoice = await p.select({
     message: "Select a cloud",
     options,
@@ -111,6 +118,11 @@ async function selectCloud(
   });
   if (p.isCancel(cloudChoice)) {
     handleCancel();
+  }
+
+  // Route to spawn link when user selects "Link Existing Server"
+  if (cloudChoice === "link") {
+    return "link";
   }
 
   // Map synthetic "local-sandbox" back to "local" and ensure sandbox beta is set
@@ -283,6 +295,15 @@ export async function cmdInteractive(): Promise<void> {
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
+  if (cloudChoice === "link") {
+    const { cmdLink } = await import("./link.js");
+    await cmdLink([
+      "--agent",
+      agentChoice,
+    ]);
+    return;
+  }
+
   await preflightCredentialCheck(manifest, cloudChoice);
 
   // Skip setup prompt if steps already set via --steps or --config
@@ -336,6 +357,15 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+
+  if (cloudChoice === "link") {
+    const { cmdLink } = await import("./link.js");
+    await cmdLink([
+      "--agent",
+      resolvedAgent,
+    ]);
+    return;
+  }
 
   if (dryRun) {
     showDryRunPreview(manifest, resolvedAgent, cloudChoice, prompt);

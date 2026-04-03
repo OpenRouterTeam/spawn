@@ -11,10 +11,14 @@ const SpawnConfigSetupSchema = v.object({
   github_token: v.optional(v.string()),
 });
 
+const SpawnConfigCredentialsSchema = v.record(v.string(), v.string());
+
 const SpawnConfigSchema = v.object({
   model: v.optional(v.string()),
   steps: v.optional(v.array(v.string())),
   name: v.optional(v.string()),
+  prompt: v.optional(v.string()),
+  credentials: v.optional(SpawnConfigCredentialsSchema),
   setup: v.optional(SpawnConfigSetupSchema),
 });
 

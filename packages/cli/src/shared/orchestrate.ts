@@ -528,27 +528,47 @@ export async function runOrchestration(
   }
 }
 
-async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
+/** Write env content to ~/.spawnrc and ensure all shell rc files source it. */
+export async function injectEnvVarsToRunner(runner: CloudRunner, envContent: string): Promise<void> {
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
     throw new Error("Unexpected characters in base64 output");
   }
 
-  const isLocalWindows = cloud.cloudName === "local" && isWindows();
-  const envSetupCmd = isLocalWindows
-    ? `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`
-    : `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-      "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
-      `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
-      "done";
+  const envSetupCmd =
+    `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+    "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
+    `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
+    "done";
 
   const envResult = await asyncTryCatch(() =>
-    withRetry("env setup", () => wrapSshCall(cloud.runner.runServer(envSetupCmd)), 2, 5),
+    withRetry("env setup", () => wrapSshCall(runner.runServer(envSetupCmd)), 2, 5),
   );
   if (!envResult.ok) {
     logWarn("Environment setup had errors");
   }
+}
+
+async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
+  const isLocalWindows = cloud.cloudName === "local" && isWindows();
+  if (isLocalWindows) {
+    logStep("Setting up environment variables...");
+    const envB64 = Buffer.from(envContent).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
+      throw new Error("Unexpected characters in base64 output");
+    }
+    const envSetupCmd =
+      `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`;
+    const envResult = await asyncTryCatch(() =>
+      withRetry("env setup", () => wrapSshCall(cloud.runner.runServer(envSetupCmd)), 2, 5),
+    );
+    if (!envResult.ok) {
+      logWarn("Environment setup had errors");
+    }
+    return;
+  }
+  await injectEnvVarsToRunner(cloud.runner, envContent);
 }
 
 async function postInstall(
@@ -712,10 +732,22 @@ async function postInstall(
   saveLaunchCmd(launchCmd, spawnId);
 
   // In headless mode, provisioning is done — skip the interactive session.
-  // The VM is healthy and the agent is installed; callers can SSH in or use `spawn connect`.
+  // If a prompt was provided, run the agent non-interactively before exiting.
   const isHeadless = process.env.SPAWN_HEADLESS === "1";
   if (isHeadless) {
-    logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    const headlessPrompt = process.env.SPAWN_PROMPT;
+    if (headlessPrompt && agent.promptCmd) {
+      logInfo("Running agent with prompt...");
+      const promptScript = `source ~/.spawnrc 2>/dev/null; ${agent.promptCmd(headlessPrompt)}`;
+      const promptResult = await asyncTryCatch(() => cloud.runner.runServer(promptScript, 3600));
+      if (!promptResult.ok) {
+        logWarn(`Agent prompt execution failed: ${getErrorMessage(promptResult.error)}`);
+      }
+    } else if (headlessPrompt && !agent.promptCmd) {
+      logWarn(`Agent ${agent.name} does not support --prompt in headless mode`);
+    } else {
+      logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    }
     if (tunnelHandle) {
       tunnelHandle.stop();
     }

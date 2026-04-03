@@ -38,10 +38,10 @@ function getHelpUsageSection(): string {
   spawn status -a <agent>            Filter status by agent (or --agent)
   spawn status -c <cloud>            Filter status by cloud (or --cloud)
   spawn status --prune               Remove gone servers from history
-  spawn fix                          Re-run agent setup on an existing VM (re-inject credentials, reinstall)
+  spawn fix                          Full VM recovery (credentials, install, config, daemons)
   spawn fix <spawn-id>               Fix a specific spawn by name or ID
-  spawn link <ip>                    Register an existing VM by IP (alias: reconnect)
-  spawn link <ip> --agent <agent>    Specify the agent running on the VM
+  spawn link <ip>                    Link & set up an existing server (alias: reconnect)
+  spawn link <ip> --agent <agent>    Specify the agent to install
   spawn link <ip> --cloud <cloud>    Specify the cloud provider
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
@@ -100,6 +100,18 @@ function getHelpAuthSection(): string {
   Run ${pc.cyan("spawn <cloud>")} to see setup instructions for a specific provider.`;
 }
 
+function getHelpConfigSection(): string {
+  return `${pc.bold("CONFIG FILE")}
+  Use ${pc.cyan("--config <path>")} to load settings from a JSON file:
+  ${pc.dim('{ "model": "...", "steps": ["github"], "prompt": "...", "name": "..." }')}
+
+  Credentials can also be included:
+  ${pc.dim('{ "credentials": { "openrouter_api_key": "sk-or-...", "hetzner_token": "..." } }')}
+
+  Keys in ${pc.dim("credentials")} are uppercased to env vars (e.g. ${pc.dim("hetzner_token")} → ${pc.dim("HETZNER_TOKEN")}).
+  Explicit flags and env vars always take priority over config file values.`;
+}
+
 function getHelpInstallSection(): string {
   return `${pc.bold("INSTALL")}
   curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash`;
@@ -146,6 +158,8 @@ export function cmdHelp(): void {
     getHelpExamplesSection(),
     "",
     getHelpAuthSection(),
+    "",
+    getHelpConfigSection(),
     "",
     getHelpInstallSection(),
     "",

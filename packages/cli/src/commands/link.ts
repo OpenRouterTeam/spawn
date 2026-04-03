@@ -6,13 +6,20 @@
 import { spawnSync } from "node:child_process";
 import { connect } from "node:net";
 import * as p from "@clack/prompts";
+import { getErrorMessage as sharedGetErrorMessage } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { generateSpawnId, saveSpawnRecord } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
 import { validateConnectionIP, validateUsername } from "../security.js";
+import { createCloudAgents, setupAutoUpdate, wrapSshCall } from "../shared/agent-setup.js";
+import { generateEnvConfig } from "../shared/agents.js";
+import { loadSavedOpenRouterKey } from "../shared/oauth.js";
+import { injectEnvVarsToRunner } from "../shared/orchestrate.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
 import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
+import { makeSshRunner } from "../shared/ssh-runner.js";
+import { logWarn, withRetry } from "../shared/ui.js";
 import { getErrorMessage, handleCancel, isInteractiveTTY } from "./shared.js";
 
 // ─── TCP check ───────────────────────────────────────────────────────────────
@@ -418,7 +425,95 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     process.exit(1);
   }
 
-  p.log.success(`Deployment linked! Run ${pc.cyan("spawn list")} to see it.`);
+  p.log.success(`Deployment linked as ${pc.bold(spawnName)}.`);
+
+  // ── Full agent setup on the linked server ─────────────────────────────────
+  // Same as spawn fix: env vars, install, configure, auto-update, daemons.
+  const agentLabel = manifest?.agents[detectedAgent]?.name ?? detectedAgent;
+  const shouldSetup = isInteractiveTTY()
+    ? await (async () => {
+        const answer = await p.confirm({
+          message: `Set up ${agentLabel} on this server? (install, configure, start daemons)`,
+          initialValue: true,
+        });
+        return !p.isCancel(answer) && answer;
+      })()
+    : true; // headless: always set up
+
+  if (shouldSetup) {
+    // Ensure API key is available
+    if (!process.env.OPENROUTER_API_KEY) {
+      const savedKey = loadSavedOpenRouterKey();
+      if (savedKey) {
+        process.env.OPENROUTER_API_KEY = savedKey;
+      }
+    }
+    const apiKey = process.env.OPENROUTER_API_KEY ?? "";
+
+    if (!apiKey) {
+      p.log.warn("No OpenRouter API key found — skipping agent setup.");
+      p.log.info("Set OPENROUTER_API_KEY and run 'spawn fix' later to complete setup.");
+    } else {
+      const runner = makeSshRunner(ip, sshUser, keyOpts);
+      const agentSetupResult = tryCatch(() => createCloudAgents(runner));
+      if (agentSetupResult.ok) {
+        const agentResolveResult = tryCatch(() => agentSetupResult.data.resolveAgent(detectedAgent));
+        if (agentResolveResult.ok) {
+          const agent = agentResolveResult.data;
+          const envPairs = manifest?.agents[detectedAgent]?.env
+            ? Object.entries(manifest.agents[detectedAgent].env).map(
+                ([k, tmpl]) => `${k}=${(tmpl ?? "").replace(/\$\{([^}]+)\}/g, (_, n) => process.env[n] ?? "")}`,
+              )
+            : [
+                `OPENROUTER_API_KEY=${apiKey}`,
+              ];
+          const envContent = generateEnvConfig(envPairs);
+
+          // Phase 1: Env vars
+          const envResult = await asyncTryCatch(() => injectEnvVarsToRunner(runner, envContent));
+          if (!envResult.ok) {
+            logWarn(`Env setup had errors: ${sharedGetErrorMessage(envResult.error)}`);
+          }
+
+          // Phase 2: Install
+          const installResult = await asyncTryCatch(() => agent.install());
+          if (!installResult.ok) {
+            logWarn(`Install had errors: ${sharedGetErrorMessage(installResult.error)}`);
+          }
+
+          // Phase 3: Configure
+          if (agent.configure) {
+            const cfgResult = await asyncTryCatch(() =>
+              withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey)), 2, 5),
+            );
+            if (!cfgResult.ok) {
+              logWarn("Configuration had errors (continuing with defaults)");
+            }
+          }
+
+          // Phase 4: Auto-update
+          if (agent.updateCmd) {
+            const upResult = await asyncTryCatch(() => setupAutoUpdate(runner, detectedAgent, agent.updateCmd!));
+            if (!upResult.ok) {
+              logWarn("Auto-update setup had errors (non-fatal)");
+            }
+          }
+
+          // Phase 5: Daemons
+          if (agent.preLaunch) {
+            const plResult = await asyncTryCatch(() => agent.preLaunch!());
+            if (!plResult.ok) {
+              logWarn(`Daemon startup had errors: ${sharedGetErrorMessage(plResult.error)}`);
+            }
+          }
+
+          p.log.success(`${pc.bold(agentLabel)} set up successfully!`);
+        } else {
+          p.log.warn(`Could not resolve agent '${detectedAgent}' for setup — skipping.`);
+        }
+      }
+    }
+  }
 
   // ── Offer to connect immediately ───────────────────────────────────────────
   if (isInteractiveTTY()) {
@@ -439,5 +534,5 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     }
   }
 
-  p.outro(`Linked as ${spawnName}. Run ${pc.cyan("spawn list")} to manage it.`);
+  p.outro(`Run ${pc.cyan("spawn list")} to manage your servers.`);
 }

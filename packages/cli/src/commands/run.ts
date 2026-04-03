@@ -841,6 +841,13 @@ function runScriptHeadless(script: string, prompt?: string, debug?: boolean, spa
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
   env.SPAWN_NON_INTERACTIVE = "1";
+  // Default headless steps to auto-update only when not explicitly configured.
+  // Use --steps all to enable everything, or --steps github,browser for specific steps.
+  if (!env.SPAWN_ENABLED_STEPS) {
+    env.SPAWN_ENABLED_STEPS = "auto-update";
+  } else if (env.SPAWN_ENABLED_STEPS === "all") {
+    delete env.SPAWN_ENABLED_STEPS;
+  }
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
@@ -894,6 +901,11 @@ function runBundleHeadless(
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
   env.SPAWN_NON_INTERACTIVE = "1";
+  if (!env.SPAWN_ENABLED_STEPS) {
+    env.SPAWN_ENABLED_STEPS = "auto-update";
+  } else if (env.SPAWN_ENABLED_STEPS === "all") {
+    delete env.SPAWN_ENABLED_STEPS;
+  }
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
   }
