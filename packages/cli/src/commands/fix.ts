@@ -1,26 +1,24 @@
 import type { SpawnRecord } from "../history.js";
 import type { Manifest } from "../manifest.js";
+import type { CloudRunner } from "../shared/agent-setup.js";
 
-import { spawnSync } from "node:child_process";
 import * as p from "@clack/prompts";
-import { isString } from "@openrouter/spawn-shared";
+import { getErrorMessage, isString } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import { getActiveServers } from "../history.js";
 import { loadManifest } from "../manifest.js";
 import { validateConnectionIP, validateIdentifier, validateServerIdentifier, validateUsername } from "../security.js";
+import { createCloudAgents, setupAutoUpdate, wrapSshCall } from "../shared/agent-setup.js";
+import { generateEnvConfig } from "../shared/agents.js";
 import { loadSavedOpenRouterKey } from "../shared/oauth.js";
+import { injectEnvVarsToRunner } from "../shared/orchestrate.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, tryCatch } from "../shared/result.js";
-import { SSH_INTERACTIVE_OPTS } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
+import { makeSshRunner } from "../shared/ssh-runner.js";
+import { logWarn, withRetry } from "../shared/ui.js";
 import { buildRecordLabel, buildRecordSubtitle } from "./list.js";
-import { getErrorMessage, handleCancel, isInteractiveTTY } from "./shared.js";
-
-/** Shell-escape a value for safe embedding in a single-quoted string. */
-function shellSingleQuote(value: string): string {
-  // Replace ' with '\'' — exit quote, insert literal ', re-enter quote
-  return "'" + value.replace(/'/g, "'\\''") + "'";
-}
+import { handleCancel, isInteractiveTTY } from "./shared.js";
 
 /** Resolve ${VAR} template references from process.env. */
 function resolveEnvTemplate(template: string): string {
@@ -30,99 +28,26 @@ function resolveEnvTemplate(template: string): string {
   });
 }
 
-/** Build a bash script to re-inject env vars and reinstall the agent remotely. */
-export function buildFixScript(manifest: Manifest, agentKey: string): string {
-  // SECURITY: validate agentKey before using it to index the manifest
-  validateIdentifier(agentKey, "Agent name");
-
-  const agentDef = manifest.agents[agentKey];
-  if (!agentDef) {
-    throw new Error(`Unknown agent: ${agentKey}`);
-  }
-
-  const lines: string[] = [
-    "#!/bin/bash",
-    "set -eo pipefail",
-    "",
-  ];
-
-  // Re-inject env vars into ~/.spawnrc (must match generateEnvConfig() output)
-  const env = agentDef.env ?? {};
-  const envEntries = Object.entries(env);
-  lines.push("echo '==> Re-injecting credentials...'");
-  // Write new .spawnrc atomically: write to .new then mv into place
-  lines.push("{");
-  // Always prepend IS_SANDBOX, LANG, and PATH — matches generateEnvConfig() in shared/agents.ts
-  lines.push("  printf 'export IS_SANDBOX=\\x271\\x27\\n'");
-  lines.push("  printf 'export LANG=\\x27C.UTF-8\\x27\\n'");
-  lines.push(
-    "  printf 'export PATH=\"$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH\"\\n'",
-  );
-  for (const [key, template] of envEntries) {
-    const value = resolveEnvTemplate(template);
-    lines.push(`  printf 'export %s=%s\\n' ${shellSingleQuote(key)} ${shellSingleQuote(value)}`);
-  }
-  lines.push("} > ~/.spawnrc.new");
-  lines.push("mv ~/.spawnrc.new ~/.spawnrc");
-  lines.push("chmod 600 ~/.spawnrc");
-  lines.push("echo '    Credentials updated in ~/.spawnrc'");
-  lines.push("");
-
-  // Re-run the agent's install command to get the latest version
-  const installCmd = agentDef.install;
-  if (installCmd) {
-    lines.push("echo '==> Re-installing agent (latest version)...'");
-    lines.push(installCmd);
-    lines.push("echo '    Agent reinstalled successfully'");
-    lines.push("");
-  }
-
-  const launchCmd = agentDef.launch ?? agentKey;
-  lines.push("echo '==> Done! Your spawn is ready.'");
-  lines.push(`echo "    Run '${launchCmd}' inside the VM to start the agent."`);
-
-  return lines.join("\n") + "\n";
-}
-
-/** Dependency-injectable SSH fix script runner type. */
-export type FixScriptRunner = (ip: string, user: string, script: string, keyOpts: string[]) => Promise<boolean>;
-
-/** Run the fix script on a remote VM by piping it to SSH's stdin. */
-async function defaultRunFixScript(ip: string, user: string, script: string, keyOpts: string[]): Promise<boolean> {
-  const result = spawnSync(
-    "ssh",
-    [
-      ...SSH_INTERACTIVE_OPTS,
-      ...keyOpts,
-      `${user}@${ip}`,
-      "--",
-      "bash -s",
-    ],
-    {
-      input: script,
-      stdio: [
-        "pipe",
-        "inherit",
-        "inherit",
-      ],
-      encoding: "utf8",
-    },
-  );
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  return (result.status ?? 1) === 0;
+/** Build the env var pairs array for generateEnvConfig, resolving templates. */
+function buildEnvPairs(agentEnv: Record<string, string>): string[] {
+  return Object.entries(agentEnv).map(([key, template]) => `${key}=${resolveEnvTemplate(template)}`);
 }
 
 /** Fix options — injectable for testing. */
 export interface FixOptions {
-  /** Override the SSH script runner (injectable for tests). */
-  runScript?: FixScriptRunner;
+  /** Override the CloudRunner (injectable for tests instead of real SSH). */
+  makeRunner?: (ip: string, user: string, keyOpts: string[]) => CloudRunner;
 }
 
-/** Fix a specific spawn: re-inject env vars and reinstall agent on the VM. */
+/**
+ * Run the full fix pipeline on a remote VM:
+ * 1. Re-inject env vars + ensure shell rc files source ~/.spawnrc
+ * 2. Reinstall agent (same install() as provisioning)
+ * 3. Configure agent (settings files, etc.)
+ * 4. Set up auto-update timer
+ * 5. Start daemons (OpenClaw gateway, Cursor proxy, etc.)
+ * 6. Verify agent binary is in PATH
+ */
 export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, options?: FixOptions): Promise<void> {
   const conn = record.connection;
   if (!conn) {
@@ -170,17 +95,14 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
     man = manifestResult.data;
   }
 
-  const agentDef = man.agents[record.agent];
-  if (!agentDef) {
+  const agentManifest = man.agents[record.agent];
+  if (!agentManifest) {
     p.log.error(`Unknown agent: ${pc.bold(record.agent)}`);
     p.log.info("This spawn may have been created with an agent that no longer exists.");
     return;
   }
 
-  // Ensure OPENROUTER_API_KEY is available before building the fix script.
-  // The normal provisioning flow uses getOrPromptApiKey() which loads from
-  // ~/.config/spawn/openrouter.json. buildFixScript() resolves env templates
-  // from process.env, so we must populate it here to avoid injecting empty keys.
+  // Ensure OPENROUTER_API_KEY is available
   if (!process.env.OPENROUTER_API_KEY) {
     const savedKey = loadSavedOpenRouterKey();
     if (savedKey) {
@@ -191,41 +113,82 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
       return;
     }
   }
-
-  // Build the remote fix script
-  const scriptResult = tryCatch(() => buildFixScript(man!, record.agent));
-  if (!scriptResult.ok) {
-    p.log.error(`Failed to build fix script: ${getErrorMessage(scriptResult.error)}`);
-    return;
-  }
-  const script = scriptResult.data;
+  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
 
   const label = record.name || conn.server_name || conn.ip;
-  const agentName = agentDef.name;
+  const agentDisplayName = agentManifest.name;
 
-  p.log.step(`Fixing ${pc.bold(agentName)} on ${pc.bold(label)}...`);
+  p.log.step(`Fixing ${pc.bold(agentDisplayName)} on ${pc.bold(label)}...`);
   p.log.info(`Connecting to ${pc.dim(`${conn.user}@${conn.ip}`)}`);
   console.log();
 
-  const runner = options?.runScript ?? defaultRunFixScript;
-  const keyOpts = options?.runScript ? [] : getSshKeyOpts(await ensureSshKeys());
-  const fixResult = await asyncTryCatch(() => runner(conn.ip, conn.user, script, keyOpts));
+  // Create SSH runner (or use injected one for tests)
+  const keyOpts = options?.makeRunner ? [] : getSshKeyOpts(await ensureSshKeys());
+  const runner = options?.makeRunner
+    ? options.makeRunner(conn.ip, conn.user, keyOpts)
+    : makeSshRunner(conn.ip, conn.user, keyOpts);
+
+  // Resolve the agent config with full install/configure/preLaunch functions
+  const { resolveAgent } = createCloudAgents(runner);
+  const agentResult = tryCatch(() => resolveAgent(record.agent));
+  if (!agentResult.ok) {
+    p.log.error(`Unknown agent: ${pc.bold(record.agent)}`);
+    return;
+  }
+  const agent = agentResult.data;
+
+  // --- Phase 1: Re-inject env vars + ensure rc files source ~/.spawnrc ---
+  const envPairs = buildEnvPairs(agentManifest.env ?? {});
+  const envContent = generateEnvConfig(envPairs);
+  const envResult = await asyncTryCatch(() => injectEnvVarsToRunner(runner, envContent));
+  if (!envResult.ok) {
+    logWarn(`Environment setup had errors: ${getErrorMessage(envResult.error)}`);
+  }
+
+  // --- Phase 2: Reinstall agent ---
+  const installResult = await asyncTryCatch(() => agent.install());
+  if (!installResult.ok) {
+    logWarn(`Agent install had errors: ${getErrorMessage(installResult.error)}`);
+    p.log.info("Continuing with remaining fix steps...");
+  }
+
+  // --- Phase 3: Configure agent (settings files, etc.) ---
+  if (agent.configure) {
+    const configResult = await asyncTryCatch(() =>
+      withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey)), 2, 5),
+    );
+    if (!configResult.ok) {
+      logWarn("Agent configuration had errors (continuing with defaults)");
+    }
+  }
+
+  // --- Phase 4: Auto-update timer ---
+  if (agent.updateCmd) {
+    const updateResult = await asyncTryCatch(() => setupAutoUpdate(runner, record.agent, agent.updateCmd!));
+    if (!updateResult.ok) {
+      logWarn("Auto-update setup had errors (non-fatal)");
+    }
+  }
+
+  // --- Phase 5: Start daemons (preLaunch) ---
+  if (agent.preLaunch) {
+    const preLaunchResult = await asyncTryCatch(() => agent.preLaunch!());
+    if (!preLaunchResult.ok) {
+      logWarn(`Pre-launch setup had errors: ${getErrorMessage(preLaunchResult.error)}`);
+      p.log.info("You may need to start the agent daemon manually.");
+    }
+  }
+
+  // --- Phase 6: Verify agent binary ---
+  const binaryName = (agentManifest.launch ?? record.agent).split(/\s+/)[0];
+  const verifyResult = await asyncTryCatch(() => runner.runServer(`command -v ${binaryName} >/dev/null 2>&1`));
+  if (!verifyResult.ok) {
+    logWarn(`Agent binary '${binaryName}' not found in PATH after fix`);
+    p.log.info("The agent may need a manual reinstall or PATH adjustment.");
+  }
 
   console.log();
-
-  if (!fixResult.ok) {
-    p.log.error(`Fix failed: ${getErrorMessage(fixResult.error)}`);
-    p.log.info(`Try manually: ${pc.cyan(`ssh ${conn.user}@${conn.ip}`)}`);
-    return;
-  }
-
-  if (!fixResult.data) {
-    p.log.error("Fix script exited with an error. Check the output above for details.");
-    p.log.info(`Try manually: ${pc.cyan(`ssh ${conn.user}@${conn.ip}`)}`);
-    return;
-  }
-
-  p.log.success(`${pc.bold(agentName)} fixed successfully!`);
+  p.log.success(`${pc.bold(agentDisplayName)} fixed successfully!`);
   p.log.info(`Reconnect: ${pc.cyan("spawn last")}`);
 }
 
@@ -267,7 +230,7 @@ export async function cmdFix(spawnId?: string, options?: FixOptions): Promise<vo
   }
 
   // Interactive picker: show active servers and let user choose
-  const options2 = servers.map((r) => ({
+  const pickerOptions = servers.map((r) => ({
     value: r.id || r.timestamp,
     label: buildRecordLabel(r),
     hint: buildRecordSubtitle(r, manifest),
@@ -275,7 +238,7 @@ export async function cmdFix(spawnId?: string, options?: FixOptions): Promise<vo
 
   const selected = await p.select({
     message: "Select a spawn to fix",
-    options: options2,
+    options: pickerOptions,
   });
 
   if (p.isCancel(selected)) {

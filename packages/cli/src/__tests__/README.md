@@ -33,7 +33,7 @@ bun test src/__tests__/manifest.test.ts
 - `commands-cloud-info.test.ts` — `cmdCloudInfo` display
 - `cmd-update-cov.test.ts` — `cmdUpdate`, script download and execution
 - `cmd-feedback.test.ts` — `spawn feedback` command: empty message rejection, URL construction
-- `cmd-fix.test.ts` — `spawn fix` command: SSH connection repair via DI-injected runScript
+- `cmd-fix.test.ts` — `spawn fix` command: full VM recovery via DI-injected CloudRunner
 - `cmd-link.test.ts` — `spawn link` command: TCP reachability check, SSH agent detection via DI
 
 ### Commands: coverage tests
