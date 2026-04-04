@@ -424,6 +424,22 @@
       "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/gcp.png"
     },
+    "daytona": {
+      "name": "Daytona",
+      "price": "Usage-based",
+      "description": "Managed development sandboxes with filesystem, process, SSH, and preview APIs",
+      "url": "https://www.daytona.io/",
+      "type": "sandbox",
+      "auth": "DAYTONA_API_KEY",
+      "provision_method": "Daytona SDK create()",
+      "exec_method": "Daytona SDK process.executeCommand",
+      "interactive_method": "ssh <token>@ssh.app.daytona.io",
+      "defaults": {
+        "image": "daytonaio/sandbox:latest",
+        "size": "small"
+      },
+      "notes": "Uses the Daytona SDK for sandbox lifecycle, file transfer, and signed preview URLs. SSH access tokens are minted on demand and never persisted."
+    },
     "sprite": {
       "name": "Sprite",
       "price": "Free tier",
@@ -479,18 +495,27 @@
     "aws/junie": "implemented",
     "digitalocean/junie": "implemented",
     "gcp/junie": "implemented",
+    "daytona/claude": "implemented",
+    "daytona/openclaw": "implemented",
+    "daytona/codex": "implemented",
+    "daytona/opencode": "implemented",
+    "daytona/kilocode": "implemented",
+    "daytona/hermes": "implemented",
+    "daytona/junie": "implemented",
     "sprite/junie": "implemented",
     "local/pi": "implemented",
     "hetzner/pi": "implemented",
     "aws/pi": "implemented",
     "digitalocean/pi": "implemented",
     "gcp/pi": "implemented",
+    "daytona/pi": "implemented",
     "sprite/pi": "implemented",
     "local/cursor": "implemented",
     "hetzner/cursor": "implemented",
     "aws/cursor": "implemented",
     "digitalocean/cursor": "implemented",
     "gcp/cursor": "implemented",
+    "daytona/cursor": "implemented",
     "sprite/cursor": "implemented"
   }
 }

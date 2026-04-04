@@ -44,11 +44,39 @@ async function runInteractiveCommand(
   }
 }
 
+async function openDaytonaDashboard(connection: VMConnection): Promise<boolean> {
+  if (connection.cloud !== "daytona") {
+    return false;
+  }
+
+  const metadata = connection.metadata;
+  const remotePort = metadata?.tunnel_remote_port;
+  if (!remotePort || !connection.server_id) {
+    return false;
+  }
+
+  const template = metadata?.tunnel_browser_url_template;
+  const urlSuffix = template ? template.replace("http://localhost:__PORT__", "") : "";
+
+  // Daytona exposes web UIs through signed preview URLs instead of a local SSH tunnel.
+  const { getSignedPreviewBrowserUrl } = await import("../daytona/daytona.js");
+  const url = await getSignedPreviewBrowserUrl(connection.server_id, Number.parseInt(remotePort, 10), urlSuffix);
+  openBrowser(url);
+  return true;
+}
+
 /** Connect to an existing VM via SSH */
-export async function cmdConnect(connection: VMConnection): Promise<void> {
+export async function cmdConnect(connection: VMConnection, agentKey?: string): Promise<void> {
+  const validateDaytona = connection.cloud === "daytona" ? await import("../daytona/daytona.js") : null;
+
   // SECURITY: Validate all connection parameters before use
   // This prevents command injection if the history file is corrupted or tampered with
   const connectValidation = tryCatch(() => {
+    if (validateDaytona) {
+      validateDaytona.validateDaytonaConnection(connection);
+      return;
+    }
+
     validateConnectionIP(connection.ip);
     validateUsername(connection.user);
     if (connection.server_name) {
@@ -81,6 +109,25 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
     );
   }
 
+  if (connection.cloud === "daytona" && connection.server_id) {
+    if (agentKey) {
+      const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
+
+      // Daytona auto-update runs as an SDK-managed background session, so reconnects
+      // need to re-arm it after a sandbox stop/start cycle.
+      await ensureDaytonaAutoUpdate(connection, agentKey);
+    }
+    p.log.step(`Connecting to Daytona sandbox ${pc.bold(connection.server_name || connection.server_id)}...`);
+    const { buildInteractiveSshArgs } = await import("../daytona/daytona.js");
+    const args = await buildInteractiveSshArgs(connection.server_id);
+    return runInteractiveCommand(
+      args[0],
+      args.slice(1),
+      "Daytona SSH connection failed",
+      `spawn connect ${connection.server_name || connection.server_id}`,
+    );
+  }
+
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
   const sshCmd = `ssh ${connection.user}@${connection.ip}`;
@@ -104,15 +151,21 @@ export async function cmdEnterAgent(
   agentKey: string,
   manifest: Manifest | null,
 ): Promise<void> {
+  const validateDaytona = connection.cloud === "daytona" ? await import("../daytona/daytona.js") : null;
+
   // SECURITY: Validate all connection parameters before use
   const enterValidation = tryCatch(() => {
-    validateConnectionIP(connection.ip);
-    validateUsername(connection.user);
-    if (connection.server_name) {
-      validateServerIdentifier(connection.server_name);
-    }
-    if (connection.server_id) {
-      validateServerIdentifier(connection.server_id);
+    if (validateDaytona) {
+      validateDaytona.validateDaytonaConnection(connection);
+    } else {
+      validateConnectionIP(connection.ip);
+      validateUsername(connection.user);
+      if (connection.server_name) {
+        validateServerIdentifier(connection.server_name);
+      }
+      if (connection.server_id) {
+        validateServerIdentifier(connection.server_id);
+      }
     }
     if (connection.launch_cmd) {
       validateLaunchCmd(connection.launch_cmd);
@@ -184,6 +237,27 @@ export async function cmdEnterAgent(
     );
   }
 
+  if (connection.cloud === "daytona" && connection.server_id) {
+    const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
+
+    // Reconnects are the earliest reliable point to restore Daytona's background
+    // updater after the sandbox has been restarted.
+    await ensureDaytonaAutoUpdate(connection, agentKey);
+
+    // Open the preview URL before entering the shell because Daytona dashboards are
+    // exposed via signed URLs, not via the SSH tunnel flow used by VM clouds.
+    await openDaytonaDashboard(connection);
+    p.log.step(
+      `Entering ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(connection.server_name || connection.server_id)}...`,
+    );
+    const { runInteractiveDaytonaCommand } = await import("../daytona/daytona.js");
+    const exitCode = await runInteractiveDaytonaCommand(connection.server_id, remoteCmd);
+    if (exitCode !== 0) {
+      throw new Error(`Failed to enter ${agentName} with exit code ${exitCode}`);
+    }
+    return;
+  }
+
   // Re-establish SSH tunnel for web dashboard if tunnel metadata was persisted at spawn time
   let tunnelHandle: SshTunnelHandle | undefined;
   const tunnelPort = connection.metadata?.tunnel_remote_port;
@@ -247,6 +321,22 @@ export async function cmdEnterAgent(
 /** Open the web dashboard for a VM by establishing an SSH tunnel and launching the browser.
  *  Blocks until the user presses Enter, then tears down the tunnel. */
 export async function cmdOpenDashboard(connection: VMConnection): Promise<void> {
+  if (connection.cloud === "daytona") {
+    const { validateDaytonaConnection } = await import("../daytona/daytona.js");
+    const validation = tryCatch(() => validateDaytonaConnection(connection));
+    if (!validation.ok) {
+      p.log.error(`Security validation failed: ${getErrorMessage(validation.error)}`);
+      return;
+    }
+    const opened = await openDaytonaDashboard(connection);
+    if (!opened) {
+      p.log.error("No dashboard metadata found for this Daytona sandbox.");
+      return;
+    }
+    p.log.success("Opened Daytona preview URL in your browser.");
+    return;
+  }
+
   const validation = tryCatch(() => {
     validateConnectionIP(connection.ip);
     validateUsername(connection.user);
