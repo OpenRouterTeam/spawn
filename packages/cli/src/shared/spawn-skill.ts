@@ -119,6 +119,11 @@ const AGENT_SKILLS: Record<string, SkillConfig> = {
     content: HERMES_SNIPPET,
     append: true,
   },
+  cursor: {
+    remotePath: "~/.cursor/rules/spawn.md",
+    content: SKILL_BODY,
+    append: false,
+  },
   junie: {
     remotePath: "~/.junie/AGENTS.md",
     content: SKILL_BODY,
