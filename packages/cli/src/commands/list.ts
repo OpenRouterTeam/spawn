@@ -850,14 +850,20 @@ export async function activeServerPicker(records: SpawnRecord[], manifest: Manif
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-export async function cmdListClear(): Promise<void> {
+export async function cmdListClear(forceYes?: boolean): Promise<void> {
   const records = filterHistory();
   if (records.length === 0) {
     p.log.info("No spawn history to clear.");
     return;
   }
 
-  if (isInteractiveTTY()) {
+  if (!isInteractiveTTY() && !forceYes) {
+    p.log.error("spawn list --clear requires --yes in non-interactive mode.");
+    p.log.info(`Usage: ${pc.cyan("spawn list --clear --yes")}`);
+    process.exit(1);
+  }
+
+  if (isInteractiveTTY() && !forceYes) {
     const shouldClear = await p.confirm({
       message: `Delete ${records.length} spawn record${records.length !== 1 ? "s" : ""} from history?`,
       initialValue: false,
