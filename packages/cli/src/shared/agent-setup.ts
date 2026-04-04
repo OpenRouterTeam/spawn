@@ -336,6 +336,45 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
+/**
+ * Poll `openclaw status --json` until bootstrapPending is false.
+ * Gives up after ~60 seconds — the dashboard will still work, it just
+ * may require the user to wait a bit or refresh.
+ */
+async function waitForOpenclawBootstrap(runner: CloudRunner): Promise<void> {
+  logStep("Waiting for OpenClaw bootstrap to complete...");
+
+  const pollScript = [
+    "source ~/.spawnrc 2>/dev/null",
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
+    "_elapsed=0",
+    "while [ $_elapsed -lt 60 ]; do",
+    "  _status=$(openclaw status --json 2>/dev/null) || { sleep 2; _elapsed=$((_elapsed + 2)); continue; }",
+    // Use bun to safely parse JSON — avoids jq dependency
+    "  _pending=$(printf '%s' \"$_status\" | bun -e '",
+    "    const d = await Bun.stdin.text();",
+    '    try { const o = JSON.parse(d); console.log(o.bootstrapPending === true ? "true" : "false"); }',
+    '    catch { console.log("unknown"); }',
+    "  ' 2>/dev/null)",
+    '  if [ "$_pending" = "false" ]; then',
+    '    echo "Bootstrap complete after ${_elapsed}s"',
+    "    exit 0",
+    "  fi",
+    "  sleep 2",
+    "  _elapsed=$((_elapsed + 2))",
+    "done",
+    'echo "Bootstrap still pending after 60s — continuing anyway"',
+    "exit 0",
+  ].join("\n");
+
+  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(pollScript, 90));
+  if (result.ok) {
+    logInfo("OpenClaw bootstrap ready");
+  } else {
+    logWarn("Bootstrap readiness check failed (non-fatal, continuing)");
+  }
+}
+
 async function setupOpenclawConfig(
   runner: CloudRunner,
   apiKey: string,
@@ -527,6 +566,11 @@ async function setupOpenclawConfig(
   // Workspace dir is created by `openclaw onboard`; ensure it exists for the fallback path.
   await runner.runServer("mkdir -p ~/.openclaw/workspace");
   await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
+
+  // Wait for OpenClaw bootstrap to complete before opening the dashboard.
+  // Without this, the Control UI opens but chat fails with "No session found"
+  // because the initial session hasn't been created yet (bootstrapPending: true).
+  await waitForOpenclawBootstrap(runner);
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -1093,7 +1137,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
-        "CURSOR_API_KEY=spawn-proxy",
+        `CURSOR_API_KEY=${apiKey}`,
       ],
       configure: () => setupCursorProxy(runner),
       preLaunch: () => startCursorProxy(runner),

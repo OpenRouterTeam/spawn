@@ -299,7 +299,8 @@
       "install": "curl https://cursor.com/install -fsS | bash",
       "launch": "agent",
       "env": {
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "CURSOR_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "config_files": {
         "~/.cursor/cli-config.json": {

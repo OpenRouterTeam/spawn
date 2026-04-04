@@ -611,7 +611,8 @@ async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
     return;
   }
   if (filteredArgs.slice(1).includes("--clear")) {
-    await cmdListClear();
+    const forceYes = filteredArgs.slice(1).includes("--yes") || filteredArgs.slice(1).includes("-y");
+    await cmdListClear(forceYes);
     return;
   }
   const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
