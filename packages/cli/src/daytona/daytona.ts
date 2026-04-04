@@ -91,6 +91,13 @@ const DAYTONA_ALLOWED_METADATA_KEYS = new Set([
 
 export const SANDBOX_SIZES: SandboxSize[] = [
   {
+    id: "default",
+    cpu: 1,
+    memory: 1,
+    disk: 3,
+    label: "Daytona default (1 vCPU · 1 GiB RAM · 3 GiB disk)",
+  },
+  {
     id: "small",
     cpu: 2,
     memory: 4,
@@ -318,6 +325,27 @@ function resolveSandboxSizeFromEnv(): SandboxSize | null {
 }
 
 /**
+ * Let Daytona apply its own documented defaults unless the user picked an explicit size.
+ */
+function getCreateResources(size: SandboxSize):
+  | {
+      cpu: number;
+      memory: number;
+      disk: number;
+    }
+  | undefined {
+  if (size.id === DEFAULT_SANDBOX_SIZE.id) {
+    return undefined;
+  }
+
+  return {
+    cpu: size.cpu,
+    memory: size.memory,
+    disk: size.disk,
+  };
+}
+
+/**
  * Prompt for a sandbox size or resolve one from environment variables.
  */
 export async function promptSandboxSize(): Promise<SandboxSize> {
@@ -406,16 +434,17 @@ export async function createServer(name: string): Promise<VMConnection> {
   const client = await getRequiredClient();
   const size = _state.sandboxSize;
   const image = getRequestedImage();
+  const resources = getCreateResources(size);
 
   logStep(`Creating Daytona sandbox '${name}' (${size.label})...`);
   const sandbox = await client.create({
     name,
     image,
-    resources: {
-      cpu: size.cpu,
-      memory: size.memory,
-      disk: size.disk,
-    },
+    ...(resources
+      ? {
+          resources,
+        }
+      : {}),
     labels: buildCreateLabels(),
     autoStopInterval: 0,
     autoArchiveInterval: 0,
