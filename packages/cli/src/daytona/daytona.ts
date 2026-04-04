@@ -738,10 +738,65 @@ function getPtySize(): {
   };
 }
 
+/**
+ * Upload a small bootstrap script so the PTY only has to exec a file path.
+ *
+ * The script clears the shell's echoed command line before launching the agent.
+ */
+async function prepareInteractiveBootstrapScript(sandboxId: string, cmd: string): Promise<string> {
+  const sandbox = await ensureSandboxStarted(sandboxId);
+  const homeDir = await getSandboxHomeDir(sandboxId);
+  const remotePath = `${homeDir}/.spawn-interactive-session.sh`;
+  const script = `#!/usr/bin/env bash
+set -e
+
+# Clear the shell's echoed bootstrap command before the agent UI takes over.
+printf '\\033[1A\\r\\033[2K\\r'
+
+${cmd}
+`;
+
+  await sandbox.fs.uploadFile(Buffer.from(script), remotePath);
+  await sandbox.process.executeCommand(`chmod 700 ${shellQuote(remotePath)}`);
+  return remotePath;
+}
+
+function consumeTerminalLine(buffer: string): {
+  line: string;
+  rest: string;
+} | null {
+  const newlineIndex = buffer.search(/[\r\n]/);
+  if (newlineIndex === -1) {
+    return null;
+  }
+
+  let lineEnd = newlineIndex + 1;
+  if (buffer[newlineIndex] === "\r" && buffer[newlineIndex + 1] === "\n") {
+    lineEnd += 1;
+  }
+
+  return {
+    line: buffer.slice(0, lineEnd),
+    rest: buffer.slice(lineEnd),
+  };
+}
+
+function shouldSuppressBootstrapEcho(line: string, bootstrapScript: string): boolean {
+  const trimmed = line.trim();
+  return trimmed === `exec ${shellQuote(bootstrapScript)}`;
+}
+
 async function runInteractivePty(sandboxId: string, cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
+
   const sandbox = await ensureSandboxStarted(sandboxId);
   const decoder = new TextDecoder();
   const { cols, rows } = getPtySize();
+  const bootstrapScript = await prepareInteractiveBootstrapScript(sandboxId, cmd);
+  let startupBuffer = "";
+  let filteringStartupEcho = true;
   const pty = await sandbox.process.createPty({
     id: `spawn-${randomUUID()}`,
     cols,
@@ -752,11 +807,33 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
       LANG: process.env.LANG || "en_US.UTF-8",
     },
     onData: (data) => {
-      process.stdout.write(
-        decoder.decode(data, {
-          stream: true,
-        }),
-      );
+      const text = decoder.decode(data, {
+        stream: true,
+      });
+
+      if (!filteringStartupEcho) {
+        process.stdout.write(text);
+        return;
+      }
+
+      startupBuffer += text;
+
+      for (;;) {
+        const consumed = consumeTerminalLine(startupBuffer);
+        if (!consumed) {
+          break;
+        }
+
+        startupBuffer = consumed.rest;
+        if (shouldSuppressBootstrapEcho(consumed.line, bootstrapScript)) {
+          continue;
+        }
+
+        filteringStartupEcho = false;
+        process.stdout.write(consumed.line + startupBuffer);
+        startupBuffer = "";
+        break;
+      }
     },
   });
 
@@ -774,7 +851,8 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
   process.stdin.resume();
   process.stdin.setRawMode?.(true);
   const result = await asyncTryCatch(async () => {
-    await pty.sendInput(`exec bash -lc ${shellQuote(cmd)}\n`);
+    await pty.waitForConnection();
+    await pty.sendInput(`exec ${shellQuote(bootstrapScript)}\n`);
     return pty.wait();
   });
 
@@ -783,7 +861,15 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
   process.stdin.setRawMode?.(false);
   process.stdin.pause();
   await asyncTryCatch(() => pty.disconnect());
-  process.stdout.write(decoder.decode());
+  const tail = decoder.decode();
+  if (filteringStartupEcho) {
+    startupBuffer += tail;
+    if (!shouldSuppressBootstrapEcho(startupBuffer, bootstrapScript)) {
+      process.stdout.write(startupBuffer);
+    }
+  } else {
+    process.stdout.write(tail);
+  }
 
   if (!result.ok) {
     throw result.error;
@@ -804,7 +890,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
     throw new Error("No Daytona sandbox is active");
   }
 
-  const exitCode = await runInteractivePty(_state.sandboxId, cmd);
+  const exitCode = await runInteractiveDaytonaCommand(_state.sandboxId, cmd);
   process.stderr.write("\n");
   logWarn(`Session ended. Your sandbox '${_state.sandboxId}' may still be running.`);
   logWarn(`Manage or delete it in the Daytona dashboard: ${DAYTONA_DASHBOARD_URL}`);
