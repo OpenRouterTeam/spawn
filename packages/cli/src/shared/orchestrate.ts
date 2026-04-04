@@ -90,6 +90,10 @@ export interface CloudOrchestrator {
     host: string;
     user: string;
   };
+  /** Return a browser URL for signed-preview style dashboard access. */
+  getSignedPreviewUrl?(remotePort: number, urlSuffix?: string, expiresInSeconds?: number): Promise<string>;
+  /** Install a provider-native auto-update mechanism when the shared systemd timer does not apply. */
+  setupAutoUpdate?(agentName: string, updateCmd: string): Promise<void>;
 }
 
 /**
@@ -231,6 +235,24 @@ function getParentFields(): {
       : {};
 }
 
+/** Build and persist a SpawnRecord for a newly-created server. */
+function recordSpawn(spawnId: string, agentName: string, cloudName: string, connection: VMConnection): void {
+  const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+  saveSpawnRecord({
+    id: spawnId,
+    agent: agentName,
+    cloud: cloudName,
+    timestamp: new Date().toISOString(),
+    ...(spawnName
+      ? {
+          name: spawnName,
+        }
+      : {}),
+    ...getParentFields(),
+    connection,
+  });
+}
+
 /** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
 export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
   const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
@@ -315,20 +337,7 @@ export async function runOrchestration(
 
     const serverBootPromise = (async () => {
       const conn = await cloud.createServer(serverName);
-      const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName
-          ? {
-              name: spawnName,
-            }
-          : {}),
-        ...getParentFields(),
-        connection: conn,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, conn);
       await cloud.waitForReady();
       return conn;
     })();
@@ -358,20 +367,7 @@ export async function runOrchestration(
       // User chose to retry — fall through to sequential path which has full retry loops
       // (Re-running the concurrent path would re-prompt for API key, etc.)
       const connection = await cloud.createServer(serverName);
-      const spawnName2 = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName2
-          ? {
-              name: spawnName2,
-            }
-          : {}),
-        ...getParentFields(),
-        connection,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, connection);
       await cloud.waitForReady();
     }
 
@@ -466,20 +462,7 @@ export async function runOrchestration(
       logError(getErrorMessage(r.error));
       await retryOrQuit("Retry server creation?");
     }
-    const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-    saveSpawnRecord({
-      id: spawnId,
-      agent: agentName,
-      cloud: cloud.cloudName,
-      timestamp: new Date().toISOString(),
-      ...(spawnName
-        ? {
-            name: spawnName,
-          }
-        : {}),
-      ...getParentFields(),
-      connection,
-    });
+    recordSpawn(spawnId, agentName, cloud.cloudName, connection);
 
     // 6. Wait for readiness (retry loop)
     for (;;) {
@@ -594,7 +577,30 @@ async function postInstall(
 
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
-    await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    if (cloud.cloudName === "daytona") {
+      // Daytona reconnects need to know whether they should recreate the provider-native
+      // background updater after a sandbox stop/start cycle.
+      saveMetadata(
+        {
+          auto_update_enabled: "1",
+        },
+        spawnId,
+      );
+    }
+    if (cloud.setupAutoUpdate) {
+      await cloud.setupAutoUpdate(agentName, agent.updateCmd);
+    } else {
+      await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    }
+  } else if (cloud.cloudName === "daytona" && agent.updateCmd) {
+    // Persist the disabled state too so reconnect paths can distinguish "not configured"
+    // from "configured earlier but the sandbox session was lost".
+    saveMetadata(
+      {
+        auto_update_enabled: "0",
+      },
+      spawnId,
+    );
   }
 
   // Spawn CLI + skill injection (recursive spawn)
@@ -623,10 +629,12 @@ async function postInstall(
     }
   }
 
-  // SSH tunnel for web dashboard
+  // Web dashboard access
   let tunnelHandle: SshTunnelHandle | undefined;
   if (agent.tunnel) {
     const tunnelCfg = agent.tunnel; // capture for closure (TS can't narrow across async boundaries)
+    const templateUrl = tunnelCfg.browserUrl?.(0);
+
     if (cloud.getConnectionInfo) {
       const getConnInfo = cloud.getConnectionInfo; // capture for closure
       const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
@@ -648,6 +656,15 @@ async function postInstall(
       if (!tunnelResult.ok) {
         logWarn("Web dashboard tunnel failed — use the TUI instead");
       }
+    } else if (cloud.getSignedPreviewUrl) {
+      const previewResult = await asyncTryCatchIf(isOperationalError, async () => {
+        const urlSuffix = templateUrl ? templateUrl.replace("http://localhost:0", "") : undefined;
+        const url = await cloud.getSignedPreviewUrl!(tunnelCfg.remotePort, urlSuffix, 3600);
+        openBrowser(url);
+      });
+      if (!previewResult.ok) {
+        logWarn("Web dashboard preview failed — use the TUI instead");
+      }
     } else if (cloud.cloudName === "local") {
       if (agent.tunnel.browserUrl) {
         const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
@@ -660,11 +677,8 @@ async function postInstall(
     const tunnelMeta: Record<string, string> = {
       tunnel_remote_port: String(agent.tunnel.remotePort),
     };
-    if (agent.tunnel.browserUrl) {
-      const templateUrl = agent.tunnel.browserUrl(0);
-      if (templateUrl) {
-        tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
-      }
+    if (templateUrl) {
+      tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
     }
     saveMetadata(tunnelMeta, spawnId);
   }

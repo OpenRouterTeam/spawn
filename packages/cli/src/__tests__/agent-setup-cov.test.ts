@@ -222,6 +222,14 @@ describe("createCloudAgents", () => {
     }
   });
 
+  it("cursor agent uses real API key as CURSOR_API_KEY (not a dummy value)", () => {
+    const envVars = result.agents.cursor.envVars("sk-or-v1-real-key");
+    const cursorKeyVar = envVars.find((v: string) => v.startsWith("CURSOR_API_KEY="));
+    expect(cursorKeyVar).toBeDefined();
+    // Must use the actual API key, not a dummy like "spawn-proxy"
+    expect(cursorKeyVar).toBe("CURSOR_API_KEY=sk-or-v1-real-key");
+  });
+
   it("all agents have launchCmd returning non-empty string", () => {
     for (const agent of Object.values(result.agents)) {
       const cmd = agent.launchCmd();
