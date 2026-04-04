@@ -91,32 +91,18 @@ const DAYTONA_ALLOWED_METADATA_KEYS = new Set([
 
 export const SANDBOX_SIZES: SandboxSize[] = [
   {
-    id: "default",
+    id: "user-default",
     cpu: 1,
     memory: 1,
     disk: 3,
-    label: "Daytona default (1 vCPU · 1 GiB RAM · 3 GiB disk)",
+    label: "User default (1 vCPU · 1 GiB RAM · 3 GiB disk)",
   },
   {
-    id: "small",
-    cpu: 2,
-    memory: 4,
-    disk: 30,
-    label: "2 vCPU · 4 GiB RAM · 30 GiB disk",
-  },
-  {
-    id: "medium",
+    id: "org-default",
     cpu: 4,
     memory: 8,
-    disk: 50,
-    label: "4 vCPU · 8 GiB RAM · 50 GiB disk",
-  },
-  {
-    id: "large",
-    cpu: 8,
-    memory: 16,
-    disk: 100,
-    label: "8 vCPU · 16 GiB RAM · 100 GiB disk",
+    disk: 10,
+    label: "Org default (4 vCPU · 8 GiB RAM · 10 GiB disk)",
   },
 ];
 
