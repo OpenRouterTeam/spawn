@@ -140,9 +140,16 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
     return;
   }
 
+  const validateDaytona = conn.cloud === "daytona" ? await import("../daytona/daytona.js") : null;
+
   // SECURITY: validate all connection fields before use
   const validationResult = tryCatch(() => {
     validateIdentifier(record.agent, "Agent name");
+    if (validateDaytona) {
+      validateDaytona.validateDaytonaConnection(conn);
+      return;
+    }
+
     validateConnectionIP(conn.ip);
     validateUsername(conn.user);
     if (conn.server_name) {
@@ -202,6 +209,35 @@ export async function fixSpawn(record: SpawnRecord, manifest: Manifest | null, o
 
   const label = record.name || conn.server_name || conn.ip;
   const agentName = agentDef.name;
+
+  if (conn.cloud === "daytona" && conn.server_id) {
+    p.log.step(`Fixing ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(label)}...`);
+    const { ensureDaytonaAutoUpdate } = await import("../daytona/auto-update.js");
+    const { ensureDaytonaAuthenticated, runDaytonaFixScript } = await import("../daytona/daytona.js");
+    await ensureDaytonaAuthenticated();
+
+    // Daytona already has first-class file/process APIs, so the fix flow stays inside
+    // the SDK instead of piping the script over SSH stdin like the VM providers do.
+    const fixResult = await asyncTryCatch(() => runDaytonaFixScript(conn.server_id!, script));
+    if (!fixResult.ok) {
+      p.log.error(`Fix failed: ${getErrorMessage(fixResult.error)}`);
+      return;
+    }
+    if (fixResult.data.output) {
+      process.stdout.write(fixResult.data.output + "\n");
+    }
+    if (fixResult.data.exitCode !== 0) {
+      p.log.error("Fix script exited with an error. Check the output above for details.");
+      return;
+    }
+
+    // Recreate the background updater if this record originally opted into it.
+    await ensureDaytonaAutoUpdate(conn, record.agent);
+
+    p.log.success(`${pc.bold(agentName)} fixed successfully!`);
+    p.log.info(`Reconnect: ${pc.cyan("spawn last")}`);
+    return;
+  }
 
   p.log.step(`Fixing ${pc.bold(agentName)} on ${pc.bold(label)}...`);
   p.log.info(`Connecting to ${pc.dim(`${conn.user}@${conn.ip}`)}`);

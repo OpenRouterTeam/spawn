@@ -245,7 +245,9 @@ input_test_openclaw() {
     printf '%s' "${attempt}" | cloud_exec "${app}" "cat > /tmp/.e2e-attempt"
 
     local output
-    # The prompt, timeout, and attempt are read from staged temp files — no interpolation in this command.
+    # Use plain-text output here. OpenClaw's JSON mode returns an envelope whose
+    # payload may omit the final assistant text, while the plain-text mode emits
+    # the reply body directly, which is what this marker test needs to assert.
     output=$(cloud_exec "${app}" "\
       source ~/.spawnrc 2>/dev/null; source ~/.bashrc 2>/dev/null; \
       export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH; \
@@ -253,7 +255,7 @@ input_test_openclaw() {
       _ATTEMPT=\$(cat /tmp/.e2e-attempt); \
       rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
       PROMPT=\$(cat /tmp/.e2e-prompt | base64 -d); \
-      timeout \"\$_TIMEOUT\" openclaw agent --message \"\$PROMPT\" --session-id \"e2e-test-\$_ATTEMPT\" --json --timeout 60" 2>&1) || true
+      timeout \"\$_TIMEOUT\" openclaw agent --message \"\$PROMPT\" --session-id \"e2e-test-\$_ATTEMPT\" --timeout 60" 2>&1) || true
 
     if printf '%s' "${output}" | grep -qx "${INPUT_TEST_MARKER}"; then
       log_ok "openclaw input test — marker found in response"

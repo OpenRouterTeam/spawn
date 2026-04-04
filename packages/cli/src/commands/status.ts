@@ -144,6 +144,14 @@ async function checkServerStatus(record: SpawnRecord): Promise<LiveState> {
       return fetchDoStatus(serverId, token);
     }
 
+    case "daytona": {
+      const { getDaytonaLiveState, validateDaytonaConnection } = await import("../daytona/daytona.js");
+      validateDaytonaConnection(conn);
+
+      // Daytona status comes from the sandbox id via the SDK, not from a VM IP lookup.
+      return getDaytonaLiveState(serverId);
+    }
+
     default:
       // Other clouds (aws, gcp, sprite) require CLI or complex auth;
       // report "unknown" rather than attempting a potentially interactive flow.
@@ -218,6 +226,15 @@ async function probeAgentAlive(record: SpawnRecord, manifest: Manifest | null): 
           stderr: "ignore",
         },
       );
+    } else if (conn.cloud === "daytona") {
+      if (!conn.server_id) {
+        return false;
+      }
+      const { probeDaytonaAgentBinary, validateDaytonaConnection } = await import("../daytona/daytona.js");
+      validateDaytonaConnection(conn);
+
+      // Probe through the SDK so status does not depend on a separately minted SSH session.
+      return probeDaytonaAgentBinary(conn.server_id, binary);
     } else {
       const user = conn.user || "root";
       const ip = conn.ip || "";
