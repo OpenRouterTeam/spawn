@@ -537,13 +537,14 @@ async function setupOpenclawConfig(
       "const p = process.env.HOME + '/.openclaw/openclaw.json';",
       "const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));",
       "if (!cfg.channels) cfg.channels = {};",
-      `Object.assign(cfg.channels.telegram || (cfg.channels.telegram = {}), ${telegramConfig});`,
+      "Object.assign(cfg.channels.telegram || (cfg.channels.telegram = {}), JSON.parse(process.env.TELEGRAM_CONFIG));",
       "fs.writeFileSync(p, JSON.stringify(cfg, null, 2));",
       "fs.chmodSync(p, 0o600);",
     ].join(" ");
     const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
       runner.runServer(
         "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+          `export TELEGRAM_CONFIG=${shellQuote(telegramConfig)}; ` +
           `bun -e ${shellQuote(mergeScript)}`,
       ),
     );
