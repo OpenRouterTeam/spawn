@@ -255,6 +255,35 @@ describe("createCloudAgents", () => {
     expect(runner.uploadFile).toHaveBeenCalled();
   });
 
+  it("openclaw telegram config is written atomically via bun merge script", async () => {
+    const token = "123456:ABC-DEF-test-token";
+    process.env.TELEGRAM_BOT_TOKEN = token;
+    await result.agents.openclaw.configure?.(
+      "sk-or-v1-test",
+      "openrouter/auto",
+      new Set([
+        "telegram",
+      ]),
+    );
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const calls = runner.runServer.mock.calls;
+    const allCmds = calls.map((c: unknown[]) => String(c[0]));
+    // Must use bun -e with atomic merge, NOT individual openclaw config set calls
+    const mergeCmd = allCmds.find((cmd: string) => cmd.includes("bun -e") && cmd.includes("botToken"));
+    expect(mergeCmd).toBeDefined();
+    // The merge script must contain the full telegram config object
+    expect(mergeCmd).toContain(token);
+    expect(mergeCmd).toContain("dmPolicy");
+    expect(mergeCmd).toContain("pairing");
+    expect(mergeCmd).toContain("groupPolicy");
+    expect(mergeCmd).toContain("requireMention");
+    // Must NOT use openclaw config set for telegram fields
+    const configSetTelegram = allCmds.find((cmd: string) =>
+      cmd.includes("openclaw config set channels.telegram.botToken"),
+    );
+    expect(configSetTelegram).toBeUndefined();
+  });
+
   it("openclaw agent preLaunch starts gateway", async () => {
     const openclaw = result.agents.openclaw;
     expect(openclaw.preLaunch).toBeDefined();
