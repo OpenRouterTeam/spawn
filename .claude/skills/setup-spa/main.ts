@@ -40,6 +40,11 @@ const GROWTH_TRIGGER_URL = process.env.GROWTH_TRIGGER_URL ?? "";
 const GROWTH_REPLY_SECRET = process.env.GROWTH_REPLY_SECRET ?? "";
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID ?? "";
 const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT ?? "8080", 10);
+const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID ?? "";
+const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
+const REDDIT_USERNAME = process.env.REDDIT_USERNAME ?? "";
+const REDDIT_PASSWORD = process.env.REDDIT_PASSWORD ?? "";
+const REDDIT_USER_AGENT = `spawn-growth:v1.0.0 (by /u/${REDDIT_USERNAME})`;
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -1501,6 +1506,92 @@ async function postCandidateCard(
   });
 }
 
+/** Get a Reddit OAuth access token. */
+async function getRedditToken(): Promise<string | null> {
+  if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET || !REDDIT_USERNAME || !REDDIT_PASSWORD) {
+    return null;
+  }
+  const auth = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": REDDIT_USER_AGENT,
+    },
+    body: `grant_type=password&username=${encodeURIComponent(REDDIT_USERNAME)}&password=${encodeURIComponent(REDDIT_PASSWORD)}`,
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return typeof data.access_token === "string" ? data.access_token : null;
+}
+
+/** Post a reply to a Reddit thread. Returns the comment URL or an error. */
+async function postRedditReply(postId: string, replyText: string): Promise<Response> {
+  const token = await getRedditToken();
+  if (!token) {
+    return Response.json(
+      {
+        error: "Reddit credentials not configured",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+
+  // Reddit's "comment" endpoint takes the parent fullname (t3_xxx for posts, t1_xxx for comments)
+  const res = await fetch("https://oauth.reddit.com/api/comment", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": REDDIT_USER_AGENT,
+    },
+    body: `thing_id=${encodeURIComponent(postId)}&text=${encodeURIComponent(replyText)}`,
+  });
+
+  const data = (await res.json()) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const errMsg = typeof data.message === "string" ? data.message : `HTTP ${res.status}`;
+    console.error(`[spa] Reddit reply failed: ${errMsg}`);
+    return Response.json(
+      {
+        ok: false,
+        error: errMsg,
+      },
+      {
+        status: 502,
+      },
+    );
+  }
+
+  // Extract the comment URL from the response
+  const jquery = data.jquery as unknown[] | undefined;
+  let commentUrl = "";
+  if (Array.isArray(jquery)) {
+    for (const item of jquery) {
+      if (Array.isArray(item) && item.length >= 4 && Array.isArray(item[3])) {
+        for (const inner of item[3]) {
+          const rec = inner as Record<string, unknown> | undefined;
+          if (rec && typeof rec.data === "object" && rec.data !== null) {
+            const d = rec.data as Record<string, unknown>;
+            if (typeof d.permalink === "string") {
+              commentUrl = `https://reddit.com${d.permalink}`;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`[spa] Reddit reply posted: ${commentUrl || postId}`);
+  return Response.json({
+    ok: true,
+    commentUrl,
+  });
+}
+
 /** Start the HTTP server for growth candidate ingestion. */
 function startHttpServer(client: SlackClient): void {
   if (!TRIGGER_SECRET) {
@@ -1559,6 +1650,52 @@ function startHttpServer(client: SlackClient): void {
         }
 
         return postCandidateCard(client, parsed.output);
+      }
+
+      if (req.method === "POST" && url.pathname === "/reply") {
+        if (!isHttpAuthed(req)) {
+          return Response.json(
+            {
+              error: "unauthorized",
+            },
+            {
+              status: 401,
+            },
+          );
+        }
+
+        const replySchema = v.object({
+          postId: v.string(),
+          replyText: v.string(),
+        });
+
+        let body: unknown;
+        try {
+          body = await req.json();
+        } catch {
+          return Response.json(
+            {
+              error: "invalid JSON",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
+
+        const parsed = v.safeParse(replySchema, body);
+        if (!parsed.success) {
+          return Response.json(
+            {
+              error: "invalid payload",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
+
+        return postRedditReply(parsed.output.postId, parsed.output.replyText);
       }
 
       return Response.json(
