@@ -15,7 +15,6 @@ import {
   downloadFile,
   ensureHcloudToken,
   ensureSshKey,
-  findSpawnSnapshot,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -40,7 +39,6 @@ async function main() {
 
   let serverType = "";
   let location = "";
-  let snapshotId: string | null = null;
   let useDocker = false;
 
   // Check if --beta docker is active
@@ -84,18 +82,13 @@ async function main() {
         }
       }
 
-      // Check for a pre-built snapshot before provisioning
-      snapshotId = await findSpawnSnapshot(agentName);
-      if (snapshotId) {
-        cloud.skipAgentInstall = true;
-      }
       return await createHetznerServer(
         name,
         serverType,
         location,
         agent.cloudInitTier,
-        snapshotId ?? undefined,
-        useDocker && !snapshotId ? "docker-ce" : undefined,
+        undefined,
+        useDocker ? "docker-ce" : undefined,
       );
     },
     getServerName,
@@ -103,7 +96,6 @@ async function main() {
       if (
         shouldSkipCloudInit({
           useDocker,
-          snapshotId,
           skipCloudInit: cloud.skipCloudInit,
         })
       ) {
@@ -113,7 +105,7 @@ async function main() {
       }
 
       // Pull and start the agent Docker container after the server is ready
-      if (useDocker && !snapshotId) {
+      if (useDocker) {
         const image = `${DOCKER_REGISTRY}/spawn-${agentName}:latest`;
         logStep(`Pulling Docker image ${image}...`);
         await runServer(`docker pull ${image}`, 300);
