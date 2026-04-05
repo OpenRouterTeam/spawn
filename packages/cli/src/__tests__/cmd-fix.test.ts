@@ -1,11 +1,12 @@
 /**
  * cmd-fix.test.ts — Tests for the `spawn fix` command.
  *
- * Uses DI (options.runScript) instead of mock.module for SSH execution
+ * Uses DI (options.makeRunner) instead of mock.module for SSH execution
  * to avoid process-global mock pollution (pattern from delete-spinner.test.ts).
  */
 
 import type { SpawnRecord } from "../history";
+import type { CloudRunner } from "../shared/agent-setup";
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -16,7 +17,7 @@ import { createMockManifest, mockClackPrompts } from "./test-helpers";
 const clack = mockClackPrompts();
 
 // ── Import modules under test (no mock.module for core modules) ────────────
-const { buildFixScript, fixSpawn, cmdFix } = await import("../commands/fix.js");
+const { fixSpawn, cmdFix } = await import("../commands/fix.js");
 const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -41,157 +42,40 @@ function makeRecord(overrides: Partial<SpawnRecord> = {}): SpawnRecord {
 
 const mockManifest = createMockManifest();
 
-// ── Test Setup ─────────────────────────────────────────────────────────────
+/** Create a mock CloudRunner that records all commands. */
+function makeMockRunner(): {
+  runner: CloudRunner;
+  commands: string[];
+  uploads: Array<{
+    local: string;
+    remote: string;
+  }>;
+} {
+  const commands: string[] = [];
+  const uploads: Array<{
+    local: string;
+    remote: string;
+  }> = [];
+  const runner: CloudRunner = {
+    runServer: mock(async (cmd: string) => {
+      commands.push(cmd);
+    }),
+    uploadFile: mock(async (local: string, remote: string) => {
+      uploads.push({
+        local,
+        remote,
+      });
+    }),
+    downloadFile: mock(async () => {}),
+  };
+  return {
+    runner,
+    commands,
+    uploads,
+  };
+}
 
-describe("buildFixScript", () => {
-  it("generates a script with env re-injection and install command", () => {
-    const script = buildFixScript(mockManifest, "claude");
-
-    expect(script).toContain("set -eo pipefail");
-    expect(script).toContain("Re-injecting credentials");
-    expect(script).toContain("IS_SANDBOX");
-    expect(script).toContain("LANG=");
-    expect(script).toContain(".npm-global/bin");
-    expect(script).toContain(".bun/bin");
-    expect(script).toContain(".cargo/bin");
-    expect(script).toContain("ANTHROPIC_API_KEY");
-    expect(script).toContain("~/.spawnrc");
-    expect(script).toContain("Re-installing agent");
-    expect(script).toContain("npm install -g claude");
-    expect(script).toContain("Done! Your spawn is ready.");
-    expect(script).toContain("claude"); // launch command hint
-  });
-
-  it("resolves ${VAR} template references from process.env", () => {
-    const savedKey = process.env.OPENROUTER_API_KEY;
-    process.env.OPENROUTER_API_KEY = "sk-or-test-key";
-    const manifest = {
-      ...mockManifest,
-      agents: {
-        ...mockManifest.agents,
-        claude: {
-          ...mockManifest.agents.claude,
-          env: {
-            OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}",
-          },
-        },
-      },
-    };
-    const script = buildFixScript(manifest, "claude");
-    // Restore before asserting (even though test will continue)
-    if (savedKey === undefined) {
-      delete process.env.OPENROUTER_API_KEY;
-    } else {
-      process.env.OPENROUTER_API_KEY = savedKey;
-    }
-    expect(script).toContain("sk-or-test-key");
-  });
-
-  it("handles agents without install command", () => {
-    const manifest = {
-      ...mockManifest,
-      agents: {
-        claude: {
-          name: "Claude Code",
-          description: "AI coding assistant",
-          url: "https://claude.ai",
-          launch: "claude",
-          env: {
-            ANTHROPIC_API_KEY: "test-key",
-          },
-        },
-      },
-    };
-    const script = buildFixScript(manifest, "claude");
-
-    expect(script).not.toContain("Re-installing agent");
-    expect(script).toContain("Re-injecting credentials");
-    expect(script).toContain("Done!");
-  });
-
-  it("handles agents without env vars — still writes IS_SANDBOX and PATH", () => {
-    const manifest = {
-      ...mockManifest,
-      agents: {
-        claude: {
-          name: "Claude Code",
-          description: "AI coding assistant",
-          url: "https://claude.ai",
-          install: "npm install -g claude",
-          launch: "claude",
-        },
-      },
-    };
-    const script = buildFixScript(manifest, "claude");
-
-    // IS_SANDBOX and PATH should always be written even without agent env vars
-    expect(script).toContain("IS_SANDBOX");
-    expect(script).toContain(".npm-global/bin");
-    expect(script).toContain("~/.spawnrc");
-    expect(script).toContain("Re-installing agent");
-  });
-
-  it("prepends IS_SANDBOX, LANG, and PATH before agent env vars (matches generateEnvConfig)", () => {
-    const script = buildFixScript(mockManifest, "claude");
-
-    const isSandboxIdx = script.indexOf("IS_SANDBOX");
-    const langIdx = script.indexOf("LANG=");
-    const pathIdx = script.indexOf(".npm-global/bin");
-    const anthropicIdx = script.indexOf("ANTHROPIC_API_KEY");
-
-    // All four must be present
-    expect(isSandboxIdx).toBeGreaterThan(-1);
-    expect(langIdx).toBeGreaterThan(-1);
-    expect(pathIdx).toBeGreaterThan(-1);
-    expect(anthropicIdx).toBeGreaterThan(-1);
-
-    // IS_SANDBOX, LANG, PATH must come before agent-specific env vars
-    expect(isSandboxIdx).toBeLessThan(anthropicIdx);
-    expect(langIdx).toBeLessThan(anthropicIdx);
-    expect(pathIdx).toBeLessThan(anthropicIdx);
-    // LANG must come after IS_SANDBOX and before PATH
-    expect(isSandboxIdx).toBeLessThan(langIdx);
-    expect(langIdx).toBeLessThan(pathIdx);
-  });
-
-  it("throws for unknown agent", () => {
-    expect(() => buildFixScript(mockManifest, "unknown-agent")).toThrow("Unknown agent: unknown-agent");
-  });
-
-  it("throws for agent key with shell metacharacters", () => {
-    expect(() => buildFixScript(mockManifest, "claude;rm -rf /")).toThrow("can only contain");
-  });
-
-  it("throws for agent key with path traversal", () => {
-    expect(() => buildFixScript(mockManifest, "../etc/passwd")).toThrow("can only contain");
-  });
-
-  it("throws for agent key with command substitution", () => {
-    expect(() => buildFixScript(mockManifest, "claude$(whoami)")).toThrow("can only contain");
-  });
-
-  it("shell-escapes single quotes in env var values", () => {
-    const manifest = {
-      ...mockManifest,
-      agents: {
-        claude: {
-          name: "Claude Code",
-          description: "AI coding assistant",
-          url: "https://claude.ai",
-          launch: "claude",
-          env: {
-            API_KEY: "it's-a-key",
-          },
-        },
-      },
-    };
-    const script = buildFixScript(manifest, "claude");
-    // Single quote in value should be escaped as '\''
-    expect(script).toContain("it'\\''s-a-key");
-  });
-});
-
-// ── Tests: fixSpawn (DI for SSH runner) ─────────────────────────────────────
+// ── Tests: fixSpawn (DI for CloudRunner) ──────────────────────────────────
 
 describe("fixSpawn", () => {
   let savedApiKey: string | undefined;
@@ -261,45 +145,69 @@ describe("fixSpawn", () => {
     expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Security validation failed"));
   });
 
-  it("calls the script runner with correct args on success", async () => {
-    const mockRunner = mock(async () => true);
+  it("runs all fix phases via CloudRunner on success", async () => {
+    const mockState = makeMockRunner();
     const record = makeRecord();
 
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(mockRunner).toHaveBeenCalledWith("1.2.3.4", "root", expect.stringContaining("set -eo pipefail"), []);
+    // Should have called runServer multiple times (env injection, install, configure, verify, etc.)
+    expect(mockState.runner.runServer).toHaveBeenCalled();
     expect(clack.logSuccess).toHaveBeenCalled();
   });
 
-  it("shows error when runner returns false", async () => {
-    const mockRunner = mock(async () => false);
+  it("injects env vars via CloudRunner", async () => {
+    const mockState = makeMockRunner();
     const record = makeRecord();
 
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("error"));
+    // First runServer call should be the env injection (base64-encoded .spawnrc + rc sourcing)
+    const envCmd = mockState.commands.find((c) => c.includes("spawnrc"));
+    expect(envCmd).toBeTruthy();
   });
 
-  it("shows error when runner throws", async () => {
-    const mockRunner = mock(async () => {
-      throw new Error("SSH failed");
+  it("verifies agent binary is in PATH", async () => {
+    const mockState = makeMockRunner();
+    const record = makeRecord();
+
+    await fixSpawn(record, mockManifest, {
+      makeRunner: () => mockState.runner,
+    });
+
+    // Should have a command -v check for the agent binary
+    const verifyCmd = mockState.commands.find((c) => c.includes("command -v"));
+    expect(verifyCmd).toBeTruthy();
+    expect(verifyCmd).toContain("claude");
+  });
+
+  it("continues when install fails (non-fatal)", async () => {
+    const mockState = makeMockRunner();
+    // Make install calls fail but allow others to succeed
+    mockState.runner.runServer = mock(async (cmd: string) => {
+      mockState.commands.push(cmd);
+      // Fail on install-related commands but succeed on env injection and verify
+      if (cmd.includes("npm install") || cmd.includes("curl")) {
+        throw new Error("install failed");
+      }
     });
     const record = makeRecord();
 
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(clack.logError).toHaveBeenCalledWith(expect.stringContaining("Fix failed"));
+    // Should still complete — install errors are non-fatal
+    expect(clack.logSuccess).toHaveBeenCalled();
   });
 
   it("loads manifest from network if not provided", async () => {
+    const mockState = makeMockRunner();
     const record = makeRecord();
-    const mockRunner = mock(async () => true);
 
     // Prime manifest cache with test data
     const savedFetch = global.fetch;
@@ -309,14 +217,14 @@ describe("fixSpawn", () => {
     global.fetch = savedFetch;
 
     await fixSpawn(record, null, {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
     expect(clack.logSuccess).toHaveBeenCalled();
   });
 });
 
-// ── Tests: cmdFix (reads real history file, DI for SSH) ─────────────────────
+// ── Tests: cmdFix (reads real history file, DI for CloudRunner) ───────────
 
 describe("cmdFix", () => {
   let testDir: string;
@@ -374,7 +282,7 @@ describe("cmdFix", () => {
   });
 
   it("fixes by spawn ID when passed as argument", async () => {
-    const mockRunner = mock(async () => true);
+    const mockState = makeMockRunner();
     const record = makeRecord({
       id: "my-spawn-id",
     });
@@ -390,14 +298,14 @@ describe("cmdFix", () => {
     global.fetch = savedFetch;
 
     await cmdFix("my-spawn-id", {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(mockRunner).toHaveBeenCalled();
+    expect(mockState.runner.runServer).toHaveBeenCalled();
   });
 
   it("fixes by spawn name", async () => {
-    const mockRunner = mock(async () => true);
+    const mockState = makeMockRunner();
     const record = makeRecord({
       name: "my-named-spawn",
     });
@@ -412,14 +320,14 @@ describe("cmdFix", () => {
     global.fetch = savedFetch;
 
     await cmdFix("my-named-spawn", {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(mockRunner).toHaveBeenCalled();
+    expect(mockState.runner.runServer).toHaveBeenCalled();
   });
 
   it("fixes by server_name", async () => {
-    const mockRunner = mock(async () => true);
+    const mockState = makeMockRunner();
     const record = makeRecord({
       connection: {
         ip: "1.2.3.4",
@@ -439,10 +347,10 @@ describe("cmdFix", () => {
     global.fetch = savedFetch;
 
     await cmdFix("spawn-xyz", {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(mockRunner).toHaveBeenCalled();
+    expect(mockState.runner.runServer).toHaveBeenCalled();
   });
 
   it("shows error when spawn ID not found", async () => {
@@ -466,7 +374,7 @@ describe("cmdFix", () => {
   });
 
   it("directly fixes when only one active server exists (no picker)", async () => {
-    const mockRunner = mock(async () => true);
+    const mockState = makeMockRunner();
     const record = makeRecord();
     writeHistory([
       record,
@@ -479,9 +387,9 @@ describe("cmdFix", () => {
     global.fetch = savedFetch;
 
     await cmdFix(undefined, {
-      runScript: mockRunner,
+      makeRunner: () => mockState.runner,
     });
 
-    expect(mockRunner).toHaveBeenCalled();
+    expect(mockState.runner.runServer).toHaveBeenCalled();
   });
 });

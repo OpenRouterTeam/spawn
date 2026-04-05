@@ -121,7 +121,6 @@ describe("fixSpawn (additional coverage)", () => {
   });
 
   it("uses record name for label when server_name is absent", async () => {
-    const mockRunner = mock(async () => true);
     const record = makeRecord({
       name: "custom-name",
       connection: {
@@ -131,13 +130,16 @@ describe("fixSpawn (additional coverage)", () => {
       },
     });
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => ({
+        runServer: mock(async () => {}),
+        uploadFile: mock(async () => {}),
+        downloadFile: mock(async () => {}),
+      }),
     });
     expect(clack.logStep).toHaveBeenCalledWith(expect.stringContaining("custom-name"));
   });
 
   it("uses IP for label when no name or server_name", async () => {
-    const mockRunner = mock(async () => true);
     const record = makeRecord({
       name: undefined,
       connection: {
@@ -147,16 +149,23 @@ describe("fixSpawn (additional coverage)", () => {
       },
     });
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => ({
+        runServer: mock(async () => {}),
+        uploadFile: mock(async () => {}),
+        downloadFile: mock(async () => {}),
+      }),
     });
     expect(clack.logStep).toHaveBeenCalledWith(expect.stringContaining("1.2.3.4"));
   });
 
   it("shows success when fix script succeeds", async () => {
-    const mockRunner = mock(async () => true);
     const record = makeRecord();
     await fixSpawn(record, mockManifest, {
-      runScript: mockRunner,
+      makeRunner: () => ({
+        runServer: mock(async () => {}),
+        uploadFile: mock(async () => {}),
+        downloadFile: mock(async () => {}),
+      }),
     });
     expect(clack.logSuccess).toHaveBeenCalledWith(expect.stringContaining("fixed successfully"));
   });

@@ -38,7 +38,7 @@ function getHelpUsageSection(): string {
   spawn status -a <agent>            Filter status by agent (or --agent)
   spawn status -c <cloud>            Filter status by cloud (or --cloud)
   spawn status --prune               Remove gone servers from history
-  spawn fix                          Re-run agent setup on an existing VM (re-inject credentials, reinstall)
+  spawn fix                          Full VM recovery (credentials, install, config, daemons)
   spawn fix <spawn-id>               Fix a specific spawn by name or ID
   spawn link <ip>                    Register an existing VM by IP (alias: reconnect)
   spawn link <ip> --agent <agent>    Specify the agent running on the VM
