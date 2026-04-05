@@ -39,7 +39,7 @@ const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const GROWTH_TRIGGER_URL = process.env.GROWTH_TRIGGER_URL ?? "";
 const GROWTH_REPLY_SECRET = process.env.GROWTH_REPLY_SECRET ?? "";
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID ?? "";
-const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT ?? "3100", 10);
+const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT ?? "8080", 10);
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -979,9 +979,7 @@ app.action("cancel_run", async ({ ack, payload }) => {
 // --- growth_approve: post draft reply to Reddit ---
 app.action("growth_approve", async ({ ack, body, client }) => {
   await ack();
-  const payload = toRecord(
-    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
-  );
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
   const postId = payload && isString(payload.value) ? payload.value : "";
   if (!postId) return;
 
@@ -990,23 +988,30 @@ app.action("growth_approve", async ({ ack, body, client }) => {
   if (!candidate) return;
 
   if (candidate.status !== "pending") {
-    await client.chat.postMessage({
-      channel: candidate.slackChannel ?? "",
-      thread_ts: candidate.slackTs ?? undefined,
-      text: `:warning: Already handled (${candidate.status}${candidate.actionedBy ? ` by <@${candidate.actionedBy}>` : ""})`,
-    }).catch(() => {});
+    await client.chat
+      .postMessage({
+        channel: candidate.slackChannel ?? "",
+        thread_ts: candidate.slackTs ?? undefined,
+        text: `:warning: Already handled (${candidate.status}${candidate.actionedBy ? ` by <@${candidate.actionedBy}>` : ""})`,
+      })
+      .catch(() => {});
     return;
   }
 
-  updateCandidateStatus(db, postId, { status: "approved", actionedBy: userId });
+  updateCandidateStatus(db, postId, {
+    status: "approved",
+    actionedBy: userId,
+  });
 
   // POST to growth VM to send the Reddit reply
   if (!GROWTH_TRIGGER_URL) {
-    await client.chat.postMessage({
-      channel: candidate.slackChannel ?? "",
-      thread_ts: candidate.slackTs ?? undefined,
-      text: ":x: GROWTH_TRIGGER_URL not configured — cannot post to Reddit",
-    }).catch(() => {});
+    await client.chat
+      .postMessage({
+        channel: candidate.slackChannel ?? "",
+        thread_ts: candidate.slackTs ?? undefined,
+        text: ":x: GROWTH_TRIGGER_URL not configured — cannot post to Reddit",
+      })
+      .catch(() => {});
     return;
   }
 
@@ -1017,7 +1022,10 @@ app.action("growth_approve", async ({ ack, body, client }) => {
         Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ postId: candidate.postId, replyText: candidate.draftReply }),
+      body: JSON.stringify({
+        postId: candidate.postId,
+        replyText: candidate.draftReply,
+      }),
     });
 
     const result = toRecord(await res.json().catch(() => null));
@@ -1040,29 +1048,37 @@ app.action("growth_approve", async ({ ack, body, client }) => {
       }
     } else {
       const errMsg = isString(result?.error) ? result.error : `HTTP ${res.status}`;
-      updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
-      await client.chat.postMessage({
-        channel: candidate.slackChannel ?? "",
-        thread_ts: candidate.slackTs ?? undefined,
-        text: `:x: Reddit reply failed: ${errMsg}`,
-      }).catch(() => {});
+      updateCandidateStatus(db, postId, {
+        status: "error",
+        actionedBy: userId,
+      });
+      await client.chat
+        .postMessage({
+          channel: candidate.slackChannel ?? "",
+          thread_ts: candidate.slackTs ?? undefined,
+          text: `:x: Reddit reply failed: ${errMsg}`,
+        })
+        .catch(() => {});
     }
   } catch (err) {
-    updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
-    await client.chat.postMessage({
-      channel: candidate.slackChannel ?? "",
-      thread_ts: candidate.slackTs ?? undefined,
-      text: `:x: Reddit reply failed: ${err instanceof Error ? err.message : String(err)}`,
-    }).catch(() => {});
+    updateCandidateStatus(db, postId, {
+      status: "error",
+      actionedBy: userId,
+    });
+    await client.chat
+      .postMessage({
+        channel: candidate.slackChannel ?? "",
+        thread_ts: candidate.slackTs ?? undefined,
+        text: `:x: Reddit reply failed: ${err instanceof Error ? err.message : String(err)}`,
+      })
+      .catch(() => {});
   }
 });
 
 // --- growth_edit: open modal with draft reply for editing ---
 app.action("growth_edit", async ({ ack, body, client }) => {
   await ack();
-  const payload = toRecord(
-    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
-  );
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
   const postId = payload && isString(payload.value) ? payload.value : "";
   if (!postId) return;
 
@@ -1076,36 +1092,47 @@ app.action("growth_edit", async ({ ack, body, client }) => {
     return; // already handled
   }
 
-  await client.views.open({
-    trigger_id: triggerId,
-    view: {
-      type: "modal",
-      callback_id: "growth_edit_submit",
-      private_metadata: postId,
-      title: { type: "plain_text", text: "Edit Reply" },
-      submit: { type: "plain_text", text: "Post to Reddit" },
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `*<${candidate.permalink.startsWith("http") ? candidate.permalink : `https://reddit.com${candidate.permalink}`}|${candidate.title}>*\nr/${candidate.subreddit}`,
-          },
+  await client.views
+    .open({
+      trigger_id: triggerId,
+      view: {
+        type: "modal",
+        callback_id: "growth_edit_submit",
+        private_metadata: postId,
+        title: {
+          type: "plain_text",
+          text: "Edit Reply",
         },
-        {
-          type: "input",
-          block_id: "reply_block",
-          label: { type: "plain_text", text: "Reply text" },
-          element: {
-            type: "plain_text_input",
-            action_id: "reply_text",
-            multiline: true,
-            initial_value: candidate.draftReply,
-          },
+        submit: {
+          type: "plain_text",
+          text: "Post to Reddit",
         },
-      ],
-    },
-  }).catch(() => {});
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*<${candidate.permalink.startsWith("http") ? candidate.permalink : `https://reddit.com${candidate.permalink}`}|${candidate.title}>*\nr/${candidate.subreddit}`,
+            },
+          },
+          {
+            type: "input",
+            block_id: "reply_block",
+            label: {
+              type: "plain_text",
+              text: "Reply text",
+            },
+            element: {
+              type: "plain_text_input",
+              action_id: "reply_text",
+              multiline: true,
+              initial_value: candidate.draftReply,
+            },
+          },
+        ],
+      },
+    })
+    .catch(() => {});
 });
 
 // --- growth_edit_submit: modal submitted with edited reply ---
@@ -1123,7 +1150,10 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
 
   const userId = toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
 
-  updateCandidateStatus(db, postId, { status: "approved", actionedBy: userId });
+  updateCandidateStatus(db, postId, {
+    status: "approved",
+    actionedBy: userId,
+  });
 
   if (!GROWTH_TRIGGER_URL) return;
 
@@ -1134,7 +1164,10 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
         Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ postId: candidate.postId, replyText: editedReply }),
+      body: JSON.stringify({
+        postId: candidate.postId,
+        replyText: editedReply,
+      }),
     });
 
     const result = toRecord(await res.json().catch(() => null));
@@ -1155,26 +1188,32 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
         );
       }
     } else {
-      updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+      updateCandidateStatus(db, postId, {
+        status: "error",
+        actionedBy: userId,
+      });
       if (candidate.slackChannel && candidate.slackTs) {
-        await client.chat.postMessage({
-          channel: candidate.slackChannel,
-          thread_ts: candidate.slackTs,
-          text: `:x: Reddit reply failed: ${isString(result?.error) ? result.error : `HTTP ${res.status}`}`,
-        }).catch(() => {});
+        await client.chat
+          .postMessage({
+            channel: candidate.slackChannel,
+            thread_ts: candidate.slackTs,
+            text: `:x: Reddit reply failed: ${isString(result?.error) ? result.error : `HTTP ${res.status}`}`,
+          })
+          .catch(() => {});
       }
     }
   } catch {
-    updateCandidateStatus(db, postId, { status: "error", actionedBy: userId });
+    updateCandidateStatus(db, postId, {
+      status: "error",
+      actionedBy: userId,
+    });
   }
 });
 
 // --- growth_skip: skip this candidate ---
 app.action("growth_skip", async ({ ack, body, client }) => {
   await ack();
-  const payload = toRecord(
-    "actions" in body && Array.isArray(body.actions) ? body.actions[0] : null,
-  );
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
   const postId = payload && isString(payload.value) ? payload.value : "";
   if (!postId) return;
 
@@ -1182,7 +1221,10 @@ app.action("growth_skip", async ({ ack, body, client }) => {
   const candidate = findCandidate(db, postId);
   if (!candidate || candidate.status !== "pending") return;
 
-  updateCandidateStatus(db, postId, { status: "skipped", actionedBy: userId });
+  updateCandidateStatus(db, postId, {
+    status: "skipped",
+    actionedBy: userId,
+  });
 
   if (candidate.slackChannel && candidate.slackTs) {
     await replaceButtonsWithStatus(
@@ -1218,7 +1260,12 @@ async function replaceButtonsWithStatus(
       .filter((b: Record<string, unknown>) => b.type !== "actions")
       .concat({
         type: "context",
-        elements: [{ type: "mrkdwn", text: statusText }],
+        elements: [
+          {
+            type: "mrkdwn",
+            text: statusText,
+          },
+        ],
       });
 
     await client.chat.update({
@@ -1271,7 +1318,14 @@ async function postCandidateCard(
 ): Promise<Response> {
   const channel = SLACK_CHANNEL_ID;
   if (!channel) {
-    return Response.json({ error: "SLACK_CHANNEL_ID not configured" }, { status: 500 });
+    return Response.json(
+      {
+        error: "SLACK_CHANNEL_ID not configured",
+      },
+      {
+        status: 500,
+      },
+    );
   }
 
   if (!candidate.found) {
@@ -1279,14 +1333,27 @@ async function postCandidateCard(
     const scanText = candidate.postsScanned
       ? `Growth scan complete — scanned ${candidate.postsScanned} posts, no candidates today.`
       : "Growth scan complete — no candidates today.";
-    await client.chat.postMessage({
-      channel,
-      text: scanText,
-      blocks: [
-        { type: "context", elements: [{ type: "mrkdwn", text: scanText }] },
-      ],
-    }).catch(() => {});
-    return Response.json({ ok: true, action: "no_candidate" });
+    await client.chat
+      .postMessage({
+        channel,
+        text: scanText,
+        blocks: [
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: scanText,
+              },
+            ],
+          },
+        ],
+      })
+      .catch(() => {});
+    return Response.json({
+      ok: true,
+      action: "no_candidate",
+    });
   }
 
   // Candidate found — build Block Kit card
@@ -1302,7 +1369,11 @@ async function postCandidateCard(
   const blocks: (KnownBlock | Block)[] = [
     {
       type: "header",
-      text: { type: "plain_text", text: "Reddit Growth — Candidate Found", emoji: true },
+      text: {
+        type: "plain_text",
+        text: "Reddit Growth — Candidate Found",
+        emoji: true,
+      },
     },
     {
       type: "section",
@@ -1316,35 +1387,52 @@ async function postCandidateCard(
   if (candidate.whatTheyAsked) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*What they asked:*\n${candidate.whatTheyAsked}` },
+      text: {
+        type: "mrkdwn",
+        text: `*What they asked:*\n${candidate.whatTheyAsked}`,
+      },
     });
   }
 
   if (candidate.whySpawnFits) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Why Spawn fits:*\n${candidate.whySpawnFits}` },
+      text: {
+        type: "mrkdwn",
+        text: `*Why Spawn fits:*\n${candidate.whySpawnFits}`,
+      },
     });
   }
 
   if (candidate.posterQualification) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Poster signals:*\n${candidate.posterQualification}` },
+      text: {
+        type: "mrkdwn",
+        text: `*Poster signals:*\n${candidate.posterQualification}`,
+      },
     });
   }
 
   if (draftReply) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Draft reply:*\n>${draftReply.replace(/\n/g, "\n>")}` },
+      text: {
+        type: "mrkdwn",
+        text: `*Draft reply:*\n>${draftReply.replace(/\n/g, "\n>")}`,
+      },
     });
   }
 
   if (candidate.relevanceScore !== undefined) {
     blocks.push({
       type: "context",
-      elements: [{ type: "mrkdwn", text: `Relevance: ${candidate.relevanceScore}/10` }],
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `Relevance: ${candidate.relevanceScore}/10`,
+        },
+      ],
     });
   }
 
@@ -1354,20 +1442,32 @@ async function postCandidateCard(
     elements: [
       {
         type: "button",
-        text: { type: "plain_text", text: "Approve", emoji: true },
+        text: {
+          type: "plain_text",
+          text: "Approve",
+          emoji: true,
+        },
         style: "primary",
         action_id: "growth_approve",
         value: postId,
       },
       {
         type: "button",
-        text: { type: "plain_text", text: "Edit", emoji: true },
+        text: {
+          type: "plain_text",
+          text: "Edit",
+          emoji: true,
+        },
         action_id: "growth_edit",
         value: postId,
       },
       {
         type: "button",
-        text: { type: "plain_text", text: "Skip", emoji: true },
+        text: {
+          type: "plain_text",
+          text: "Skip",
+          emoji: true,
+        },
         style: "danger",
         action_id: "growth_skip",
         value: postId,
@@ -1394,7 +1494,11 @@ async function postCandidateCard(
     createdAt: new Date().toISOString(),
   });
 
-  return Response.json({ ok: true, action: "posted", ts: msg.ts });
+  return Response.json({
+    ok: true,
+    action: "posted",
+    ts: msg.ts,
+  });
 }
 
 /** Start the HTTP server for growth candidate ingestion. */
@@ -1410,30 +1514,61 @@ function startHttpServer(client: SlackClient): void {
       const url = new URL(req.url);
 
       if (req.method === "GET" && url.pathname === "/health") {
-        return Response.json({ status: "ok" });
+        return Response.json({
+          status: "ok",
+        });
       }
 
       if (req.method === "POST" && url.pathname === "/candidate") {
         if (!isHttpAuthed(req)) {
-          return Response.json({ error: "unauthorized" }, { status: 401 });
+          return Response.json(
+            {
+              error: "unauthorized",
+            },
+            {
+              status: 401,
+            },
+          );
         }
 
         let body: unknown;
         try {
           body = await req.json();
         } catch {
-          return Response.json({ error: "invalid JSON" }, { status: 400 });
+          return Response.json(
+            {
+              error: "invalid JSON",
+            },
+            {
+              status: 400,
+            },
+          );
         }
 
         const parsed = v.safeParse(CandidatePayloadSchema, body);
         if (!parsed.success) {
-          return Response.json({ error: "invalid payload", issues: parsed.issues }, { status: 400 });
+          return Response.json(
+            {
+              error: "invalid payload",
+              issues: parsed.issues,
+            },
+            {
+              status: 400,
+            },
+          );
         }
 
         return postCandidateCard(client, parsed.output);
       }
 
-      return Response.json({ error: "not found" }, { status: 404 });
+      return Response.json(
+        {
+          error: "not found",
+        },
+        {
+          status: 404,
+        },
+      );
     },
   });
 
