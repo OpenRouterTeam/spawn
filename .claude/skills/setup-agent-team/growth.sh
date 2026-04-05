@@ -82,10 +82,16 @@ fi
 # Inject Reddit data into prompt template
 REDDIT_JSON=$(cat "${REDDIT_DATA_FILE}")
 # Use bun for safe substitution to avoid sed escaping issues with JSON
+DECISIONS_FILE="${HOME}/.config/spawn/growth-decisions.md"
 bun -e "
+import { existsSync } from 'node:fs';
 const template = await Bun.file('${PROMPT_TEMPLATE}').text();
 const data = await Bun.file('${REDDIT_DATA_FILE}').text();
-const result = template.replace('REDDIT_DATA_PLACEHOLDER', data.trim());
+const decisionsPath = '${DECISIONS_FILE}';
+const decisions = existsSync(decisionsPath) ? await Bun.file(decisionsPath).text() : 'No past decisions yet.';
+const result = template
+  .replace('REDDIT_DATA_PLACEHOLDER', data.trim())
+  .replace('DECISIONS_PLACEHOLDER', decisions.trim());
 await Bun.write('${PROMPT_FILE}', result);
 "
 

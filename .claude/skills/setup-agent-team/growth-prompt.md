@@ -6,6 +6,14 @@ Your job: from the pre-fetched Reddit posts below, find the ONE best thread wher
 
 **IMPORTANT: Do NOT use any tools.** All data is provided below. Your entire response should be plain text output — no bash commands, no file reads, no tool calls. Just analyze the data and respond with your findings.
 
+## Past decisions
+
+The team has reviewed previous candidates. Learn from these patterns — what got approved, what got skipped, and how replies were edited. Prefer posts similar to approved ones and avoid patterns seen in skipped ones.
+
+```
+DECISIONS_PLACEHOLDER
+```
+
 ## Pre-fetched Reddit data
 
 The following posts were fetched automatically. Each post includes the title, selftext, subreddit, engagement stats, and the poster's recent comment history.
