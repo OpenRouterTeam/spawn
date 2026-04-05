@@ -156,9 +156,9 @@ fi
 # --- Phase 3: Extract candidate and POST to SPA ---
 CANDIDATE_JSON=""
 
-# Extract the json:candidate block from Claude's output
+# Extract the json:candidate block from Claude's output (may be multi-line)
 if [[ -f "${CLAUDE_OUTPUT_FILE}" ]]; then
-    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${CLAUDE_OUTPUT_FILE}" | tail -1)
+    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${CLAUDE_OUTPUT_FILE}" | tr -d '\n')
 fi
 
 if [[ -z "${CANDIDATE_JSON}" ]]; then
