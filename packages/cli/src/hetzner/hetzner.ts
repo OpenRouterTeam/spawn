@@ -481,39 +481,7 @@ export async function promptLocation(excludeLocations?: string[]): Promise<strin
   return selectFromList(items, "Hetzner location", defaultLoc);
 }
 
-// ─── Snapshot Lookup ─────────────────────────────────────────────────────────
-
-export async function findSpawnSnapshot(agentName: string): Promise<string | null> {
-  const r = await asyncTryCatch(async () => {
-    const prefix = `spawn-${agentName}-`;
-    const text = await hetznerApi("GET", "/images?type=snapshot&per_page=100", undefined, 1);
-    const data = parseJsonObj(text);
-    const allImages = toObjectArray(data?.images);
-    // Snapshots are named `spawn-{agent}-*` and stored in the description field
-    const images = allImages.filter((img) => isString(img.description) && img.description.startsWith(prefix));
-    if (images.length === 0) {
-      return null;
-    }
-
-    // Sort by created descending to get the latest snapshot
-    images.sort((a, b) => {
-      const aDate = isString(a.created) ? a.created : "";
-      const bDate = isString(b.created) ? b.created : "";
-      return bDate.localeCompare(aDate);
-    });
-
-    const latestId = images[0].id;
-    if (!isNumber(latestId) || latestId <= 0) {
-      return null;
-    }
-
-    logInfo(`Found pre-built snapshot for ${agentName} (ID: ${latestId})`);
-    return String(latestId);
-  });
-  return r.ok ? r.data : null;
-}
-
-// ─── SSH-Only Wait (for snapshot boots) ──────────────────────────────────────
+// ─── SSH-Only Wait (for docker boots) ───────────────────────────────────────
 
 export async function waitForSshOnly(ip?: string): Promise<void> {
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -567,13 +535,13 @@ export async function createServer(
   serverType?: string,
   location?: string,
   tier?: CloudInitTier,
-  snapshotId?: string,
+  _snapshotId?: string,
   dockerImage?: string,
 ): Promise<VMConnection> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   let loc = location || process.env.HETZNER_LOCATION || DEFAULT_LOCATION;
-  const image: string | number = snapshotId ? Number(snapshotId) : (dockerImage ?? "ubuntu-24.04");
-  const imageLabel = snapshotId ? `snapshot:${snapshotId}` : (dockerImage ?? "ubuntu-24.04");
+  const image: string = dockerImage ?? "ubuntu-24.04";
+  const imageLabel: string = dockerImage ?? "ubuntu-24.04";
 
   if (!validateRegionName(loc)) {
     logError("Invalid HETZNER_LOCATION");
@@ -583,8 +551,7 @@ export async function createServer(
   // Get all SSH key IDs once (paginated to avoid missing keys beyond page 1)
   const allKeys = await hetznerGetAll("/ssh_keys", "ssh_keys");
   const sshKeyIds: number[] = allKeys.map((k) => (isNumber(k.id) ? k.id : 0)).filter(Boolean);
-  // Skip cloud-init when booting from a pre-baked snapshot
-  const userdata = snapshotId ? undefined : getCloudInitUserdata(tier);
+  const userdata = getCloudInitUserdata(tier);
 
   // Track locations that failed so the user isn't offered them again
   const failedLocations: string[] = [];
