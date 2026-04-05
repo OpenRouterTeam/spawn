@@ -515,17 +515,37 @@ async function setupOpenclawConfig(
     );
   }
 
-  // Configure Telegram channel if a bot token was provided
+  // Configure Telegram channel if a bot token was provided.
+  // Write the full channel object atomically via a bun script that reads the
+  // existing config, deep-merges the telegram block, and writes it back.
+  // Individual `openclaw config set` calls created malformed nested structures
+  // that prevented the bot from polling — see #2655.
   if (telegramBotToken) {
+    const telegramConfig = JSON.stringify({
+      enabled: true,
+      botToken: telegramBotToken,
+      dmPolicy: "pairing",
+      groupPolicy: "open",
+      groups: {
+        "*": {
+          requireMention: true,
+        },
+      },
+    });
+    const mergeScript = [
+      "import fs from 'fs';",
+      "const p = process.env.HOME + '/.openclaw/openclaw.json';",
+      "const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));",
+      "if (!cfg.channels) cfg.channels = {};",
+      "Object.assign(cfg.channels.telegram || (cfg.channels.telegram = {}), JSON.parse(process.env.TELEGRAM_CONFIG));",
+      "fs.writeFileSync(p, JSON.stringify(cfg, null, 2));",
+      "fs.chmodSync(p, 0o600);",
+    ].join(" ");
     const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
       runner.runServer(
         "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-          "openclaw config set channels.telegram.enabled true >/dev/null; " +
-          `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
-          "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
-          "openclaw config set channels.telegram.groupPolicy open >/dev/null; " +
-          // Restrict config file permissions — it now contains the Telegram bot token
-          "chmod 600 ~/.openclaw/openclaw.json 2>/dev/null || true",
+          `export TELEGRAM_CONFIG=${shellQuote(telegramConfig)}; ` +
+          `bun -e ${shellQuote(mergeScript)}`,
       ),
     );
     if (telegramResult.ok) {
