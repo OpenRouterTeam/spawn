@@ -980,6 +980,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupClaudeCodeConfig(runner, apiKey),
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude -p --dangerously-skip-permissions ${shellQuote(prompt)}`,
       updateCmd:
         'export PATH="$HOME/.claude/local/bin:$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin:$PATH"; ' +
         "npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || " +
@@ -1001,6 +1003,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex --full-auto ${shellQuote(prompt)}`,
       updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @openai/codex@latest",
     },
 
@@ -1029,6 +1033,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         preLaunchMsg: "Your web dashboard will open automatically — use it for WhatsApp QR scanning and channel setup.",
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        promptCmd: (prompt: string) =>
+          `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw run ${shellQuote(prompt)}`,
         tunnel: {
           remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
@@ -1046,6 +1052,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode --prompt ${shellQuote(prompt)}`,
       updateCmd: openCodeInstallCmd(),
     },
 
@@ -1066,6 +1074,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode --prompt ${shellQuote(prompt)}`,
       updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @kilocode/cli@latest",
     },
 
@@ -1101,6 +1111,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       },
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes ${shellQuote(prompt)}`,
       updateCmd:
         // Same SSH→HTTPS rewrite for auto-update runs
         'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
@@ -1123,6 +1135,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie --prompt ${shellQuote(prompt)}`,
       updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @jetbrains/junie-cli@latest",
     },
 
@@ -1140,6 +1154,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi --prompt ${shellQuote(prompt)}`,
       updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @mariozechner/pi-coding-agent@latest",
     },
 
@@ -1163,6 +1179,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
         'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh --prompt ${shellQuote(prompt)}`,
       updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };
