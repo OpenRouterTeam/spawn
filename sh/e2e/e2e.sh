@@ -675,8 +675,10 @@ final_cleanup() {
     if [ "${LOG_DIR}" != "${_E2E_CREATED_LOG_DIR:-}" ]; then
       log_warn "Refusing to rm -rf LOG_DIR not created by this script: ${LOG_DIR}"
     else
+      SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
+      SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
       case "${LOG_DIR}" in
-        */spawn-e2e.*)
+        "${SAFE_TMP_ROOT}"/spawn-e2e.*)
           rm -rf "${LOG_DIR}"
           ;;
         *)
