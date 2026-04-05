@@ -672,16 +672,18 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
-    SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
-    case "${LOG_DIR}" in
-      "${SAFE_TMP_ROOT}"/spawn-e2e.*)
-        rm -rf "${LOG_DIR}"
-        ;;
-      *)
-        log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
-        ;;
-    esac
+    if [ "${LOG_DIR}" != "${_E2E_CREATED_LOG_DIR:-}" ]; then
+      log_warn "Refusing to rm -rf LOG_DIR not created by this script: ${LOG_DIR}"
+    else
+      case "${LOG_DIR}" in
+        */spawn-e2e.*)
+          rm -rf "${LOG_DIR}"
+          ;;
+        *)
+          log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
+          ;;
+      esac
+    fi
   fi
 }
 trap final_cleanup EXIT
@@ -713,6 +715,7 @@ export E2E_FAST_MODE="${FAST_MODE}"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
 LOG_DIR=$(mktemp -d "${TMP_ROOT}/spawn-e2e.XXXXXX")
+_E2E_CREATED_LOG_DIR="${LOG_DIR}"
 export LOG_DIR
 log_info "Log directory: ${LOG_DIR}"
 
