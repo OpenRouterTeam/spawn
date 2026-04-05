@@ -2,11 +2,9 @@
 set -eo pipefail
 
 # Reddit Growth Agent — Single Cycle (Discovery Only)
-# Triggered by trigger-server.ts via GitHub Actions (daily)
-#
-# Scans Reddit for "feature ask" threads that Spawn solves,
-# qualifies the poster, picks the 1 best candidate, and outputs
-# a summary to the log. Does NOT post replies or notify externally.
+# Phase 1: Batch-fetch Reddit posts via reddit-fetch.ts (fast, parallel)
+# Phase 2: Pass results to Claude for scoring/qualification (no tool use)
+# Phase 3: POST candidate to SPA for Slack notification
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -14,33 +12,17 @@ cd "${REPO_ROOT}"
 
 SPAWN_REASON="${SPAWN_REASON:-manual}"
 TEAM_NAME="spawn-growth"
-CYCLE_TIMEOUT=1800   # 30 min
-HARD_TIMEOUT=2400    # 40 min grace
+HARD_TIMEOUT=300   # 5 min (scoring is fast, no tool use)
 
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""
+REDDIT_DATA_FILE=""
 
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [growth] $*" | tee -a "${LOG_FILE}"
-}
-
-# --- Safe sed substitution (escapes sed metacharacters in replacement) ---
-safe_substitute() {
-    local placeholder="$1"
-    local value="$2"
-    local file="$3"
-    if printf '%s' "$value" | grep -qP '\x01'; then
-        log "ERROR: safe_substitute value contains illegal \\x01 character"
-        return 1
-    fi
-    local escaped
-    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g')
-    escaped="${escaped//$'\n'/\\$'\n'}"
-    sed -i.bak "s$(printf '\x01')${placeholder}$(printf '\x01')${escaped}$(printf '\x01')g" "$file"
-    rm -f "${file}.bak"
 }
 
 # Cleanup function
@@ -51,7 +33,7 @@ cleanup() {
     local exit_code=$?
     log "Running cleanup (exit_code=${exit_code})..."
 
-    rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
+    rm -f "${PROMPT_FILE:-}" "${REDDIT_DATA_FILE:-}" "${CLAUDE_STREAM_FILE:-}" 2>/dev/null || true
     if [[ -n "${CLAUDE_PID:-}" ]] && kill -0 "${CLAUDE_PID}" 2>/dev/null; then
         kill -TERM "${CLAUDE_PID}" 2>/dev/null || true
     fi
@@ -65,19 +47,28 @@ trap cleanup EXIT SIGTERM SIGINT
 log "=== Starting growth cycle ==="
 log "Working directory: ${REPO_ROOT}"
 log "Reason: ${SPAWN_REASON}"
-log "Timeout: ${CYCLE_TIMEOUT}s"
 
 # Fetch latest refs
 log "Fetching latest refs..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
-# Update Claude Code to latest version
-log "Updating Claude Code..."
-claude update --yes 2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Claude Code update failed (continuing with current version)"
+# --- Phase 1: Batch fetch Reddit posts ---
+log "Phase 1: Fetching Reddit posts..."
 
-# Prepare prompt
-log "Launching growth cycle..."
+REDDIT_DATA_FILE=$(mktemp /tmp/growth-reddit-XXXXXX.json)
+chmod 0600 "${REDDIT_DATA_FILE}"
+
+if ! bun run "${SCRIPT_DIR}/reddit-fetch.ts" > "${REDDIT_DATA_FILE}" 2>> "${LOG_FILE}"; then
+    log "ERROR: reddit-fetch.ts failed"
+    exit 1
+fi
+
+POST_COUNT=$(bun -e "const d=JSON.parse(await Bun.file('${REDDIT_DATA_FILE}').text()); console.log(d.postsScanned ?? d.posts?.length ?? 0)")
+log "Phase 1 done: ${POST_COUNT} posts fetched"
+
+# --- Phase 2: Score with Claude ---
+log "Phase 2: Scoring with Claude..."
 
 PROMPT_FILE=$(mktemp /tmp/growth-prompt-XXXXXX.md)
 chmod 0600 "${PROMPT_FILE}"
@@ -88,18 +79,22 @@ if [[ ! -f "$PROMPT_TEMPLATE" ]]; then
     exit 1
 fi
 
-cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
-
-# Substitute env vars into prompt
-safe_substitute "REDDIT_CLIENT_ID_PLACEHOLDER" "${REDDIT_CLIENT_ID:-}" "${PROMPT_FILE}"
-safe_substitute "REDDIT_CLIENT_SECRET_PLACEHOLDER" "${REDDIT_CLIENT_SECRET:-}" "${PROMPT_FILE}"
-safe_substitute "REDDIT_USERNAME_PLACEHOLDER" "${REDDIT_USERNAME:-}" "${PROMPT_FILE}"
-safe_substitute "REDDIT_PASSWORD_PLACEHOLDER" "${REDDIT_PASSWORD:-}" "${PROMPT_FILE}"
+# Inject Reddit data into prompt template
+REDDIT_JSON=$(cat "${REDDIT_DATA_FILE}")
+# Use bun for safe substitution to avoid sed escaping issues with JSON
+bun -e "
+const template = await Bun.file('${PROMPT_TEMPLATE}').text();
+const data = await Bun.file('${REDDIT_DATA_FILE}').text();
+const result = template.replace('REDDIT_DATA_PLACEHOLDER', data.trim());
+await Bun.write('${PROMPT_FILE}', result);
+"
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
-# Run claude in background
-claude -p - --dangerously-skip-permissions --model sonnet < "${PROMPT_FILE}" >> "${LOG_FILE}" 2>&1 &
+# Run claude with stream-json to capture text (plain -p stdout is empty with extended thinking)
+CLAUDE_STREAM_FILE=$(mktemp /tmp/growth-stream-XXXXXX.jsonl)
+CLAUDE_OUTPUT_FILE=$(mktemp /tmp/growth-output-XXXXXX.txt)
+claude -p - --model sonnet --output-format stream-json --verbose < "${PROMPT_FILE}" > "${CLAUDE_STREAM_FILE}" 2>> "${LOG_FILE}" &
 CLAUDE_PID=$!
 log "Claude started (pid=${CLAUDE_PID})"
 
@@ -119,7 +114,7 @@ kill_claude() {
 WALL_START=$(date +%s)
 
 while kill -0 "${CLAUDE_PID}" 2>/dev/null; do
-    sleep 30
+    sleep 10
     WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
 
     if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
@@ -132,23 +127,43 @@ done
 wait "${CLAUDE_PID}" 2>/dev/null
 CLAUDE_EXIT=$?
 
+# Extract text content from stream-json into plain text output file
+bun -e "
+const lines = (await Bun.file('${CLAUDE_STREAM_FILE}').text()).split('\n').filter(Boolean);
+const texts = [];
+for (const line of lines) {
+  try {
+    const ev = JSON.parse(line);
+    if (ev.type === 'assistant' && Array.isArray(ev.message?.content)) {
+      for (const block of ev.message.content) {
+        if (block.type === 'text' && block.text) texts.push(block.text);
+      }
+    }
+  } catch {}
+}
+await Bun.write('${CLAUDE_OUTPUT_FILE}', texts.join('\n'));
+" 2>> "${LOG_FILE}" || true
+
+# Append Claude output to log
+cat "${CLAUDE_OUTPUT_FILE}" >> "${LOG_FILE}" 2>/dev/null || true
+
 if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
-    log "Cycle completed successfully"
+    log "Phase 2 done: scoring completed"
 else
-    log "Cycle failed (exit_code=${CLAUDE_EXIT})"
+    log "Phase 2 failed (exit_code=${CLAUDE_EXIT})"
 fi
 
-# --- Extract candidate JSON and POST to SPA ---
+# --- Phase 3: Extract candidate and POST to SPA ---
 CANDIDATE_JSON=""
 
-# Extract the json:candidate block from the log (between ```json:candidate and ```)
-if [[ -f "${LOG_FILE}" ]]; then
-    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${LOG_FILE}" | tail -1)
+# Extract the json:candidate block from Claude's output
+if [[ -f "${CLAUDE_OUTPUT_FILE}" ]]; then
+    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${CLAUDE_OUTPUT_FILE}" | tail -1)
 fi
 
 if [[ -z "${CANDIDATE_JSON}" ]]; then
     log "No json:candidate block found in output"
-    CANDIDATE_JSON='{"found":false}'
+    CANDIDATE_JSON="{\"found\":false,\"postsScanned\":${POST_COUNT}}"
 fi
 
 log "Candidate JSON: ${CANDIDATE_JSON}"
@@ -166,3 +181,5 @@ if [[ -n "${SPA_TRIGGER_URL:-}" && -n "${SPA_TRIGGER_SECRET:-}" ]]; then
 else
     log "SPA_TRIGGER_URL or SPA_TRIGGER_SECRET not set, skipping Slack notification"
 fi
+
+rm -f "${CLAUDE_OUTPUT_FILE}" "${CLAUDE_STREAM_FILE}" 2>/dev/null || true
