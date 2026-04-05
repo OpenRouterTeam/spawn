@@ -132,6 +132,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
     console.error(`    ${pc.cyan("--beta parallel")}     Parallelize server boot with setup prompts`);
     console.error(`    ${pc.cyan("--beta docker")}       Use Docker CE app image on Hetzner/GCP (faster boot)`);
+    console.error(`    ${pc.cyan("--beta sandbox")}      Run local agents in a Docker container (sandboxed)`);
     console.error(`    ${pc.cyan("--beta recursive")}    Install spawn CLI on VM for recursive spawning`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
@@ -316,19 +317,24 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
 
 /** Print a descriptive error for a failed prompt file read and exit */
 function handlePromptFileError(promptFile: string, err: unknown): never {
+  // SECURITY: Strip control characters to prevent terminal injection via crafted paths.
+  // validatePromptFilePath() rejects these early, but this is defense-in-depth for
+  // error paths that run before validation (e.g., stat failures).
+  // Inline the same regex from security.ts to avoid async import in a sync function.
+  const safePath = promptFile.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
   const errObj = toRecord(err);
   const code = isString(errObj?.code) ? errObj.code : "";
   if (code === "ENOENT") {
-    console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
+    console.error(pc.red(`Prompt file not found: ${pc.bold(safePath)}`));
     console.error("\nCheck the path and try again.");
   } else if (code === "EACCES") {
-    console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
+    console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(safePath)}`));
+    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${safePath}`)}`);
   } else if (code === "EISDIR") {
-    console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
+    console.error(pc.red(`'${safePath}' is a directory, not a file.`));
     console.error("\nProvide a path to a text file containing your prompt.");
   } else {
-    console.error(pc.red(`Error reading prompt file '${promptFile}': ${getErrorMessage(err)}`));
+    console.error(pc.red(`Error reading prompt file '${safePath}': ${getErrorMessage(err)}`));
   }
   process.exit(1);
 }
@@ -605,7 +611,8 @@ async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
     return;
   }
   if (filteredArgs.slice(1).includes("--clear")) {
-    await cmdListClear();
+    const forceYes = filteredArgs.slice(1).includes("--yes") || filteredArgs.slice(1).includes("-y");
+    await cmdListClear(forceYes);
     return;
   }
   const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
@@ -893,6 +900,7 @@ async function main(): Promise<void> {
     "parallel",
     "docker",
     "recursive",
+    "sandbox",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
@@ -903,6 +911,7 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
       console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
       console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("sandbox")}     Run local agents in a Docker container (sandboxed)`);
       console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
       process.exit(1);
     }
@@ -1066,23 +1075,6 @@ async function main(): Promise<void> {
       console.error(
         `\n${pc.cyan("--custom")} enables interactive pickers, but ${pc.cyan("--headless")} disables all prompts.`,
       );
-    }
-    process.exit(3);
-  }
-
-  // Validate headless-incompatible flags
-  if (effectiveHeadless && dryRun) {
-    if (outputFormat === "json") {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          error_code: "VALIDATION_ERROR",
-          error_message: "--headless and --dry-run cannot be used together",
-        }),
-      );
-    } else {
-      console.error(pc.red("Error: --headless and --dry-run cannot be used together"));
-      console.error(`\nUse ${pc.cyan("--dry-run")} for previewing, or ${pc.cyan("--headless")} for execution.`);
     }
     process.exit(3);
   }

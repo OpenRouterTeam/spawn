@@ -54,7 +54,7 @@ fi
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
 # ---------------------------------------------------------------------------
-ALL_CLOUDS="aws hetzner digitalocean gcp sprite"
+ALL_CLOUDS="aws hetzner digitalocean gcp daytona sprite"
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -230,7 +230,7 @@ run_single_agent() {
   # Per-agent timeout: run provision/verify/input_test in a subshell with a
   # wall-clock timeout. This prevents any single step from hanging indefinitely
   # and ensures a result file is always written (pass, fail, or timeout).
-  # Fixes #2714: sprite-zeroclaw and digitalocean-opencode stalling with no result.
+  # Fixes #2714: digitalocean-opencode stalling with no result.
   # ---------------------------------------------------------------------------
   local effective_agent_timeout
   effective_agent_timeout=$(get_agent_timeout "${agent}")
@@ -377,6 +377,21 @@ run_agents_for_cloud() {
     if [ "${effective_parallel}" -gt "${cloud_max}" ]; then
       effective_parallel="${cloud_max}"
     fi
+  fi
+
+  # Bail out early if the cloud reports zero capacity (e.g. droplet limit reached).
+  # All agents would fail anyway — skip with an actionable error instead of wasting
+  # time on retries that cannot succeed. (#3059)
+  if [ "${effective_parallel}" -eq 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
+    log_err "No capacity available on ${cloud} — all ${cloud} agents will be marked as failed."
+    log_err "Delete existing instances or request a limit increase, then re-run."
+    for agent in ${AGENTS_TO_TEST}; do
+      printf 'fail' > "${log_dir}/${cloud}-${agent}.result"
+      if [ -z "${cloud_failed}" ]; then cloud_failed="${agent}"; else cloud_failed="${cloud_failed} ${agent}"; fi
+    done
+    printf '%s %s %s %s %s' "0" "$(printf '%s\n' "${AGENTS_TO_TEST}" | wc -w | tr -d ' ')" "0s" "" "|${cloud_failed}" \
+      > "${log_dir}/${cloud}.summary"
+    return 1
   fi
 
   if [ "${effective_parallel}" -gt 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
@@ -657,8 +672,10 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
+    SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
+    SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
     case "${LOG_DIR}" in
-      /tmp/spawn-e2e.*)
+      "${SAFE_TMP_ROOT}"/spawn-e2e.*)
         rm -rf "${LOG_DIR}"
         ;;
       *)
@@ -693,7 +710,9 @@ fi
 export E2E_FAST_MODE="${FAST_MODE}"
 
 # Create temp log directory
-LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/spawn-e2e.XXXXXX")
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
+LOG_DIR=$(mktemp -d "${TMP_ROOT}/spawn-e2e.XXXXXX")
 export LOG_DIR
 log_info "Log directory: ${LOG_DIR}"
 

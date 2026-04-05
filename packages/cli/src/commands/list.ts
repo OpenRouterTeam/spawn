@@ -96,6 +96,20 @@ export function buildRecordSubtitle(r: SpawnRecord, manifest: Manifest | null): 
   return parts.join(" \u00b7 ");
 }
 
+async function assertValidDaytonaRecords(records: SpawnRecord[]): Promise<void> {
+  const daytonaRecords = records.filter((record) => record.connection?.cloud === "daytona");
+  if (daytonaRecords.length === 0) {
+    return;
+  }
+
+  const { validateDaytonaConnection } = await import("../daytona/daytona.js");
+  for (const record of daytonaRecords) {
+    // Daytona records carry provider-specific metadata and are consumed through
+    // signed previews / on-demand SSH, so fail fast on any malformed history entry.
+    validateDaytonaConnection(record.connection!);
+  }
+}
+
 // ── Filter resolution ────────────────────────────────────────────────────────
 
 async function suggestFilterCorrection(
@@ -352,6 +366,10 @@ async function fetchCloudInstances(cloud: string, record: SpawnRecord): Promise<
       const { listServers } = await import("../gcp/gcp.js");
       return listServers(zone, project);
     }
+    case "daytona": {
+      const { listServers } = await import("../daytona/daytona.js");
+      return listServers();
+    }
     default:
       return [];
   }
@@ -461,7 +479,9 @@ async function handleGoneServer(record: SpawnRecord, cloud: string): Promise<"de
  */
 async function refreshConnectionIp(record: SpawnRecord): Promise<"ok" | "gone" | "skip"> {
   const conn = record.connection;
-  if (!conn?.cloud || conn.cloud === "local" || conn.cloud === "sprite" || conn.deleted) {
+  if (!conn?.cloud || conn.cloud === "local" || conn.cloud === "sprite" || conn.cloud === "daytona" || conn.deleted) {
+    // Daytona reconnects are keyed by sandbox id. There is no stable public VM IP
+    // to refresh the way there is for the SSH-backed clouds.
     return "skip";
   }
 
@@ -602,10 +622,16 @@ export async function handleRecordAction(
   }
 
   if (!conn.deleted) {
+    const reconnectHint =
+      conn.cloud === "daytona"
+        ? `spawn connect ${conn.server_name || conn.server_id || conn.ip}`
+        : conn.ip === "sprite-console"
+          ? `sprite console -s ${conn.server_name}`
+          : `ssh ${conn.user}@${conn.ip}`;
     options.push({
       value: "reconnect",
       label: "SSH into VM",
-      hint: conn.ip === "sprite-console" ? `sprite console -s ${conn.server_name}` : `ssh ${conn.user}@${conn.ip}`,
+      hint: reconnectHint,
     });
   }
 
@@ -681,7 +707,7 @@ export async function handleRecordAction(
   }
 
   if (action === "reconnect") {
-    const reconnectResult = await asyncTryCatch(() => cmdConnect(conn));
+    const reconnectResult = await asyncTryCatch(() => cmdConnect(conn, selected.agent));
     if (!reconnectResult.ok) {
       p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);
 
@@ -824,14 +850,20 @@ export async function activeServerPicker(records: SpawnRecord[], manifest: Manif
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-export async function cmdListClear(): Promise<void> {
+export async function cmdListClear(forceYes?: boolean): Promise<void> {
   const records = filterHistory();
   if (records.length === 0) {
     p.log.info("No spawn history to clear.");
     return;
   }
 
-  if (isInteractiveTTY()) {
+  if (!isInteractiveTTY() && !forceYes) {
+    p.log.error("spawn list --clear requires --yes in non-interactive mode.");
+    p.log.info(`Usage: ${pc.cyan("spawn list --clear --yes")}`);
+    process.exit(1);
+  }
+
+  if (isInteractiveTTY() && !forceYes) {
     const shouldClear = await p.confirm({
       message: `Delete ${records.length} spawn record${records.length !== 1 ? "s" : ""} from history?`,
       initialValue: false,
@@ -867,6 +899,7 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     if (filtered.length === 0) {
       const historyRecords = filterHistory(agentFilter, cloudFilter);
       if (historyRecords.length > 0) {
+        await assertValidDaytonaRecords(historyRecords);
         p.log.info("No active servers found. Showing spawn history:");
         renderListTable(historyRecords, manifest);
         showListFooter(historyRecords, agentFilter, cloudFilter);
@@ -876,6 +909,7 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
       return;
     }
 
+    await assertValidDaytonaRecords(filtered);
     await activeServerPicker(filtered, manifest);
     return;
   }
@@ -887,6 +921,8 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     await showEmptyListMessage(agentFilter, cloudFilter);
     return;
   }
+
+  await assertValidDaytonaRecords(records);
 
   if (process.argv.includes("--json")) {
     console.log(JSON.stringify(records, null, 2));
@@ -918,6 +954,10 @@ export async function cmdLast(): Promise<void> {
   const latest = records[0];
   const lastManifestResult = await asyncTryCatch(() => loadManifest());
   const manifest: Manifest | null = lastManifestResult.ok ? lastManifestResult.data : null;
+
+  await assertValidDaytonaRecords([
+    latest,
+  ]);
 
   const label = buildRecordLabel(latest);
   const subtitle = buildRecordSubtitle(latest, manifest);

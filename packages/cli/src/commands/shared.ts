@@ -162,6 +162,9 @@ export function findClosestKeyByNameOrKey(
 function resolveEntityKey(manifest: Manifest, input: string, kind: "agent" | "cloud"): string | null {
   const collection = getEntityCollection(manifest, kind);
   if (collection[input]) {
+    if (kind === "agent" && manifest.agents[input].disabled) {
+      return null;
+    }
     return input;
   }
   const keys = getEntityKeys(manifest, kind);
@@ -285,6 +288,13 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   const def = ENTITY_DEFS[kind];
   const collection = getEntityCollection(manifest, kind);
   if (collection[value]) {
+    if (kind === "agent" && manifest.agents[value].disabled) {
+      p.log.error(`${pc.bold(manifest.agents[value].name)} is temporarily disabled.`);
+      if (manifest.agents[value].disabled_reason) {
+        p.log.info(manifest.agents[value].disabled_reason);
+      }
+      return false;
+    }
     return true;
   }
 
@@ -479,9 +489,26 @@ export function parseAuthEnvVars(auth: string): string[] {
     .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
 }
 
+/** Legacy env var names accepted as aliases for the canonical names in the manifest */
+const AUTH_VAR_ALIASES: Record<string, string[]> = {
+  DIGITALOCEAN_ACCESS_TOKEN: [
+    "DIGITALOCEAN_API_TOKEN",
+    "DO_API_TOKEN",
+  ],
+};
+
+/** Check if an auth env var (or one of its legacy aliases) is set */
+export function isAuthEnvVarSet(varName: string): boolean {
+  if (process.env[varName]) {
+    return true;
+  }
+  const aliases = AUTH_VAR_ALIASES[varName];
+  return !!aliases?.some((a) => !!process.env[a]);
+}
+
 /** Format an auth env var line showing whether it's already set or needs to be exported */
 function formatAuthVarLine(varName: string, urlHint?: string): string {
-  if (process.env[varName]) {
+  if (isAuthEnvVarSet(varName)) {
     return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
   }
   const hint = urlHint ? `  ${pc.dim(`# ${urlHint}`)}` : "";
@@ -494,12 +521,12 @@ export function hasCloudCredentials(auth: string): boolean {
   if (vars.length === 0) {
     return false;
   }
-  return vars.every((v) => !!process.env[v]);
+  return vars.every((v) => isAuthEnvVarSet(v));
 }
 
 /** Format a single credential env var as a status line (green if set, red if missing) */
 export function formatCredStatusLine(varName: string, urlHint?: string): string {
-  if (process.env[varName]) {
+  if (isAuthEnvVarSet(varName)) {
     return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
   }
   const suffix = urlHint ? `  ${pc.dim(urlHint)}` : "";
@@ -532,7 +559,7 @@ export function collectMissingCredentials(authVars: string[], cloud?: string): s
     missing.push("OPENROUTER_API_KEY");
   }
   for (const v of authVars) {
-    if (!process.env[v]) {
+    if (!isAuthEnvVarSet(v)) {
       missing.push(v);
     }
   }

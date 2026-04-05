@@ -4,7 +4,7 @@ set -eo pipefail
 # Thin shim: ensures bun is available, runs bundled digitalocean.js (local or from GitHub release)
 # Includes restart loop for SIGTERM recovery on DigitalOcean
 
-_AGENT_NAME="zeroclaw"
+_AGENT_NAME="pi"
 _MAX_RETRIES=3
 
 _ensure_bun() {

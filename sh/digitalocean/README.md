@@ -16,12 +16,6 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/openclaw.sh)
 ```
 
-#### ZeroClaw
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/zeroclaw.sh)
-```
-
 #### Codex CLI
 
 ```bash
@@ -58,11 +52,17 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/junie.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/cursor.sh)
 ```
 
+#### Pi
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/pi.sh)
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |
 |---|---|---|
-| `DO_API_TOKEN` | DigitalOcean API token | — (OAuth if unset) |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DigitalOcean API token (also accepts `DIGITALOCEAN_API_TOKEN` or `DO_API_TOKEN`) | — (OAuth if unset) |
 | `DO_DROPLET_NAME` | Name for the created droplet | auto-generated |
 | `DO_REGION` | Datacenter region (see regions below) | `nyc3` |
 | `DO_DROPLET_SIZE` | Droplet size slug (see sizes below) | `s-2vcpu-2gb` |
@@ -97,7 +97,7 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/cursor.sh)
 
 ```bash
 DO_DROPLET_NAME=dev-mk1 \
-DO_API_TOKEN=your-token \
+DIGITALOCEAN_ACCESS_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/claude.sh)
 ```
@@ -107,7 +107,7 @@ Override region and droplet size:
 ```bash
 DO_REGION=fra1 \
 DO_DROPLET_SIZE=s-1vcpu-2gb \
-DO_API_TOKEN=your-token \
+DIGITALOCEAN_ACCESS_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/claude.sh)
 ```

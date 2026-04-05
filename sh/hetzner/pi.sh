@@ -12,11 +12,11 @@ _ensure_bun
 
 # SPAWN_CLI_DIR override — force local source (used by e2e tests)
 if [[ -n "${SPAWN_CLI_DIR:-}" && -f "$SPAWN_CLI_DIR/packages/cli/src/hetzner/main.ts" ]]; then
-    exec bun run "$SPAWN_CLI_DIR/packages/cli/src/hetzner/main.ts" zeroclaw "$@"
+    exec bun run "$SPAWN_CLI_DIR/packages/cli/src/hetzner/main.ts" pi "$@"
 fi
 
 HETZNER_JS=$(mktemp)
 trap 'rm -f "$HETZNER_JS"' EXIT
 curl -fsSL --proto '=https' "https://github.com/OpenRouterTeam/spawn/releases/download/hetzner-latest/hetzner.js" -o "$HETZNER_JS" \
     || { printf '\033[0;31mFailed to download hetzner.js\033[0m\n' >&2; exit 1; }
-exec bun run "$HETZNER_JS" zeroclaw "$@"
+exec bun run "$HETZNER_JS" pi "$@"

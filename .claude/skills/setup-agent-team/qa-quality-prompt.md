@@ -166,7 +166,8 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 9. If changes were made: commit, push, open a PR (NOT draft) with title "fix(e2e): [description]"
 10. Clean up worktree when done
 11. Report: clouds tested, clouds skipped, agents passed, agents failed, fixed
-12. **SIGN-OFF**: `-- qa/e2e-tester`
+12. **SHUTDOWN RESPONSIVENESS**: After reporting results, remain actively responsive. If you receive a `shutdown_request` message at any point, immediately respond with `{"type":"shutdown_response","request_id":"<id>","approve":true}` — do NOT go idle without responding to a pending shutdown request.
+13. **SIGN-OFF**: `-- qa/e2e-tester`
 
 ### Teammate 5: record-keeper (model=sonnet)
 
@@ -245,7 +246,7 @@ Use the Task tool to spawn all 5 teammates in parallel:
 
 Keep looping until:
 - All tasks are completed OR
-- Time budget is reached (see timeout warnings at 25/29/30 min)
+- Time budget is reached (see timeout warnings at 75/83/85 min)
 
 ## Step 4 — Summary
 
@@ -277,7 +278,13 @@ After all teammates finish, compile a summary:
 - PRs: [links if any, or "none — no updates needed"]
 ```
 
-Then shutdown all teammates and exit.
+Then shutdown all teammates and exit:
+
+1. Send `shutdown_request` to each teammate via `SendMessage`.
+2. Wait up to 60 seconds for `shutdown_response` from each teammate.
+3. **If any teammate does NOT respond within 60 seconds, consider them shut down and proceed anyway.** Do NOT retry `shutdown_request` — the teammate has completed their work and gone idle.
+4. Call `TeamDelete` once all teammates have responded OR 60 seconds have elapsed.
+5. **After `TeamDelete`, output the summary as plain text with NO further tool calls.** Any tool call after `TeamDelete` causes an infinite shutdown prompt loop in non-interactive mode.
 
 ## Team Coordination
 

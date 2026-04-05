@@ -15,7 +15,7 @@ _ensure_bun
 
 # SPAWN_CLI_DIR override — force local source (used by e2e tests)
 if [[ -n "${SPAWN_CLI_DIR:-}" && -f "$SPAWN_CLI_DIR/packages/cli/src/local/main.ts" ]]; then
-    exec bun run "$SPAWN_CLI_DIR/packages/cli/src/local/main.ts" zeroclaw "$@"
+    exec bun run "$SPAWN_CLI_DIR/packages/cli/src/local/main.ts" pi "$@"
 fi
 
 # Remote — download bundled local.js from GitHub release
@@ -24,4 +24,4 @@ trap 'rm -f "$LOCAL_JS"' EXIT
 curl -fsSL --proto '=https' "https://github.com/OpenRouterTeam/spawn/releases/download/local-latest/local.js" -o "$LOCAL_JS" \
     || { printf '\033[0;31mFailed to download local.js\033[0m\n' >&2; exit 1; }
 
-exec bun run "$LOCAL_JS" zeroclaw "$@"
+exec bun run "$LOCAL_JS" pi "$@"

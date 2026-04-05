@@ -148,34 +148,12 @@ describe("createCloudAgents", () => {
     expect(runner.uploadFile).toHaveBeenCalled();
   });
 
-  it("openclaw agent envVars include OPENROUTER_API_KEY", () => {
-    const envVars = result.agents.openclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("ANTHROPIC_BASE_URL"))).toBe(true);
-  });
-
   it("openclaw agent has tunnel config", () => {
     const openclaw = result.agents.openclaw;
     expect(openclaw.tunnel).toBeDefined();
     expect(openclaw.tunnel?.remotePort).toBe(18789);
     const url = openclaw.tunnel?.browserUrl(8080);
     expect(url).toContain("localhost:8080");
-  });
-
-  it("zeroclaw agent envVars include ZEROCLAW_PROVIDER", () => {
-    const envVars = result.agents.zeroclaw.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("ZEROCLAW_PROVIDER=openrouter"))).toBe(true);
-  });
-
-  it("zeroclaw agent configure calls runServer", async () => {
-    await result.agents.zeroclaw.configure?.("sk-or-v1-test", undefined, new Set());
-    expect(runner.runServer).toHaveBeenCalled();
-  });
-
-  it("hermes agent envVars include OPENAI_BASE_URL", () => {
-    const envVars = result.agents.hermes.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENAI_BASE_URL"))).toBe(true);
-    expect(envVars.some((v: string) => v.includes("HERMES_YOLO_MODE"))).toBe(true);
   });
 
   it("hermes agent configure removes YOLO mode when not enabled", async () => {
@@ -199,14 +177,57 @@ describe("createCloudAgents", () => {
     expect(runner.runServer).not.toHaveBeenCalled();
   });
 
-  it("kilocode agent envVars include KILO_PROVIDER_TYPE", () => {
-    const envVars = result.agents.kilocode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("KILO_PROVIDER_TYPE=openrouter"))).toBe(true);
+  it("agent envVars include provider-specific env vars", () => {
+    const cases: Array<
+      [
+        string,
+        string[],
+      ]
+    > = [
+      [
+        "openclaw",
+        [
+          "OPENROUTER_API_KEY",
+          "ANTHROPIC_BASE_URL",
+        ],
+      ],
+      [
+        "hermes",
+        [
+          "OPENAI_BASE_URL",
+          "HERMES_YOLO_MODE",
+        ],
+      ],
+      [
+        "kilocode",
+        [
+          "KILO_PROVIDER_TYPE=openrouter",
+        ],
+      ],
+      [
+        "opencode",
+        [
+          "OPENROUTER_API_KEY",
+        ],
+      ],
+    ];
+    for (const [agent, expectedVars] of cases) {
+      const envVars = result.agents[agent].envVars("sk-or-v1-test");
+      for (const expected of expectedVars) {
+        expect(
+          envVars.some((v: string) => v.includes(expected)),
+          `${agent} envVars should include ${expected}`,
+        ).toBe(true);
+      }
+    }
   });
 
-  it("opencode agent envVars include OPENROUTER_API_KEY", () => {
-    const envVars = result.agents.opencode.envVars("sk-or-v1-test");
-    expect(envVars.some((v: string) => v.includes("OPENROUTER_API_KEY"))).toBe(true);
+  it("cursor agent uses real API key as CURSOR_API_KEY (not a dummy value)", () => {
+    const envVars = result.agents.cursor.envVars("sk-or-v1-real-key");
+    const cursorKeyVar = envVars.find((v: string) => v.startsWith("CURSOR_API_KEY="));
+    expect(cursorKeyVar).toBeDefined();
+    // Must use the actual API key, not a dummy like "spawn-proxy"
+    expect(cursorKeyVar).toBe("CURSOR_API_KEY=sk-or-v1-real-key");
   });
 
   it("all agents have launchCmd returning non-empty string", () => {
@@ -222,6 +243,7 @@ describe("createCloudAgents", () => {
       expect([
         "minimal",
         "node",
+        "bun",
         "full",
       ]).toContain(agent.cloudInitTier);
     }
@@ -231,6 +253,35 @@ describe("createCloudAgents", () => {
     await result.agents.openclaw.configure?.("sk-or-v1-test", "openrouter/auto", new Set());
     // Should have called uploadFile for the config
     expect(runner.uploadFile).toHaveBeenCalled();
+  });
+
+  it("openclaw telegram config is written atomically via bun merge script", async () => {
+    const token = "123456:ABC-DEF-test-token";
+    process.env.TELEGRAM_BOT_TOKEN = token;
+    await result.agents.openclaw.configure?.(
+      "sk-or-v1-test",
+      "openrouter/auto",
+      new Set([
+        "telegram",
+      ]),
+    );
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const calls = runner.runServer.mock.calls;
+    const allCmds = calls.map((c: unknown[]) => String(c[0]));
+    // Must use bun -e with atomic merge, NOT individual openclaw config set calls
+    const mergeCmd = allCmds.find((cmd: string) => cmd.includes("bun -e") && cmd.includes("botToken"));
+    expect(mergeCmd).toBeDefined();
+    // The merge script must contain the full telegram config object
+    expect(mergeCmd).toContain(token);
+    expect(mergeCmd).toContain("dmPolicy");
+    expect(mergeCmd).toContain("pairing");
+    expect(mergeCmd).toContain("groupPolicy");
+    expect(mergeCmd).toContain("requireMention");
+    // Must NOT use openclaw config set for telegram fields
+    const configSetTelegram = allCmds.find((cmd: string) =>
+      cmd.includes("openclaw config set channels.telegram.botToken"),
+    );
+    expect(configSetTelegram).toBeUndefined();
   });
 
   it("openclaw agent preLaunch starts gateway", async () => {

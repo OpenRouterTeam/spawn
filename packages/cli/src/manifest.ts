@@ -43,6 +43,8 @@ export interface AgentDef {
   category?: string;
   tagline?: string;
   tags?: string[];
+  disabled?: boolean;
+  disabled_reason?: string;
 }
 
 export interface CloudDef {
@@ -280,7 +282,9 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
 }
 
 export function agentKeys(m: Manifest): string[] {
-  return Object.keys(m.agents).sort((a, b) => (m.agents[b].github_stars ?? 0) - (m.agents[a].github_stars ?? 0));
+  return Object.keys(m.agents)
+    .filter((k) => !m.agents[k].disabled)
+    .sort((a, b) => (m.agents[b].github_stars ?? 0) - (m.agents[a].github_stars ?? 0));
 }
 
 export function cloudKeys(m: Manifest): string[] {

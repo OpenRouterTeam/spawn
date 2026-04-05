@@ -62,25 +62,34 @@ afterEach(() => {
 // ── Logging functions ──────────────────────────────────────────────
 
 describe("logging functions", () => {
-  it("logInfo writes green text to stderr", () => {
-    logInfo("test info");
-    expect(stderrOutput.join("")).toContain("test info");
-  });
-
-  it("logWarn writes yellow text to stderr", () => {
-    logWarn("test warn");
-    expect(stderrOutput.join("")).toContain("test warn");
-  });
-
-  it("logError writes red text to stderr", () => {
-    logError("test error");
-    expect(stderrOutput.join("")).toContain("test error");
-  });
-
-  it("logStep writes cyan text to stderr", () => {
-    logStep("test step");
-    expect(stderrOutput.join("")).toContain("test step");
-  });
+  for (const [fn, msg] of [
+    [
+      logInfo,
+      "test info",
+    ],
+    [
+      logWarn,
+      "test warn",
+    ],
+    [
+      logError,
+      "test error",
+    ],
+    [
+      logStep,
+      "test step",
+    ],
+  ] satisfies Array<
+    [
+      (msg: string) => void,
+      string,
+    ]
+  >) {
+    it(`${fn.name} writes message to stderr`, () => {
+      fn(msg);
+      expect(stderrOutput.join("")).toContain(msg);
+    });
+  }
 
   it("logStepInline writes message (newline-terminated in non-TTY)", () => {
     logStepInline("inline msg");

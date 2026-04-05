@@ -11,13 +11,13 @@ If you have the [spawn CLI](https://github.com/OpenRouterTeam/spawn) installed:
 ```bash
 spawn claude local
 spawn openclaw local
-spawn zeroclaw local
 spawn codex local
 spawn opencode local
 spawn kilocode local
 spawn hermes local
 spawn junie local
 spawn cursor local
+spawn pi local
 ```
 
 Or run directly without the CLI:
@@ -25,13 +25,13 @@ Or run directly without the CLI:
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/openclaw.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/zeroclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/kilocode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/hermes.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/junie.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/cursor.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/pi.sh)
 ```
 
 ## Non-Interactive Mode

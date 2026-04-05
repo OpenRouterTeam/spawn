@@ -406,7 +406,7 @@ export function validateLaunchCmd(cmd: string): void {
       "Invalid launch command in history: invalid agent invocation\n\n" +
         `Command: "${cmd}"\n` +
         `Rejected segment: "${lastSegment}"\n\n` +
-        "The final segment must be a simple binary name (e.g., 'claude', 'zeroclaw agent').\n\n" +
+        "The final segment must be a simple binary name (e.g., 'claude', 'hermes').\n\n" +
         "Your spawn history file may be corrupted or tampered with.\n" +
         `To fix: run 'spawn list --clear' to reset history`,
     );
@@ -553,6 +553,18 @@ export function validateTunnelPort(port: string): void {
   }
 }
 
+/**
+ * Strip ASCII control characters from a string for safe terminal display.
+ * Removes characters 0x00-0x1F and 0x7F, preserving tab (0x09) and newline (0x0A).
+ * SECURITY-CRITICAL: Prevents ANSI escape sequence injection in error messages.
+ *
+ * @param s - The string to sanitize
+ * @returns The string with control characters removed
+ */
+export function stripControlChars(s: string): string {
+  return s.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+}
+
 // Sensitive path patterns that should never be read as prompt files
 // These protect credentials and system files from accidental exfiltration
 const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{
@@ -632,17 +644,22 @@ export function validatePromptFilePath(filePath: string): void {
     );
   }
 
+  // Reject paths containing control characters (ANSI escape sequences, null bytes, etc.)
+  // These can cause terminal injection when displayed in error messages.
+  if (/[\x00-\x08\x0B-\x1F\x7F]/.test(filePath)) {
+    throw new Error(
+      "Prompt file path contains control characters (e.g., ANSI escape sequences).\n\n" +
+        "File paths must be plain text without terminal control codes.\n" +
+        "Check that the path was entered correctly.",
+    );
+  }
+
   // Normalize the path to resolve .. and textual tricks
   let resolved = resolve(filePath);
 
-  // Follow symlinks to validate the real target path, not the symlink name.
-  // Without this, a symlink like `innocent.txt -> ~/.ssh/id_rsa` would bypass
-  // sensitive path checks because the resolved string wouldn't match patterns.
-  if (existsSync(resolved)) {
-    resolved = realpathSync(resolved);
-  }
-
-  // Check against sensitive path patterns
+  // Check against sensitive path patterns BEFORE any filesystem calls.
+  // On macOS, lstat("/etc/master.passwd") throws EACCES before we can check
+  // the pattern, so we must validate the textual path first.
   for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
     if (pattern.test(resolved)) {
       throw new Error(
@@ -653,6 +670,27 @@ export function validatePromptFilePath(filePath: string): void {
           `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
           "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt",
       );
+    }
+  }
+
+  // Follow symlinks to validate the real target path, not the symlink name.
+  // Without this, a symlink like `innocent.txt -> ~/.ssh/id_rsa` would bypass
+  // sensitive path checks because the resolved string wouldn't match patterns.
+  if (existsSync(resolved)) {
+    resolved = realpathSync(resolved);
+
+    // Re-check after symlink resolution — the real path may be sensitive
+    for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
+      if (pattern.test(resolved)) {
+        throw new Error(
+          `Security check failed: cannot use '${filePath}' as a prompt file.\n\n` +
+            `This path points to ${description}.\n` +
+            "Prompt contents are sent to the agent and may be logged or stored remotely.\n\n" +
+            "For security, use a plain text file instead:\n" +
+            `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
+            "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt",
+        );
+      }
     }
   }
 }

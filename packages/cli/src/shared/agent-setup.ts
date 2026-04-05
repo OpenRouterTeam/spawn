@@ -7,6 +7,7 @@ import type { Result } from "./ui.js";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import { setupCursorProxy, startCursorProxy } from "./cursor-proxy.js";
 import { getTmpDir } from "./paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isOperationalError, tryCatchIf } from "./result.js";
 import { validateRemotePath } from "./ssh.js";
@@ -39,6 +40,27 @@ export interface CloudRunner {
   runServer(cmd: string, timeoutSecs?: number): Promise<void>;
   uploadFile(localPath: string, remotePath: string): Promise<void>;
   downloadFile(remotePath: string, localPath: string): Promise<void>;
+}
+
+// ─── Script template validation ────────────────────────────────────────────
+
+/**
+ * Validate that a script template string does not contain JS template
+ * interpolation patterns (`${...}`) before it is base64-encoded for shell
+ * injection into systemd units or remote commands.
+ *
+ * Defense-in-depth: the scripts are currently static string arrays joined
+ * with `\n`, so they should never contain interpolation markers. This guard
+ * catches future regressions where a developer might accidentally introduce
+ * template literal interpolation before encoding.
+ *
+ * Note: backticks alone are allowed (used in markdown content for skill
+ * files), but `${` is always rejected as it indicates JS interpolation.
+ */
+export function validateScriptTemplate(script: string, label: string): void {
+  if (/\$\{/.test(script)) {
+    throw new Error(`Script template "${label}" contains \${} interpolation — refusing to encode`);
+  }
 }
 
 // ─── Install helpers ────────────────────────────────────────────────────────
@@ -163,59 +185,6 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
 }
 
 // ─── Cursor CLI Config ────────────────────────────────────────────────────────
-
-async function setupCursorConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
-  logStep("Configuring Cursor CLI for OpenRouter...");
-
-  const configJson = `{
-  "version": 1,
-  "permissions": {
-    "allow": ["Shell(*)", "Read(*)", "Write(*)", "WebFetch(*)", "Mcp(*)"],
-    "deny": []
-  }
-}`;
-
-  // Spawn skill rule — injected into .cursor/rules/ so the agent knows
-  // it can provision child VMs via the spawn CLI.
-  const spawnRule = [
-    "---",
-    "description: Spawn CLI — provision child cloud VMs with AI coding agents",
-    "alwaysApply: true",
-    "---",
-    "",
-    "# Spawn — Create Child VMs",
-    "",
-    "You have the `spawn` CLI installed. Use it to provision cloud VMs with AI agents.",
-    "",
-    "## Usage",
-    "",
-    "```bash",
-    'spawn <agent> <cloud> --headless --output json --prompt "task description"',
-    "```",
-    "",
-    "## Agents: claude, codex, openclaw, zeroclaw, opencode, kilocode, hermes, junie, cursor",
-    "## Clouds: hetzner, digitalocean, aws, gcp, sprite",
-    "",
-    "The command returns JSON with connection details. Use this to delegate subtasks",
-    "to specialized agents running on separate cloud VMs.",
-    "",
-  ].join("\n");
-
-  // Upload config files via SCP — avoids base64 interpolation into shell commands.
-  await uploadConfigFile(runner, configJson, "$HOME/.cursor/cli-config.json");
-  await uploadConfigFile(runner, spawnRule, "$HOME/.cursor/rules/spawn.mdc");
-  // Spawn rule should be world-readable (not sensitive)
-  await runner.runServer("chmod 644 ~/.cursor/rules/spawn.mdc");
-
-  // Persist PATH so agent binary is available
-  const pathScript = [
-    'grep -q ".cursor/bin" ~/.bashrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.bashrc',
-    'grep -q ".cursor/bin" ~/.zshrc 2>/dev/null || printf \'\\nexport PATH="$HOME/.cursor/bin:$PATH"\\n\' >> ~/.zshrc',
-  ].join(" && ");
-
-  await runner.runServer(pathScript);
-  logInfo("Cursor CLI configured");
-}
 
 // ─── GitHub Auth ─────────────────────────────────────────────────────────────
 
@@ -367,6 +336,45 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
+/**
+ * Poll `openclaw status --json` until bootstrapPending is false.
+ * Gives up after ~60 seconds — the dashboard will still work, it just
+ * may require the user to wait a bit or refresh.
+ */
+async function waitForOpenclawBootstrap(runner: CloudRunner): Promise<void> {
+  logStep("Waiting for OpenClaw bootstrap to complete...");
+
+  const pollScript = [
+    "source ~/.spawnrc 2>/dev/null",
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
+    "_elapsed=0",
+    "while [ $_elapsed -lt 60 ]; do",
+    "  _status=$(openclaw status --json 2>/dev/null) || { sleep 2; _elapsed=$((_elapsed + 2)); continue; }",
+    // Use bun to safely parse JSON — avoids jq dependency
+    "  _pending=$(printf '%s' \"$_status\" | bun -e '",
+    "    const d = await Bun.stdin.text();",
+    '    try { const o = JSON.parse(d); console.log(o.bootstrapPending === true ? "true" : "false"); }',
+    '    catch { console.log("unknown"); }',
+    "  ' 2>/dev/null)",
+    '  if [ "$_pending" = "false" ]; then',
+    '    echo "Bootstrap complete after ${_elapsed}s"',
+    "    exit 0",
+    "  fi",
+    "  sleep 2",
+    "  _elapsed=$((_elapsed + 2))",
+    "done",
+    'echo "Bootstrap still pending after 60s — continuing anyway"',
+    "exit 0",
+  ].join("\n");
+
+  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(pollScript, 90));
+  if (result.ok) {
+    logInfo("OpenClaw bootstrap ready");
+  } else {
+    logWarn("Bootstrap readiness check failed (non-fatal, continuing)");
+  }
+}
+
 async function setupOpenclawConfig(
   runner: CloudRunner,
   apiKey: string,
@@ -507,17 +515,37 @@ async function setupOpenclawConfig(
     );
   }
 
-  // Configure Telegram channel if a bot token was provided
+  // Configure Telegram channel if a bot token was provided.
+  // Write the full channel object atomically via a bun script that reads the
+  // existing config, deep-merges the telegram block, and writes it back.
+  // Individual `openclaw config set` calls created malformed nested structures
+  // that prevented the bot from polling — see #2655.
   if (telegramBotToken) {
+    const telegramConfig = JSON.stringify({
+      enabled: true,
+      botToken: telegramBotToken,
+      dmPolicy: "pairing",
+      groupPolicy: "open",
+      groups: {
+        "*": {
+          requireMention: true,
+        },
+      },
+    });
+    const mergeScript = [
+      "import fs from 'fs';",
+      "const p = process.env.HOME + '/.openclaw/openclaw.json';",
+      "const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));",
+      "if (!cfg.channels) cfg.channels = {};",
+      "Object.assign(cfg.channels.telegram || (cfg.channels.telegram = {}), JSON.parse(process.env.TELEGRAM_CONFIG));",
+      "fs.writeFileSync(p, JSON.stringify(cfg, null, 2));",
+      "fs.chmodSync(p, 0o600);",
+    ].join(" ");
     const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
       runner.runServer(
         "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-          "openclaw config set channels.telegram.enabled true >/dev/null; " +
-          `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
-          "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
-          "openclaw config set channels.telegram.groupPolicy open >/dev/null; " +
-          // Restrict config file permissions — it now contains the Telegram bot token
-          "chmod 600 ~/.openclaw/openclaw.json 2>/dev/null || true",
+          `export TELEGRAM_CONFIG=${shellQuote(telegramConfig)}; ` +
+          `bun -e ${shellQuote(mergeScript)}`,
       ),
     );
     if (telegramResult.ok) {
@@ -558,6 +586,11 @@ async function setupOpenclawConfig(
   // Workspace dir is created by `openclaw onboard`; ensure it exists for the fallback path.
   await runner.runServer("mkdir -p ~/.openclaw/workspace");
   await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
+
+  // Wait for OpenClaw bootstrap to complete before opening the dashboard.
+  // Without this, the Control UI opens but chat fails with "No session found"
+  // because the initial session hasn't been created yet (bootstrapPending: true).
+  await waitForOpenclawBootstrap(runner);
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -579,7 +612,11 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "#!/bin/bash",
     'source "$HOME/.spawnrc" 2>/dev/null',
     'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
-    "exec openclaw gateway",
+    "while true; do",
+    "  openclaw gateway",
+    '  echo "openclaw gateway exited, restarting in 5s" >> /tmp/openclaw-gateway.log',
+    "  sleep 5",
+    "done",
   ].join("\n");
 
   // __USER__ and __HOME__ are sed-substituted at deploy time
@@ -602,6 +639,9 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "WantedBy=multi-user.target",
   ].join("\n");
 
+  validateScriptTemplate(wrapperScript, "gateway-wrapper");
+  validateScriptTemplate(unitFile, "gateway-unit");
+
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(wrapperB64)) {
@@ -614,11 +654,12 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   const script = [
     "source ~/.spawnrc 2>/dev/null",
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
-    "if command -v systemctl >/dev/null 2>&1; then",
+    "printf '%s' '" + wrapperB64 + "' | base64 -d > /tmp/openclaw-gateway-wrapper.tmp",
+    "chmod +x /tmp/openclaw-gateway-wrapper.tmp",
+    "if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then",
     '  _sudo=""',
     '  [ "$(id -u)" != "0" ] && _sudo="sudo"',
-    "  printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/openclaw-gateway-wrapper > /dev/null",
-    "  $_sudo chmod +x /usr/local/bin/openclaw-gateway-wrapper",
+    "  $_sudo mv /tmp/openclaw-gateway-wrapper.tmp /usr/local/bin/openclaw-gateway-wrapper",
     "  printf '%s' '" + unitB64 + "' | base64 -d > /tmp/openclaw-gateway.unit.tmp",
     '  sed -i "s|__USER__|$(whoami)|;s|__HOME__|$HOME|" /tmp/openclaw-gateway.unit.tmp',
     "  $_sudo mv /tmp/openclaw-gateway.unit.tmp /etc/systemd/system/openclaw-gateway.service",
@@ -629,64 +670,19 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     '  [ "$(id -u)" != "0" ] && _cron_restart="sudo systemctl restart openclaw-gateway"',
     '  (crontab -l 2>/dev/null | grep -v openclaw-gateway; echo "0 * * * * nc -z 127.0.0.1 18789 2>/dev/null || $_cron_restart >> /tmp/openclaw-gateway.log 2>&1") | crontab - 2>/dev/null || true',
     "else",
-    '  _oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }',
+    "  mv /tmp/openclaw-gateway-wrapper.tmp /tmp/openclaw-gateway-wrapper",
     `  if ${portCheck}; then echo "Gateway already running"; exit 0; fi`,
-    '  if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null &',
-    '  else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi',
+    "  if command -v setsid >/dev/null 2>&1; then setsid /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null &",
+    "  else nohup /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
     "fi",
     "elapsed=0; while [ $elapsed -lt 300 ]; do",
-    `  if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi`,
+    `  if ${portCheck}; then echo "Gateway ready after $elapsed sec"; exit 0; fi`,
     "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
     "done",
     'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1',
   ].join("\n");
   await runner.runServer(script);
   logInfo("OpenClaw gateway started");
-}
-
-// ─── ZeroClaw Config ─────────────────────────────────────────────────────────
-
-async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
-  logStep("Configuring ZeroClaw for autonomous operation...");
-
-  // Remove any pre-existing config (e.g. from Docker image extraction) before
-  // running onboard, which generates a fresh config with the correct API key.
-  await runner.runServer("rm -f ~/.zeroclaw/config.toml");
-
-  // Run onboard first to set up provider/key
-  await runner.runServer(
-    `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
-  );
-
-  // Patch autonomy settings in-place. `zeroclaw onboard` already generates
-  // [security] and [shell] sections — so we sed the values instead of
-  // appending duplicate sections.
-  const patchScript = [
-    "cd ~/.zeroclaw",
-    // Update existing security values (or append section if missing)
-    'if grep -q "^\\[security\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^autonomy = .*/autonomy = \"full\"/' config.toml",
-    "  sed -i 's/^supervised = .*/supervised = false/' config.toml",
-    "  sed -i 's/^allow_destructive = .*/allow_destructive = true/' config.toml",
-    "else",
-    "  printf '\\n[security]\\nautonomy = \"full\"\\nsupervised = false\\nallow_destructive = true\\n' >> config.toml",
-    "fi",
-    // Update existing shell policy (or append section if missing)
-    'if grep -q "^\\[shell\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^policy = .*/policy = \"allow_all\"/' config.toml",
-    "else",
-    "  printf '\\n[shell]\\npolicy = \"allow_all\"\\n' >> config.toml",
-    "fi",
-    // Force native runtime (no Docker) — zeroclaw auto-detects Docker and
-    // launches in a container otherwise, which hangs the interactive session.
-    'if grep -q "^\\[runtime\\]" config.toml 2>/dev/null; then',
-    "  sed -i 's/^adapter = .*/adapter = \"native\"/' config.toml",
-    "else",
-    "  printf '\\n[runtime]\\nadapter = \"native\"\\n' >> config.toml",
-    "fi",
-  ].join("\n");
-  await runner.runServer(patchScript);
-  logInfo("ZeroClaw configured for autonomous operation");
 }
 
 // ─── OpenCode Install Command ────────────────────────────────────────────────
@@ -717,6 +713,22 @@ const NPM_PREFIX_SETUP =
   // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
   // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
   'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
+
+/**
+ * Validator-safe npm setup for base64-encoded helper scripts.
+ *
+ * setupAutoUpdate() rejects `${...}` inside encoded script templates, so the
+ * auto-update path needs a shell snippet that avoids brace expansion while
+ * still preserving the same prefix and PATH behavior as installs.
+ */
+const NPM_AUTO_UPDATE_SETUP =
+  '_NPM_G_FLAGS=""; ' +
+  '_npm_prefix="$(npm prefix -g 2>/dev/null || echo /usr/local)"; ' +
+  '_npm_gbin="$_npm_prefix/bin"; ' +
+  'if ! [ -w "$_npm_prefix" ] || ! printf "%s" ":$PATH:" | grep -qF ":$_npm_gbin:"; then ' +
+  'mkdir -p "$HOME/.npm-global/bin"; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  'case " $NODE_OPTIONS " in *" --dns-result-order=ipv4first "*) ;; *) export NODE_OPTIONS="$NODE_OPTIONS --dns-result-order=ipv4first" ;; esac';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -908,6 +920,10 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
     "WantedBy=timers.target",
   ].join("\n");
 
+  validateScriptTemplate(wrapperScript, "auto-update-wrapper");
+  validateScriptTemplate(unitFile, "auto-update-unit");
+  validateScriptTemplate(timerFile, "auto-update-timer");
+
   const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
   const unitB64 = Buffer.from(unitFile).toString("base64");
   const timerB64 = Buffer.from(timerFile).toString("base64");
@@ -922,7 +938,7 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   }
 
   const script = [
-    "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
+    "if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then exit 0; fi",
     '_sudo=""',
     '[ "$(id -u)" != "0" ] && _sudo="sudo"',
     "printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-auto-update > /dev/null",
@@ -938,17 +954,13 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
 
   const result = await asyncTryCatch(() => runner.runServer(script));
   if (result.ok) {
-    logInfo("Agent auto-update service installed (runs every 6 hours)");
+    logInfo("Agent auto-update setup completed");
   } else {
     logWarn("Auto-update setup failed (non-fatal, agent still works)");
   }
 }
 
 // ─── Default Agent Definitions ───────────────────────────────────────────────
-
-// Last zeroclaw release that shipped Linux prebuilt binaries (v0.1.9a has none).
-// Used for direct binary install to avoid a Rust source build timeout.
-const ZEROCLAW_PREBUILT_TAG = "v0.1.7-beta.30";
 
 function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
@@ -989,9 +1001,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @openai/codex@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @openai/codex@latest",
     },
 
     openclaw: (() => {
@@ -1023,9 +1033,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
-        updateCmd:
-          'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-          "npm install -g ${_NPM_G_FLAGS:-} openclaw@latest",
+        updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS openclaw@latest",
       };
     })(),
 
@@ -1058,53 +1066,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @kilocode/cli@latest",
-    },
-
-    zeroclaw: {
-      name: "ZeroClaw",
-      cloudInitTier: "minimal",
-      modelEnvVar: "ZEROCLAW_MODEL",
-      preProvision: detectGithubAuth,
-      install: async () => {
-        // Direct binary install from pinned release (v0.1.9a "latest" has no assets,
-        // causing the bootstrap --prefer-prebuilt path to 404-fail and fall back to
-        // a Rust source build that exceeds the 600s install timeout).
-        const directInstallCmd =
-          `_ZC_ARCH="$(uname -m)"; ` +
-          `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
-          `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
-          `else echo "Unsupported arch: $_ZC_ARCH" >&2; exit 1; fi; ` +
-          `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/download/${ZEROCLAW_PREBUILT_TAG}/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
-          `_ZC_TMP="$(mktemp -d)"; ` +
-          `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
-          `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
-          `{ mkdir -p "$HOME/.local/bin" && install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw"; } && ` +
-          `rm -rf "$_ZC_TMP"`;
-        await installAgent(runner, "ZeroClaw", directInstallCmd, 120);
-      },
-      envVars: (apiKey) => [
-        `OPENROUTER_API_KEY=${apiKey}`,
-        "ZEROCLAW_PROVIDER=openrouter",
-        "ZEROCLAW_RUNTIME=native",
-      ],
-      configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
-      launchCmd: () =>
-        "export PATH=$HOME/.local/bin:$HOME/.cargo/bin:$PATH; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
-      updateCmd:
-        'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"; ' +
-        `_ZC_ARCH="$(uname -m)"; ` +
-        `if [ "$_ZC_ARCH" = "x86_64" ]; then _ZC_TARGET="x86_64-unknown-linux-gnu"; ` +
-        `elif [ "$_ZC_ARCH" = "aarch64" ] || [ "$_ZC_ARCH" = "arm64" ]; then _ZC_TARGET="aarch64-unknown-linux-gnu"; ` +
-        "else exit 1; fi; " +
-        `_ZC_URL="https://github.com/zeroclaw-labs/zeroclaw/releases/latest/download/zeroclaw-\${_ZC_TARGET}.tar.gz"; ` +
-        `_ZC_TMP="$(mktemp -d)"; ` +
-        `curl --proto '=https' -fsSL "$_ZC_URL" -o "$_ZC_TMP/zeroclaw.tar.gz" && ` +
-        `tar -xzf "$_ZC_TMP/zeroclaw.tar.gz" -C "$_ZC_TMP" && ` +
-        `install -m 755 "$_ZC_TMP/zeroclaw" "$HOME/.local/bin/zeroclaw" && ` +
-        `rm -rf "$_ZC_TMP"`,
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @kilocode/cli@latest",
     },
 
     hermes: {
@@ -1161,31 +1123,47 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @jetbrains/junie-cli@latest",
+    },
+
+    pi: {
+      name: "Pi",
+      cloudInitTier: "node",
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Pi",
+          `cd "$HOME" && ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @mariozechner/pi-coding-agent && ${NPM_GLOBAL_PATH_PERSIST}`,
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi",
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @mariozechner/pi-coding-agent@latest",
     },
 
     cursor: {
       name: "Cursor CLI",
-      cloudInitTier: "minimal",
+      cloudInitTier: "bun",
       preProvision: detectGithubAuth,
       install: () =>
         installAgent(
           runner,
           "Cursor CLI",
           "curl https://cursor.com/install -fsS | bash && " +
-            'export PATH="$HOME/.cursor/bin:$PATH" && ' +
+            'export PATH="$HOME/.local/bin:$PATH" && ' +
             "agent --version",
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `CURSOR_API_KEY=${apiKey}`,
       ],
-      configure: (apiKey) => setupCursorConfig(runner, apiKey),
+      configure: () => setupCursorProxy(runner),
+      preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
-        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cursor/bin:$PATH"; agent --endpoint https://openrouter.ai/api/v1',
-      updateCmd: 'export PATH="$HOME/.cursor/bin:$PATH"; agent update',
+        'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
+      updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };
 }

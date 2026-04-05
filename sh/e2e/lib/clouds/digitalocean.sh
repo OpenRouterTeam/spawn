@@ -4,10 +4,18 @@
 # Implements the standard cloud driver interface (_digitalocean_*) for
 # provisioning and managing DigitalOcean droplets in the E2E test suite.
 #
-# Requires: DO_API_TOKEN, jq, ssh
+# Accepts: DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN
 # API: https://api.digitalocean.com/v2
 # SSH user: root
 set -eo pipefail
+
+# ── Resolve DigitalOcean token (canonical > alternate > legacy) ───────────
+if [ -n "${DIGITALOCEAN_ACCESS_TOKEN:-}" ]; then
+  DO_API_TOKEN="${DIGITALOCEAN_ACCESS_TOKEN}"
+elif [ -n "${DIGITALOCEAN_API_TOKEN:-}" ]; then
+  DO_API_TOKEN="${DIGITALOCEAN_API_TOKEN}"
+fi
+export DO_API_TOKEN
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -19,7 +27,7 @@ _DO_DEFAULT_REGION="nyc3"
 # ---------------------------------------------------------------------------
 # _do_curl_auth [curl-args...]
 #
-# Wrapper around curl that passes the DO_API_TOKEN via a temp config file
+# Wrapper around curl that passes the token via a temp config file
 # instead of a command-line -H flag. This keeps the token out of `ps` output.
 # All arguments are forwarded to curl.
 # ---------------------------------------------------------------------------
@@ -37,19 +45,19 @@ _do_curl_auth() {
 # ---------------------------------------------------------------------------
 # _digitalocean_validate_env
 #
-# Validates that DO_API_TOKEN is set and the DigitalOcean API is reachable
-# with valid credentials.
+# Validates that a DigitalOcean token is set and the API is reachable.
+# Accepts DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN.
 # Returns 0 on success, 1 on failure.
 # ---------------------------------------------------------------------------
 _digitalocean_validate_env() {
   if [ -z "${DO_API_TOKEN:-}" ]; then
-    log_err "DO_API_TOKEN is not set"
+    log_err "DigitalOcean token is not set (set DIGITALOCEAN_ACCESS_TOKEN, DIGITALOCEAN_API_TOKEN, or DO_API_TOKEN)"
     return 1
   fi
 
   if ! _do_curl_auth -sf \
     "${_DO_API}/account" >/dev/null 2>&1; then
-    log_err "DigitalOcean API authentication failed — check DO_API_TOKEN"
+    log_err "DigitalOcean API authentication failed — check your token"
     return 1
   fi
 
@@ -65,7 +73,7 @@ _digitalocean_validate_env() {
 # ---------------------------------------------------------------------------
 _digitalocean_headless_env() {
   local app="$1"
-  # local agent="$2"  # unused but part of the interface
+  # $2 = agent (unused but part of the interface)
 
   printf 'export DO_DROPLET_NAME="%s"\n' "${app}"
   printf 'export DO_DROPLET_SIZE="%s"\n' "${DO_DROPLET_SIZE:-${_DO_DEFAULT_SIZE}}"
@@ -366,16 +374,18 @@ EOF
 # Queries the DigitalOcean account to determine available droplet capacity.
 # Subtracts non-e2e droplets from the account limit so parallel test runs
 # don't fail due to pre-existing droplets consuming quota slots.
+# Returns 0 when no capacity is available so the caller can skip the cloud.
 # Falls back to 3 if the API is unavailable.
 # ---------------------------------------------------------------------------
 _digitalocean_max_parallel() {
   local _account_json _limit _existing _available
   _account_json=$(_do_curl_auth -sf "${_DO_API}/account" 2>/dev/null) || { printf '3'; return 0; }
   _limit=$(printf '%s' "${_account_json}" | grep -o '"droplet_limit":[0-9]*' | grep -o '[0-9]*$') || { printf '3'; return 0; }
-  _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | grep -o '"id":[0-9]*' | wc -l | tr -d ' ') || { printf '3'; return 0; }
+  _existing=$(_do_curl_auth -sf "${_DO_API}/droplets?per_page=200" 2>/dev/null | jq -r '.droplets | length' 2>/dev/null) || { printf '3'; return 0; }
   _available=$(( _limit - _existing ))
   if [ "${_available}" -lt 1 ]; then
-    printf '1'
+    log_warn "DigitalOcean droplet limit reached: ${_existing}/${_limit} droplets in use (0 available)" >&2
+    printf '0'
   else
     printf '%d' "${_available}"
   fi

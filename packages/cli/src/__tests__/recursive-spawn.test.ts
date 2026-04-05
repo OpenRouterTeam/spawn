@@ -1,8 +1,9 @@
 import type { SpawnRecord } from "../history.js";
 
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import * as p from "@clack/prompts";
 import { findDescendants, pullChildHistory } from "../commands/delete.js";
 import { cmdTree } from "../commands/tree.js";
 import { exportHistory, HISTORY_SCHEMA_VERSION, loadHistory, mergeChildHistory, saveSpawnRecord } from "../history.js";
@@ -396,16 +397,13 @@ describe("recursive spawn", () => {
 
   describe("cmdTree", () => {
     it("shows empty message when no history", async () => {
-      const logs: string[] = [];
-      const origLog = console.log;
-      console.log = (...args: unknown[]) => {
-        logs.push(args.map(String).join(" "));
-      };
+      const logInfoSpy = spyOn(p.log, "info").mockImplementation(mock(() => {}));
 
       await cmdTree();
 
-      console.log = origLog;
-      // p.log.info writes to stderr, not captured — but cmdTree should not throw
+      const calls = logInfoSpy.mock.calls.map((args) => String(args[0]));
+      expect(calls.some((msg) => msg.includes("No spawn history found"))).toBe(true);
+      logInfoSpy.mockRestore();
     });
 
     it("renders tree with parent-child relationships", async () => {
@@ -517,19 +515,17 @@ describe("recursive spawn", () => {
         timestamp: "2026-03-24T01:00:00.000Z",
       });
 
-      const logs: string[] = [];
-      const origLog = console.log;
-      console.log = (...args: unknown[]) => {
-        logs.push(args.map(String).join(" "));
-      };
-
+      const logInfoSpy = spyOn(p.log, "info").mockImplementation(mock(() => {}));
       const manifestMod = await import("../manifest.js");
       const manifestSpy = spyOn(manifestMod, "loadManifest").mockRejectedValue(new Error("no network"));
 
       await cmdTree();
 
-      console.log = origLog;
       manifestSpy.mockRestore();
+
+      const calls = logInfoSpy.mock.calls.map((args) => String(args[0]));
+      expect(calls.some((msg) => msg.includes("no parent-child relationships"))).toBe(true);
+      logInfoSpy.mockRestore();
     });
 
     it("renders deleted and depth labels", async () => {

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { clearHistory, filterHistory, loadHistory, saveSpawnRecord } from "../history.js";
 import { getHistoryPath } from "../shared/paths.js";
+import { asyncTryCatch } from "../shared/result.js";
 import { mockClackPrompts } from "./test-helpers";
 
 /**
@@ -284,7 +285,7 @@ describe("clearHistory", () => {
 
 // ── cmdListClear via mock.module ─────────────────────────────────────────────
 
-const { logInfo: mockLogInfo, logSuccess: mockLogSuccess } = mockClackPrompts();
+const { logInfo: mockLogInfo, logError: mockLogError, logSuccess: mockLogSuccess } = mockClackPrompts();
 
 // Import after mock setup
 const { cmdListClear } = await import("../commands/index.js");
@@ -303,6 +304,7 @@ describe("cmdListClear", () => {
     };
     process.env.SPAWN_HOME = testDir;
     mockLogInfo.mockClear();
+    mockLogError.mockClear();
     mockLogSuccess.mockClear();
   });
 
@@ -317,7 +319,7 @@ describe("cmdListClear", () => {
   });
 
   it("should call log.info when no history exists", async () => {
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     const msg = String(mockLogInfo.mock.calls[0][0]);
     expect(msg).toContain("No spawn history to clear");
@@ -338,7 +340,7 @@ describe("cmdListClear", () => {
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 2 spawn records from history");
@@ -354,7 +356,7 @@ describe("cmdListClear", () => {
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 1 spawn record from history");
@@ -372,14 +374,14 @@ describe("cmdListClear", () => {
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(existsSync(join(testDir, "history.json"))).toBe(false);
   });
 
   it("should handle empty array history file as no history", async () => {
     writeFileSync(join(testDir, "history.json"), "[]");
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
     const msg = String(mockLogInfo.mock.calls[0][0]);
@@ -389,7 +391,7 @@ describe("cmdListClear", () => {
   it("should handle corrupted history file as no history", async () => {
     writeFileSync(join(testDir, "history.json"), "corrupt{{{");
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
     const msg = String(mockLogInfo.mock.calls[0][0]);
@@ -407,7 +409,7 @@ describe("cmdListClear", () => {
     }
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 50 spawn records from history");
@@ -423,7 +425,7 @@ describe("cmdListClear", () => {
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    await cmdListClear();
+    await cmdListClear(true);
 
     // Save new record after clearing
     saveSpawnRecord({
@@ -438,7 +440,7 @@ describe("cmdListClear", () => {
 
   it("should use log.info for zero records and log.success for non-zero", async () => {
     // Test with zero
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
 
@@ -455,8 +457,37 @@ describe("cmdListClear", () => {
       },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-    await cmdListClear();
+    await cmdListClear(true);
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     expect(mockLogInfo).not.toHaveBeenCalled();
+  });
+
+  it("should require --yes in non-interactive mode when history exists", async () => {
+    const records: SpawnRecord[] = [
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
+
+    // Without forceYes in non-interactive mode, cmdListClear should exit
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code: number) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    }) satisfies (code: number) => never;
+
+    await asyncTryCatch(() => cmdListClear());
+
+    process.exit = originalExit;
+    expect(exitCode).toBe(1);
+    expect(mockLogError).toHaveBeenCalledTimes(1);
+    const msg = String(mockLogError.mock.calls[0][0]);
+    expect(msg).toContain("--yes");
+    // History should NOT have been cleared
+    expect(existsSync(join(testDir, "history.json"))).toBe(true);
   });
 });

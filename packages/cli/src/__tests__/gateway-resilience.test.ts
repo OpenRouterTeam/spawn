@@ -99,6 +99,8 @@ describe("startGateway", () => {
     expect(capturedScript).toContain("nc -z 127.0.0.1 18789");
 
     expect(wrapper).toContain('source "$HOME/.spawnrc"');
-    expect(wrapper).toContain("exec openclaw gateway");
+    expect(wrapper).toContain("while true; do");
+    expect(wrapper).toContain("  openclaw gateway");
+    expect(wrapper).toContain("restarting in 5s");
   });
 });

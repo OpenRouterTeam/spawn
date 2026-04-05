@@ -81,7 +81,7 @@ provision_agent() {
     # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility.
     # Positive whitelist: only variables actually emitted by cloud_headless_env
     # functions are allowed. This prevents injection of arbitrary env vars.
-    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION SPRITE_NAME SPRITE_ORG "
+    _ALLOWED_HEADLESS_VARS=" LIGHTSAIL_SERVER_NAME AWS_DEFAULT_REGION LIGHTSAIL_BUNDLE DO_DROPLET_NAME DO_DROPLET_SIZE DO_REGION GCP_INSTANCE_NAME GCP_PROJECT GCP_ZONE GCP_MACHINE_TYPE HETZNER_SERVER_NAME HETZNER_SERVER_TYPE HETZNER_LOCATION DAYTONA_SANDBOX_NAME DAYTONA_SANDBOX_SIZE SPRITE_NAME SPRITE_ORG "
     while IFS= read -r _env_line; do
       # Skip lines that don't look like export VAR="VALUE"
       case "${_env_line}" in
@@ -275,11 +275,6 @@ CLOUD_ENV
         printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
       } >> "${env_tmp}"
       ;;
-    zeroclaw)
-      {
-        printf 'export ZEROCLAW_PROVIDER=%q\n' "openrouter"
-      } >> "${env_tmp}"
-      ;;
     hermes)
       {
         printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
@@ -378,7 +373,7 @@ _ensure_agent_binary() {
   # PATH includes all common binary locations for detection.
   local bin_name=""
   local install_cmd=""
-  local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:$HOME/.cursor/bin:/usr/local/bin:$PATH"'
+  local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.claude/local/bin:/usr/local/bin:$PATH"'
 
   case "${agent}" in
     claude)
@@ -392,10 +387,6 @@ _ensure_agent_binary() {
     codex)
       bin_name="codex"
       install_cmd="mkdir -p ~/.npm-global && npm install -g --prefix ~/.npm-global @openai/codex"
-      ;;
-    zeroclaw)
-      bin_name="zeroclaw"
-      install_cmd="curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
       ;;
     opencode)
       bin_name="opencode"
