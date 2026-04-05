@@ -546,6 +546,7 @@ async function postInstall(
   // Parse enabled setup steps
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
+  const isHeadless = process.env.SPAWN_HEADLESS === "1";
   if (stepsEnv !== undefined) {
     const stepNames = stepsEnv.split(",").filter(Boolean);
     if (stepNames.length > 0) {
@@ -558,6 +559,11 @@ async function postInstall(
     } else {
       enabledSteps = new Set();
     }
+  } else if (isHeadless) {
+    // In headless mode, default to auto-update only (use --steps all to override)
+    enabledSteps = new Set([
+      "auto-update",
+    ]);
   }
 
   // Agent-specific configuration
@@ -726,10 +732,21 @@ async function postInstall(
   saveLaunchCmd(launchCmd, spawnId);
 
   // In headless mode, provisioning is done — skip the interactive session.
-  // The VM is healthy and the agent is installed; callers can SSH in or use `spawn connect`.
-  const isHeadless = process.env.SPAWN_HEADLESS === "1";
+  // If --prompt was provided and the agent has a promptCmd, execute the prompt on the VM.
   if (isHeadless) {
-    logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    const headlessPrompt = process.env.SPAWN_PROMPT;
+    if (headlessPrompt && agent.promptCmd) {
+      logInfo("Headless mode — running prompt on provisioned VM...");
+      const promptRunCmd = agent.promptCmd(headlessPrompt);
+      const promptResult = await asyncTryCatch(() => cloud.runner.runServer(promptRunCmd, 600));
+      if (!promptResult.ok) {
+        logWarn(`Prompt execution failed: ${getErrorMessage(promptResult.error)}`);
+      } else {
+        logInfo("Prompt execution completed");
+      }
+    } else {
+      logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    }
     if (tunnelHandle) {
       tunnelHandle.stop();
     }
