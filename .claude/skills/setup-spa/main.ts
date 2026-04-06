@@ -14,12 +14,14 @@ import {
   findCandidate,
   findThread,
   formatToolStats,
+  logDecision,
   markdownToRichTextBlocks,
   openDb,
   PR_URL_REGEX,
   parseStreamEvent,
   plainTextFallback,
   ResultSchema,
+  readDecisions,
   runCleanupIfDue,
   stripMention,
   updateCandidateStatus,
@@ -1042,6 +1044,7 @@ app.action("growth_approve", async ({ ack, body, client }) => {
         postedReply: candidate.draftReply,
         redditCommentUrl: commentUrl,
       });
+      logDecision(candidate, "approved");
       // Update the Slack message — replace buttons with confirmation
       if (candidate.slackChannel && candidate.slackTs) {
         await replaceButtonsWithStatus(
@@ -1184,6 +1187,7 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
         postedReply: editedReply,
         redditCommentUrl: commentUrl,
       });
+      logDecision(candidate, "edited", editedReply);
       if (candidate.slackChannel && candidate.slackTs) {
         await replaceButtonsWithStatus(
           client,
@@ -1230,6 +1234,7 @@ app.action("growth_skip", async ({ ack, body, client }) => {
     status: "skipped",
     actionedBy: userId,
   });
+  logDecision(candidate, "skipped");
 
   if (candidate.slackChannel && candidate.slackTs) {
     await replaceButtonsWithStatus(

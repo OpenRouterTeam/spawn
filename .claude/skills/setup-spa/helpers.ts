@@ -5,7 +5,16 @@ import type { Result } from "@openrouter/spawn-shared";
 import type { Block } from "@slack/bolt";
 
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import { Err, isString, Ok, toRecord } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
@@ -299,9 +308,10 @@ function rowToCandidate(r: RawCandidate): CandidateRow {
     draftReply: r.draft_reply,
     slackChannel: r.slack_channel ?? undefined,
     slackTs: r.slack_ts ?? undefined,
-    status: r.status === "approved" || r.status === "posted" || r.status === "skipped" || r.status === "error"
-      ? r.status
-      : "pending",
+    status:
+      r.status === "approved" || r.status === "posted" || r.status === "skipped" || r.status === "error"
+        ? r.status
+        : "pending",
     actionedBy: r.actioned_by ?? undefined,
     actionedAt: r.actioned_at ?? undefined,
     postedReply: r.posted_reply ?? undefined,
@@ -335,7 +345,12 @@ export function upsertCandidate(db: Database, candidate: CandidateRow): void {
 /** Look up a candidate by Reddit post ID. */
 export function findCandidate(db: Database, postId: string): CandidateRow | undefined {
   const row = db
-    .query<RawCandidate, [string]>("SELECT * FROM candidates WHERE post_id = ?")
+    .query<
+      RawCandidate,
+      [
+        string,
+      ]
+    >("SELECT * FROM candidates WHERE post_id = ?")
     .get(postId);
   return row ? rowToCandidate(row) : undefined;
 }
@@ -368,6 +383,43 @@ export function updateCandidateStatus(
       postId,
     ],
   );
+}
+
+const DECISIONS_PATH = `${process.env.HOME ?? "/tmp"}/.config/spawn/growth-decisions.md`;
+
+/** Append a decision entry to the growth decisions log. */
+export function logDecision(
+  candidate: CandidateRow,
+  decision: "approved" | "edited" | "skipped",
+  editedReply?: string,
+): void {
+  const dir = dirname(DECISIONS_PATH);
+  if (!existsSync(dir))
+    mkdirSync(dir, {
+      recursive: true,
+    });
+
+  const date = new Date().toISOString().split("T")[0];
+  const reply = editedReply ?? candidate.draftReply;
+  const entry = `
+## ${decision.toUpperCase()} — ${date}
+
+- **Post**: [${candidate.title}](https://reddit.com${candidate.permalink})
+- **Subreddit**: r/${candidate.subreddit}
+- **Decision**: ${decision}
+${editedReply ? "- **Edited**: yes (original draft was modified)\n" : ""}\
+- **Reply**: ${reply.replace(/\n/g, " ")}
+
+---
+`;
+
+  appendFileSync(DECISIONS_PATH, entry);
+}
+
+/** Read the decisions log (returns empty string if no file). */
+export function readDecisions(): string {
+  if (!existsSync(DECISIONS_PATH)) return "";
+  return readFileSync(DECISIONS_PATH, "utf-8");
 }
 
 // #endregion
