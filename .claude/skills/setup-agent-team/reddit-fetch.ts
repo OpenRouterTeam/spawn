@@ -19,14 +19,25 @@ if (!CLIENT_ID || !CLIENT_SECRET || !USERNAME || !PASSWORD) {
 }
 
 const SUBREDDITS = [
+  // Agent-specific (people already using coding agents)
+  "ClaudeCode",
+  "opencodeCLI",
+  "cursor",
+  "GithubCopilot",
+  "codex",
+  "RooCode",
+  "windsurf",
+  // General AI + dev communities
   "Vibecoding",
   "AIAgents",
-  "LocalLLaMA",
+  "ClaudeAI",
   "ChatGPT",
   "SelfHosted",
   "programming",
   "commandline",
   "devops",
+  "webdev",
+  "openai",
 ];
 
 const QUERIES = [
@@ -37,6 +48,12 @@ const QUERIES = [
   "vibe coding setup",
   "deploy coding agent",
   "cloud dev environment AI",
+  "AI coding assistant server",
+  "run Claude Code remote",
+  "coding agent VPS",
+  "AI dev environment cheap",
+  "API rate limit coding agent",
+  "coding agent cost",
 ];
 
 const MAX_CONCURRENT = 5;
