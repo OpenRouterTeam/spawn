@@ -2,10 +2,14 @@
  * Reddit Fetch — Batch scanner for the growth agent.
  *
  * Authenticates with Reddit, fires all subreddit×query searches concurrently,
- * deduplicates, pre-fetches poster comment histories, and outputs JSON to stdout.
+ * deduplicates (including against SPA's candidate DB), pre-fetches poster
+ * comment histories, and outputs JSON to stdout.
  *
  * Env vars: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD
  */
+
+import { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 
 const CLIENT_ID = process.env.REDDIT_CLIENT_ID ?? "";
 const CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
@@ -18,18 +22,23 @@ if (!CLIENT_ID || !CLIENT_SECRET || !USERNAME || !PASSWORD) {
   process.exit(1);
 }
 
-const SUBREDDITS = [
+// Subreddits — shuffled each run so we don't always hit the same ones first
+const SUBREDDITS = shuffle([
   "Vibecoding",
   "AIAgents",
-  "LocalLLaMA",
   "ChatGPT",
   "SelfHosted",
   "programming",
   "commandline",
   "devops",
-];
+  "ClaudeAI",
+  "webdev",
+  "openai",
+  "CodingWithAI",
+]);
 
-const QUERIES = [
+// Queries — shuffled each run for variety
+const QUERIES = shuffle([
   "coding agent cloud",
   "coding agent server",
   "self host AI coding",
@@ -37,7 +46,11 @@ const QUERIES = [
   "vibe coding setup",
   "deploy coding agent",
   "cloud dev environment AI",
-];
+  "AI coding assistant server",
+  "run Claude Code remote",
+  "coding agent VPS",
+  "AI dev environment cheap",
+]);
 
 const MAX_CONCURRENT = 5;
 
@@ -52,6 +65,44 @@ interface RedditPost {
   selftext: string;
   authorName: string;
   authorComments: string[];
+}
+
+/** Fisher-Yates shuffle. */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [
+    ...arr,
+  ];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [
+      a[j],
+      a[i],
+    ];
+  }
+  return a;
+}
+
+/** Load post IDs already seen by SPA from the candidates DB. */
+function loadSeenPostIds(): Set<string> {
+  const dbPath = `${process.env.HOME ?? "/tmp"}/.config/spawn/state.db`;
+  if (!existsSync(dbPath)) return new Set();
+  try {
+    const db = new Database(dbPath, {
+      readonly: true,
+    });
+    const rows = db
+      .query<
+        {
+          post_id: string;
+        },
+        []
+      >("SELECT post_id FROM candidates")
+      .all();
+    db.close();
+    return new Set(rows.map((r) => r.post_id));
+  } catch {
+    return new Set();
+  }
 }
 
 /** Simple concurrency limiter. */
@@ -170,6 +221,10 @@ async function main(): Promise<void> {
   const token = await getToken();
   console.error("[reddit-fetch] Authenticated");
 
+  // Load already-seen post IDs from SPA's DB
+  const seenIds = loadSeenPostIds();
+  console.error(`[reddit-fetch] ${seenIds.size} posts already seen in DB`);
+
   // Build all search tasks
   const searchTasks: Array<() => Promise<Map<string, RedditPost>>> = [];
 
@@ -193,17 +248,22 @@ async function main(): Promise<void> {
 
   const allResults = await pooled(searchTasks, MAX_CONCURRENT);
 
-  // Merge and deduplicate
+  // Merge, deduplicate, and filter out already-seen posts
   const allPosts = new Map<string, RedditPost>();
+  let skippedSeen = 0;
   for (const resultMap of allResults) {
     for (const [id, post] of resultMap) {
+      if (seenIds.has(id)) {
+        skippedSeen++;
+        continue;
+      }
       if (!allPosts.has(id)) {
         allPosts.set(id, post);
       }
     }
   }
 
-  console.error(`[reddit-fetch] Found ${allPosts.size} unique posts`);
+  console.error(`[reddit-fetch] Found ${allPosts.size} unique posts (${skippedSeen} already seen, skipped)`);
 
   // Pre-fetch poster comments for posts with some engagement
   const postsArray = [
@@ -250,7 +310,7 @@ async function main(): Promise<void> {
   };
 
   console.log(JSON.stringify(output));
-  console.error(`[reddit-fetch] Done — ${postsArray.length} posts output`);
+  console.error(`[reddit-fetch] Done — ${filtered.length} posts output`);
 }
 
 main().catch((err) => {
