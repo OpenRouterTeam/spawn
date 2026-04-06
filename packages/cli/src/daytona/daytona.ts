@@ -261,7 +261,6 @@ export async function getDaytonaClient(allowPrompt = false): Promise<Daytona | n
   const keysUrl = "https://app.daytona.io/dashboard/keys";
   logStep("Daytona API key required");
   logInfo("Opening Daytona dashboard to create or copy your API key...");
-  logInfo(`If the browser didn't open, visit: ${keysUrl}`);
   openBrowser(keysUrl);
 
   for (;;) {
