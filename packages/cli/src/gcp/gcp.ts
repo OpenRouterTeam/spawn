@@ -699,6 +699,13 @@ function getStartupScript(tier: CloudInitTier = "full"): string {
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+    "# Install GitHub CLI (gh) via official APT repo — baked into cloud-init",
+    "# so it's available before post-provision SSH (avoids race condition #3206)",
+    'curl -fsSL --proto "=https" https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null',
+    "chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg",
+    'printf "deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\\n" "$(dpkg --print-architecture)" > /etc/apt/sources.list.d/github-cli.list',
+    "apt-get update -qq",
+    "apt-get install -y --no-install-recommends gh",
   ];
   if (needsNode(tier)) {
     lines.push(
