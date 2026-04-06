@@ -162,9 +162,17 @@ fi
 # --- Phase 3: Extract candidate and POST to SPA ---
 CANDIDATE_JSON=""
 
-# Extract the json:candidate block from Claude's output (may be multi-line)
+# Extract the last valid json:candidate block from Claude's output
 if [[ -f "${CLAUDE_OUTPUT_FILE}" ]]; then
-    CANDIDATE_JSON=$(sed -n '/^```json:candidate$/,/^```$/{/^```/d;p;}' "${CLAUDE_OUTPUT_FILE}" | tr -d '\n')
+    CANDIDATE_JSON=$(bun -e "
+const text = await Bun.file('${CLAUDE_OUTPUT_FILE}').text();
+const blocks = [...text.matchAll(/\`\`\`json:candidate\n([\s\S]*?)\n\`\`\`/g)];
+let result = '';
+for (const block of blocks) {
+  try { result = JSON.stringify(JSON.parse(block[1].trim())); } catch {}
+}
+if (result) console.log(result);
+" 2>/dev/null)
 fi
 
 if [[ -z "${CANDIDATE_JSON}" ]]; then
