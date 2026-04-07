@@ -22,6 +22,8 @@ interface ServerStatusResult {
   record: SpawnRecord;
   liveState: LiveState;
   agentAlive: boolean | null;
+  /** Security alerts from the VM (null = not checked, empty = clean). */
+  securityAlerts: string | null;
 }
 
 interface JsonStatusEntry {
@@ -32,6 +34,8 @@ interface JsonStatusEntry {
   name: string;
   state: LiveState;
   agent_alive: boolean | null;
+  security: "clean" | "alerts" | "unknown";
+  security_alerts: string[];
   spawned_at: string;
   server_id: string;
 }
@@ -269,6 +273,85 @@ async function probeAgentAlive(record: SpawnRecord, manifest: Manifest | null): 
   return result.ok ? result.data : false;
 }
 
+// ── Security alerts probe ───────────────────────────────────────────────────
+
+/**
+ * Fetch the security alerts log from a running VM.
+ * Returns the raw alert text, empty string if clean, or null if not reachable.
+ */
+async function fetchSecurityAlerts(record: SpawnRecord): Promise<string | null> {
+  const conn = record.connection;
+  if (!conn) {
+    return null;
+  }
+  if (conn.cloud === "local" || conn.cloud === "daytona") {
+    return null;
+  }
+
+  const alertCmd = "cat /var/log/spawn-security-alerts.log 2>/dev/null || true";
+
+  const result = await asyncTryCatch(async () => {
+    let proc: {
+      stdout: ReadableStream<Uint8Array>;
+      exited: Promise<number>;
+    };
+
+    if (conn.cloud === "sprite") {
+      const name = conn.server_name || "";
+      if (!name) {
+        return null;
+      }
+      proc = Bun.spawn(
+        [
+          "sprite",
+          "exec",
+          "-s",
+          name,
+          "--",
+          "bash",
+          "-c",
+          alertCmd,
+        ],
+        {
+          stdout: "pipe",
+          stderr: "ignore",
+        },
+      );
+    } else {
+      const user = conn.user || "root";
+      const ip = conn.ip || "";
+      if (!ip || ip === "sprite-console") {
+        return null;
+      }
+      proc = Bun.spawn(
+        [
+          "ssh",
+          ...SSH_BASE_OPTS,
+          "-o",
+          "ConnectTimeout=5",
+          `${user}@${ip}`,
+          alertCmd,
+        ],
+        {
+          stdout: "pipe",
+          stderr: "ignore",
+        },
+      );
+    }
+
+    const output = await Promise.race([
+      new Response(proc.stdout).text(),
+      new Promise<string>((_, reject) => {
+        setTimeout(() => reject(new Error("timeout")), 10_000);
+      }),
+    ]);
+    await proc.exited;
+    return output.trim();
+  });
+
+  return result.ok ? (result.data ?? null) : null;
+}
+
 // ── Formatting ───────────────────────────────────────────────────────────────
 
 function fmtState(state: LiveState): string {
@@ -289,6 +372,17 @@ function fmtProbe(alive: boolean | null): string {
     return pc.dim("—");
   }
   return alive ? pc.green("live") : pc.red("down");
+}
+
+function fmtSecurity(alerts: string | null): string {
+  if (alerts === null) {
+    return pc.dim("—");
+  }
+  if (alerts === "") {
+    return pc.green("clean");
+  }
+  const count = alerts.split("\n").filter(Boolean).length;
+  return pc.red(`${count} alert${count !== 1 ? "s" : ""}`);
 }
 
 function fmtIp(conn: SpawnRecord["connection"]): string {
@@ -319,6 +413,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
   const COL_IP = 16;
   const COL_STATE = 12;
   const COL_PROBE = 10;
+  const COL_SEC = 12;
   const COL_SINCE = 12;
 
   const header = [
@@ -328,6 +423,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
     col(pc.dim("IP"), COL_IP),
     col(pc.dim("State"), COL_STATE),
     col(pc.dim("Probe"), COL_PROBE),
+    col(pc.dim("Security"), COL_SEC),
     pc.dim("Since"),
   ].join(" ");
 
@@ -339,6 +435,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
       "-".repeat(COL_IP),
       "-".repeat(COL_STATE),
       "-".repeat(COL_PROBE),
+      "-".repeat(COL_SEC),
       "-".repeat(COL_SINCE),
     ].join("-"),
   );
@@ -347,7 +444,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
   console.log(header);
   console.log(divider);
 
-  for (const { record, liveState, agentAlive } of results) {
+  for (const { record, liveState, agentAlive, securityAlerts } of results) {
     const conn = record.connection;
     const shortId = record.id ? record.id.slice(0, 6) : "??????";
     const agentDisplay = resolveDisplayName(manifest, record.agent, "agent");
@@ -355,6 +452,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
     const ip = fmtIp(conn);
     const state = fmtState(liveState);
     const probe = fmtProbe(agentAlive);
+    const security = fmtSecurity(securityAlerts);
     const since = formatRelativeTime(record.timestamp);
 
     const row = [
@@ -364,6 +462,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
       col(ip, COL_IP),
       col(state, COL_STATE),
       col(probe, COL_PROBE),
+      col(security, COL_SEC),
       pc.dim(since),
     ].join(" ");
 
@@ -376,7 +475,7 @@ function renderStatusTable(results: ServerStatusResult[], manifest: Manifest | n
 // ── JSON output ──────────────────────────────────────────────────────────────
 
 function renderStatusJson(results: ServerStatusResult[]): void {
-  const entries: JsonStatusEntry[] = results.map(({ record, liveState, agentAlive }) => ({
+  const entries: JsonStatusEntry[] = results.map(({ record, liveState, agentAlive, securityAlerts }) => ({
     id: record.id || "",
     agent: record.agent,
     cloud: record.cloud,
@@ -384,6 +483,8 @@ function renderStatusJson(results: ServerStatusResult[]): void {
     name: record.name || record.connection?.server_name || "",
     state: liveState,
     agent_alive: agentAlive,
+    security: securityAlerts === null ? "unknown" : securityAlerts === "" ? "clean" : "alerts",
+    security_alerts: securityAlerts ? securityAlerts.split("\n").filter(Boolean) : [],
     spawned_at: record.timestamp,
     server_id: record.connection?.server_id || record.connection?.server_name || "",
   }));
@@ -431,13 +532,21 @@ export async function cmdStatus(opts: StatusOpts = {}): Promise<void> {
     candidates.map(async (record) => {
       const liveState = await checkServerStatus(record);
       let agentAlive: boolean | null = null;
+      let securityAlerts: string | null = null;
       if (liveState === "running") {
-        agentAlive = await probeFn(record, manifest);
+        // Run probe and security check in parallel
+        const [probeResult, alertsResult] = await Promise.all([
+          probeFn(record, manifest),
+          fetchSecurityAlerts(record),
+        ]);
+        agentAlive = probeResult;
+        securityAlerts = alertsResult;
       }
       return {
         record,
         liveState,
         agentAlive,
+        securityAlerts,
       };
     }),
   );
@@ -487,6 +596,23 @@ export async function cmdStatus(opts: StatusOpts = {}): Promise<void> {
         `${unreachable.length} server${unreachable.length !== 1 ? "s" : ""} running but agent unreachable. The agent may have crashed or still be starting.`,
       ),
     );
+  }
+
+  // Security alerts summary
+  const withAlerts = results.filter((r) => r.securityAlerts && r.securityAlerts.length > 0);
+  if (withAlerts.length > 0) {
+    p.log.warn(pc.yellow(`${withAlerts.length} server${withAlerts.length !== 1 ? "s" : ""} with security alerts:`));
+    for (const { record, securityAlerts } of withAlerts) {
+      const name = record.name || record.connection?.server_name || record.id?.slice(0, 6) || "?";
+      const lines = (securityAlerts || "").split("\n").filter(Boolean);
+      p.log.warn(pc.yellow(`  ${name}:`));
+      for (const line of lines) {
+        const stripped = line.replace(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\]\s*/, "");
+        if (stripped) {
+          p.log.warn(`    ${stripped}`);
+        }
+      }
+    }
   }
 
   const running = results.filter((r) => r.liveState === "running").length;
