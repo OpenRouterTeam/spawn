@@ -1074,22 +1074,24 @@ async function prepareOpenClawPreviewAccess(
  *  must be appended on demand rather than during initial setup when the preview host is unknown. */
 async function allowOpenClawPreviewOrigin(sandboxId: string, previewUrl: string): Promise<void> {
   const previewOrigin = new URL(previewUrl).origin;
-  const escapedOrigin = JSON.stringify(previewOrigin);
   const patchConfigCmd = [
+    `SPAWN_PREVIEW_ORIGIN=${shellQuote(previewOrigin)}`,
     "node -e",
     shellQuote(
       `
 const fs = require("node:fs");
-const path = process.env.HOME + "/.openclaw/openclaw.json";
-const config = JSON.parse(fs.readFileSync(path, "utf8"));
+const origin = process.env.SPAWN_PREVIEW_ORIGIN;
+if (!origin) { process.exit(1); }
+const cfgPath = process.env.HOME + "/.openclaw/openclaw.json";
+const config = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 const gateway = config.gateway ?? (config.gateway = {});
 const controlUi = gateway.controlUi ?? (gateway.controlUi = {});
 const allowedOrigins = Array.isArray(controlUi.allowedOrigins) ? controlUi.allowedOrigins : [];
-if (!allowedOrigins.includes(${escapedOrigin})) {
-  allowedOrigins.push(${escapedOrigin});
+if (!allowedOrigins.includes(origin)) {
+  allowedOrigins.push(origin);
 }
 controlUi.allowedOrigins = allowedOrigins;
-fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\\n", { mode: 0o600 });
+fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + "\\n", { mode: 0o600 });
       `.trim(),
     ),
   ].join(" ");
