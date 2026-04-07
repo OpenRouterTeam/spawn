@@ -201,6 +201,19 @@ if [ -z "${AGENTS_TO_TEST}" ]; then
   AGENTS_TO_TEST="${ALL_AGENTS}"
 fi
 
+# Sanity-check list sizes to prevent unbounded string growth (#3190)
+_cloud_count=$(printf '%s\n' "${CLOUDS}" | wc -w | tr -d ' ')
+_agent_count=$(printf '%s\n' "${AGENTS_TO_TEST}" | wc -w | tr -d ' ')
+if [ "${_cloud_count}" -gt 50 ]; then
+  printf "Error: too many clouds (%s) — max 50\n" "${_cloud_count}" >&2
+  exit 1
+fi
+if [ "${_agent_count}" -gt 100 ]; then
+  printf "Error: too many agents (%s) — max 100\n" "${_agent_count}" >&2
+  exit 1
+fi
+unset _cloud_count _agent_count
+
 # ---------------------------------------------------------------------------
 # Count clouds to decide single vs multi-cloud mode
 # ---------------------------------------------------------------------------
@@ -540,16 +553,26 @@ send_matrix_email() {
   fi
 
   # Build results string: "cloud:agent:result,..." for bun to process
+  # Sanitize cloud/agent names to alphanumeric, dash, underscore only (#3189)
   local results=""
   for cloud in ${clouds}; do
+    local safe_cloud
+    safe_cloud=$(printf '%s' "${cloud}" | tr -cd 'a-zA-Z0-9_-')
     for agent in ${agents}; do
+      local safe_agent
+      safe_agent=$(printf '%s' "${agent}" | tr -cd 'a-zA-Z0-9_-')
       local result="skip"
       local result_file="${log_dir}/${cloud}-${agent}.result"
       if [ -f "${result_file}" ]; then
         result=$(cat "${result_file}")
       fi
+      # Sanitize result to known values only
+      case "${result}" in
+        pass|fail|skip) ;;
+        *) result="skip" ;;
+      esac
       if [ -n "${results}" ]; then results="${results},"; fi
-      results="${results}${cloud}:${agent}:${result}"
+      results="${results}${safe_cloud}:${safe_agent}:${result}"
     done
   done
 
@@ -672,16 +695,28 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
-    SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
-    case "${LOG_DIR}" in
-      "${SAFE_TMP_ROOT}"/spawn-e2e.*)
-        rm -rf "${LOG_DIR}"
-        ;;
-      *)
-        log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
-        ;;
-    esac
+    if [ "${LOG_DIR}" != "${_E2E_CREATED_LOG_DIR:-}" ]; then
+      log_warn "Refusing to rm -rf LOG_DIR not created by this script: ${LOG_DIR}"
+    else
+      SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
+      SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
+      # Resolve symlinks to prevent symlink-following attacks (#3194)
+      local resolved_log_dir
+      resolved_log_dir=$(realpath "${LOG_DIR}" 2>/dev/null || printf '%s' "${LOG_DIR}")
+      # Verify ownership before deletion
+      if [ ! -O "${resolved_log_dir}" ]; then
+        log_warn "LOG_DIR not owned by current user, refusing deletion: ${resolved_log_dir}"
+      else
+        case "${resolved_log_dir}" in
+          "${SAFE_TMP_ROOT}"/spawn-e2e.*)
+            rm -rf "${resolved_log_dir}"
+            ;;
+          *)
+            log_warn "Refusing to rm -rf unexpected path: ${resolved_log_dir}"
+            ;;
+        esac
+      fi
+    fi
   fi
 }
 trap final_cleanup EXIT
@@ -713,6 +748,7 @@ export E2E_FAST_MODE="${FAST_MODE}"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
 LOG_DIR=$(mktemp -d "${TMP_ROOT}/spawn-e2e.XXXXXX")
+_E2E_CREATED_LOG_DIR="${LOG_DIR}"
 export LOG_DIR
 log_info "Log directory: ${LOG_DIR}"
 

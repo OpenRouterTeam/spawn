@@ -25,6 +25,7 @@ import {
   logInfo,
   logStep,
   logWarn,
+  openBrowser,
   prepareStdinForHandoff,
   prompt,
   promptSpawnNameShared,
@@ -38,12 +39,14 @@ interface DaytonaConfigFile {
   token?: string;
   api_url?: string;
   target?: string;
+  sandbox_size?: string;
 }
 
 interface ResolvedDaytonaConfig {
   apiKey: string;
   apiUrl?: string;
   target?: string;
+  sandboxSize?: string;
 }
 
 interface DaytonaSshAccess {
@@ -73,6 +76,7 @@ const DaytonaConfigFileSchema = v.object({
   token: v.optional(v.string()),
   api_url: v.optional(v.string()),
   target: v.optional(v.string()),
+  sandbox_size: v.optional(v.string()),
 });
 
 const DAYTONA_SSH_HOST = "ssh.app.daytona.io";
@@ -91,25 +95,18 @@ const DAYTONA_ALLOWED_METADATA_KEYS = new Set([
 
 export const SANDBOX_SIZES: SandboxSize[] = [
   {
-    id: "small",
-    cpu: 2,
-    memory: 4,
-    disk: 30,
-    label: "2 vCPU · 4 GiB RAM · 30 GiB disk",
+    id: "user-default",
+    cpu: 1,
+    memory: 1,
+    disk: 3,
+    label: "User default (1 vCPU · 1 GiB RAM · 3 GiB disk)",
   },
   {
-    id: "medium",
+    id: "org-default",
     cpu: 4,
     memory: 8,
-    disk: 50,
-    label: "4 vCPU · 8 GiB RAM · 50 GiB disk",
-  },
-  {
-    id: "large",
-    cpu: 8,
-    memory: 16,
-    disk: 100,
-    label: "8 vCPU · 16 GiB RAM · 100 GiB disk",
+    disk: 10,
+    label: "Org default (4 vCPU · 8 GiB RAM · 10 GiB disk)",
   },
 ];
 
@@ -193,14 +190,34 @@ async function saveDaytonaConfig(config: ResolvedDaytonaConfig): Promise<void> {
     lines.push(`  "api_url": ${jsonEscape(config.apiUrl)}`);
   }
   if (config.target) {
-    const lastIndex = lines.length - 1;
-    lines[lastIndex] += ",";
+    lines[lines.length - 1] += ",";
     lines.push(`  "target": ${jsonEscape(config.target)}`);
+  }
+  if (config.sandboxSize) {
+    lines[lines.length - 1] += ",";
+    lines.push(`  "sandbox_size": ${jsonEscape(config.sandboxSize)}`);
   }
   lines.push("}");
 
   writeFileSync(configPath, lines.join("\n") + "\n", {
     mode: 0o600,
+  });
+}
+
+async function updateSavedSandboxSize(sizeId: string): Promise<void> {
+  const saved = await readSavedDaytonaConfigSafe();
+  if (!saved) {
+    return;
+  }
+  const apiKey = saved.api_key || saved.token || "";
+  if (!apiKey) {
+    return;
+  }
+  await saveDaytonaConfig({
+    apiKey,
+    apiUrl: saved.api_url,
+    target: saved.target,
+    sandboxSize: sizeId,
   });
 }
 
@@ -241,11 +258,13 @@ export async function getDaytonaClient(allowPrompt = false): Promise<Daytona | n
     return null;
   }
 
-  logStep("Manual Daytona API key entry");
-  logInfo("Get your Daytona API key from https://app.daytona.io/dashboard/keys");
+  const keysUrl = "https://app.daytona.io/dashboard/keys";
+  logStep("Daytona API key required");
+  logInfo("Opening Daytona dashboard to create or copy your API key...");
+  openBrowser(keysUrl);
 
   for (;;) {
-    const token = (await prompt("Enter your Daytona API key: ")).trim();
+    const token = (await prompt("Paste your Daytona API key: ")).trim();
     if (!token) {
       throw new Error("No Daytona API key provided");
     }
@@ -318,6 +337,27 @@ function resolveSandboxSizeFromEnv(): SandboxSize | null {
 }
 
 /**
+ * Let Daytona apply its own documented defaults unless the user picked an explicit size.
+ */
+function getCreateResources(size: SandboxSize):
+  | {
+      cpu: number;
+      memory: number;
+      disk: number;
+    }
+  | undefined {
+  if (size.id === DEFAULT_SANDBOX_SIZE.id) {
+    return undefined;
+  }
+
+  return {
+    cpu: size.cpu,
+    memory: size.memory,
+    disk: size.disk,
+  };
+}
+
+/**
  * Prompt for a sandbox size or resolve one from environment variables.
  */
 export async function promptSandboxSize(): Promise<SandboxSize> {
@@ -327,19 +367,31 @@ export async function promptSandboxSize(): Promise<SandboxSize> {
     return envSize;
   }
 
-  if (process.env.SPAWN_CUSTOM !== "1" || process.env.SPAWN_NON_INTERACTIVE === "1") {
-    _state.sandboxSize = DEFAULT_SANDBOX_SIZE;
-    return DEFAULT_SANDBOX_SIZE;
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    const saved = await readSavedDaytonaConfigSafe();
+    const savedId = saved?.sandbox_size;
+    const savedSize = savedId ? SANDBOX_SIZES.find((s) => s.id === savedId) : null;
+    _state.sandboxSize = savedSize || DEFAULT_SANDBOX_SIZE;
+    return _state.sandboxSize;
   }
+
+  const saved = await readSavedDaytonaConfigSafe();
+  const savedDefault = saved?.sandbox_size;
+  const defaultSize = (savedDefault && SANDBOX_SIZES.find((s) => s.id === savedDefault)) || DEFAULT_SANDBOX_SIZE;
 
   process.stderr.write("\n");
   const selectedId = await selectFromList(
     SANDBOX_SIZES.map((size) => `${size.id}|${size.label}`),
     "Daytona sandbox size",
-    DEFAULT_SANDBOX_SIZE.id,
+    defaultSize.id,
   );
-  const selected = SANDBOX_SIZES.find((size) => size.id === selectedId) || DEFAULT_SANDBOX_SIZE;
+  const selected = SANDBOX_SIZES.find((size) => size.id === selectedId) || defaultSize;
   _state.sandboxSize = selected;
+
+  if (selected.id !== savedDefault) {
+    await updateSavedSandboxSize(selected.id);
+  }
+
   return selected;
 }
 
@@ -406,16 +458,17 @@ export async function createServer(name: string): Promise<VMConnection> {
   const client = await getRequiredClient();
   const size = _state.sandboxSize;
   const image = getRequestedImage();
+  const resources = getCreateResources(size);
 
   logStep(`Creating Daytona sandbox '${name}' (${size.label})...`);
   const sandbox = await client.create({
     name,
     image,
-    resources: {
-      cpu: size.cpu,
-      memory: size.memory,
-      disk: size.disk,
-    },
+    ...(resources
+      ? {
+          resources,
+        }
+      : {}),
     labels: buildCreateLabels(),
     autoStopInterval: 0,
     autoArchiveInterval: 0,
@@ -723,10 +776,65 @@ function getPtySize(): {
   };
 }
 
+/**
+ * Upload a small bootstrap script so the PTY only has to exec a file path.
+ *
+ * The script clears the shell's echoed command line before launching the agent.
+ */
+async function prepareInteractiveBootstrapScript(sandboxId: string, cmd: string): Promise<string> {
+  const sandbox = await ensureSandboxStarted(sandboxId);
+  const homeDir = await getSandboxHomeDir(sandboxId);
+  const remotePath = `${homeDir}/.spawn-interactive-session.sh`;
+  const script = `#!/usr/bin/env bash
+set -e
+
+# Clear the shell's echoed bootstrap command before the agent UI takes over.
+printf '\\033[1A\\r\\033[2K\\r'
+
+${cmd}
+`;
+
+  await sandbox.fs.uploadFile(Buffer.from(script), remotePath);
+  await sandbox.process.executeCommand(`chmod 700 ${shellQuote(remotePath)}`);
+  return remotePath;
+}
+
+function consumeTerminalLine(buffer: string): {
+  line: string;
+  rest: string;
+} | null {
+  const newlineIndex = buffer.search(/[\r\n]/);
+  if (newlineIndex === -1) {
+    return null;
+  }
+
+  let lineEnd = newlineIndex + 1;
+  if (buffer[newlineIndex] === "\r" && buffer[newlineIndex + 1] === "\n") {
+    lineEnd += 1;
+  }
+
+  return {
+    line: buffer.slice(0, lineEnd),
+    rest: buffer.slice(lineEnd),
+  };
+}
+
+function shouldSuppressBootstrapEcho(line: string, bootstrapScript: string): boolean {
+  const trimmed = line.trim();
+  return trimmed === `exec ${shellQuote(bootstrapScript)}`;
+}
+
 async function runInteractivePty(sandboxId: string, cmd: string): Promise<number> {
+  if (!cmd || /\0/.test(cmd)) {
+    throw new Error("Invalid command: must be non-empty and must not contain null bytes");
+  }
+
   const sandbox = await ensureSandboxStarted(sandboxId);
   const decoder = new TextDecoder();
   const { cols, rows } = getPtySize();
+  const bootstrapScript = await prepareInteractiveBootstrapScript(sandboxId, cmd);
+  let startupBuffer = "";
+  let filteringStartupEcho = true;
   const pty = await sandbox.process.createPty({
     id: `spawn-${randomUUID()}`,
     cols,
@@ -737,11 +845,33 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
       LANG: process.env.LANG || "en_US.UTF-8",
     },
     onData: (data) => {
-      process.stdout.write(
-        decoder.decode(data, {
-          stream: true,
-        }),
-      );
+      const text = decoder.decode(data, {
+        stream: true,
+      });
+
+      if (!filteringStartupEcho) {
+        process.stdout.write(text);
+        return;
+      }
+
+      startupBuffer += text;
+
+      for (;;) {
+        const consumed = consumeTerminalLine(startupBuffer);
+        if (!consumed) {
+          break;
+        }
+
+        startupBuffer = consumed.rest;
+        if (shouldSuppressBootstrapEcho(consumed.line, bootstrapScript)) {
+          continue;
+        }
+
+        filteringStartupEcho = false;
+        process.stdout.write(consumed.line + startupBuffer);
+        startupBuffer = "";
+        break;
+      }
     },
   });
 
@@ -759,7 +889,8 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
   process.stdin.resume();
   process.stdin.setRawMode?.(true);
   const result = await asyncTryCatch(async () => {
-    await pty.sendInput(`exec bash -lc ${shellQuote(cmd)}\n`);
+    await pty.waitForConnection();
+    await pty.sendInput(`exec ${shellQuote(bootstrapScript)}\n`);
     return pty.wait();
   });
 
@@ -768,7 +899,15 @@ async function runInteractivePty(sandboxId: string, cmd: string): Promise<number
   process.stdin.setRawMode?.(false);
   process.stdin.pause();
   await asyncTryCatch(() => pty.disconnect());
-  process.stdout.write(decoder.decode());
+  const tail = decoder.decode();
+  if (filteringStartupEcho) {
+    startupBuffer += tail;
+    if (!shouldSuppressBootstrapEcho(startupBuffer, bootstrapScript)) {
+      process.stdout.write(startupBuffer);
+    }
+  } else {
+    process.stdout.write(tail);
+  }
 
   if (!result.ok) {
     throw result.error;
@@ -789,7 +928,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
     throw new Error("No Daytona sandbox is active");
   }
 
-  const exitCode = await runInteractivePty(_state.sandboxId, cmd);
+  const exitCode = await runInteractiveDaytonaCommand(_state.sandboxId, cmd);
   process.stderr.write("\n");
   logWarn(`Session ended. Your sandbox '${_state.sandboxId}' may still be running.`);
   logWarn(`Manage or delete it in the Daytona dashboard: ${DAYTONA_DASHBOARD_URL}`);
@@ -935,22 +1074,24 @@ async function prepareOpenClawPreviewAccess(
  *  must be appended on demand rather than during initial setup when the preview host is unknown. */
 async function allowOpenClawPreviewOrigin(sandboxId: string, previewUrl: string): Promise<void> {
   const previewOrigin = new URL(previewUrl).origin;
-  const escapedOrigin = JSON.stringify(previewOrigin);
   const patchConfigCmd = [
+    `SPAWN_PREVIEW_ORIGIN=${shellQuote(previewOrigin)}`,
     "node -e",
     shellQuote(
       `
 const fs = require("node:fs");
-const path = process.env.HOME + "/.openclaw/openclaw.json";
-const config = JSON.parse(fs.readFileSync(path, "utf8"));
+const origin = process.env.SPAWN_PREVIEW_ORIGIN;
+if (!origin) { process.exit(1); }
+const cfgPath = process.env.HOME + "/.openclaw/openclaw.json";
+const config = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 const gateway = config.gateway ?? (config.gateway = {});
 const controlUi = gateway.controlUi ?? (gateway.controlUi = {});
 const allowedOrigins = Array.isArray(controlUi.allowedOrigins) ? controlUi.allowedOrigins : [];
-if (!allowedOrigins.includes(${escapedOrigin})) {
-  allowedOrigins.push(${escapedOrigin});
+if (!allowedOrigins.includes(origin)) {
+  allowedOrigins.push(origin);
 }
 controlUi.allowedOrigins = allowedOrigins;
-fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\\n", { mode: 0o600 });
+fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + "\\n", { mode: 0o600 });
       `.trim(),
     ),
   ].join(" ");

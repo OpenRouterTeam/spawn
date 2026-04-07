@@ -646,7 +646,7 @@ export async function handleRecordAction(
     options.push({
       value: "fix",
       label: "Fix this server",
-      hint: "Re-inject credentials and reinstall agent",
+      hint: "Re-inject credentials, reinstall, reconfigure, restart daemons",
     });
   }
 

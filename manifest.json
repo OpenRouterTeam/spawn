@@ -428,7 +428,7 @@
     "daytona": {
       "name": "Daytona",
       "price": "Usage-based",
-      "description": "Managed development sandboxes with filesystem, process, SSH, and preview APIs",
+      "description": "Managed dev sandboxes with full SDK access (Daytona account required)",
       "url": "https://www.daytona.io/",
       "type": "sandbox",
       "auth": "DAYTONA_API_KEY",
