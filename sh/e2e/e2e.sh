@@ -702,7 +702,11 @@ final_cleanup() {
       SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
       # Resolve symlinks to prevent symlink-following attacks (#3194)
       local resolved_log_dir
-      resolved_log_dir=$(realpath "${LOG_DIR}" 2>/dev/null || printf '%s' "${LOG_DIR}")
+      resolved_log_dir=$(realpath "${LOG_DIR}" 2>/dev/null)
+      if [ -z "${resolved_log_dir}" ]; then
+        log_warn "Failed to resolve LOG_DIR path, skipping cleanup"
+        return
+      fi
       # Verify ownership before deletion
       if [ ! -O "${resolved_log_dir}" ]; then
         log_warn "LOG_DIR not owned by current user, refusing deletion: ${resolved_log_dir}"
