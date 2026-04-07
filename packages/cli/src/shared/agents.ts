@@ -150,6 +150,12 @@ const COMMON_STEPS: OptionalStep[] = [
     hint: "keep agent + system packages up to date (every 6h)",
     defaultOn: true,
   },
+  {
+    value: "security-scan",
+    label: "Security scan",
+    hint: "periodic checks for SSH anomalies, failed logins, suspicious software",
+    defaultOn: true,
+  },
 ];
 
 /** Get the optional setup steps for a given agent (no CloudRunner required). */

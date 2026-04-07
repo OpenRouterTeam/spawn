@@ -15,10 +15,54 @@ import {
 } from "../security.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatchIf, isOperationalError, tryCatch } from "../shared/result.js";
-import { SSH_INTERACTIVE_OPTS, spawnInteractive, startSshTunnel } from "../shared/ssh.js";
+import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, spawnInteractive, startSshTunnel } from "../shared/ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { logWarn, openBrowser, shellQuote } from "../shared/ui.js";
 import { getErrorMessage } from "./shared.js";
+
+/**
+ * Check the remote VM for security alerts written by the spawn-security-scan cron.
+ * If alerts exist, display them as warnings before launching the agent.
+ * Silently skips if the alerts file doesn't exist (scan not installed) or SSH fails.
+ */
+async function checkSecurityAlerts(ip: string, user: string, keyOpts: string[]): Promise<void> {
+  const result = await asyncTryCatchIf(isOperationalError, async () => {
+    const proc = Bun.spawn(
+      [
+        "ssh",
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        `${user}@${ip}`,
+        "--",
+        "cat /var/log/spawn-security-alerts.log 2>/dev/null || true",
+      ],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+    const trimmed = output.trim();
+    if (!trimmed) {
+      return;
+    }
+    // Display each alert line as a warning
+    process.stderr.write("\n");
+    p.log.warn(pc.bold(pc.yellow("Security alerts from your VM:")));
+    for (const line of trimmed.split("\n")) {
+      // Strip the timestamp prefix for cleaner display
+      const stripped = line.replace(/^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\]\s*/, "");
+      if (stripped) {
+        p.log.warn(`  ${stripped}`);
+      }
+    }
+    process.stderr.write("\n");
+  });
+  if (!result.ok) {
+    // Silently ignore — security check is best-effort
+  }
+}
 
 /** Execute a shell command and resolve/reject on process close/error */
 async function runInteractiveCommand(
@@ -297,10 +341,13 @@ export async function cmdEnterAgent(
     }
   }
 
+  // Check for security alerts before entering the session
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  await checkSecurityAlerts(connection.ip, connection.user, keyOpts);
+
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
   const quotedRemoteCmd = shellQuote(remoteCmd);
-  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await runInteractiveCommand(
     "ssh",
     [

@@ -91,7 +91,7 @@ bun test src/__tests__/manifest.test.ts
 - `paths.test.ts` — `getSpawnDir`, `getCacheDir`, `getHistoryPath`, `getSshDir`, path resolution
 - `ssh-keys.test.ts` — SSH key discovery, generation, fingerprinting
 - `update-check.test.ts` — Auto-update check logic
-- `auto-update.test.ts` — `setupAutoUpdate`: systemd service unit generation and orchestration integration
+- `auto-update.test.ts` — `setupAutoUpdate`: systemd service unit generation and orchestration integration; `setupSecurityScan`: cron-based security heuristics and orchestration integration
 - `kill-with-timeout.test.ts` — `killWithTimeout`: SIGKILL after grace period, already-exited process handling
 - `with-retry-result.test.ts` — `withRetry`, `wrapSshCall`, Result constructors
 - `orchestrate.test.ts` — `runOrchestration`

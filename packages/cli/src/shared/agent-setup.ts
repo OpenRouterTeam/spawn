@@ -960,6 +960,156 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   }
 }
 
+// ─── Security Scan ─────────────────────────────────────────────────────────
+
+/**
+ * Install a cron job that runs basic security heuristics every 6 hours.
+ * Checks: SSH authorized_keys anomalies, failed login attempts, unexpected
+ * packages, and suspicious processes. Findings are written to
+ * /var/log/spawn-security-scan.log so they can be displayed on reconnect.
+ *
+ * Skipped for local cloud and non-cron systems.
+ */
+export async function setupSecurityScan(runner: CloudRunner): Promise<void> {
+  logStep("Setting up security scan...");
+
+  const scanScript = [
+    "#!/bin/bash",
+    "set -eo pipefail",
+    'LOGFILE="/var/log/spawn-security-scan.log"',
+    'ALERTFILE="/var/log/spawn-security-alerts.log"',
+    "",
+    "# Truncate alerts file each run — only latest findings matter",
+    '> "$ALERTFILE"',
+    "",
+    'log() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$LOGFILE"; }',
+    'alert() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$ALERTFILE"; log "ALERT: $*"; }',
+    "",
+    'log "Security scan started"',
+    "",
+    "# ── Check 1: SSH authorized_keys ──",
+    "# Count keys across all users. Spawn injects exactly one key at provision time.",
+    "# Multiple keys or keys from unexpected sources are suspicious.",
+    "_total_keys=0",
+    "_key_alerts=0",
+    "for _authfile in /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys; do",
+    '  [ -f "$_authfile" ] || continue',
+    '  _count=$(grep -c "^ssh-" "$_authfile" 2>/dev/null || echo 0)',
+    "  _total_keys=$((_total_keys + _count))",
+    '  if [ "$_count" -gt 2 ]; then',
+    '    alert "SSH: $_authfile contains $_count keys (expected 1-2)"',
+    "    _key_alerts=$((_key_alerts + 1))",
+    "  fi",
+    "done",
+    'if [ "$_total_keys" -eq 0 ]; then',
+    '  alert "SSH: No authorized_keys found — server may be inaccessible"',
+    "fi",
+    'log "SSH key check done: $_total_keys total keys, $_key_alerts alerts"',
+    "",
+    "# ── Check 2: Failed login attempts ──",
+    "# Check auth logs for brute-force indicators.",
+    "_fail_count=0",
+    "if [ -f /var/log/auth.log ]; then",
+    "  _fail_count=$(grep -c 'Failed password\\|authentication failure' /var/log/auth.log 2>/dev/null || echo 0)",
+    "elif [ -f /var/log/secure ]; then",
+    "  _fail_count=$(grep -c 'Failed password\\|authentication failure' /var/log/secure 2>/dev/null || echo 0)",
+    "fi",
+    'if [ "$_fail_count" -gt 50 ]; then',
+    '  alert "AUTH: $_fail_count failed login attempts detected — possible brute-force"',
+    "  # Grab the top offending IPs",
+    '  _top_ips=""',
+    "  if [ -f /var/log/auth.log ]; then",
+    "    _top_ips=$(grep 'Failed password' /var/log/auth.log 2>/dev/null | grep -oE '([0-9]{1,3}\\.){3}[0-9]{1,3}' | sort | uniq -c | sort -rn | head -5)",
+    "  elif [ -f /var/log/secure ]; then",
+    "    _top_ips=$(grep 'Failed password' /var/log/secure 2>/dev/null | grep -oE '([0-9]{1,3}\\.){3}[0-9]{1,3}' | sort | uniq -c | sort -rn | head -5)",
+    "  fi",
+    '  if [ -n "$_top_ips" ]; then',
+    '    alert "AUTH: Top offending IPs:\\n$_top_ips"',
+    "  fi",
+    "fi",
+    'log "Auth check done: $_fail_count failed attempts"',
+    "",
+    "# ── Check 3: Unexpected software ──",
+    "# Flag known attack tools or unexpected daemons that spawn never installs.",
+    '_suspicious_bins="nmap masscan hydra john hashcat ettercap aircrack-ng metasploit msfconsole msfvenom netcat ncat socat cryptominer xmrig minerd cgminer"',
+    "_found_suspicious=0",
+    "for _bin in $_suspicious_bins; do",
+    '  if command -v "$_bin" >/dev/null 2>&1; then',
+    '    alert "SOFTWARE: Unexpected binary found: $_bin ($(command -v "$_bin"))"',
+    "    _found_suspicious=$((_found_suspicious + 1))",
+    "  fi",
+    "done",
+    'log "Software check done: $_found_suspicious suspicious binaries"',
+    "",
+    "# ── Check 4: Suspicious processes ──",
+    "# Check for crypto miners or reverse shells.",
+    '_sus_procs=$(ps aux 2>/dev/null | grep -iE "xmrig|minerd|cryptonight|stratum\\+|/dev/tcp/|bash -i" | grep -v grep || true)',
+    'if [ -n "$_sus_procs" ]; then',
+    '  alert "PROCESS: Suspicious processes detected:\\n$_sus_procs"',
+    "fi",
+    "",
+    "# ── Check 5: Unexpected cron jobs ──",
+    "# Look for cron entries not installed by spawn.",
+    "_cron_alerts=0",
+    "for _user in $(cut -d: -f1 /etc/passwd 2>/dev/null); do",
+    '  _cron=$(crontab -l -u "$_user" 2>/dev/null || true)',
+    '  if [ -n "$_cron" ]; then',
+    '    _non_spawn=$(echo "$_cron" | grep -v "^#" | grep -v "spawn\\|openclaw-gateway" || true)',
+    '    if [ -n "$_non_spawn" ]; then',
+    '      _count=$(echo "$_non_spawn" | wc -l | tr -d " ")',
+    '      if [ "$_count" -gt 0 ]; then',
+    '        alert "CRON: $_count unexpected cron entries for user $_user"',
+    "        _cron_alerts=$((_cron_alerts + 1))",
+    "      fi",
+    "    fi",
+    "  fi",
+    "done",
+    'log "Cron check done: $_cron_alerts users with unexpected entries"',
+    "",
+    "# ── Check 6: Listening ports ──",
+    "# Flag unexpected listeners (not SSH, not agent dashboards).",
+    '_known_ports="22 80 443 8080 8443 18789 3000 5173"',
+    "_listeners=$(ss -tlnp 2>/dev/null | tail -n +2 || netstat -tlnp 2>/dev/null | tail -n +2 || true)",
+    'if [ -n "$_listeners" ]; then',
+    "  _unexpected=$(echo \"$_listeners\" | grep -vE \"($(echo $_known_ports | tr ' ' '|'))\" | grep -v 'sshd\\|node\\|bun\\|deno\\|python' || true)",
+    '  if [ -n "$_unexpected" ]; then',
+    '    _ucount=$(echo "$_unexpected" | wc -l | tr -d " ")',
+    '    alert "NETWORK: $_ucount unexpected listening ports detected"',
+    "  fi",
+    "fi",
+    "",
+    'log "Security scan completed"',
+  ].join("\n");
+
+  const scanB64 = Buffer.from(scanScript).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(scanB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+
+  const cronLine = "0 */6 * * * /usr/local/bin/spawn-security-scan >> /var/log/spawn-security-scan.log 2>&1";
+
+  const installScript = [
+    "if ! command -v crontab >/dev/null 2>&1; then exit 0; fi",
+    '_sudo=""',
+    '[ "$(id -u)" != "0" ] && _sudo="sudo"',
+    "printf '%s' '" + scanB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-security-scan > /dev/null",
+    "$_sudo chmod +x /usr/local/bin/spawn-security-scan",
+    "$_sudo touch /var/log/spawn-security-scan.log /var/log/spawn-security-alerts.log",
+    "$_sudo chmod 644 /var/log/spawn-security-scan.log /var/log/spawn-security-alerts.log",
+    // Add cron entry if not already present
+    `(crontab -l 2>/dev/null | grep -v spawn-security-scan; echo "${cronLine}") | crontab - 2>/dev/null || true`,
+    // Run the first scan immediately
+    "/usr/local/bin/spawn-security-scan 2>/dev/null || true",
+  ].join("\n");
+
+  const result = await asyncTryCatch(() => runner.runServer(installScript));
+  if (result.ok) {
+    logInfo("Security scan installed (runs every 6 hours)");
+  } else {
+    logWarn("Security scan setup failed (non-fatal)");
+  }
+}
+
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
