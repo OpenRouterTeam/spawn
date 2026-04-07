@@ -17,7 +17,7 @@ import {
   saveMetadata,
   saveSpawnRecord,
 } from "../history.js";
-import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
+import { offerGithubAuth, setupAutoUpdate, setupSecurityScan, wrapSshCall } from "./agent-setup.js";
 import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
@@ -601,6 +601,15 @@ async function postInstall(
       },
       spawnId,
     );
+  }
+
+  // Security scan cron
+  if (
+    cloud.cloudName !== "local" &&
+    cloud.cloudName !== "daytona" &&
+    (!enabledSteps || enabledSteps.has("security-scan"))
+  ) {
+    await setupSecurityScan(cloud.runner);
   }
 
   // Spawn CLI + skill injection (recursive spawn)

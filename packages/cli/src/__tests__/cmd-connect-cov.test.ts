@@ -144,6 +144,7 @@ describe("cmdEnterAgent", () => {
   let getSshKeyOptsSpy: ReturnType<typeof spyOn>;
   let startSshTunnelSpy: ReturnType<typeof spyOn>;
   let openBrowserSpy: ReturnType<typeof spyOn>;
+  let bunSpawnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     clack.logError.mockReset();
@@ -162,6 +163,30 @@ describe("cmdEnterAgent", () => {
       stop: mock(() => {}),
     });
     openBrowserSpy = spyOn(uiModule, "openBrowser").mockImplementation(() => {});
+    // Mock Bun.spawn for checkSecurityAlerts — return empty output (no alerts)
+    bunSpawnSpy = spyOn(Bun, "spawn").mockReturnValue({
+      stdout: new ReadableStream({
+        start(controller) {
+          controller.close();
+        },
+      }),
+      stderr: new ReadableStream({
+        start(controller) {
+          controller.close();
+        },
+      }),
+      exited: Promise.resolve(0),
+      pid: 0,
+      exitCode: null,
+      signalCode: null,
+      killed: false,
+      stdin: undefined,
+      readable: new ReadableStream(),
+      ref: () => {},
+      unref: () => {},
+      kill: () => {},
+      [Symbol.asyncDispose]: async () => {},
+    } satisfies ReturnType<typeof Bun.spawn>);
   });
 
   afterEach(() => {
@@ -171,6 +196,7 @@ describe("cmdEnterAgent", () => {
     getSshKeyOptsSpy.mockRestore();
     startSshTunnelSpy.mockRestore();
     openBrowserSpy.mockRestore();
+    bunSpawnSpy.mockRestore();
   });
 
   it("enters agent via SSH with stored launch_cmd", async () => {
