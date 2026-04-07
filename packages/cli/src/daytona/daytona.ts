@@ -25,6 +25,7 @@ import {
   logInfo,
   logStep,
   logWarn,
+  openBrowser,
   prepareStdinForHandoff,
   prompt,
   promptSpawnNameShared,
@@ -38,12 +39,14 @@ interface DaytonaConfigFile {
   token?: string;
   api_url?: string;
   target?: string;
+  sandbox_size?: string;
 }
 
 interface ResolvedDaytonaConfig {
   apiKey: string;
   apiUrl?: string;
   target?: string;
+  sandboxSize?: string;
 }
 
 interface DaytonaSshAccess {
@@ -73,6 +76,7 @@ const DaytonaConfigFileSchema = v.object({
   token: v.optional(v.string()),
   api_url: v.optional(v.string()),
   target: v.optional(v.string()),
+  sandbox_size: v.optional(v.string()),
 });
 
 const DAYTONA_SSH_HOST = "ssh.app.daytona.io";
@@ -186,14 +190,34 @@ async function saveDaytonaConfig(config: ResolvedDaytonaConfig): Promise<void> {
     lines.push(`  "api_url": ${jsonEscape(config.apiUrl)}`);
   }
   if (config.target) {
-    const lastIndex = lines.length - 1;
-    lines[lastIndex] += ",";
+    lines[lines.length - 1] += ",";
     lines.push(`  "target": ${jsonEscape(config.target)}`);
+  }
+  if (config.sandboxSize) {
+    lines[lines.length - 1] += ",";
+    lines.push(`  "sandbox_size": ${jsonEscape(config.sandboxSize)}`);
   }
   lines.push("}");
 
   writeFileSync(configPath, lines.join("\n") + "\n", {
     mode: 0o600,
+  });
+}
+
+async function updateSavedSandboxSize(sizeId: string): Promise<void> {
+  const saved = await readSavedDaytonaConfigSafe();
+  if (!saved) {
+    return;
+  }
+  const apiKey = saved.api_key || saved.token || "";
+  if (!apiKey) {
+    return;
+  }
+  await saveDaytonaConfig({
+    apiKey,
+    apiUrl: saved.api_url,
+    target: saved.target,
+    sandboxSize: sizeId,
   });
 }
 
@@ -234,11 +258,13 @@ export async function getDaytonaClient(allowPrompt = false): Promise<Daytona | n
     return null;
   }
 
-  logStep("Manual Daytona API key entry");
-  logInfo("Get your Daytona API key from https://app.daytona.io/dashboard/keys");
+  const keysUrl = "https://app.daytona.io/dashboard/keys";
+  logStep("Daytona API key required");
+  logInfo("Opening Daytona dashboard to create or copy your API key...");
+  openBrowser(keysUrl);
 
   for (;;) {
-    const token = (await prompt("Enter your Daytona API key: ")).trim();
+    const token = (await prompt("Paste your Daytona API key: ")).trim();
     if (!token) {
       throw new Error("No Daytona API key provided");
     }
@@ -341,19 +367,31 @@ export async function promptSandboxSize(): Promise<SandboxSize> {
     return envSize;
   }
 
-  if (process.env.SPAWN_CUSTOM !== "1" || process.env.SPAWN_NON_INTERACTIVE === "1") {
-    _state.sandboxSize = DEFAULT_SANDBOX_SIZE;
-    return DEFAULT_SANDBOX_SIZE;
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    const saved = await readSavedDaytonaConfigSafe();
+    const savedId = saved?.sandbox_size;
+    const savedSize = savedId ? SANDBOX_SIZES.find((s) => s.id === savedId) : null;
+    _state.sandboxSize = savedSize || DEFAULT_SANDBOX_SIZE;
+    return _state.sandboxSize;
   }
+
+  const saved = await readSavedDaytonaConfigSafe();
+  const savedDefault = saved?.sandbox_size;
+  const defaultSize = (savedDefault && SANDBOX_SIZES.find((s) => s.id === savedDefault)) || DEFAULT_SANDBOX_SIZE;
 
   process.stderr.write("\n");
   const selectedId = await selectFromList(
     SANDBOX_SIZES.map((size) => `${size.id}|${size.label}`),
     "Daytona sandbox size",
-    DEFAULT_SANDBOX_SIZE.id,
+    defaultSize.id,
   );
-  const selected = SANDBOX_SIZES.find((size) => size.id === selectedId) || DEFAULT_SANDBOX_SIZE;
+  const selected = SANDBOX_SIZES.find((size) => size.id === selectedId) || defaultSize;
   _state.sandboxSize = selected;
+
+  if (selected.id !== savedDefault) {
+    await updateSavedSandboxSize(selected.id);
+  }
+
   return selected;
 }
 
