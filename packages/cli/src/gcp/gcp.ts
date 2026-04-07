@@ -693,12 +693,13 @@ function getStartupScript(tier: CloudInitTier = "full"): string {
   assertSafeUsername(resolveUsername());
 
   const packages = getPackagesForTier(tier);
+  const quotedPackages = packages.map((p) => shellQuote(p)).join(" ");
   const lines = [
     "#!/bin/bash",
     "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
-    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+    `apt-get install -y --no-install-recommends ${quotedPackages}`,
     "# Install GitHub CLI (gh) via official APT repo — baked into cloud-init",
     "# so it's available before post-provision SSH (avoids race condition #3206)",
     'curl -fsSL --proto "=https" https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null',

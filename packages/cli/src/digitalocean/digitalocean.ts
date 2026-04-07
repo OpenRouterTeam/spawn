@@ -1025,13 +1025,14 @@ export async function promptDoRegion(): Promise<string> {
 
 function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
+  const quotedPackages = packages.map((p) => shellQuote(p)).join(" ");
   const lines = [
     "#!/bin/bash",
     "set -e",
     "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
-    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+    `apt-get install -y --no-install-recommends ${quotedPackages}`,
   ];
   if (needsNode(tier)) {
     lines.push(`${NODE_INSTALL_CMD} || true`);
