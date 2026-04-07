@@ -54,6 +54,20 @@ interface RawThread {
   pr_urls: string | null;
 }
 
+const PrUrlsSchema = v.array(v.string());
+
+function parsePrUrls(raw: string | null): string[] | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  const result = v.safeParse(PrUrlsSchema, parsed);
+  return result.success ? result.output : undefined;
+}
+
 function rowToThread(r: RawThread): ThreadRow {
   return {
     channel: r.channel,
@@ -62,11 +76,7 @@ function rowToThread(r: RawThread): ThreadRow {
     createdAt: r.created_at,
     userId: r.user_id ?? undefined,
     lastActivityAt: r.last_activity_at ?? undefined,
-    prUrls: r.pr_urls
-      ? Array.isArray(JSON.parse(r.pr_urls))
-        ? JSON.parse(r.pr_urls).filter(isString)
-        : undefined
-      : undefined,
+    prUrls: parsePrUrls(r.pr_urls),
   };
 }
 
