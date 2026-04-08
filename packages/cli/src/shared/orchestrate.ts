@@ -829,9 +829,11 @@ async function postInstall(
     tunnelHandle.stop();
   }
 
-  // Pull child's spawn history back to the parent for `spawn tree`
+  // Pull child's spawn history back to the parent for `spawn tree`.
+  // Fire-and-forget — never delay exit for a convenience feature.
+  // process.exit() below kills any in-flight SSH calls.
   if (cloud.cloudName !== "local") {
-    await pullChildHistory(cloud.runner, spawnId);
+    pullChildHistory(cloud.runner, spawnId).catch(() => {});
   }
 
   process.exit(exitCode);
