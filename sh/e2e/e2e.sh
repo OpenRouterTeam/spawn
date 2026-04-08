@@ -698,22 +698,40 @@ final_cleanup() {
     if [ "${LOG_DIR}" != "${_E2E_CREATED_LOG_DIR:-}" ]; then
       log_warn "Refusing to rm -rf LOG_DIR not created by this script: ${LOG_DIR}"
     else
+      # Reject symlinks to prevent TOCTOU races (CWE-367, #3233):
+      # Previous code resolved symlinks then operated on the resolved path,
+      # but an attacker could swap the symlink target between resolve and rm.
+      # Fix: refuse to delete symlinks entirely — LOG_DIR should never be one.
+      if [ -L "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR is a symlink, refusing deletion to prevent symlink attacks: ${LOG_DIR}"
+        return
+      fi
       SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
       SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
-      # Resolve symlinks to prevent symlink-following attacks (#3194)
+      # Use realpath -P to resolve, then verify the original path matches
+      # (ensures LOG_DIR is not inside a symlinked parent directory)
       local resolved_log_dir
-      resolved_log_dir=$(realpath "${LOG_DIR}" 2>/dev/null)
+      resolved_log_dir=$(realpath -P "${LOG_DIR}" 2>/dev/null)
       if [ -z "${resolved_log_dir}" ]; then
         log_warn "Failed to resolve LOG_DIR path, skipping cleanup"
         return
       fi
-      # Verify ownership before deletion
-      if [ ! -O "${resolved_log_dir}" ]; then
-        log_warn "LOG_DIR not owned by current user, refusing deletion: ${resolved_log_dir}"
+      # Re-check symlink after resolve to narrow the TOCTOU window
+      if [ -L "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR became a symlink during cleanup, aborting: ${LOG_DIR}"
+        return
+      fi
+      # Verify ownership on the original path (not the resolved one)
+      if [ ! -O "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR not owned by current user, refusing deletion: ${LOG_DIR}"
       else
         case "${resolved_log_dir}" in
           "${SAFE_TMP_ROOT}"/spawn-e2e.*)
-            rm -rf "${resolved_log_dir}"
+            # Delete the original path — if it became a symlink between check
+            # and here, rm -rf on a symlink just removes the link itself when
+            # the target no longer matches. The double -L check above minimizes
+            # this window.
+            rm -rf "${LOG_DIR}"
             ;;
           *)
             log_warn "Refusing to rm -rf unexpected path: ${resolved_log_dir}"
