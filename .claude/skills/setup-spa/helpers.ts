@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { Err, isString, Ok, toRecord } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
 import * as v from "valibot";
@@ -803,7 +803,7 @@ export async function downloadSlackFile(
     mkdirSync(dir, {
       recursive: true,
     });
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeName = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
     const localPath = `${dir}/${safeName}`;
     writeFileSync(localPath, buffer);
     return Ok(localPath);
