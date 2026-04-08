@@ -459,17 +459,16 @@ async function setupOpenclawConfig(
     await uploadConfigFile(runner, fallbackConfig, "$HOME/.openclaw/openclaw.json");
   }
 
-  // Set custom model if user selected one different from the onboard default
-  if (modelId !== "openrouter/auto") {
-    const modelResult = await asyncTryCatchIf(isOperationalError, () =>
-      runner.runServer(
-        "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-          `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
-      ),
-    );
-    if (!modelResult.ok) {
-      logWarn("Custom model config failed (non-fatal)");
-    }
+  // Always set the model after onboard — `openclaw onboard` may pick its own
+  // default (e.g. arcee/trinity-large-thinking) instead of openrouter/auto.
+  const modelResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
+    ),
+  );
+  if (!modelResult.ok) {
+    logWarn("Model config failed (non-fatal)");
   }
 
   // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
