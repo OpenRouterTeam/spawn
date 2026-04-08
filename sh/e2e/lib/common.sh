@@ -168,9 +168,11 @@ get_provision_timeout() {
   local safe_agent
   safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
 
-  # Check for env var override: PROVISION_TIMEOUT_<agent> (printenv, no eval)
-  local env_val
-  env_val=$(printenv "PROVISION_TIMEOUT_${safe_agent}" 2>/dev/null) || env_val=""
+  # Check for env var override: PROVISION_TIMEOUT_<agent>
+  # Use eval with safe_agent (already sanitized to [A-Za-z0-9_]) for reliable
+  # variable lookup — printenv is fragile across shells and platforms.
+  local env_val=""
+  eval "env_val=\${PROVISION_TIMEOUT_${safe_agent}:-}"
   if [ -n "${env_val}" ]; then
     case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
   fi
@@ -204,9 +206,11 @@ get_agent_timeout() {
   local safe_agent
   safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
 
-  # Check for env var override: AGENT_TIMEOUT_<agent> (printenv, no eval)
-  local env_val
-  env_val=$(printenv "AGENT_TIMEOUT_${safe_agent}" 2>/dev/null) || env_val=""
+  # Check for env var override: AGENT_TIMEOUT_<agent>
+  # Use eval with safe_agent (already sanitized to [A-Za-z0-9_]) for reliable
+  # variable lookup — printenv is fragile across shells and platforms.
+  local env_val=""
+  eval "env_val=\${AGENT_TIMEOUT_${safe_agent}:-}"
   if [ -n "${env_val}" ]; then
     case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
   fi
