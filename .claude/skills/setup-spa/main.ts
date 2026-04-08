@@ -1317,8 +1317,13 @@ function isHttpAuthed(req: Request): boolean {
   if (!TRIGGER_SECRET) return false;
   const given = req.headers.get("Authorization") ?? "";
   const expected = `Bearer ${TRIGGER_SECRET}`;
-  if (given.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  // Use try/catch instead of length pre-check: timingSafeEqual throws on length
+  // mismatch, and the pre-check leaks the expected secret length via timing (CWE-208).
+  try {
+    return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  } catch {
+    return false;
+  }
 }
 
 /** Post a Block Kit candidate card to Slack and store in DB. */
@@ -1597,6 +1602,20 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
   });
 }
 
+/** Simple token-bucket rate limiter: max 10 requests per minute per endpoint. */
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(endpoint: string): boolean {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(endpoint) ?? { count: 0, resetAt: now + 60_000 };
+  if (now > bucket.resetAt) {
+    bucket.count = 0;
+    bucket.resetAt = now + 60_000;
+  }
+  bucket.count = bucket.count + 1;
+  rateLimitBuckets.set(endpoint, bucket);
+  return bucket.count <= 10;
+}
+
 /** Start the HTTP server for growth candidate ingestion. */
 function startHttpServer(client: SlackClient): void {
   if (!TRIGGER_SECRET) {
@@ -1610,6 +1629,9 @@ function startHttpServer(client: SlackClient): void {
       const url = new URL(req.url);
 
       if (req.method === "GET" && url.pathname === "/health") {
+        if (!checkRateLimit("/health")) {
+          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
+        }
         return Response.json({
           status: "ok",
         });
@@ -1625,6 +1647,9 @@ function startHttpServer(client: SlackClient): void {
               status: 401,
             },
           );
+        }
+        if (!checkRateLimit("/candidate")) {
+          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
         }
 
         let body: unknown;
@@ -1667,6 +1692,9 @@ function startHttpServer(client: SlackClient): void {
               status: 401,
             },
           );
+        }
+        if (!checkRateLimit("/reply")) {
+          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
         }
 
         const replySchema = v.object({
