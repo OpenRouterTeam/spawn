@@ -41,6 +41,7 @@ describe("cmdStatus", () => {
   let testDir: string;
   let originalFetch: typeof global.fetch;
   let consoleSpy: ReturnType<typeof spyOn>;
+  let bunSpawnSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     testDir = join(process.env.HOME ?? "", `spawn-status-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -57,12 +58,37 @@ describe("cmdStatus", () => {
     clack.spinnerStart.mockReset();
     clack.spinnerStop.mockReset();
     consoleSpy = spyOn(console, "log").mockImplementation(() => {});
+    // Mock Bun.spawn for fetchSecurityAlerts — return empty output (no alerts)
+    bunSpawnSpy = spyOn(Bun, "spawn").mockReturnValue({
+      stdout: new ReadableStream({
+        start(controller) {
+          controller.close();
+        },
+      }),
+      stderr: new ReadableStream({
+        start(controller) {
+          controller.close();
+        },
+      }),
+      exited: Promise.resolve(0),
+      pid: 0,
+      exitCode: null,
+      signalCode: null,
+      killed: false,
+      stdin: undefined,
+      readable: new ReadableStream(),
+      ref: () => {},
+      unref: () => {},
+      kill: () => {},
+      [Symbol.asyncDispose]: async () => {},
+    } satisfies ReturnType<typeof Bun.spawn>);
   });
 
   afterEach(() => {
     process.env.SPAWN_HOME = savedSpawnHome;
     global.fetch = originalFetch;
     consoleSpy.mockRestore();
+    bunSpawnSpy.mockRestore();
   });
 
   it("shows no servers message when history is empty", async () => {

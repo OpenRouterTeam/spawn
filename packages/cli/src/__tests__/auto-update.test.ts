@@ -421,6 +421,13 @@ describe("security scan", () => {
       expect(decoded).toContain("nmap");
       expect(decoded).toContain("ss -tlnp");
       expect(decoded).toContain("crontab -l");
+      // High CPU miner detection
+      expect(decoded).toContain("80.0");
+      expect(decoded).toContain("ps aux --no-headers");
+      // Mining pool connection detection
+      expect(decoded).toContain("3333");
+      expect(decoded).toContain("4444");
+      expect(decoded).toContain("mining pool ports");
     });
 
     it("does not throw on runServer failure (non-fatal)", async () => {
