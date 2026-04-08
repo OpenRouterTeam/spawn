@@ -576,8 +576,11 @@ send_matrix_email() {
     done
   done
 
-  local ts_file
+  local ts_file old_umask
+  old_umask=$(umask)
+  umask 077
   ts_file=$(mktemp /tmp/e2e-email-XXXXXX.ts)
+  umask "${old_umask}"
 
   cat > "${ts_file}" << 'TS_EOF'
 const results = (process.env._E2E_RESULTS ?? "").split(",").filter(Boolean);
