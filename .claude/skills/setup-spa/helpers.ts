@@ -686,6 +686,11 @@ export function extractMarkdownTables(raw: string): {
   clean: string;
   tables: string[];
 } {
+  if (raw.length > 50_000)
+    return {
+      clean: raw,
+      tables: [],
+    };
   const tables: string[] = [];
   MARKDOWN_TABLE_RE.lastIndex = 0;
   const clean = raw.replace(MARKDOWN_TABLE_RE, (match) => {
