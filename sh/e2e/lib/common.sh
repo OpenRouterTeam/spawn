@@ -165,20 +165,22 @@ _AGENT_TIMEOUT_hermes=3600
 get_provision_timeout() {
   local agent="$1"
   # Sanitize agent name: whitelist [A-Za-z0-9_] only, replacing all else with _
-  # This prevents shell metacharacter injection before eval on lines below
   local safe_agent
   safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
 
-  # Check for env var override: PROVISION_TIMEOUT_<agent>
-  local env_var="PROVISION_TIMEOUT_${safe_agent}"
-  eval "local env_val=\${${env_var}:-}"
+  # Check for env var override: PROVISION_TIMEOUT_<agent> (printenv, no eval)
+  local env_val
+  env_val=$(printenv "PROVISION_TIMEOUT_${safe_agent}" 2>/dev/null) || env_val=""
   if [ -n "${env_val}" ]; then
     case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
   fi
 
-  # Check for built-in per-agent default
-  local builtin_var="_PROVISION_TIMEOUT_${safe_agent}"
-  eval "local builtin_val=\${${builtin_var}:-}"
+  # Check for built-in per-agent default (lookup table, no eval)
+  local builtin_val=""
+  case "${safe_agent}" in
+    junie)  builtin_val="${_PROVISION_TIMEOUT_junie:-}" ;;
+    hermes) builtin_val="${_PROVISION_TIMEOUT_hermes:-}" ;;
+  esac
   if [ -n "${builtin_val}" ]; then
     printf '%s' "${builtin_val}"
     return
@@ -202,16 +204,19 @@ get_agent_timeout() {
   local safe_agent
   safe_agent=$(printf '%s' "${agent}" | sed 's/[^A-Za-z0-9_]/_/g')
 
-  # Check for env var override: AGENT_TIMEOUT_<agent>
-  local env_var="AGENT_TIMEOUT_${safe_agent}"
-  eval "local env_val=\${${env_var}:-}"
+  # Check for env var override: AGENT_TIMEOUT_<agent> (printenv, no eval)
+  local env_val
+  env_val=$(printenv "AGENT_TIMEOUT_${safe_agent}" 2>/dev/null) || env_val=""
   if [ -n "${env_val}" ]; then
     case "${env_val}" in ''|*[!0-9]*) ;; *) printf '%s' "${env_val}"; return ;; esac
   fi
 
-  # Check for built-in per-agent default
-  local builtin_var="_AGENT_TIMEOUT_${safe_agent}"
-  eval "local builtin_val=\${${builtin_var}:-}"
+  # Check for built-in per-agent default (lookup table, no eval)
+  local builtin_val=""
+  case "${safe_agent}" in
+    junie)  builtin_val="${_AGENT_TIMEOUT_junie:-}" ;;
+    hermes) builtin_val="${_AGENT_TIMEOUT_hermes:-}" ;;
+  esac
   if [ -n "${builtin_val}" ]; then
     printf '%s' "${builtin_val}"
     return
