@@ -39,7 +39,7 @@ import {
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
-import { initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
+import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
 import { checkForUpdates } from "./update-check.js";
 
 const VERSION = pkg.version;
@@ -49,6 +49,7 @@ const VERSION = pkg.version;
 initTelemetry(VERSION);
 
 function handleError(err: unknown): never {
+  captureError("cli_error", err);
   const msg = getErrorMessage(err);
   console.error(pc.red(`Error: ${msg}`));
   console.error(`\nRun ${pc.cyan("spawn help")} for usage information.`);
