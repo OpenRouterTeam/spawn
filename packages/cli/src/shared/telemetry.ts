@@ -2,6 +2,7 @@
 // Default on. Disable with SPAWN_TELEMETRY=0.
 // Strictly errors/warnings/crashes — no command tracking, no session events.
 
+import { isString } from "@openrouter/spawn-shared";
 import { asyncTryCatch } from "./result.js";
 
 // Same PostHog project as feedback.ts
@@ -55,6 +56,55 @@ const SENSITIVE_PATTERNS: [
   ],
 ];
 
+/**
+ * Parse a JS Error stack string into PostHog stack frames.
+ * Each line like "    at functionName (filename:line:col)" becomes a frame.
+ */
+function parseStackFrames(stack: string): {
+  platform: string;
+  function: string;
+  filename: string;
+  lineno?: number;
+  colno?: number;
+  in_app: boolean;
+}[] {
+  const frames: {
+    platform: string;
+    function: string;
+    filename: string;
+    lineno?: number;
+    colno?: number;
+    in_app: boolean;
+  }[] = [];
+  for (const line of stack.split("\n")) {
+    const match = /^\s+at\s+(?:(.+?)\s+\((.+?):(\d+):(\d+)\)|(.+?):(\d+):(\d+))/.exec(line);
+    if (!match) {
+      continue;
+    }
+    const fn = match[1] || "<anonymous>";
+    const file = scrub(match[2] || match[5] || "<unknown>");
+    const lineno = Number(match[3] || match[6]);
+    const colno = Number(match[4] || match[7]);
+    frames.push({
+      platform: "node:javascript",
+      function: fn,
+      filename: file,
+      ...(lineno
+        ? {
+            lineno,
+          }
+        : {}),
+      ...(colno
+        ? {
+            colno,
+          }
+        : {}),
+      in_app: !file.includes("node_modules"),
+    });
+  }
+  return frames;
+}
+
 /** Scrub sensitive data from a string before sending to telemetry. */
 function scrub(text: string): string {
   let result = text;
@@ -94,6 +144,32 @@ export function initTelemetry(version: string): void {
     arch: process.arch,
   };
 
+  // Intercept all stderr output — captures console.error, logError, logWarn, etc.
+  const origWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = function interceptedWrite(
+    chunk: Uint8Array | string,
+    encodingOrCb?: BufferEncoding | ((err?: Error) => void),
+    cb?: (err?: Error) => void,
+  ): boolean {
+    const text = isString(chunk) ? chunk : new TextDecoder().decode(chunk);
+    // Strip ANSI codes for classification
+    const stripped = text.replace(/\x1b\[[0-9;]*m/g, "").trim();
+    if (stripped && isString(chunk)) {
+      // Classify by color code: red = error, yellow = warning
+      const hasRed = chunk.includes("\x1b[0;31m") || chunk.includes("\x1b[31m");
+      const hasYellow = chunk.includes("\x1b[1;33m") || chunk.includes("\x1b[33m");
+      if (hasRed) {
+        captureError("stderr", stripped);
+      } else if (hasYellow) {
+        captureWarning(stripped);
+      }
+    }
+    if (cb) {
+      return origWrite(chunk, encodingOrCb satisfies BufferEncoding | undefined, cb);
+    }
+    return origWrite(chunk, encodingOrCb);
+  };
+
   // Capture uncaught errors
   process.on("uncaughtException", (err) => {
     captureError("uncaught_exception", err);
@@ -128,21 +204,52 @@ export function captureWarning(message: string): void {
   });
 }
 
-/** Capture an error event. */
+/** Map our error types to PostHog mechanism types. */
+function mechanismType(type: string): string {
+  switch (type) {
+    case "uncaught_exception":
+      return "onuncaughtexception";
+    case "unhandled_rejection":
+      return "onunhandledrejection";
+    default:
+      return "generic";
+  }
+}
+
+/** Capture an error as a $exception event (shows in PostHog Error Tracking). */
 export function captureError(type: string, err: unknown): void {
   if (!_enabled) {
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
-  pushEvent("cli_error", {
+  const scrubbedMessage = scrub(message);
+
+  const exceptionEntry: Record<string, unknown> = {
     type,
-    message: scrub(message),
-    ...(stack
-      ? {
-          stack: scrub(stack),
-        }
-      : {}),
+    value: scrubbedMessage,
+    mechanism: {
+      handled: type === "log_error",
+      type: mechanismType(type),
+      synthetic: !(err instanceof Error),
+    },
+  };
+
+  if (stack) {
+    const frames = parseStackFrames(stack);
+    if (frames.length > 0) {
+      exceptionEntry.stacktrace = {
+        type: "raw",
+        frames,
+      };
+    }
+  }
+
+  pushEvent("$exception", {
+    $exception_list: [
+      exceptionEntry,
+    ],
+    $exception_level: "error",
   });
 }
 
