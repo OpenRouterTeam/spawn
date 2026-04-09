@@ -192,9 +192,11 @@ function sendBatch(batch: TelemetryEvent[]): void {
     api_key: POSTHOG_TOKEN,
     batch: batch.map((e) => ({
       event: e.event,
-      distinct_id: _sessionId,
       timestamp: e.timestamp,
-      properties: e.properties,
+      properties: {
+        ...e.properties,
+        distinct_id: _sessionId,
+      },
     })),
   });
 
