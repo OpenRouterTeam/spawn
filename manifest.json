@@ -496,118 +496,171 @@
   "skills": {
     "github-mcp": {
       "name": "GitHub",
-      "description": "PRs, issues, repos, search via GitHub API",
+      "description": "PRs, issues, repos, code search via GitHub API",
       "type": "mcp",
       "package": "@modelcontextprotocol/server-github",
       "env_vars": ["GITHUB_TOKEN"],
       "agents": {
-        "claude": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"],
-            "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
-          },
-          "default": true
-        },
-        "cursor": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"],
-            "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
-          },
-          "default": true
-        }
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" } }, "default": true }
       }
     },
     "playwright-mcp": {
       "name": "Playwright",
-      "description": "Browser automation — navigate, click, screenshot, scrape",
+      "description": "Browser automation — navigate, click, screenshot, fill forms, test",
       "type": "mcp",
-      "package": "@anthropic-ai/mcp-server-playwright",
+      "package": "@playwright/mcp",
       "agents": {
-        "claude": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
-          },
-          "default": true
-        },
-        "cursor": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
-          },
-          "default": true
-        }
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": true },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": true },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@playwright/mcp", "--headless"] }, "default": false }
       }
     },
     "fetch-mcp": {
       "name": "Fetch",
-      "description": "HTTP requests — fetch web pages, APIs, and files",
+      "description": "HTTP requests — fetch web pages, APIs, convert HTML to markdown",
       "type": "mcp",
-      "package": "@anthropic-ai/mcp-server-fetch",
+      "package": "@modelcontextprotocol/server-fetch",
       "agents": {
-        "claude": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@anthropic-ai/mcp-server-fetch"]
-          },
-          "default": false
-        },
-        "cursor": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@anthropic-ai/mcp-server-fetch"]
-          },
-          "default": false
-        }
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"] }, "default": false }
       }
     },
     "context7": {
       "name": "Context7",
-      "description": "Library docs lookup — up-to-date documentation in context",
+      "description": "Library docs — up-to-date documentation and code examples in context",
       "type": "mcp",
       "package": "@upstash/context7-mcp",
       "agents": {
-        "claude": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp"]
-          },
-          "default": false
-        },
-        "cursor": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp"]
-          },
-          "default": false
-        }
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": true },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": true },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }, "default": false }
+      }
+    },
+    "sequential-thinking": {
+      "name": "Sequential Thinking",
+      "description": "Step-by-step reasoning — structured problem solving with branching and revision",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-sequential-thinking",
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"] }, "default": false }
+      }
+    },
+    "memory-mcp": {
+      "name": "Memory",
+      "description": "Persistent knowledge graph — remember entities and relations across sessions",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-memory",
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] }, "default": false }
+      }
+    },
+    "brave-search": {
+      "name": "Brave Search",
+      "description": "Web search — search the web, news, images via Brave API",
+      "type": "mcp",
+      "package": "@brave/brave-search-mcp-server",
+      "env_vars": ["BRAVE_API_KEY"],
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@brave/brave-search-mcp-server"], "env": { "BRAVE_API_KEY": "${BRAVE_API_KEY}" } }, "default": false }
+      }
+    },
+    "sentry-mcp": {
+      "name": "Sentry",
+      "description": "Error tracking — fetch errors, search issues, correlate with releases",
+      "type": "mcp",
+      "package": "@sentry/mcp-server",
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] }, "default": false }
       }
     },
     "postgres-mcp": {
       "name": "PostgreSQL",
-      "description": "Database access — query, inspect schema, manage tables",
+      "description": "Database access — read-only SQL queries, schema inspection",
       "type": "mcp",
       "package": "@modelcontextprotocol/server-postgres",
       "env_vars": ["DATABASE_URL"],
       "agents": {
-        "claude": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-postgres"],
-            "env": { "DATABASE_URL": "${DATABASE_URL}" }
-          },
-          "default": false
-        },
-        "cursor": {
-          "mcp_config": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-postgres"],
-            "env": { "DATABASE_URL": "${DATABASE_URL}" }
-          },
-          "default": false
-        }
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": { "DATABASE_URL": "${DATABASE_URL}" } }, "default": false }
+      }
+    },
+    "sqlite-mcp": {
+      "name": "SQLite",
+      "description": "Local database — SQL queries and schema inspection on SQLite files",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-sqlite",
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"] }, "default": false }
+      }
+    },
+    "slack-mcp": {
+      "name": "Slack",
+      "description": "Slack integration — read/send messages, search channels, manage threads",
+      "type": "mcp",
+      "package": "@modelcontextprotocol/server-slack",
+      "env_vars": ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"],
+      "agents": {
+        "claude": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "cursor": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "codex": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "hermes": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "kilocode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "opencode": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false },
+        "openclaw": { "mcp_config": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_TEAM_ID": "${SLACK_TEAM_ID}" } }, "default": false }
       }
     },
     "git-workflow": {
@@ -616,18 +669,12 @@
       "type": "instruction",
       "content": "---\nname: git-workflow\ndescription: Git branching strategy, conventional commits, and PR workflow best practices\n---\n\n# Git Workflow\n\nFollow these conventions for all git operations:\n\n## Branching\n- `feat/<name>` for new features\n- `fix/<name>` for bug fixes\n- `chore/<name>` for maintenance\n- Always branch from `main`\n\n## Commits\nUse conventional commits: `type(scope): description`\n- `feat:` new feature\n- `fix:` bug fix\n- `docs:` documentation\n- `refactor:` code restructuring\n- `test:` adding tests\n- `chore:` maintenance\n\n## Pull Requests\n1. Create a feature branch\n2. Make focused, atomic commits\n3. Open a PR with a clear title and description\n4. Request review, address feedback\n5. Squash merge when approved\n",
       "agents": {
-        "claude": {
-          "instruction_path": "~/.claude/skills/git-workflow/SKILL.md",
-          "default": true
-        },
-        "openclaw": {
-          "instruction_path": "~/.openclaw/skills/git-workflow/SKILL.md",
-          "default": true
-        },
-        "codex": {
-          "instruction_path": "~/.agents/skills/git-workflow/SKILL.md",
-          "default": true
-        }
+        "claude": { "instruction_path": "~/.claude/skills/git-workflow/SKILL.md", "default": true },
+        "openclaw": { "instruction_path": "~/.openclaw/skills/git-workflow/SKILL.md", "default": true },
+        "codex": { "instruction_path": "~/.agents/skills/git-workflow/SKILL.md", "default": true },
+        "hermes": { "instruction_path": "~/.agents/skills/git-workflow/SKILL.md", "default": true },
+        "kilocode": { "instruction_path": "~/.agents/skills/git-workflow/SKILL.md", "default": true },
+        "opencode": { "instruction_path": "~/.agents/skills/git-workflow/SKILL.md", "default": true }
       }
     },
     "docker": {
@@ -636,18 +683,12 @@
       "type": "instruction",
       "content": "---\nname: docker\ndescription: Docker container management, Dockerfile best practices, and docker compose workflows\n---\n\n# Docker\n\nYou can use Docker on this machine for containerized workflows.\n\n## Common Commands\n\n```bash\n# Build an image\ndocker build -t myapp .\n\n# Run a container\ndocker run -d -p 8080:8080 --name myapp myapp\n\n# View running containers\ndocker ps\n\n# View logs\ndocker logs -f myapp\n\n# Execute command in container\ndocker exec -it myapp bash\n\n# Stop and remove\ndocker stop myapp && docker rm myapp\n```\n\n## Docker Compose\n\n```bash\ndocker compose up -d      # Start services\ndocker compose down        # Stop services\ndocker compose logs -f     # Follow logs\ndocker compose ps          # List services\n```\n\n## Dockerfile Best Practices\n- Use multi-stage builds to minimize image size\n- Pin base image versions (e.g., `node:22-slim`)\n- Copy `package.json` before source for layer caching\n- Use `.dockerignore` to exclude `node_modules`, `.git`\n- Run as non-root user in production\n",
       "agents": {
-        "claude": {
-          "instruction_path": "~/.claude/skills/docker/SKILL.md",
-          "default": false
-        },
-        "openclaw": {
-          "instruction_path": "~/.openclaw/skills/docker/SKILL.md",
-          "default": false
-        },
-        "codex": {
-          "instruction_path": "~/.agents/skills/docker/SKILL.md",
-          "default": false
-        }
+        "claude": { "instruction_path": "~/.claude/skills/docker/SKILL.md", "default": false },
+        "openclaw": { "instruction_path": "~/.openclaw/skills/docker/SKILL.md", "default": false },
+        "codex": { "instruction_path": "~/.agents/skills/docker/SKILL.md", "default": false },
+        "hermes": { "instruction_path": "~/.agents/skills/docker/SKILL.md", "default": false },
+        "kilocode": { "instruction_path": "~/.agents/skills/docker/SKILL.md", "default": false },
+        "opencode": { "instruction_path": "~/.agents/skills/docker/SKILL.md", "default": false }
       }
     },
     "web-search": {
@@ -656,18 +697,12 @@
       "type": "instruction",
       "content": "---\nname: web-search\ndescription: Search the web and fetch URL content using command-line tools\nallowed-tools: Bash\n---\n\n# Web Search & Fetch\n\nYou can search the web and fetch content from URLs.\n\n## Fetch a URL\n\n```bash\ncurl -fsSL \"https://example.com\" | head -200\n```\n\n## Search with DuckDuckGo (no API key needed)\n\n```bash\n# HTML search results\ncurl -fsSL \"https://html.duckduckgo.com/html/?q=your+search+query\" | bun -e \"\nconst html = await Bun.stdin.text();\nconst results = [...html.matchAll(/class=\\\"result__a\\\"[^>]*href=\\\"([^\\\"]+)\\\"[^>]*>([^<]+)/g)];\nfor (const [, url, title] of results.slice(0, 5)) {\n  const decoded = decodeURIComponent(url.replace(/.*uddg=/, '').replace(/&.*/, ''));\n  console.log(title.trim(), '-', decoded);\n}\"\n```\n\n## Fetch and Extract Text\n\n```bash\n# Fetch URL and strip HTML tags\ncurl -fsSL \"URL\" | bun -e \"\nconst html = await Bun.stdin.text();\nconst text = html.replace(/<script[^>]*>[\\\\s\\\\S]*?<\\\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\\\s\\\\S]*?<\\\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\\\s+/g, ' ').trim();\nconsole.log(text.slice(0, 5000));\"\n```\n",
       "agents": {
-        "claude": {
-          "instruction_path": "~/.claude/skills/web-search/SKILL.md",
-          "default": true
-        },
-        "openclaw": {
-          "instruction_path": "~/.openclaw/skills/web-search/SKILL.md",
-          "default": true
-        },
-        "codex": {
-          "instruction_path": "~/.agents/skills/web-search/SKILL.md",
-          "default": true
-        }
+        "claude": { "instruction_path": "~/.claude/skills/web-search/SKILL.md", "default": true },
+        "openclaw": { "instruction_path": "~/.openclaw/skills/web-search/SKILL.md", "default": true },
+        "codex": { "instruction_path": "~/.agents/skills/web-search/SKILL.md", "default": true },
+        "hermes": { "instruction_path": "~/.agents/skills/web-search/SKILL.md", "default": true },
+        "kilocode": { "instruction_path": "~/.agents/skills/web-search/SKILL.md", "default": true },
+        "opencode": { "instruction_path": "~/.agents/skills/web-search/SKILL.md", "default": true }
       }
     },
     "deploy": {
@@ -676,18 +711,12 @@
       "type": "instruction",
       "content": "---\nname: deploy\ndescription: Deploy applications using common deployment strategies\nallowed-tools: Bash\n---\n\n# Deploy\n\nCommon deployment patterns for this VM.\n\n## SSH Deploy (to another server)\n\n```bash\n# Copy files and restart\nrsync -avz --exclude node_modules --exclude .git ./ user@host:/app/\nssh user@host 'cd /app && npm install --production && pm2 restart all'\n```\n\n## Docker Deploy\n\n```bash\n# Build, tag, push, deploy\ndocker build -t registry.example.com/app:latest .\ndocker push registry.example.com/app:latest\nssh user@host 'docker pull registry.example.com/app:latest && docker compose up -d'\n```\n\n## Process Management (pm2)\n\n```bash\nnpm install -g pm2\npm2 start app.js --name myapp\npm2 save\npm2 startup         # Auto-start on reboot\npm2 logs myapp      # View logs\npm2 restart myapp   # Restart\n```\n\n## Systemd Service\n\n```bash\n# Create /etc/systemd/system/myapp.service\nsudo systemctl daemon-reload\nsudo systemctl enable myapp\nsudo systemctl start myapp\nsudo journalctl -u myapp -f\n```\n",
       "agents": {
-        "claude": {
-          "instruction_path": "~/.claude/skills/deploy/SKILL.md",
-          "default": false
-        },
-        "openclaw": {
-          "instruction_path": "~/.openclaw/skills/deploy/SKILL.md",
-          "default": false
-        },
-        "codex": {
-          "instruction_path": "~/.agents/skills/deploy/SKILL.md",
-          "default": false
-        }
+        "claude": { "instruction_path": "~/.claude/skills/deploy/SKILL.md", "default": false },
+        "openclaw": { "instruction_path": "~/.openclaw/skills/deploy/SKILL.md", "default": false },
+        "codex": { "instruction_path": "~/.agents/skills/deploy/SKILL.md", "default": false },
+        "hermes": { "instruction_path": "~/.agents/skills/deploy/SKILL.md", "default": false },
+        "kilocode": { "instruction_path": "~/.agents/skills/deploy/SKILL.md", "default": false },
+        "opencode": { "instruction_path": "~/.agents/skills/deploy/SKILL.md", "default": false }
       }
     }
   }
