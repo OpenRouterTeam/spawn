@@ -9,6 +9,7 @@ import { isString } from "@openrouter/spawn-shared";
 import { parseJsonObj } from "./parse.js";
 import { getSpawnCloudConfigPath } from "./paths.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "./result.js";
+import { captureError, captureWarning } from "./telemetry.js";
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
@@ -30,10 +31,12 @@ export function logDebug(msg: string): void {
 
 export function logWarn(msg: string): void {
   process.stderr.write(`${YELLOW}${msg}${NC}\n`);
+  captureWarning(msg);
 }
 
 export function logError(msg: string): void {
   process.stderr.write(`${RED}${msg}${NC}\n`);
+  captureError("log_error", msg);
 }
 
 export function logStep(msg: string): void {

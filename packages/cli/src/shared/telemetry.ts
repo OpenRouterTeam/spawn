@@ -2,7 +2,6 @@
 // Default on. Disable with SPAWN_TELEMETRY=0.
 // Strictly errors/warnings/crashes — no command tracking, no session events.
 
-import { isString } from "@openrouter/spawn-shared";
 import { asyncTryCatch } from "./result.js";
 
 // Same PostHog project as feedback.ts
@@ -142,32 +141,6 @@ export function initTelemetry(version: string): void {
     spawn_version: version,
     os: process.platform,
     arch: process.arch,
-  };
-
-  // Intercept all stderr output — captures console.error, logError, logWarn, etc.
-  const origWrite = process.stderr.write.bind(process.stderr);
-  process.stderr.write = function interceptedWrite(
-    chunk: Uint8Array | string,
-    encodingOrCb?: BufferEncoding | ((err?: Error) => void),
-    cb?: (err?: Error) => void,
-  ): boolean {
-    const text = isString(chunk) ? chunk : new TextDecoder().decode(chunk);
-    // Strip ANSI codes for classification
-    const stripped = text.replace(/\x1b\[[0-9;]*m/g, "").trim();
-    if (stripped && isString(chunk)) {
-      // Classify by color code: red = error, yellow = warning
-      const hasRed = chunk.includes("\x1b[0;31m") || chunk.includes("\x1b[31m");
-      const hasYellow = chunk.includes("\x1b[1;33m") || chunk.includes("\x1b[33m");
-      if (hasRed) {
-        captureError("stderr", stripped);
-      } else if (hasYellow) {
-        captureWarning(stripped);
-      }
-    }
-    if (cb) {
-      return origWrite(chunk, encodingOrCb satisfies BufferEncoding | undefined, cb);
-    }
-    return origWrite(chunk, encodingOrCb);
   };
 
   // Capture uncaught errors
