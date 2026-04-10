@@ -131,10 +131,17 @@ describe("telemetry", () => {
     await new Promise((r) => setTimeout(r, 50));
   }
 
+  /** Drain any stale events accumulated by the singleton module from other tests. */
+  async function drainStaleEvents(): Promise<void> {
+    await flushAndWait();
+    fetchMock.mockClear();
+  }
+
   describe("scrubbing", () => {
     it("redacts OpenRouter API keys from error messages", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("Failed with key sk-or-v1-abc123def456ghi789jkl012mno345"));
       await flushAndWait();
@@ -151,6 +158,7 @@ describe("telemetry", () => {
     it("redacts Anthropic API keys", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("key: sk-ant-api03-XXXXXXXXXXXXXXXXXXXXXXXXX"));
       await flushAndWait();
@@ -167,6 +175,7 @@ describe("telemetry", () => {
     it("redacts email addresses", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("Contact user@example.com for help"));
       await flushAndWait();
@@ -183,6 +192,7 @@ describe("telemetry", () => {
     it("redacts IPv4 addresses", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("Connection to 192.168.1.100 refused"));
       await flushAndWait();
@@ -199,6 +209,7 @@ describe("telemetry", () => {
     it("redacts home directory paths", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("File not found: /home/johndoe/.config/spawn"));
       await flushAndWait();
@@ -215,6 +226,7 @@ describe("telemetry", () => {
     it("redacts GitHub tokens", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("Auth failed with ghp_1234567890abcdefghij"));
       await flushAndWait();
@@ -231,6 +243,7 @@ describe("telemetry", () => {
     it("redacts Bearer tokens", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", new Error("Header: Bearer eyJhbGciOiJIUz.truncated"));
       await flushAndWait();
@@ -248,6 +261,7 @@ describe("telemetry", () => {
     it("sends a cli_warning event with scrubbed message", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureWarning("Slow connection to 10.0.0.1");
       await flushAndWait();
@@ -266,6 +280,7 @@ describe("telemetry", () => {
     it("produces $exception event with mechanism info", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("log_error", new Error("something broke"));
       await flushAndWait();
@@ -285,6 +300,7 @@ describe("telemetry", () => {
     it("marks uncaught_exception as unhandled with correct mechanism type", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("uncaught_exception", new Error("crash"));
       await flushAndWait();
@@ -301,6 +317,7 @@ describe("telemetry", () => {
     it("marks non-Error values as synthetic", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureError("test_error", "plain string error");
       await flushAndWait();
@@ -317,6 +334,8 @@ describe("telemetry", () => {
     it("includes stack frames when Error has a stack", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+
+      await drainStaleEvents();
 
       const err = new Error("test");
       mod.captureError("test_error", err);
@@ -343,6 +362,7 @@ describe("telemetry", () => {
     it("includes api_key and distinct_id in batch", async () => {
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureWarning("test");
       await flushAndWait();
@@ -362,6 +382,7 @@ describe("telemetry", () => {
       mod.initTelemetry("1.2.3-test");
       mod.setTelemetryContext("agent", "claude");
       mod.setTelemetryContext("cloud", "hetzner");
+      await drainStaleEvents();
 
       mod.captureWarning("test");
       await flushAndWait();
@@ -383,6 +404,7 @@ describe("telemetry", () => {
 
       const mod = await import("../shared/telemetry.js");
       mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
 
       mod.captureWarning("should not send");
       mod.captureError("test", new Error("should not send"));
