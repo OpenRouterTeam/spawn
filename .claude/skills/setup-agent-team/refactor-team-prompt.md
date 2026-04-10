@@ -56,12 +56,15 @@ There are TWO tracks:
 ### Issue track (NO plan mode)
 Teammates assigned to fix a labeled issue (safe-to-work, security, bug) are spawned WITHOUT plan_mode_required. They go straight to fixing — no approval needed. The issue label IS the approval.
 
-### Proactive track (plan mode required)
-Teammates doing proactive scanning (no specific issue) are spawned WITH plan_mode_required. They must:
+### Proactive track (message-based approval — NEVER use plan_mode_required)
+**CRITICAL: NEVER spawn proactive teammates with `plan_mode_required`.** In non-interactive (`-p`) mode, plan_mode_required causes agents to hang indefinitely waiting for human UI approval that never arrives. They cannot process shutdown_request messages while blocked, which prevents TeamDelete from completing. This is the root cause of issues #3244, #3249, and #3256.
+
+Teammates doing proactive scanning (no specific issue) are spawned WITHOUT plan_mode_required. They use message-based approval instead:
 1. Scan the codebase and identify a candidate change
-2. Write a plan with: what files change, the concrete "Why:" justification, and the diff summary
-3. Call ExitPlanMode — this sends you (team lead) an approval request
-4. WAIT for your approval before creating the branch, committing, or pushing
+2. Write a plan proposal: what files change, the concrete "Why:" justification, and the diff summary
+3. Send the plan to you (team lead) via SendMessage — title: "Plan proposal: [brief description]"
+4. WAIT for your reply before creating the branch, committing, or pushing
+5. Proceed ONLY if you respond with "Approved" — stop and report "No action taken" if rejected or no reply within 3 minutes
 
 As team lead, REJECT proactive plans that:
 - Have vague justifications ("improves readability", "better error handling")
@@ -91,9 +94,9 @@ Filter out discovery team issues (labels: `discovery-team`, `cloud-proposal`, `a
 
 If there are more issues than teammates, prioritize: `security` > `bug` > `safe-to-work`.
 
-**Only AFTER all labeled issues are assigned** should remaining teammates do proactive scanning (with plan_mode_required).
+**Only AFTER all labeled issues are assigned** should remaining teammates do proactive scanning (message-based approval — see above). NEVER use plan_mode_required.
 
-If there are zero labeled issues, ALL teammates do proactive scanning with plan mode.
+If there are zero labeled issues, ALL teammates do proactive scanning with message-based approval.
 
 ## Time Budget
 
