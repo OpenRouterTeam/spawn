@@ -67,10 +67,12 @@ async function fetchLatestVersion(): Promise<string | null> {
   return fallback.ok ? fallback.data : null;
 }
 
+function parseSemver(v: string): number[] {
+  return v.split(".").map((n) => Number.parseInt(n, 10) || 0);
+}
+
 function compareVersions(current: string, latest: string): boolean {
   // Simple semantic version comparison (assumes format: major.minor.patch)
-  const parseSemver = (v: string): number[] => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
-
   const currentParts = parseSemver(current);
   const latestParts = parseSemver(latest);
 
@@ -84,6 +86,13 @@ function compareVersions(current: string, latest: string): boolean {
   }
 
   return false;
+}
+
+/** Check if two versions share the same major.minor (e.g. 1.0.x). */
+function isSameMinor(current: string, latest: string): boolean {
+  const c = parseSemver(current);
+  const l = parseSemver(latest);
+  return c[0] === l[0] && c[1] === l[1];
 }
 
 // ── Failure Backoff ──────────────────────────────────────────────────────────
@@ -164,6 +173,24 @@ function printUpdateBanner(latestVersion: string): void {
   );
   console.error(pc.yellow("| ") + pc.bold(line2) + " ".repeat(width - 2 - line2.length) + pc.yellow(" |"));
   console.error(pc.yellow(border));
+  console.error();
+}
+
+/**
+ * Show a non-blocking update notice without auto-installing.
+ * Users can update manually with `spawn update` or set SPAWN_AUTO_UPDATE=1.
+ */
+function printUpdateNotice(latestVersion: string): void {
+  console.error();
+  console.error(
+    pc.yellow("  Update available: ") +
+      pc.dim(`v${VERSION}`) +
+      pc.yellow(" → ") +
+      pc.green(pc.bold(`v${latestVersion}`)),
+  );
+  console.error(
+    pc.dim(`  Run ${pc.cyan("spawn update")} to install, or set SPAWN_AUTO_UPDATE=1 for automatic updates`),
+  );
   console.error();
 }
 
@@ -362,12 +389,22 @@ export async function checkForUpdates(jsonOutput = false): Promise<void> {
   // Record successful check so we don't hit the network again for an hour
   markUpdateChecked();
 
-  // Auto-update if newer version is available
+  // Notify if newer version is available
   if (compareVersions(VERSION, latestVersion)) {
-    const r = tryCatch(() => performAutoUpdate(latestVersion, jsonOutput));
-    if (!r.ok) {
-      logWarn("Auto-update encountered an error");
-      logDebug(getErrorMessage(r.error));
+    // Only auto-update within the same major.minor (patch updates only).
+    // e.g. 1.0.0 → 1.0.5 is allowed, 1.0.0 → 1.1.0 is not.
+    const patchOnly = isSameMinor(VERSION, latestVersion);
+
+    if (patchOnly && process.env.SPAWN_AUTO_UPDATE === "1") {
+      // Opt-in auto-update for patch versions
+      const r = tryCatch(() => performAutoUpdate(latestVersion, jsonOutput));
+      if (!r.ok) {
+        logWarn("Auto-update encountered an error");
+        logDebug(getErrorMessage(r.error));
+      }
+    } else {
+      // Show notice: either auto-update is off, or it's a minor/major bump
+      printUpdateNotice(latestVersion);
     }
   }
 }
