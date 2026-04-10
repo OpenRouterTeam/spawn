@@ -78,21 +78,22 @@ describe("tryTarballInstall", () => {
     expect(getUrl()).toContain("/releases/tags/agent-openclaw-latest");
   });
 
-  it("runs curl | tar xz -C / on the remote VM", async () => {
+  it("runs curl | tar xz on the remote VM with non-root transform", async () => {
     const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
     const runner = createMockRunner();
 
     const result = await tryTarballInstall(runner, "openclaw", fetchFn);
 
     expect(result).toBe(true);
-    // 2 calls: download+extract, then mirror files for non-root users
-    expect(runner.runServer).toHaveBeenCalledTimes(2);
+    expect(runner.runServer).toHaveBeenCalledTimes(1);
     const cmd = String(runner.runServer.mock.calls[0][0]);
     expect(cmd).toContain("curl -fsSL");
-    expect(cmd).toContain("tar xz -C /");
+    expect(cmd).toContain("tar xz");
     expect(cmd).toContain(".spawn-tarball");
-    const mirrorCmd = String(runner.runServer.mock.calls[1][0]);
-    expect(mirrorCmd).toContain("cp -a");
+    // Non-root: uses --transform to remap /root/ to $HOME/
+    expect(cmd).toContain("--transform");
+    // Fallback to sudo for clouds with passwordless sudo
+    expect(cmd).toContain("sudo tar xz -C /");
   });
 
   it("returns false when release does not exist (404)", async () => {
@@ -236,63 +237,6 @@ describe("tryTarballInstall", () => {
       const cmd = String(runner.runServer.mock.calls[0][0]);
       expect(cmd).toContain("uname -m");
       expect(cmd).not.toContain("exit 1");
-    });
-  });
-
-  describe("non-root home directory mirroring", () => {
-    let mirrorCmd: string;
-
-    beforeEach(async () => {
-      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
-      const runner = createMockRunner();
-      await tryTarballInstall(runner, "openclaw", fetchFn);
-      mirrorCmd = String(runner.runServer.mock.calls[1][0]);
-    });
-
-    it("mirrors dotfiles from /root/ to $HOME with non-root guard and ownership fix", () => {
-      expect(mirrorCmd).toContain("cp -a");
-      expect(mirrorCmd).toContain('"$HOME/$_d"');
-      expect(mirrorCmd).toContain('if [ "$(id -u)" != "0" ]; then');
-      expect(mirrorCmd).toContain('chown -R "$(id -u):$(id -g)"');
-      expect(mirrorCmd).toContain('cp /root/.spawn-tarball "$HOME/.spawn-tarball"');
-      for (const dir of [
-        ".claude",
-        ".local",
-        ".npm-global",
-        ".cargo",
-        ".opencode",
-        ".hermes",
-        ".bun",
-      ]) {
-        expect(mirrorCmd).toContain(dir);
-      }
-    });
-
-    it("uses sudo for cp and chown in mirror commands", () => {
-      // sudo is needed because non-root users can't read /root/ or chown root-owned files
-      const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
-      // cp from /root/ needs sudo
-      expect(mirrorCmd).toContain(`${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`);
-      // cp marker file needs sudo
-      expect(mirrorCmd).toContain(`${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`);
-      // chown needs sudo
-      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`);
-      expect(mirrorCmd).toContain(`${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`);
-    });
-
-    it("does not suppress errors with 2>/dev/null || true", () => {
-      // Errors must propagate so failures are visible, not silently swallowed
-      expect(mirrorCmd).not.toContain("2>/dev/null || true");
-    });
-
-    it("returns true even when mirror step fails (non-fatal)", async () => {
-      const fetchFn = mockFetch(new Response(JSON.stringify(RELEASE_PAYLOAD)));
-      const runner = createMockRunner();
-      runner.runServer.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("cp failed"));
-
-      const result = await tryTarballInstall(runner, "openclaw", fetchFn);
-
-      expect(result).toBe(true);
     });
   });
 });
