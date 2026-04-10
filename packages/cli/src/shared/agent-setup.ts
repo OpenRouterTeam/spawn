@@ -336,6 +336,45 @@ async function installChromeBrowser(runner: CloudRunner): Promise<void> {
   }
 }
 
+/**
+ * Poll `openclaw status --json` until bootstrapPending is false.
+ * Gives up after ~60 seconds — the dashboard will still work, it just
+ * may require the user to wait a bit or refresh.
+ */
+async function waitForOpenclawBootstrap(runner: CloudRunner): Promise<void> {
+  logStep("Waiting for OpenClaw bootstrap to complete...");
+
+  const pollScript = [
+    "source ~/.spawnrc 2>/dev/null",
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
+    "_elapsed=0",
+    "while [ $_elapsed -lt 60 ]; do",
+    "  _status=$(openclaw status --json 2>/dev/null) || { sleep 2; _elapsed=$((_elapsed + 2)); continue; }",
+    // Use bun to safely parse JSON — avoids jq dependency
+    "  _pending=$(printf '%s' \"$_status\" | bun -e '",
+    "    const d = await Bun.stdin.text();",
+    '    try { const o = JSON.parse(d); console.log(o.bootstrapPending === true ? "true" : "false"); }',
+    '    catch { console.log("unknown"); }',
+    "  ' 2>/dev/null)",
+    '  if [ "$_pending" = "false" ]; then',
+    '    echo "Bootstrap complete after ${_elapsed}s"',
+    "    exit 0",
+    "  fi",
+    "  sleep 2",
+    "  _elapsed=$((_elapsed + 2))",
+    "done",
+    'echo "Bootstrap still pending after 60s — continuing anyway"',
+    "exit 0",
+  ].join("\n");
+
+  const result = await asyncTryCatchIf(isOperationalError, () => runner.runServer(pollScript, 90));
+  if (result.ok) {
+    logInfo("OpenClaw bootstrap ready");
+  } else {
+    logWarn("Bootstrap readiness check failed (non-fatal, continuing)");
+  }
+}
+
 async function setupOpenclawConfig(
   runner: CloudRunner,
   apiKey: string,
@@ -420,17 +459,16 @@ async function setupOpenclawConfig(
     await uploadConfigFile(runner, fallbackConfig, "$HOME/.openclaw/openclaw.json");
   }
 
-  // Set custom model if user selected one different from the onboard default
-  if (modelId !== "openrouter/auto") {
-    const modelResult = await asyncTryCatchIf(isOperationalError, () =>
-      runner.runServer(
-        "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-          `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
-      ),
-    );
-    if (!modelResult.ok) {
-      logWarn("Custom model config failed (non-fatal)");
-    }
+  // Always set the model after onboard — `openclaw onboard` may pick its own
+  // default (e.g. arcee/trinity-large-thinking) instead of openrouter/auto.
+  const modelResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
+    ),
+  );
+  if (!modelResult.ok) {
+    logWarn("Model config failed (non-fatal)");
   }
 
   // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
@@ -476,17 +514,37 @@ async function setupOpenclawConfig(
     );
   }
 
-  // Configure Telegram channel if a bot token was provided
+  // Configure Telegram channel if a bot token was provided.
+  // Write the full channel object atomically via a bun script that reads the
+  // existing config, deep-merges the telegram block, and writes it back.
+  // Individual `openclaw config set` calls created malformed nested structures
+  // that prevented the bot from polling — see #2655.
   if (telegramBotToken) {
+    const telegramConfig = JSON.stringify({
+      enabled: true,
+      botToken: telegramBotToken,
+      dmPolicy: "pairing",
+      groupPolicy: "open",
+      groups: {
+        "*": {
+          requireMention: true,
+        },
+      },
+    });
+    const mergeScript = [
+      "import fs from 'fs';",
+      "const p = process.env.HOME + '/.openclaw/openclaw.json';",
+      "const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));",
+      "if (!cfg.channels) cfg.channels = {};",
+      "Object.assign(cfg.channels.telegram || (cfg.channels.telegram = {}), JSON.parse(process.env.TELEGRAM_CONFIG));",
+      "fs.writeFileSync(p, JSON.stringify(cfg, null, 2));",
+      "fs.chmodSync(p, 0o600);",
+    ].join(" ");
     const telegramResult = await asyncTryCatchIf(isOperationalError, () =>
       runner.runServer(
         "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-          "openclaw config set channels.telegram.enabled true >/dev/null; " +
-          `openclaw config set channels.telegram.botToken ${shellQuote(telegramBotToken)} >/dev/null; ` +
-          "openclaw config set channels.telegram.dmPolicy pairing >/dev/null; " +
-          "openclaw config set channels.telegram.groupPolicy open >/dev/null; " +
-          // Restrict config file permissions — it now contains the Telegram bot token
-          "chmod 600 ~/.openclaw/openclaw.json 2>/dev/null || true",
+          `export TELEGRAM_CONFIG=${shellQuote(telegramConfig)}; ` +
+          `bun -e ${shellQuote(mergeScript)}`,
       ),
     );
     if (telegramResult.ok) {
@@ -527,6 +585,11 @@ async function setupOpenclawConfig(
   // Workspace dir is created by `openclaw onboard`; ensure it exists for the fallback path.
   await runner.runServer("mkdir -p ~/.openclaw/workspace");
   await uploadConfigFile(runner, userMd, "$HOME/.openclaw/workspace/USER.md");
+
+  // Wait for OpenClaw bootstrap to complete before opening the dashboard.
+  // Without this, the Control UI opens but chat fails with "No session found"
+  // because the initial session hasn't been created yet (bootstrapPending: true).
+  await waitForOpenclawBootstrap(runner);
 }
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
@@ -548,7 +611,11 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "#!/bin/bash",
     'source "$HOME/.spawnrc" 2>/dev/null',
     'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
-    "exec openclaw gateway",
+    "while true; do",
+    "  openclaw gateway",
+    '  echo "openclaw gateway exited, restarting in 5s" >> /tmp/openclaw-gateway.log',
+    "  sleep 5",
+    "done",
   ].join("\n");
 
   // __USER__ and __HOME__ are sed-substituted at deploy time
@@ -586,11 +653,12 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   const script = [
     "source ~/.spawnrc 2>/dev/null",
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
-    "if command -v systemctl >/dev/null 2>&1; then",
+    "printf '%s' '" + wrapperB64 + "' | base64 -d > /tmp/openclaw-gateway-wrapper.tmp",
+    "chmod +x /tmp/openclaw-gateway-wrapper.tmp",
+    "if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then",
     '  _sudo=""',
     '  [ "$(id -u)" != "0" ] && _sudo="sudo"',
-    "  printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/openclaw-gateway-wrapper > /dev/null",
-    "  $_sudo chmod +x /usr/local/bin/openclaw-gateway-wrapper",
+    "  $_sudo mv /tmp/openclaw-gateway-wrapper.tmp /usr/local/bin/openclaw-gateway-wrapper",
     "  printf '%s' '" + unitB64 + "' | base64 -d > /tmp/openclaw-gateway.unit.tmp",
     '  sed -i "s|__USER__|$(whoami)|;s|__HOME__|$HOME|" /tmp/openclaw-gateway.unit.tmp',
     "  $_sudo mv /tmp/openclaw-gateway.unit.tmp /etc/systemd/system/openclaw-gateway.service",
@@ -601,13 +669,13 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     '  [ "$(id -u)" != "0" ] && _cron_restart="sudo systemctl restart openclaw-gateway"',
     '  (crontab -l 2>/dev/null | grep -v openclaw-gateway; echo "0 * * * * nc -z 127.0.0.1 18789 2>/dev/null || $_cron_restart >> /tmp/openclaw-gateway.log 2>&1") | crontab - 2>/dev/null || true',
     "else",
-    '  _oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }',
+    "  mv /tmp/openclaw-gateway-wrapper.tmp /tmp/openclaw-gateway-wrapper",
     `  if ${portCheck}; then echo "Gateway already running"; exit 0; fi`,
-    '  if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null &',
-    '  else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi',
+    "  if command -v setsid >/dev/null 2>&1; then setsid /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null &",
+    "  else nohup /tmp/openclaw-gateway-wrapper > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
     "fi",
     "elapsed=0; while [ $elapsed -lt 300 ]; do",
-    `  if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi`,
+    `  if ${portCheck}; then echo "Gateway ready after $elapsed sec"; exit 0; fi`,
     "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
     "done",
     'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1',
@@ -644,6 +712,22 @@ const NPM_PREFIX_SETUP =
   // Force IPv4 DNS resolution to avoid IPv6 connectivity failures on some clouds
   // (e.g. Sprite VMs with flaky IPv6 routing to the npm registry)
   'export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"';
+
+/**
+ * Validator-safe npm setup for base64-encoded helper scripts.
+ *
+ * setupAutoUpdate() rejects `${...}` inside encoded script templates, so the
+ * auto-update path needs a shell snippet that avoids brace expansion while
+ * still preserving the same prefix and PATH behavior as installs.
+ */
+const NPM_AUTO_UPDATE_SETUP =
+  '_NPM_G_FLAGS=""; ' +
+  '_npm_prefix="$(npm prefix -g 2>/dev/null || echo /usr/local)"; ' +
+  '_npm_gbin="$_npm_prefix/bin"; ' +
+  'if ! [ -w "$_npm_prefix" ] || ! printf "%s" ":$PATH:" | grep -qF ":$_npm_gbin:"; then ' +
+  'mkdir -p "$HOME/.npm-global/bin"; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
+  'export PATH="$HOME/.npm-global/bin:$PATH"; ' +
+  'case " $NODE_OPTIONS " in *" --dns-result-order=ipv4first "*) ;; *) export NODE_OPTIONS="$NODE_OPTIONS --dns-result-order=ipv4first" ;; esac';
 
 /**
  * Shell snippet that persists ~/.npm-global/bin in PATH across all shell config
@@ -853,7 +937,7 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
   }
 
   const script = [
-    "if ! command -v systemctl >/dev/null 2>&1; then exit 0; fi",
+    "if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then exit 0; fi",
     '_sudo=""',
     '[ "$(id -u)" != "0" ] && _sudo="sudo"',
     "printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-auto-update > /dev/null",
@@ -869,9 +953,174 @@ export async function setupAutoUpdate(runner: CloudRunner, agentName: string, up
 
   const result = await asyncTryCatch(() => runner.runServer(script));
   if (result.ok) {
-    logInfo("Agent auto-update service installed (runs every 6 hours)");
+    logInfo("Agent auto-update setup completed");
   } else {
     logWarn("Auto-update setup failed (non-fatal, agent still works)");
+  }
+}
+
+// ─── Security Scan ─────────────────────────────────────────────────────────
+
+/**
+ * Install a cron job that runs basic security heuristics every 6 hours.
+ * Checks: SSH authorized_keys anomalies, failed login attempts, unexpected
+ * packages, and suspicious processes. Findings are written to
+ * /var/log/spawn-security-scan.log so they can be displayed on reconnect.
+ *
+ * Skipped for local cloud and non-cron systems.
+ */
+export async function setupSecurityScan(runner: CloudRunner): Promise<void> {
+  logStep("Setting up security scan...");
+
+  const scanScript = [
+    "#!/bin/bash",
+    "set -eo pipefail",
+    'LOGFILE="/var/log/spawn-security-scan.log"',
+    'ALERTFILE="/var/log/spawn-security-alerts.log"',
+    "",
+    "# Truncate alerts file each run — only latest findings matter",
+    '> "$ALERTFILE"',
+    "",
+    'log() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$LOGFILE"; }',
+    'alert() { printf "[%s] %s\\n" "$(date -u +\'%Y-%m-%dT%H:%M:%SZ\')" "$*" >> "$ALERTFILE"; log "ALERT: $*"; }',
+    "",
+    'log "Security scan started"',
+    "",
+    "# ── Check 1: SSH authorized_keys ──",
+    "# Count keys across all users. Spawn injects exactly one key at provision time.",
+    "# Multiple keys or keys from unexpected sources are suspicious.",
+    "_total_keys=0",
+    "_key_alerts=0",
+    "for _authfile in /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys; do",
+    '  [ -f "$_authfile" ] || continue',
+    '  _count=$(grep -c "^ssh-" "$_authfile" 2>/dev/null || echo 0)',
+    "  _total_keys=$((_total_keys + _count))",
+    '  if [ "$_count" -gt 2 ]; then',
+    '    alert "SSH: $_authfile contains $_count keys (expected 1-2)"',
+    "    _key_alerts=$((_key_alerts + 1))",
+    "  fi",
+    "done",
+    'if [ "$_total_keys" -eq 0 ]; then',
+    '  alert "SSH: No authorized_keys found — server may be inaccessible"',
+    "fi",
+    'log "SSH key check done: $_total_keys total keys, $_key_alerts alerts"',
+    "",
+    "# ── Check 2: Failed login attempts ──",
+    "# Check auth logs for brute-force indicators.",
+    "_fail_count=0",
+    "if [ -f /var/log/auth.log ]; then",
+    "  _fail_count=$(grep -c 'Failed password\\|authentication failure' /var/log/auth.log 2>/dev/null || echo 0)",
+    "elif [ -f /var/log/secure ]; then",
+    "  _fail_count=$(grep -c 'Failed password\\|authentication failure' /var/log/secure 2>/dev/null || echo 0)",
+    "fi",
+    'if [ "$_fail_count" -gt 50 ]; then',
+    '  alert "AUTH: $_fail_count failed login attempts detected — possible brute-force"',
+    "  # Grab the top offending IPs",
+    '  _top_ips=""',
+    "  if [ -f /var/log/auth.log ]; then",
+    "    _top_ips=$(grep 'Failed password' /var/log/auth.log 2>/dev/null | grep -oE '([0-9]{1,3}\\.){3}[0-9]{1,3}' | sort | uniq -c | sort -rn | head -5)",
+    "  elif [ -f /var/log/secure ]; then",
+    "    _top_ips=$(grep 'Failed password' /var/log/secure 2>/dev/null | grep -oE '([0-9]{1,3}\\.){3}[0-9]{1,3}' | sort | uniq -c | sort -rn | head -5)",
+    "  fi",
+    '  if [ -n "$_top_ips" ]; then',
+    '    alert "AUTH: Top offending IPs:\\n$_top_ips"',
+    "  fi",
+    "fi",
+    'log "Auth check done: $_fail_count failed attempts"',
+    "",
+    "# ── Check 3: Unexpected software ──",
+    "# Flag known attack tools or unexpected daemons that spawn never installs.",
+    '_suspicious_bins="nmap masscan hydra john hashcat ettercap aircrack-ng metasploit msfconsole msfvenom netcat ncat socat cryptominer xmrig minerd cgminer"',
+    "_found_suspicious=0",
+    "for _bin in $_suspicious_bins; do",
+    '  if command -v "$_bin" >/dev/null 2>&1; then',
+    '    alert "SOFTWARE: Unexpected binary found: $_bin ($(command -v "$_bin"))"',
+    "    _found_suspicious=$((_found_suspicious + 1))",
+    "  fi",
+    "done",
+    'log "Software check done: $_found_suspicious suspicious binaries"',
+    "",
+    "# ── Check 4: Suspicious processes ──",
+    "# Check for crypto miners or reverse shells.",
+    '_sus_procs=$(ps aux 2>/dev/null | grep -iE "xmrig|minerd|cryptonight|stratum\\+|/dev/tcp/|bash -i" | grep -v grep || true)',
+    'if [ -n "$_sus_procs" ]; then',
+    '  alert "PROCESS: Suspicious processes detected:\\n$_sus_procs"',
+    "fi",
+    "",
+    "# ── Check 4b: High CPU processes (miner signal) ──",
+    "# Crypto miners peg CPU at 90-100%. Flag any non-agent process sustaining high usage.",
+    "_high_cpu=$(ps aux --no-headers 2>/dev/null | awk '$3 > 80.0 { print }' | grep -vE \"claude|codex|aider|node|bun|deno|python|apt|dpkg|cc1|gcc|g\\+\\+|make|cargo|rustc\" || true)",
+    'if [ -n "$_high_cpu" ]; then',
+    '  _hcount=$(echo "$_high_cpu" | wc -l | tr -d " ")',
+    '  alert "CPU: $_hcount process(es) using >80%% CPU — possible crypto miner:\\n$_high_cpu"',
+    "fi",
+    "",
+    "# ── Check 4c: Mining pool connections ──",
+    "# Miners connect to pools on well-known ports (3333, 4444, 5555, 8333) via stratum.",
+    '_pool_conns=$(ss -tnp 2>/dev/null | grep -E ":(3333|4444|5555|8333|14444|45700)\\s" || true)',
+    'if [ -n "$_pool_conns" ]; then',
+    '  alert "NETWORK: Outbound connections to known mining pool ports detected:\\n$_pool_conns"',
+    "fi",
+    "",
+    "# ── Check 5: Unexpected cron jobs ──",
+    "# Look for cron entries not installed by spawn.",
+    "_cron_alerts=0",
+    "for _user in $(cut -d: -f1 /etc/passwd 2>/dev/null); do",
+    '  _cron=$(crontab -l -u "$_user" 2>/dev/null || true)',
+    '  if [ -n "$_cron" ]; then',
+    '    _non_spawn=$(echo "$_cron" | grep -v "^#" | grep -v "spawn\\|openclaw-gateway" || true)',
+    '    if [ -n "$_non_spawn" ]; then',
+    '      _count=$(echo "$_non_spawn" | wc -l | tr -d " ")',
+    '      if [ "$_count" -gt 0 ]; then',
+    '        alert "CRON: $_count unexpected cron entries for user $_user"',
+    "        _cron_alerts=$((_cron_alerts + 1))",
+    "      fi",
+    "    fi",
+    "  fi",
+    "done",
+    'log "Cron check done: $_cron_alerts users with unexpected entries"',
+    "",
+    "# ── Check 6: Listening ports ──",
+    "# Flag unexpected listeners (not SSH, not agent dashboards).",
+    '_known_ports="22 80 443 8080 8443 18789 3000 5173"',
+    "_listeners=$(ss -tlnp 2>/dev/null | tail -n +2 || netstat -tlnp 2>/dev/null | tail -n +2 || true)",
+    'if [ -n "$_listeners" ]; then',
+    "  _unexpected=$(echo \"$_listeners\" | grep -vE \"($(echo $_known_ports | tr ' ' '|'))\" | grep -v 'sshd\\|node\\|bun\\|deno\\|python' || true)",
+    '  if [ -n "$_unexpected" ]; then',
+    '    _ucount=$(echo "$_unexpected" | wc -l | tr -d " ")',
+    '    alert "NETWORK: $_ucount unexpected listening ports detected"',
+    "  fi",
+    "fi",
+    "",
+    'log "Security scan completed"',
+  ].join("\n");
+
+  const scanB64 = Buffer.from(scanScript).toString("base64");
+  if (!/^[A-Za-z0-9+/=]+$/.test(scanB64)) {
+    throw new Error("Unexpected characters in base64 output");
+  }
+
+  const cronLine = "0 */6 * * * /usr/local/bin/spawn-security-scan >> /var/log/spawn-security-scan.log 2>&1";
+
+  const installScript = [
+    "if ! command -v crontab >/dev/null 2>&1; then exit 0; fi",
+    '_sudo=""',
+    '[ "$(id -u)" != "0" ] && _sudo="sudo"',
+    "printf '%s' '" + scanB64 + "' | base64 -d | $_sudo tee /usr/local/bin/spawn-security-scan > /dev/null",
+    "$_sudo chmod +x /usr/local/bin/spawn-security-scan",
+    "$_sudo touch /var/log/spawn-security-scan.log /var/log/spawn-security-alerts.log",
+    "$_sudo chmod 644 /var/log/spawn-security-scan.log /var/log/spawn-security-alerts.log",
+    // Add cron entry if not already present
+    `(crontab -l 2>/dev/null | grep -v spawn-security-scan; echo "${cronLine}") | crontab - 2>/dev/null || true`,
+    // Run the first scan immediately
+    "/usr/local/bin/spawn-security-scan 2>/dev/null || true",
+  ].join("\n");
+
+  const result = await asyncTryCatch(() => runner.runServer(installScript));
+  if (result.ok) {
+    logInfo("Security scan installed (runs every 6 hours)");
+  } else {
+    logWarn("Security scan setup failed (non-fatal)");
   }
 }
 
@@ -895,6 +1144,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupClaudeCodeConfig(runner, apiKey),
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude -p --dangerously-skip-permissions ${shellQuote(prompt)}`,
       updateCmd:
         'export PATH="$HOME/.claude/local/bin:$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin:$PATH"; ' +
         "npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || " +
@@ -916,9 +1167,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: () => setupCodexConfig(runner),
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @openai/codex@latest",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex --full-auto ${shellQuote(prompt)}`,
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @openai/codex@latest",
     },
 
     openclaw: (() => {
@@ -946,13 +1197,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         preLaunchMsg: "Your web dashboard will open automatically — use it for WhatsApp QR scanning and channel setup.",
         launchCmd: () =>
           "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        promptCmd: (prompt: string) =>
+          `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw run ${shellQuote(prompt)}`,
         tunnel: {
           remotePort: 18789,
           browserUrl: (localPort: number) => `http://localhost:${localPort}/#token=${dashboardToken}`,
         },
-        updateCmd:
-          'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-          "npm install -g ${_NPM_G_FLAGS:-} openclaw@latest",
+        updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS openclaw@latest",
       };
     })(),
 
@@ -965,6 +1216,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode --prompt ${shellQuote(prompt)}`,
       updateCmd: openCodeInstallCmd(),
     },
 
@@ -985,9 +1238,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @kilocode/cli@latest",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode --prompt ${shellQuote(prompt)}`,
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @kilocode/cli@latest",
     },
 
     hermes: {
@@ -1022,6 +1275,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       },
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes ${shellQuote(prompt)}`,
       updateCmd:
         // Same SSH→HTTPS rewrite for auto-update runs
         'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
@@ -1044,9 +1299,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; junie --prompt ${shellQuote(prompt)}`,
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @jetbrains/junie-cli@latest",
     },
 
     pi: {
@@ -1063,9 +1318,9 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi",
-      updateCmd:
-        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' +
-        "npm install -g ${_NPM_G_FLAGS:-} @mariozechner/pi-coding-agent@latest",
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi --prompt ${shellQuote(prompt)}`,
+      updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @mariozechner/pi-coding-agent@latest",
     },
 
     cursor: {
@@ -1082,12 +1337,14 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
-        "CURSOR_API_KEY=spawn-proxy",
+        `CURSOR_API_KEY=${apiKey}`,
       ],
       configure: () => setupCursorProxy(runner),
       preLaunch: () => startCursorProxy(runner),
       launchCmd: () =>
         'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh',
+      promptCmd: (prompt) =>
+        `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.local/bin:$PATH"; agent --endpoint https://api2.cursor.sh --prompt ${shellQuote(prompt)}`,
       updateCmd: 'export PATH="$HOME/.local/bin:$PATH"; agent update',
     },
   };

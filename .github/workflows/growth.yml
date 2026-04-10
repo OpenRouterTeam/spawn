@@ -1,0 +1,38 @@
+name: Trigger Growth
+
+on:
+  schedule:
+    - cron: '37 14 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger growth cycle
+        env:
+          SPRITE_URL: ${{ secrets.GROWTH_SPRITE_URL }}
+          TRIGGER_SECRET: ${{ secrets.GROWTH_TRIGGER_SECRET }}
+        run: |
+          HTTP_CODE=$(curl -sS --connect-timeout 15 --max-time 30 \
+            -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${TRIGGER_SECRET}")
+          BODY=$(cat /tmp/response.json 2>/dev/null || echo '{}')
+          echo "$BODY"
+          case "$HTTP_CODE" in
+            2*)
+              echo "::notice::Trigger accepted (HTTP $HTTP_CODE)"
+              ;;
+            409)
+              echo "::notice::Run already in progress (HTTP 409)"
+              ;;
+            429)
+              echo "::warning::Server at capacity (HTTP 429)"
+              ;;
+            *)
+              echo "::error::Trigger failed (HTTP $HTTP_CODE)"
+              exit 1
+              ;;
+          esac

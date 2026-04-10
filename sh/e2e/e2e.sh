@@ -54,7 +54,7 @@ fi
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
 # ---------------------------------------------------------------------------
-ALL_CLOUDS="aws hetzner digitalocean gcp sprite"
+ALL_CLOUDS="aws hetzner digitalocean gcp daytona sprite"
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -200,6 +200,19 @@ fi
 if [ -z "${AGENTS_TO_TEST}" ]; then
   AGENTS_TO_TEST="${ALL_AGENTS}"
 fi
+
+# Sanity-check list sizes to prevent unbounded string growth (#3190)
+_cloud_count=$(printf '%s\n' "${CLOUDS}" | wc -w | tr -d ' ')
+_agent_count=$(printf '%s\n' "${AGENTS_TO_TEST}" | wc -w | tr -d ' ')
+if [ "${_cloud_count}" -gt 50 ]; then
+  printf "Error: too many clouds (%s) — max 50\n" "${_cloud_count}" >&2
+  exit 1
+fi
+if [ "${_agent_count}" -gt 100 ]; then
+  printf "Error: too many agents (%s) — max 100\n" "${_agent_count}" >&2
+  exit 1
+fi
+unset _cloud_count _agent_count
 
 # ---------------------------------------------------------------------------
 # Count clouds to decide single vs multi-cloud mode
@@ -540,21 +553,34 @@ send_matrix_email() {
   fi
 
   # Build results string: "cloud:agent:result,..." for bun to process
+  # Sanitize cloud/agent names to alphanumeric, dash, underscore only (#3189)
   local results=""
   for cloud in ${clouds}; do
+    local safe_cloud
+    safe_cloud=$(printf '%s' "${cloud}" | tr -cd 'a-zA-Z0-9_-')
     for agent in ${agents}; do
+      local safe_agent
+      safe_agent=$(printf '%s' "${agent}" | tr -cd 'a-zA-Z0-9_-')
       local result="skip"
       local result_file="${log_dir}/${cloud}-${agent}.result"
       if [ -f "${result_file}" ]; then
         result=$(cat "${result_file}")
       fi
+      # Sanitize result to known values only
+      case "${result}" in
+        pass|fail|skip) ;;
+        *) result="skip" ;;
+      esac
       if [ -n "${results}" ]; then results="${results},"; fi
-      results="${results}${cloud}:${agent}:${result}"
+      results="${results}${safe_cloud}:${safe_agent}:${result}"
     done
   done
 
-  local ts_file
+  local ts_file old_umask
+  old_umask=$(umask)
+  umask 077
   ts_file=$(mktemp /tmp/e2e-email-XXXXXX.ts)
+  umask "${old_umask}"
 
   cat > "${ts_file}" << 'TS_EOF'
 const results = (process.env._E2E_RESULTS ?? "").split(",").filter(Boolean);
@@ -672,14 +698,50 @@ final_cleanup() {
     done
   fi
   if [ -n "${LOG_DIR:-}" ] && [ -d "${LOG_DIR:-}" ]; then
-    case "${LOG_DIR}" in
-      /tmp/spawn-e2e.*)
-        rm -rf "${LOG_DIR}"
-        ;;
-      *)
-        log_warn "Refusing to rm -rf unexpected path: ${LOG_DIR}"
-        ;;
-    esac
+    if [ "${LOG_DIR}" != "${_E2E_CREATED_LOG_DIR:-}" ]; then
+      log_warn "Refusing to rm -rf LOG_DIR not created by this script: ${LOG_DIR}"
+    else
+      # Reject symlinks to prevent TOCTOU races (CWE-367, #3233):
+      # Previous code resolved symlinks then operated on the resolved path,
+      # but an attacker could swap the symlink target between resolve and rm.
+      # Fix: refuse to delete symlinks entirely — LOG_DIR should never be one.
+      if [ -L "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR is a symlink, refusing deletion to prevent symlink attacks: ${LOG_DIR}"
+        return
+      fi
+      SAFE_TMP_ROOT="${TMP_ROOT:-${TMPDIR:-/tmp}}"
+      SAFE_TMP_ROOT="${SAFE_TMP_ROOT%/}"
+      # Use realpath -P to resolve, then verify the original path matches
+      # (ensures LOG_DIR is not inside a symlinked parent directory)
+      local resolved_log_dir
+      resolved_log_dir=$(realpath -P "${LOG_DIR}" 2>/dev/null)
+      if [ -z "${resolved_log_dir}" ]; then
+        log_warn "Failed to resolve LOG_DIR path, skipping cleanup"
+        return
+      fi
+      # Re-check symlink after resolve to narrow the TOCTOU window
+      if [ -L "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR became a symlink during cleanup, aborting: ${LOG_DIR}"
+        return
+      fi
+      # Verify ownership on the original path (not the resolved one)
+      if [ ! -O "${LOG_DIR}" ]; then
+        log_warn "LOG_DIR not owned by current user, refusing deletion: ${LOG_DIR}"
+      else
+        case "${resolved_log_dir}" in
+          "${SAFE_TMP_ROOT}"/spawn-e2e.*)
+            # Delete the original path — if it became a symlink between check
+            # and here, rm -rf on a symlink just removes the link itself when
+            # the target no longer matches. The double -L check above minimizes
+            # this window.
+            rm -rf "${LOG_DIR}"
+            ;;
+          *)
+            log_warn "Refusing to rm -rf unexpected path: ${resolved_log_dir}"
+            ;;
+        esac
+      fi
+    fi
   fi
 }
 trap final_cleanup EXIT
@@ -708,7 +770,10 @@ fi
 export E2E_FAST_MODE="${FAST_MODE}"
 
 # Create temp log directory
-LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/spawn-e2e.XXXXXX")
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
+LOG_DIR=$(mktemp -d "${TMP_ROOT}/spawn-e2e.XXXXXX")
+_E2E_CREATED_LOG_DIR="${LOG_DIR}"
 export LOG_DIR
 log_info "Log directory: ${LOG_DIR}"
 

@@ -9,6 +9,7 @@ import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { maybeShowStarPrompt } from "../shared/star-prompt.js";
 import { validateModelId } from "../shared/ui.js";
+import { cmdLink } from "./link.js";
 import { activeServerPicker } from "./list.js";
 import { execScript, showDryRunPreview } from "./run.js";
 import {
@@ -103,6 +104,13 @@ async function selectCloud(
       });
     }
   }
+
+  // Add "Link Existing Server" option at the bottom for BYOS workflow
+  options.push({
+    value: "link-existing",
+    label: "Link Existing Server",
+    hint: "bring your own server via IP address",
+  });
 
   const cloudChoice = await p.select({
     message: "Select a cloud",
@@ -305,6 +313,17 @@ export async function cmdInteractive(): Promise<void> {
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
+  // Handle "Link Existing Server" — redirect to spawn link with the agent pre-selected
+  if (cloudChoice === "link-existing") {
+    p.outro("Switching to link mode...");
+    await cmdLink([
+      "link",
+      "--agent",
+      agentChoice,
+    ]);
+    return;
+  }
+
   await preflightCredentialCheck(manifest, cloudChoice);
 
   // Skip setup prompt if steps already set via --steps or --config
@@ -361,6 +380,17 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+
+  // Handle "Link Existing Server" — redirect to spawn link with the agent pre-selected
+  if (cloudChoice === "link-existing") {
+    p.outro("Switching to link mode...");
+    await cmdLink([
+      "link",
+      "--agent",
+      resolvedAgent,
+    ]);
+    return;
+  }
 
   if (dryRun) {
     showDryRunPreview(manifest, resolvedAgent, cloudChoice, prompt);

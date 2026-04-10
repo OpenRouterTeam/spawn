@@ -17,7 +17,7 @@ import {
   saveMetadata,
   saveSpawnRecord,
 } from "../history.js";
-import { offerGithubAuth, setupAutoUpdate, wrapSshCall } from "./agent-setup.js";
+import { offerGithubAuth, setupAutoUpdate, setupSecurityScan, wrapSshCall } from "./agent-setup.js";
 import { tryTarballInstall } from "./agent-tarball.js";
 import { generateEnvConfig } from "./agents.js";
 import { getOrPromptApiKey } from "./oauth.js";
@@ -90,6 +90,10 @@ export interface CloudOrchestrator {
     host: string;
     user: string;
   };
+  /** Return a browser URL for signed-preview style dashboard access. */
+  getSignedPreviewUrl?(remotePort: number, urlSuffix?: string, expiresInSeconds?: number): Promise<string>;
+  /** Install a provider-native auto-update mechanism when the shared systemd timer does not apply. */
+  setupAutoUpdate?(agentName: string, updateCmd: string): Promise<void>;
 }
 
 /**
@@ -231,6 +235,24 @@ function getParentFields(): {
       : {};
 }
 
+/** Build and persist a SpawnRecord for a newly-created server. */
+function recordSpawn(spawnId: string, agentName: string, cloudName: string, connection: VMConnection): void {
+  const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
+  saveSpawnRecord({
+    id: spawnId,
+    agent: agentName,
+    cloud: cloudName,
+    timestamp: new Date().toISOString(),
+    ...(spawnName
+      ? {
+          name: spawnName,
+        }
+      : {}),
+    ...getParentFields(),
+    connection,
+  });
+}
+
 /** Append recursive-spawn env vars to the envPairs array when --beta recursive is active. */
 export function appendRecursiveEnvVars(envPairs: string[], spawnId: string): void {
   const currentDepth = Number(process.env.SPAWN_DEPTH) || 0;
@@ -315,20 +337,7 @@ export async function runOrchestration(
 
     const serverBootPromise = (async () => {
       const conn = await cloud.createServer(serverName);
-      const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName
-          ? {
-              name: spawnName,
-            }
-          : {}),
-        ...getParentFields(),
-        connection: conn,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, conn);
       await cloud.waitForReady();
       return conn;
     })();
@@ -358,20 +367,7 @@ export async function runOrchestration(
       // User chose to retry — fall through to sequential path which has full retry loops
       // (Re-running the concurrent path would re-prompt for API key, etc.)
       const connection = await cloud.createServer(serverName);
-      const spawnName2 = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-      saveSpawnRecord({
-        id: spawnId,
-        agent: agentName,
-        cloud: cloud.cloudName,
-        timestamp: new Date().toISOString(),
-        ...(spawnName2
-          ? {
-              name: spawnName2,
-            }
-          : {}),
-        ...getParentFields(),
-        connection,
-      });
+      recordSpawn(spawnId, agentName, cloud.cloudName, connection);
       await cloud.waitForReady();
     }
 
@@ -466,20 +462,7 @@ export async function runOrchestration(
       logError(getErrorMessage(r.error));
       await retryOrQuit("Retry server creation?");
     }
-    const spawnName = process.env.SPAWN_NAME_KEBAB || process.env.SPAWN_NAME || undefined;
-    saveSpawnRecord({
-      id: spawnId,
-      agent: agentName,
-      cloud: cloud.cloudName,
-      timestamp: new Date().toISOString(),
-      ...(spawnName
-        ? {
-            name: spawnName,
-          }
-        : {}),
-      ...getParentFields(),
-      connection,
-    });
+    recordSpawn(spawnId, agentName, cloud.cloudName, connection);
 
     // 6. Wait for readiness (retry loop)
     for (;;) {
@@ -528,27 +511,47 @@ export async function runOrchestration(
   }
 }
 
-async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
+/** Write env content to ~/.spawnrc and ensure all shell rc files source it. */
+export async function injectEnvVarsToRunner(runner: CloudRunner, envContent: string): Promise<void> {
   logStep("Setting up environment variables...");
   const envB64 = Buffer.from(envContent).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
     throw new Error("Unexpected characters in base64 output");
   }
 
-  const isLocalWindows = cloud.cloudName === "local" && isWindows();
-  const envSetupCmd = isLocalWindows
-    ? `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`
-    : `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-      "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
-      `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
-      "done";
+  const envSetupCmd =
+    `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+    "for _rc in ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc; do " +
+    `grep -q 'source ~/.spawnrc' "$_rc" 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> "$_rc"; ` +
+    "done";
 
   const envResult = await asyncTryCatch(() =>
-    withRetry("env setup", () => wrapSshCall(cloud.runner.runServer(envSetupCmd)), 2, 5),
+    withRetry("env setup", () => wrapSshCall(runner.runServer(envSetupCmd)), 2, 5),
   );
   if (!envResult.ok) {
     logWarn("Environment setup had errors");
   }
+}
+
+async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Promise<void> {
+  const isLocalWindows = cloud.cloudName === "local" && isWindows();
+  if (isLocalWindows) {
+    logStep("Setting up environment variables...");
+    const envB64 = Buffer.from(envContent).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(envB64)) {
+      throw new Error("Unexpected characters in base64 output");
+    }
+    const envSetupCmd =
+      `$bytes = [Convert]::FromBase64String('${envB64}'); ` + `[IO.File]::WriteAllBytes("$HOME/.spawnrc", $bytes)`;
+    const envResult = await asyncTryCatch(() =>
+      withRetry("env setup", () => wrapSshCall(cloud.runner.runServer(envSetupCmd)), 2, 5),
+    );
+    if (!envResult.ok) {
+      logWarn("Environment setup had errors");
+    }
+    return;
+  }
+  await injectEnvVarsToRunner(cloud.runner, envContent);
 }
 
 async function postInstall(
@@ -563,6 +566,7 @@ async function postInstall(
   // Parse enabled setup steps
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
+  const isHeadless = process.env.SPAWN_HEADLESS === "1";
   if (stepsEnv !== undefined) {
     const stepNames = stepsEnv.split(",").filter(Boolean);
     if (stepNames.length > 0) {
@@ -575,6 +579,11 @@ async function postInstall(
     } else {
       enabledSteps = new Set();
     }
+  } else if (isHeadless) {
+    // In headless mode, default to auto-update only (use --steps all to override)
+    enabledSteps = new Set([
+      "auto-update",
+    ]);
   }
 
   // Agent-specific configuration
@@ -594,7 +603,39 @@ async function postInstall(
 
   // Auto-update service
   if (cloud.cloudName !== "local" && agent.updateCmd && (!enabledSteps || enabledSteps.has("auto-update"))) {
-    await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    if (cloud.cloudName === "daytona") {
+      // Daytona reconnects need to know whether they should recreate the provider-native
+      // background updater after a sandbox stop/start cycle.
+      saveMetadata(
+        {
+          auto_update_enabled: "1",
+        },
+        spawnId,
+      );
+    }
+    if (cloud.setupAutoUpdate) {
+      await cloud.setupAutoUpdate(agentName, agent.updateCmd);
+    } else {
+      await setupAutoUpdate(cloud.runner, agentName, agent.updateCmd);
+    }
+  } else if (cloud.cloudName === "daytona" && agent.updateCmd) {
+    // Persist the disabled state too so reconnect paths can distinguish "not configured"
+    // from "configured earlier but the sandbox session was lost".
+    saveMetadata(
+      {
+        auto_update_enabled: "0",
+      },
+      spawnId,
+    );
+  }
+
+  // Security scan cron
+  if (
+    cloud.cloudName !== "local" &&
+    cloud.cloudName !== "daytona" &&
+    (!enabledSteps || enabledSteps.has("security-scan"))
+  ) {
+    await setupSecurityScan(cloud.runner);
   }
 
   // Spawn CLI + skill injection (recursive spawn)
@@ -657,10 +698,12 @@ async function postInstall(
     }
   }
 
-  // SSH tunnel for web dashboard
+  // Web dashboard access
   let tunnelHandle: SshTunnelHandle | undefined;
   if (agent.tunnel) {
     const tunnelCfg = agent.tunnel; // capture for closure (TS can't narrow across async boundaries)
+    const templateUrl = tunnelCfg.browserUrl?.(0);
+
     if (cloud.getConnectionInfo) {
       const getConnInfo = cloud.getConnectionInfo; // capture for closure
       const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
@@ -682,6 +725,15 @@ async function postInstall(
       if (!tunnelResult.ok) {
         logWarn("Web dashboard tunnel failed — use the TUI instead");
       }
+    } else if (cloud.getSignedPreviewUrl) {
+      const previewResult = await asyncTryCatchIf(isOperationalError, async () => {
+        const urlSuffix = templateUrl ? templateUrl.replace("http://localhost:0", "") : undefined;
+        const url = await cloud.getSignedPreviewUrl!(tunnelCfg.remotePort, urlSuffix, 3600);
+        openBrowser(url);
+      });
+      if (!previewResult.ok) {
+        logWarn("Web dashboard preview failed — use the TUI instead");
+      }
     } else if (cloud.cloudName === "local") {
       if (agent.tunnel.browserUrl) {
         const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
@@ -694,11 +746,8 @@ async function postInstall(
     const tunnelMeta: Record<string, string> = {
       tunnel_remote_port: String(agent.tunnel.remotePort),
     };
-    if (agent.tunnel.browserUrl) {
-      const templateUrl = agent.tunnel.browserUrl(0);
-      if (templateUrl) {
-        tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
-      }
+    if (templateUrl) {
+      tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
     }
     saveMetadata(tunnelMeta, spawnId);
   }
@@ -746,10 +795,21 @@ async function postInstall(
   saveLaunchCmd(launchCmd, spawnId);
 
   // In headless mode, provisioning is done — skip the interactive session.
-  // The VM is healthy and the agent is installed; callers can SSH in or use `spawn connect`.
-  const isHeadless = process.env.SPAWN_HEADLESS === "1";
+  // If --prompt was provided and the agent has a promptCmd, execute the prompt on the VM.
   if (isHeadless) {
-    logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    const headlessPrompt = process.env.SPAWN_PROMPT;
+    if (headlessPrompt && agent.promptCmd) {
+      logInfo("Headless mode — running prompt on provisioned VM...");
+      const promptRunCmd = agent.promptCmd(headlessPrompt);
+      const promptResult = await asyncTryCatch(() => cloud.runner.runServer(promptRunCmd, 600));
+      if (!promptResult.ok) {
+        logWarn(`Prompt execution failed: ${getErrorMessage(promptResult.error)}`);
+      } else {
+        logInfo("Prompt execution completed");
+      }
+    } else {
+      logInfo("Headless mode — provisioning complete. Skipping interactive session.");
+    }
     if (tunnelHandle) {
       tunnelHandle.stop();
     }
@@ -803,9 +863,11 @@ async function postInstall(
     tunnelHandle.stop();
   }
 
-  // Pull child's spawn history back to the parent for `spawn tree`
+  // Pull child's spawn history back to the parent for `spawn tree`.
+  // Fire-and-forget — never delay exit for a convenience feature.
+  // process.exit() below kills any in-flight SSH calls.
   if (cloud.cloudName !== "local") {
-    await pullChildHistory(cloud.runner, spawnId);
+    pullChildHistory(cloud.runner, spawnId).catch(() => {});
   }
 
   process.exit(exitCode);

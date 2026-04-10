@@ -742,17 +742,30 @@ export async function execScript(
     return true;
   }
 
-  // macOS/Linux: download the bash wrapper script and run via bash
-  const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
-  const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
+  // macOS/Linux: prefer the checked-in wrapper when running from a local checkout.
+  let scriptContent = "";
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  const localScriptResolved = cliDir ? resolveLocalWrapperScript(cliDir, cloud, agent) : "";
 
-  const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
-  if (!dlResult.ok) {
-    reportDownloadError(ghUrl, dlResult.error);
-    return false;
+  if (localScriptResolved) {
+    scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
+    if (debug) {
+      console.error(`[run] Using local script: ${localScriptResolved}`);
+    }
+  } else {
+    const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
+    const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
+
+    const dlResult = await asyncTryCatch(() => downloadScriptWithFallback(url, ghUrl));
+    if (!dlResult.ok) {
+      reportDownloadError(ghUrl, dlResult.error);
+      return false;
+    }
+
+    scriptContent = dlResult.data;
   }
 
-  const lastErr = runBashScript(dlResult.data, prompt, dashboardUrl, debug, spawnName);
+  const lastErr = runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
     return false;
@@ -829,6 +842,45 @@ function headlessError(
     outputFormat,
   );
   process.exit(exitCode);
+}
+
+/**
+ * Resolve a trusted local Spawn checkout path for SPAWN_CLI_DIR.
+ *
+ * On macOS, `/tmp` commonly resolves to `/private/tmp`, so compare against
+ * the checkout's real path instead of the raw env var spelling.
+ */
+function resolveTrustedCliDir(cliDir: string): string {
+  const resolvedCliDir = path.resolve(cliDir);
+  const realCliDir = tryCatchIf(isFileError, () => fs.realpathSync(resolvedCliDir));
+  return realCliDir.ok ? realCliDir.data : resolvedCliDir;
+}
+
+/**
+ * Resolve a checked-in shell wrapper from a trusted local Spawn checkout.
+ *
+ * This lets unreleased provider work run from the current branch instead of
+ * depending on the CDN / raw GitHub copy being published already.
+ */
+function resolveLocalWrapperScript(cliDir: string, cloud: string, agent: string): string {
+  const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+  if (hasBadChars(cloud) || hasBadChars(agent)) {
+    return "";
+  }
+
+  const resolvedCliDir = resolveTrustedCliDir(cliDir);
+  const candidatePath = path.join(resolvedCliDir, "sh", cloud, `${agent}.sh`);
+  const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
+  if (!realResult.ok) {
+    return "";
+  }
+
+  const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+  if (!realResult.data.startsWith(prefix)) {
+    return "";
+  }
+
+  return realResult.data;
 }
 
 /** Run a script in headless mode (all output to stderr, no interactive session) */
@@ -1006,7 +1058,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     if (cliDir) {
       const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
       if (!hasBadChars(resolvedCloud) && !hasBadChars(resolvedAgent)) {
-        const resolvedCliDir = path.resolve(cliDir);
+        const resolvedCliDir = resolveTrustedCliDir(cliDir);
         const candidatePath = path.join(resolvedCliDir, "packages", "cli", "src", resolvedCloud, "main.ts");
         const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
         if (realResult.ok) {
@@ -1063,25 +1115,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     // macOS/Linux: download bash wrapper script
     let scriptContent: string;
     const cliDir = process.env.SPAWN_CLI_DIR;
-    let localScriptResolved = "";
-
-    if (cliDir) {
-      const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
-      const safeCloud = !hasBadChars(resolvedCloud);
-      const safeAgent = !hasBadChars(resolvedAgent);
-
-      if (safeCloud && safeAgent) {
-        const resolvedCliDir = path.resolve(cliDir);
-        const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
-        const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
-        if (realResult.ok) {
-          const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
-          if (realResult.data.startsWith(prefix)) {
-            localScriptResolved = realResult.data;
-          }
-        }
-      }
-    }
+    const localScriptResolved = cliDir ? resolveLocalWrapperScript(cliDir, resolvedCloud, resolvedAgent) : "";
 
     if (localScriptResolved) {
       scriptContent = fs.readFileSync(localScriptResolved, "utf-8");

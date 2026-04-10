@@ -39,11 +39,17 @@ import {
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
+import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
 import { checkForUpdates } from "./update-check.js";
 
 const VERSION = pkg.version;
 
+// Initialize telemetry early — captures uncaught errors and exit flush.
+// Disabled with SPAWN_TELEMETRY=0.
+initTelemetry(VERSION);
+
 function handleError(err: unknown): never {
+  captureError("cli_error", err);
   const msg = getErrorMessage(err);
   console.error(pc.red(`Error: ${msg}`));
   console.error(`\nRun ${pc.cyan("spawn help")} for usage information.`);
@@ -221,6 +227,10 @@ async function handleDefaultCommand(
   headless?: boolean,
   outputFormat?: string,
 ): Promise<void> {
+  setTelemetryContext("agent", agent);
+  if (cloud) {
+    setTelemetryContext("cloud", cloud);
+  }
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
@@ -611,7 +621,8 @@ async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
     return;
   }
   if (filteredArgs.slice(1).includes("--clear")) {
-    await cmdListClear();
+    const forceYes = filteredArgs.slice(1).includes("--yes") || filteredArgs.slice(1).includes("-y");
+    await cmdListClear(forceYes);
     return;
   }
   const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));

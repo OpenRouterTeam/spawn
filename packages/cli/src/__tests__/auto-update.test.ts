@@ -17,7 +17,7 @@ const mockTryTarballInstall = mock(() => Promise.resolve(false));
 import type { AgentConfig } from "../shared/agents";
 import type { CloudOrchestrator, OrchestrationOptions } from "../shared/orchestrate";
 
-import { setupAutoUpdate } from "../shared/agent-setup";
+import { setupAutoUpdate, setupSecurityScan } from "../shared/agent-setup";
 import { runOrchestration } from "../shared/orchestrate";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -328,6 +328,178 @@ describe("auto-update service", () => {
       const calls = runServer.mock.calls.map((c) => c[0]);
       const autoUpdateCall = calls.find((cmd: string) => isString(cmd) && cmd.includes("spawn-auto-update"));
       expect(autoUpdateCall).toBeUndefined();
+    });
+  });
+});
+
+describe("security scan", () => {
+  let stderrSpy: ReturnType<typeof spyOn>;
+  let exitSpy: ReturnType<typeof spyOn>;
+  let testDir: string;
+  let savedSpawnHome: string | undefined;
+  let savedEnabledSteps: string | undefined;
+
+  beforeEach(() => {
+    testDir = join(process.env.HOME ?? "", `.spawn-test-security-${Date.now()}-${Math.random()}`);
+    mkdirSync(testDir, {
+      recursive: true,
+    });
+    savedSpawnHome = process.env.SPAWN_HOME;
+    savedEnabledSteps = process.env.SPAWN_ENABLED_STEPS;
+    process.env.SPAWN_HOME = testDir;
+    process.env.SPAWN_SKIP_GITHUB_AUTH = "1";
+    delete process.env.SPAWN_ENABLED_STEPS;
+    delete process.env.SPAWN_BETA;
+    stderrSpy = spyOn(process.stderr, "write").mockImplementation(() => true);
+    exitSpy = spyOn(process, "exit").mockImplementation((code) => {
+      throw new Error(`__EXIT_${isNumber(code) ? code : 0}__`);
+    });
+    mockGetOrPromptApiKey.mockClear();
+    mockGetOrPromptApiKey.mockImplementation(() => Promise.resolve("sk-or-v1-test-key"));
+    mockTryTarballInstall.mockClear();
+    mockTryTarballInstall.mockImplementation(() => Promise.resolve(false));
+  });
+
+  afterEach(() => {
+    if (savedSpawnHome !== undefined) {
+      process.env.SPAWN_HOME = savedSpawnHome;
+    } else {
+      delete process.env.SPAWN_HOME;
+    }
+    if (savedEnabledSteps !== undefined) {
+      process.env.SPAWN_ENABLED_STEPS = savedEnabledSteps;
+    } else {
+      delete process.env.SPAWN_ENABLED_STEPS;
+    }
+    tryCatch(() =>
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      }),
+    );
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  describe("setupSecurityScan direct", () => {
+    it("installs scan script and cron job via runServer", async () => {
+      const runServer = mock(() => Promise.resolve());
+      const runner = {
+        runServer,
+        uploadFile: mock(() => Promise.resolve()),
+        downloadFile: mock(() => Promise.resolve()),
+      };
+
+      await setupSecurityScan(runner);
+
+      expect(runServer).toHaveBeenCalledTimes(1);
+      const script = runServer.mock.calls[0][0];
+      expect(script).toContain("command -v crontab");
+      expect(script).toContain("/usr/local/bin/spawn-security-scan");
+      expect(script).toContain("spawn-security-alerts.log");
+      expect(script).toContain("crontab");
+    });
+
+    it("scan script checks SSH keys, auth logs, and suspicious binaries", async () => {
+      const runServer = mock(() => Promise.resolve());
+      const runner = {
+        runServer,
+        uploadFile: mock(() => Promise.resolve()),
+        downloadFile: mock(() => Promise.resolve()),
+      };
+
+      await setupSecurityScan(runner);
+
+      const script = runServer.mock.calls[0][0];
+      // Extract the base64-encoded scan script
+      const b64Match = /printf '%s' '([A-Za-z0-9+/=]+)' \| base64 -d \| \$_sudo tee/.exec(script);
+      expect(b64Match).toBeTruthy();
+      const decoded = Buffer.from(b64Match![1], "base64").toString("utf-8");
+      expect(decoded).toContain("authorized_keys");
+      expect(decoded).toContain("Failed password");
+      expect(decoded).toContain("xmrig");
+      expect(decoded).toContain("nmap");
+      expect(decoded).toContain("ss -tlnp");
+      expect(decoded).toContain("crontab -l");
+      // High CPU miner detection
+      expect(decoded).toContain("80.0");
+      expect(decoded).toContain("ps aux --no-headers");
+      // Mining pool connection detection
+      expect(decoded).toContain("3333");
+      expect(decoded).toContain("4444");
+      expect(decoded).toContain("mining pool ports");
+    });
+
+    it("does not throw on runServer failure (non-fatal)", async () => {
+      const runServer = mock(() => Promise.reject(new Error("SSH connection refused")));
+      const runner = {
+        runServer,
+        uploadFile: mock(() => Promise.resolve()),
+        downloadFile: mock(() => Promise.resolve()),
+      };
+
+      await setupSecurityScan(runner);
+      expect(runServer).toHaveBeenCalled();
+    });
+  });
+
+  describe("orchestration integration", () => {
+    it("installs security scan for cloud VMs by default", async () => {
+      const runServer = mock(() => Promise.resolve());
+      const cloud = createMockCloud({
+        cloudName: "digitalocean",
+        runner: {
+          runServer,
+          uploadFile: mock(() => Promise.resolve()),
+          downloadFile: mock(() => Promise.resolve()),
+        },
+      });
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      const calls = runServer.mock.calls.map((c) => c[0]);
+      const securityCall = calls.find((cmd: string) => isString(cmd) && cmd.includes("spawn-security-scan"));
+      expect(securityCall).toBeTruthy();
+    });
+
+    it("skips security scan for local cloud", async () => {
+      const runServer = mock(() => Promise.resolve());
+      const cloud = createMockCloud({
+        cloudName: "local",
+        runner: {
+          runServer,
+          uploadFile: mock(() => Promise.resolve()),
+          downloadFile: mock(() => Promise.resolve()),
+        },
+      });
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      const calls = runServer.mock.calls.map((c) => c[0]);
+      const securityCall = calls.find((cmd: string) => isString(cmd) && cmd.includes("spawn-security-scan"));
+      expect(securityCall).toBeUndefined();
+    });
+
+    it("skips security scan when step is disabled", async () => {
+      process.env.SPAWN_ENABLED_STEPS = "github";
+      const runServer = mock(() => Promise.resolve());
+      const cloud = createMockCloud({
+        cloudName: "digitalocean",
+        runner: {
+          runServer,
+          uploadFile: mock(() => Promise.resolve()),
+          downloadFile: mock(() => Promise.resolve()),
+        },
+      });
+      const agent = createMockAgent();
+
+      await runOrchestrationSafe(cloud, agent, "testagent");
+
+      const calls = runServer.mock.calls.map((c) => c[0]);
+      const securityCall = calls.find((cmd: string) => isString(cmd) && cmd.includes("spawn-security-scan"));
+      expect(securityCall).toBeUndefined();
     });
   });
 });

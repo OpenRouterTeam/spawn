@@ -95,24 +95,43 @@ export async function tryTarballInstall(
   logStep("Downloading pre-built agent tarball...");
 
   // Build arch-aware download command: remote VM picks the right URL based on uname -m
-  // Use sudo for tar extraction — on clouds like AWS Lightsail, SSH user is 'ubuntu' (non-root)
-  // but tarballs extract to /root/. The ubuntu user has passwordless sudo.
-  const sudo = '$([ "$(id -u)" != "0" ] && echo sudo || echo "")';
+  //
+  // Tarballs are built with absolute /root/ paths. Two strategies:
+  // - Root user: extract directly to / (fast, no transform needed)
+  // - Non-root user: use tar --transform to remap /root/ to $HOME/ during extraction.
+  //   This avoids needing sudo entirely (Sprite VMs don't have it).
+  //   Falls back to sudo-based extraction for clouds with passwordless sudo (AWS, GCP).
+  const extractCmd = [
+    'if [ "$(id -u)" = "0" ]; then',
+    "  tar xz -C /",
+    "else",
+    // Try transform first (no sudo needed) — remap /root/ paths to $HOME/
+    '  tar xz --transform "s|^root/|${HOME#/}/|" -C / 2>/dev/null ||',
+    // Fallback: sudo extract + mirror (for clouds with passwordless sudo)
+    "  sudo tar xz -C / 2>/dev/null",
+    "fi",
+  ].join("\n");
+
+  // Arch detection + URL selection + download + extract + verify marker
+  const markerCheck = [
+    "if [ -f /root/.spawn-tarball ]; then true",
+    'elif [ -f "$HOME/.spawn-tarball" ]; then true',
+    "else false; fi",
+  ].join("; ");
+
   let downloadCmd: string;
   if (x86Url && armUrl) {
     downloadCmd =
       "_arch=$(uname -m); " +
       `if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then ` +
       `_url='${armUrl}'; else _url='${x86Url}'; fi; ` +
-      `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+      `curl -fsSL --connect-timeout 10 --max-time 120 "$_url" | (${extractCmd}) && (${markerCheck})`;
   } else {
-    // Only one arch available — validate the remote VM matches before downloading.
-    // If the arch doesn't match, fail so the caller falls back to live install.
     const isArm = !!armUrl;
     const archGuard = isArm
       ? '_arch=$(uname -m); if [ "$_arch" != "aarch64" ] && [ "$_arch" != "arm64" ]; then echo "Tarball is arm64 but VM is $_arch" >&2; exit 1; fi; '
       : '_arch=$(uname -m); if [ "$_arch" = "aarch64" ] || [ "$_arch" = "arm64" ]; then echo "Tarball is x86_64 but VM is $_arch" >&2; exit 1; fi; ';
-    downloadCmd = `${archGuard}curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | ${sudo} tar xz -C / && ${sudo} test -f /root/.spawn-tarball`;
+    downloadCmd = `${archGuard}curl -fsSL --connect-timeout 10 --max-time 120 '${url}' | (${extractCmd}) && (${markerCheck})`;
   }
 
   // Phase 3: Remote execution — catch-all because any failure means "fall back to live install"
@@ -121,34 +140,6 @@ export async function tryTarballInstall(
     logWarn("Tarball download/extract failed on remote VM");
     logDebug(getErrorMessage(extractResult.error));
     return false;
-  }
-
-  // Phase 4: Mirror /root/ files to $HOME/ for non-root SSH users (e.g. GCP, AWS Lightsail).
-  // Tarballs are built with absolute /root/ paths, but some clouds SSH as a regular user
-  // whose $HOME is /home/<user>/, not /root/. Without this, binaries are unreachable.
-  const mirrorCmd = [
-    'if [ "$(id -u)" != "0" ]; then',
-    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
-    '    if [ -d "/root/$_d" ]; then',
-    '      mkdir -p "$HOME/$_d"',
-    `      ${sudo} cp -a "/root/$_d/." "$HOME/$_d/"`,
-    "    fi",
-    "  done",
-    "  # Copy marker file",
-    `  ${sudo} cp /root/.spawn-tarball "$HOME/.spawn-tarball"`,
-    "  # Fix ownership — files were extracted as root",
-    `  ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/.spawn-tarball"`,
-    "  for _d in .claude .local .npm-global .cargo .opencode .hermes .bun; do",
-    '    if [ -d "$HOME/$_d" ]; then',
-    `      ${sudo} chown -R "$(id -u):$(id -g)" "$HOME/$_d"`,
-    "    fi",
-    "  done",
-    "fi",
-  ].join("\n");
-  // Non-fatal — mirror failure should not block tarball install
-  const mirrorResult = await asyncTryCatch(() => runner.runServer(mirrorCmd, 30));
-  if (!mirrorResult.ok) {
-    logWarn("Tarball file mirroring failed (non-fatal)");
   }
 
   logInfo("Agent installed from pre-built tarball");

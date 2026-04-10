@@ -30,8 +30,8 @@ You have the \`spawn\` CLI installed. Use it to provision cloud VMs with AI agen
 spawn <agent> <cloud> --headless --output json --prompt "task description"
 \`\`\`
 
-**Agents:** claude, codex, cursor, openclaw, opencode, kilocode, hermes, junie
-**Clouds:** hetzner, digitalocean, aws, gcp, sprite
+**Agents:** claude, codex, cursor, openclaw, opencode, kilocode, hermes, junie, pi
+**Clouds:** hetzner, digitalocean, aws, gcp, daytona, sprite
 
 Returns JSON: \`{"status":"success","ip_address":"...","ssh_user":"root","server_id":"..."}\`
 
@@ -74,7 +74,7 @@ const HERMES_SNIPPET = `
 
 You have the \`spawn\` CLI for creating child cloud VMs with AI agents.
 Use \`spawn <agent> <cloud> --headless --output json --prompt "task"\` to delegate work.
-Available agents: claude, codex, cursor, openclaw, opencode, kilocode, hermes, junie.
+Available agents: claude, codex, cursor, openclaw, opencode, kilocode, hermes, junie, pi.
 Cloud credentials are pre-configured. Run \`spawn list --json\` to see children.
 \`--headless\` only provisions. To run a prompt on the child: \`ssh root@<ip> "bash -lc 'claude -p --dangerously-skip-permissions \\"prompt\\"'"\`. Always use \`bash -lc\` (binaries are in ~/.local/bin/).
 `;
@@ -118,6 +118,11 @@ const AGENT_SKILLS: Record<string, SkillConfig> = {
     remotePath: "~/.hermes/SOUL.md",
     content: HERMES_SNIPPET,
     append: true,
+  },
+  cursor: {
+    remotePath: "~/.cursor/rules/spawn.md",
+    content: SKILL_BODY,
+    append: false,
   },
   junie: {
     remotePath: "~/.junie/AGENTS.md",

@@ -222,6 +222,14 @@ describe("createCloudAgents", () => {
     }
   });
 
+  it("cursor agent uses real API key as CURSOR_API_KEY (not a dummy value)", () => {
+    const envVars = result.agents.cursor.envVars("sk-or-v1-real-key");
+    const cursorKeyVar = envVars.find((v: string) => v.startsWith("CURSOR_API_KEY="));
+    expect(cursorKeyVar).toBeDefined();
+    // Must use the actual API key, not a dummy like "spawn-proxy"
+    expect(cursorKeyVar).toBe("CURSOR_API_KEY=sk-or-v1-real-key");
+  });
+
   it("all agents have launchCmd returning non-empty string", () => {
     for (const agent of Object.values(result.agents)) {
       const cmd = agent.launchCmd();
@@ -245,6 +253,35 @@ describe("createCloudAgents", () => {
     await result.agents.openclaw.configure?.("sk-or-v1-test", "openrouter/auto", new Set());
     // Should have called uploadFile for the config
     expect(runner.uploadFile).toHaveBeenCalled();
+  });
+
+  it("openclaw telegram config is written atomically via bun merge script", async () => {
+    const token = "123456:ABC-DEF-test-token";
+    process.env.TELEGRAM_BOT_TOKEN = token;
+    await result.agents.openclaw.configure?.(
+      "sk-or-v1-test",
+      "openrouter/auto",
+      new Set([
+        "telegram",
+      ]),
+    );
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const calls = runner.runServer.mock.calls;
+    const allCmds = calls.map((c: unknown[]) => String(c[0]));
+    // Must use bun -e with atomic merge, NOT individual openclaw config set calls
+    const mergeCmd = allCmds.find((cmd: string) => cmd.includes("bun -e") && cmd.includes("botToken"));
+    expect(mergeCmd).toBeDefined();
+    // The merge script must contain the full telegram config object
+    expect(mergeCmd).toContain(token);
+    expect(mergeCmd).toContain("dmPolicy");
+    expect(mergeCmd).toContain("pairing");
+    expect(mergeCmd).toContain("groupPolicy");
+    expect(mergeCmd).toContain("requireMention");
+    // Must NOT use openclaw config set for telegram fields
+    const configSetTelegram = allCmds.find((cmd: string) =>
+      cmd.includes("openclaw config set channels.telegram.botToken"),
+    );
+    expect(configSetTelegram).toBeUndefined();
   });
 
   it("openclaw agent preLaunch starts gateway", async () => {

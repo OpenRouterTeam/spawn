@@ -1,6 +1,6 @@
 {
   "name": "@openrouter/spawn",
-  "version": "0.31.0",
+  "version": "1.0.1",
   "type": "module",
   "bin": {
     "spawn": "cli.js"
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.0.0",
+    "@daytonaio/sdk": "0.160.0",
     "@openrouter/spawn-shared": "workspace:*",
     "picocolors": "1.1.1",
     "valibot": "1.2.0"

@@ -40,6 +40,12 @@ export interface AgentConfig {
   preLaunchMsg?: string;
   /** Shell command to launch the agent interactively. */
   launchCmd: () => string;
+  /**
+   * Shell command to run the agent with a prompt non-interactively.
+   * Used by headless mode when --prompt is provided.
+   * If undefined, headless --prompt will set SPAWN_PROMPT env var but not auto-execute.
+   */
+  promptCmd?: (prompt: string) => string;
   /** Cloud-init dependency tier. Defaults to "full" if unset. */
   cloudInitTier?: CloudInitTier;
   /** Skip tarball install attempt (e.g., already using snapshot). */
@@ -142,6 +148,12 @@ const COMMON_STEPS: OptionalStep[] = [
     value: "auto-update",
     label: "Auto-update",
     hint: "keep agent + system packages up to date (every 6h)",
+    defaultOn: true,
+  },
+  {
+    value: "security-scan",
+    label: "Security scan",
+    hint: "periodic checks for SSH anomalies, failed logins, suspicious software",
     defaultOn: true,
   },
 ];

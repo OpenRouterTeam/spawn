@@ -5,8 +5,17 @@ import type { Result } from "@openrouter/spawn-shared";
 import type { Block } from "@slack/bolt";
 
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname } from "node:path";
 import { Err, isString, Ok, toRecord } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
 import * as v from "valibot";
@@ -45,6 +54,20 @@ interface RawThread {
   pr_urls: string | null;
 }
 
+const PrUrlsSchema = v.array(v.string());
+
+function parsePrUrls(raw: string | null): string[] | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  const result = v.safeParse(PrUrlsSchema, parsed);
+  return result.success ? result.output : undefined;
+}
+
 function rowToThread(r: RawThread): ThreadRow {
   return {
     channel: r.channel,
@@ -53,11 +76,7 @@ function rowToThread(r: RawThread): ThreadRow {
     createdAt: r.created_at,
     userId: r.user_id ?? undefined,
     lastActivityAt: r.last_activity_at ?? undefined,
-    prUrls: r.pr_urls
-      ? Array.isArray(JSON.parse(r.pr_urls))
-        ? JSON.parse(r.pr_urls).filter(isString)
-        : undefined
-      : undefined,
+    prUrls: parsePrUrls(r.pr_urls),
   };
 }
 
@@ -149,6 +168,23 @@ export function openDb(path?: string): Database {
       PRIMARY KEY (channel, thread_ts)
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS candidates (
+      post_id            TEXT PRIMARY KEY,
+      permalink          TEXT NOT NULL,
+      title              TEXT NOT NULL,
+      subreddit          TEXT NOT NULL,
+      draft_reply        TEXT NOT NULL,
+      slack_channel      TEXT,
+      slack_ts           TEXT,
+      status             TEXT NOT NULL DEFAULT 'pending',
+      actioned_by        TEXT,
+      actioned_at        TEXT,
+      posted_reply       TEXT,
+      reddit_comment_url TEXT,
+      created_at         TEXT NOT NULL
+    )
+  `);
   if (!path) {
     migrateFromJson(db);
   }
@@ -235,6 +271,165 @@ export function updateThread(
       threadTs,
     ],
   );
+}
+
+// #region Candidates — Reddit growth pipeline
+
+/** A Reddit growth candidate tracked for approval. */
+export interface CandidateRow {
+  postId: string;
+  permalink: string;
+  title: string;
+  subreddit: string;
+  draftReply: string;
+  slackChannel?: string;
+  slackTs?: string;
+  status: "pending" | "approved" | "posted" | "skipped" | "error";
+  actionedBy?: string;
+  actionedAt?: string;
+  postedReply?: string;
+  redditCommentUrl?: string;
+  createdAt: string;
+}
+
+/** Raw SQLite row shape for candidates. */
+interface RawCandidate {
+  post_id: string;
+  permalink: string;
+  title: string;
+  subreddit: string;
+  draft_reply: string;
+  slack_channel: string | null;
+  slack_ts: string | null;
+  status: string;
+  actioned_by: string | null;
+  actioned_at: string | null;
+  posted_reply: string | null;
+  reddit_comment_url: string | null;
+  created_at: string;
+}
+
+function rowToCandidate(r: RawCandidate): CandidateRow {
+  return {
+    postId: r.post_id,
+    permalink: r.permalink,
+    title: r.title,
+    subreddit: r.subreddit,
+    draftReply: r.draft_reply,
+    slackChannel: r.slack_channel ?? undefined,
+    slackTs: r.slack_ts ?? undefined,
+    status:
+      r.status === "approved" || r.status === "posted" || r.status === "skipped" || r.status === "error"
+        ? r.status
+        : "pending",
+    actionedBy: r.actioned_by ?? undefined,
+    actionedAt: r.actioned_at ?? undefined,
+    postedReply: r.posted_reply ?? undefined,
+    redditCommentUrl: r.reddit_comment_url ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Insert or update a candidate. On conflict (same post_id), updates Slack coordinates. */
+export function upsertCandidate(db: Database, candidate: CandidateRow): void {
+  db.run(
+    `INSERT INTO candidates (post_id, permalink, title, subreddit, draft_reply, slack_channel, slack_ts, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (post_id) DO UPDATE SET
+       slack_channel = excluded.slack_channel,
+       slack_ts      = excluded.slack_ts`,
+    [
+      candidate.postId,
+      candidate.permalink,
+      candidate.title,
+      candidate.subreddit,
+      candidate.draftReply,
+      candidate.slackChannel ?? null,
+      candidate.slackTs ?? null,
+      candidate.status,
+      candidate.createdAt,
+    ],
+  );
+}
+
+/** Look up a candidate by Reddit post ID. */
+export function findCandidate(db: Database, postId: string): CandidateRow | undefined {
+  const row = db
+    .query<
+      RawCandidate,
+      [
+        string,
+      ]
+    >("SELECT * FROM candidates WHERE post_id = ?")
+    .get(postId);
+  return row ? rowToCandidate(row) : undefined;
+}
+
+/** Update a candidate's status and related fields after an action. */
+export function updateCandidateStatus(
+  db: Database,
+  postId: string,
+  update: {
+    status: CandidateRow["status"];
+    actionedBy?: string;
+    postedReply?: string;
+    redditCommentUrl?: string;
+  },
+): void {
+  db.run(
+    `UPDATE candidates SET
+       status             = ?,
+       actioned_by        = ?,
+       actioned_at        = ?,
+       posted_reply       = ?,
+       reddit_comment_url = ?
+     WHERE post_id = ?`,
+    [
+      update.status,
+      update.actionedBy ?? null,
+      new Date().toISOString(),
+      update.postedReply ?? null,
+      update.redditCommentUrl ?? null,
+      postId,
+    ],
+  );
+}
+
+const DECISIONS_PATH = `${process.env.HOME ?? "/tmp"}/.config/spawn/growth-decisions.md`;
+
+/** Append a decision entry to the growth decisions log. */
+export function logDecision(
+  candidate: CandidateRow,
+  decision: "approved" | "edited" | "skipped",
+  editedReply?: string,
+): void {
+  const dir = dirname(DECISIONS_PATH);
+  if (!existsSync(dir))
+    mkdirSync(dir, {
+      recursive: true,
+    });
+
+  const date = new Date().toISOString().split("T")[0];
+  const reply = editedReply ?? candidate.draftReply;
+  const entry = `
+## ${decision.toUpperCase()} — ${date}
+
+- **Post**: [${candidate.title}](https://reddit.com${candidate.permalink})
+- **Subreddit**: r/${candidate.subreddit}
+- **Decision**: ${decision}
+${editedReply ? "- **Edited**: yes (original draft was modified)\n" : ""}\
+- **Reply**: ${reply.replace(/\n/g, " ")}
+
+---
+`;
+
+  appendFileSync(DECISIONS_PATH, entry);
+}
+
+/** Read the decisions log (returns empty string if no file). */
+export function readDecisions(): string {
+  if (!existsSync(DECISIONS_PATH)) return "";
+  return readFileSync(DECISIONS_PATH, "utf-8");
 }
 
 // #endregion
@@ -491,6 +686,11 @@ export function extractMarkdownTables(raw: string): {
   clean: string;
   tables: string[];
 } {
+  if (raw.length > 50_000)
+    return {
+      clean: raw,
+      tables: [],
+    };
   const tables: string[] = [];
   MARKDOWN_TABLE_RE.lastIndex = 0;
   const clean = raw.replace(MARKDOWN_TABLE_RE, (match) => {
@@ -603,7 +803,7 @@ export async function downloadSlackFile(
     mkdirSync(dir, {
       recursive: true,
     });
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeName = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
     const localPath = `${dir}/${safeName}`;
     writeFileSync(localPath, buffer);
     return Ok(localPath);

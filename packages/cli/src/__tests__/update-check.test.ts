@@ -34,6 +34,8 @@ function mockEnv() {
   process.env.NODE_ENV = undefined;
   process.env.BUN_ENV = undefined;
   process.env.SPAWN_NO_UPDATE_CHECK = undefined;
+  // Enable auto-update for tests that verify update behavior
+  process.env.SPAWN_AUTO_UPDATE = "1";
   return originalEnv;
 }
 
@@ -92,7 +94,7 @@ describe("update-check", () => {
     });
 
     it("should check for updates on every run", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to prevent actual update + re-exec
@@ -108,7 +110,7 @@ describe("update-check", () => {
     });
 
     it("should auto-update when newer version is available", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to prevent actual update + re-exec
@@ -121,7 +123,7 @@ describe("update-check", () => {
       // Should have printed update message to stderr
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Update available");
-      expect(output).toContain("99.0.0");
+      expect(output).toContain("1.0.99");
       expect(output).toContain("Updating automatically");
 
       // Should have called execFileSync for curl, bash, which, and re-exec
@@ -167,7 +169,7 @@ describe("update-check", () => {
     });
 
     it("should handle update failures gracefully", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to throw an error (curl fetch fails)
@@ -210,7 +212,7 @@ describe("update-check", () => {
     });
 
     it("should redirect install script stdout to stderr when jsonOutput=true", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -247,7 +249,7 @@ describe("update-check", () => {
     });
 
     it("should use inherit stdio for install script when jsonOutput=false", async () => {
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -287,7 +289,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -350,7 +352,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -427,7 +429,7 @@ describe("update-check", () => {
         "/usr/local/bin/spawn",
       ];
 
-      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
+      const mockFetch = mock(() => Promise.resolve(new Response("1.0.99\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");

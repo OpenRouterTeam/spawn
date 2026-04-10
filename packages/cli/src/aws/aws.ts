@@ -899,6 +899,7 @@ export async function ensureSshKey(): Promise<void> {
 
 function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const packages = getPackagesForTier(tier);
+  const quotedPackages = packages.map((p) => shellQuote(p)).join(" ");
   const lines = [
     "#!/bin/bash",
     "export DEBIAN_FRONTEND=noninteractive",
@@ -908,7 +909,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
     "  chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile",
     "fi",
     "apt-get update -y",
-    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+    `apt-get install -y --no-install-recommends ${quotedPackages}`,
   ];
   if (needsNode(tier)) {
     lines.push(
