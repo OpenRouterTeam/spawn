@@ -45,7 +45,7 @@ const SENSITIVE_PATTERNS: [
   ],
   // Base64-encoded blobs that might contain secrets (40+ chars)
   [
-    /[A-Za-z0-9+/]{40,}={0,2}\b/g,
+    /[A-Za-z0-9+/]{40,100}={0,2}/g,
     "[REDACTED_B64]",
   ],
   // Home directory paths — replace with ~
