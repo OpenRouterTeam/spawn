@@ -95,6 +95,24 @@ const pendingQueues = new Map<
 
 // #region Claude Code helpers
 
+/**
+ * Sanitize user input before writing to subprocess stdin.
+ * Strips control characters (except tab, newline, carriage return) to prevent
+ * escape-sequence injection. Enforces a 100KB size limit to prevent memory abuse.
+ */
+const MAX_STDIN_BYTES = 100 * 1024; // 100KB
+
+function sanitizeStdinInput(input: string): string {
+  // Strip non-printable control chars except \t (0x09), \n (0x0A), \r (0x0D)
+  const sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  // Enforce size limit (truncate to MAX_STDIN_BYTES in UTF-8)
+  const encoded = new TextEncoder().encode(sanitized);
+  if (encoded.byteLength > MAX_STDIN_BYTES) {
+    return new TextDecoder().decode(encoded.slice(0, MAX_STDIN_BYTES));
+  }
+  return sanitized;
+}
+
 const SYSTEM_PROMPT = `You are SPA (Spawn's Personal Agent), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
 Your primary job is to help manage GitHub issues based on Slack conversations:
@@ -404,7 +422,7 @@ async function runClaudeAndStream(
     },
   });
 
-  proc.stdin.write(prompt);
+  proc.stdin.write(sanitizeStdinInput(prompt));
   proc.stdin.end();
 
   activeRuns.set(threadTs, {
