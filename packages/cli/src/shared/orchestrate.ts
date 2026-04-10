@@ -652,6 +652,42 @@ async function postInstall(
     await injectSpawnSkill(cloud.runner, agentName);
   }
 
+  // Skill installation (--beta skills)
+  const selectedSkillsEnv = process.env.SPAWN_SELECTED_SKILLS;
+  if (selectedSkillsEnv && cloud.cloudName !== "local") {
+    const skillIds = selectedSkillsEnv.split(",").filter(Boolean);
+    if (skillIds.length > 0) {
+      const { loadManifest } = await import("../manifest.js");
+      const manifestForSkills = await loadManifest();
+      if (manifestForSkills.skills) {
+        const { installSkills } = await import("./skills.js");
+        await installSkills(cloud.runner, manifestForSkills, agentName, skillIds);
+
+        // Append skill env vars to .spawnrc so MCP servers can resolve ${VAR} at runtime
+        const skillEnvPairs = (process.env.SPAWN_SKILL_ENV_PAIRS ?? "").split(",").filter(Boolean);
+        if (skillEnvPairs.length > 0) {
+          const envLines = skillEnvPairs
+            .map((pair) => {
+              const eqIdx = pair.indexOf("=");
+              if (eqIdx === -1) {
+                return "";
+              }
+              const key = pair.slice(0, eqIdx);
+              const val = pair.slice(eqIdx + 1);
+              return `export ${key}='${val.replace(/'/g, "'\\''")}'`;
+            })
+            .filter(Boolean)
+            .join("\n");
+          if (envLines) {
+            await asyncTryCatch(() =>
+              cloud.runner.runServer(`printf '\\n# [spawn:skills]\\n${envLines}\\n' >> ~/.spawnrc`),
+            );
+          }
+        }
+      }
+    }
+  }
+
   // Pre-launch hooks (retry loop)
   if (agent.preLaunch) {
     for (;;) {

@@ -252,6 +252,27 @@ async function promptSetupOptions(agentName: string): Promise<Set<string> | unde
   return stepSet;
 }
 
+/** Show the skills picker if --beta skills is active and the agent has skills available. */
+async function maybePromptSkills(manifest: Manifest, agentName: string): Promise<void> {
+  if (process.env.SPAWN_SELECTED_SKILLS) {
+    return;
+  }
+  const betaFeatures = (process.env.SPAWN_BETA ?? "").split(",").filter(Boolean);
+  if (!betaFeatures.includes("skills")) {
+    return;
+  }
+  const { promptSkillSelection, collectSkillEnvVars } = await import("../shared/skills.js");
+  const selectedSkills = await promptSkillSelection(manifest, agentName);
+  if (selectedSkills && selectedSkills.length > 0) {
+    process.env.SPAWN_SELECTED_SKILLS = selectedSkills.join(",");
+    const envPairs = await collectSkillEnvVars(manifest, selectedSkills);
+    if (envPairs.length > 0) {
+      const existing = process.env.SPAWN_SKILL_ENV_PAIRS ?? "";
+      process.env.SPAWN_SKILL_ENV_PAIRS = existing ? `${existing},${envPairs.join(",")}` : envPairs.join(",");
+    }
+  }
+}
+
 export { getAndValidateCloudChoices, promptSetupOptions, promptSpawnName, selectCloud };
 
 export async function cmdInteractive(): Promise<void> {
@@ -313,6 +334,9 @@ export async function cmdInteractive(): Promise<void> {
       ].join(",");
     }
   }
+
+  // Skills picker (--beta skills)
+  await maybePromptSkills(manifest, agentChoice);
 
   const spawnName = await promptSpawnName();
 

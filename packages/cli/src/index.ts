@@ -911,6 +911,7 @@ async function main(): Promise<void> {
     "docker",
     "recursive",
     "sandbox",
+    "skills",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
   for (const flag of betaFeatures) {
@@ -922,6 +923,7 @@ async function main(): Promise<void> {
       console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
       console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
       console.error(`  ${pc.cyan("sandbox")}     Run local agents in a Docker container (sandboxed)`);
+      console.error(`  ${pc.cyan("skills")}      Pre-install MCP servers and tools on the VM`);
       console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
       process.exit(1);
     }
