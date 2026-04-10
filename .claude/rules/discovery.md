@@ -73,7 +73,22 @@ Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests
 - If something is already implemented, close the issue with a note
 - If a bug is reported, fix it
 
-## 5. Extend tests
+## 5. Curate skills catalog
+
+Research and maintain the `skills` section of `manifest.json`. Skills are agent-specific capabilities pre-installed on VMs via `--beta skills`.
+
+Three types:
+- **MCP servers** — npm packages giving agents tool access (GitHub, Playwright, databases)
+- **Agent Skills** — SKILL.md files following the Agent Skills standard (agentskills.io)
+- **Agent configs** — native config files unlocking agent features (Cursor rules, OpenClaw SOUL.md)
+
+When adding a skill:
+1. Verify the npm package exists and starts: `npm view PACKAGE version && timeout 5 npx -y PACKAGE`
+2. Document prerequisites (apt packages, Chrome, API keys)
+3. Mark OAuth-requiring skills as `"headless_compatible": false`
+4. Only add actively maintained packages (updated in last 6 months)
+
+## 6. Extend tests
 
 Tests use Bun's built-in test runner (`bun:test`). When adding a new cloud or agent:
 - Add unit tests in `packages/cli/src/__tests__/` with mocked fetch/prompts
