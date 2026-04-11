@@ -265,6 +265,8 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 
 Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cycle end.
 
+**Long-running commands warning**: `bun install`, `bunx @biomejs/biome check`, and `bun test` can take minutes and block message delivery. Messages (including `shutdown_request`) are only delivered between tool calls, not during them. To stay responsive: run these commands early, and check for messages before starting a new long-running operation.
+
 ## Monitor Loop (CRITICAL)
 
 **CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
@@ -280,7 +282,7 @@ Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cy
 
 Keep looping until:
 - All tasks are completed OR
-- Time budget is reached (10 min warn, 12 min shutdown, 15 min force)
+- Time budget is reached (20 min warn, 23 min shutdown, 25 min force)
 
 ## Team Coordination
 
@@ -291,13 +293,13 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY between turns.
 **You MUST stay active until every teammate has confirmed shutdown.** Exiting early orphans teammates.
 
 Follow this exact shutdown sequence:
-1. At 10 min: broadcast "wrap up" to all teammates
-2. At 12 min: send `shutdown_request` to EACH teammate by name
-3. Wait for ALL shutdown confirmations — keep calling `TaskList` while waiting
+1. At 20 min: broadcast "wrap up" to all teammates
+2. At 23 min: send `shutdown_request` to EACH teammate by name
+3. Wait up to 2 minutes for shutdown confirmations — keep calling `TaskList`. **If a teammate does NOT respond within 2 minutes, do NOT wait longer.** Stuck teammates running long bash commands (bun install, biome, bun test) cannot receive messages mid-subprocess. Proceed to step 4 without their confirmation — do NOT let stuck teammates block cleanup.
 4. In ONE turn: call `TeamDelete`, then run `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` — do everything in this single turn
 5. **Output a plain-text summary and STOP** — do NOT call any tool after `TeamDelete`. This text-only response ends the session.
 
-**NEVER exit without shutting down all teammates first.** If a teammate doesn't respond to shutdown_request within 2 minutes, send it again.
+**NEVER wait indefinitely for teammate confirmation.** If a teammate doesn't respond to shutdown_request within 2 minutes, send it once more, then proceed to TeamDelete regardless. See issue #3259.
 
 **CRITICAL — NO TOOLS AFTER TeamDelete.** After `TeamDelete` returns (whether success or "No team name found"), you MUST NOT make any further tool calls. Output your final summary as plain text and stop. Any tool call after `TeamDelete` triggers an infinite shutdown prompt loop in non-interactive (-p) mode. See issue #3103.
 
