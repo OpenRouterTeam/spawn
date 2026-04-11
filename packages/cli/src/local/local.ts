@@ -83,14 +83,19 @@ export async function runLocal(cmd: string): Promise<void> {
 
 /** Run a command locally using an argument array (no shell interpretation). */
 export async function runLocalArgs(args: ReadonlyArray<string>): Promise<void> {
-  const proc = Bun.spawn(args, {
-    stdio: [
-      "inherit",
-      "inherit",
-      "inherit",
+  const proc = Bun.spawn(
+    [
+      ...args,
     ],
-    env: process.env,
-  });
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+      env: process.env,
+    },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     throw new Error(`Command failed (exit ${exitCode}): ${args.join(" ")}`);

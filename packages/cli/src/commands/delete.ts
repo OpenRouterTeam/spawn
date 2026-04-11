@@ -319,8 +319,11 @@ export async function pullChildHistory(record: SpawnRecord): Promise<void> {
     const childRecords: SpawnRecord[] = [];
     for (const el of parsed) {
       const result = v.safeParse(SpawnRecordSchema, el);
-      if (result.success) {
-        childRecords.push(result.output);
+      if (result.success && result.output.id) {
+        childRecords.push({
+          ...result.output,
+          id: result.output.id,
+        });
       }
     }
     if (childRecords.length > 0) {
