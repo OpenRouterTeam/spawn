@@ -136,7 +136,7 @@ describe("manifest", () => {
       );
     });
 
-    it("should use disk cache when fresh", async () => {
+    it("should always fetch from GitHub even when cache exists", async () => {
       mkdirSync(join(env.testDir, "spawn"), {
         recursive: true,
       });
@@ -149,7 +149,8 @@ describe("manifest", () => {
       expect(manifest).toHaveProperty("agents");
       expect(manifest).toHaveProperty("clouds");
       expect(manifest).toHaveProperty("matrix");
-      expect(global.fetch).not.toHaveBeenCalled();
+      // Always fetches fresh — cache is only an offline fallback
+      expect(global.fetch).toHaveBeenCalled();
     });
 
     it("should refresh cache when forceRefresh is true", async () => {

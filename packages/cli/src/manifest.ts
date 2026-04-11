@@ -76,7 +76,6 @@ const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main` as const;
 const SPAWN_CDN = "https://openrouter.ai/labs/spawn" as const;
 /** Static URL for version checks — GitHub release artifact, never changes with repo structure */
 const VERSION_URL = `https://github.com/${REPO}/releases/download/cli-latest/version` as const;
-const CACHE_TTL = 3600; // 1 hour in seconds
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
 // ── Cache helpers ──────────────────────────────────────────────────────────────
@@ -195,13 +194,6 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
 let _cached: Manifest | null = null;
 let _staleCache = false;
 
-function tryLoadFromDiskCache(): Manifest | null {
-  if (cacheAge() >= CACHE_TTL) {
-    return null;
-  }
-  return readCache();
-}
-
 function updateCache(manifest: Manifest): Manifest {
   writeCache(manifest);
   _cached = manifest;
@@ -246,17 +238,8 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
     return local;
   }
 
-  // Check disk cache first if not forcing refresh
-  if (!forceRefresh) {
-    const cached = tryLoadFromDiskCache();
-    if (cached) {
-      _cached = cached;
-      _staleCache = false;
-      return cached;
-    }
-  }
-
-  // Fetch from GitHub
+  // Always fetch from GitHub first — ensures users always see latest agents/clouds.
+  // Disk cache is only used as an offline fallback.
   const fetched = await fetchManifestFromGitHub();
   if (fetched) {
     return updateCache(fetched);
