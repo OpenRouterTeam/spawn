@@ -680,6 +680,10 @@ async function postInstall(
               }
               const val = pair.slice(eqIdx + 1);
               const valB64 = Buffer.from(val).toString("base64");
+              if (!/^[A-Za-z0-9+/=]+$/.test(valB64)) {
+                logWarn(`Skipping skill env var with invalid base64: ${key}`);
+                return "";
+              }
               return `export ${key}="$(echo '${valB64}' | base64 -d)"`;
             })
             .filter(Boolean)
