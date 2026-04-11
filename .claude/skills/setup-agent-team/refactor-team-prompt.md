@@ -280,7 +280,7 @@ Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cy
 
 Keep looping until:
 - All tasks are completed OR
-- Time budget is reached (10 min warn, 12 min shutdown, 15 min force)
+- Time budget is reached (20 min warn, 23 min shutdown, 25 min force)
 
 ## Team Coordination
 
@@ -288,16 +288,16 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY between turns.
 
 ## Lifecycle Management
 
-**You MUST stay active until every teammate has confirmed shutdown.** Exiting early orphans teammates.
+**Stay active until teammates shut down — but do NOT loop forever waiting for stuck agents.**
 
 Follow this exact shutdown sequence:
-1. At 10 min: broadcast "wrap up" to all teammates
-2. At 12 min: send `shutdown_request` to EACH teammate by name
-3. Wait for ALL shutdown confirmations — keep calling `TaskList` while waiting
+1. At 20 min: broadcast "wrap up" to all teammates
+2. At 23 min: send `shutdown_request` to EACH teammate by name
+3. Poll `TaskList` waiting for confirmations. If a teammate has not responded after **3 rounds of shutdown_requests** (≈6 min), **stop waiting for that teammate** and proceed. In-process agents that never respond will block TeamDelete indefinitely — retrying is futile after 3 attempts.
 4. In ONE turn: call `TeamDelete`, then run `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` — do everything in this single turn
 5. **Output a plain-text summary and STOP** — do NOT call any tool after `TeamDelete`. This text-only response ends the session.
 
-**NEVER exit without shutting down all teammates first.** If a teammate doesn't respond to shutdown_request within 2 minutes, send it again.
+**If a teammate doesn't respond to shutdown_request within 2 minutes, send it again — but only up to 3 times total.** After 3 unanswered shutdown_requests, mark that teammate as non-responsive and proceed to step 4 without waiting. Non-responsive in-process teammates indicate a harness issue (see #3261) that cannot be solved by retrying.
 
 **CRITICAL — NO TOOLS AFTER TeamDelete.** After `TeamDelete` returns (whether success or "No team name found"), you MUST NOT make any further tool calls. Output your final summary as plain text and stop. Any tool call after `TeamDelete` triggers an infinite shutdown prompt loop in non-interactive (-p) mode. See issue #3103.
 
