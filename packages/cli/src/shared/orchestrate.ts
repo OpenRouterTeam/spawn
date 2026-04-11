@@ -666,6 +666,7 @@ async function postInstall(
         // Append skill env vars to .spawnrc so MCP servers can resolve ${VAR} at runtime
         const skillEnvPairs = (process.env.SPAWN_SKILL_ENV_PAIRS ?? "").split(",").filter(Boolean);
         if (skillEnvPairs.length > 0) {
+          const validKeyRe = /^[A-Z_][A-Z0-9_]*$/;
           const envLines = skillEnvPairs
             .map((pair) => {
               const eqIdx = pair.indexOf("=");
@@ -673,8 +674,13 @@ async function postInstall(
                 return "";
               }
               const key = pair.slice(0, eqIdx);
+              if (!validKeyRe.test(key)) {
+                logWarn(`Skipping invalid skill env var key: ${key}`);
+                return "";
+              }
               const val = pair.slice(eqIdx + 1);
-              return `export ${key}='${val.replace(/'/g, "'\\''")}'`;
+              const valB64 = Buffer.from(val).toString("base64");
+              return `export ${key}="$(echo '${valB64}' | base64 -d)"`;
             })
             .filter(Boolean)
             .join("\n");
