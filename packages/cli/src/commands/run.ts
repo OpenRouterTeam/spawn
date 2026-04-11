@@ -1196,11 +1196,13 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     if (conn.user && tryCatch(() => validateUsername(conn.user)).ok) {
       connectionFields.ssh_user = conn.user;
     }
-    if (conn.server_id && tryCatch(() => validateServerIdentifier(conn.server_id)).ok) {
-      connectionFields.server_id = conn.server_id;
+    const serverId = conn.server_id;
+    if (serverId && tryCatch(() => validateServerIdentifier(serverId)).ok) {
+      connectionFields.server_id = serverId;
     }
-    if (conn.server_name && tryCatch(() => validateServerIdentifier(conn.server_name)).ok) {
-      connectionFields.server_name = conn.server_name;
+    const serverName = conn.server_name;
+    if (serverName && tryCatch(() => validateServerIdentifier(serverName)).ok) {
+      connectionFields.server_name = serverName;
     }
   }
 
