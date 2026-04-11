@@ -689,9 +689,15 @@ async function postInstall(
             .filter(Boolean)
             .join("\n");
           if (envLines) {
-            await asyncTryCatch(() =>
-              cloud.runner.runServer(`printf '\\n# [spawn:skills]\\n${envLines}\\n' >> ~/.spawnrc`),
-            );
+            const payload = `\n# [spawn:skills]\n${envLines}\n`;
+            const payloadB64 = Buffer.from(payload).toString("base64");
+            if (!/^[A-Za-z0-9+/=]+$/.test(payloadB64)) {
+              logWarn("Unexpected characters in skill env payload base64");
+            } else {
+              await asyncTryCatch(() =>
+                cloud.runner.runServer(`printf '%s' '${payloadB64}' | base64 -d >> ~/.spawnrc`),
+              );
+            }
           }
         }
       }
