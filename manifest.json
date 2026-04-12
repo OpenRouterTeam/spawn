@@ -439,7 +439,8 @@
         "image": "daytonaio/sandbox:latest",
         "size": "small"
       },
-      "notes": "Uses the Daytona SDK for sandbox lifecycle, file transfer, and signed preview URLs. SSH access tokens are minted on demand and never persisted."
+      "notes": "Uses the Daytona SDK for sandbox lifecycle, file transfer, and signed preview URLs. SSH access tokens are minted on demand and never persisted.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/daytona.png"
     },
     "sprite": {
       "name": "Sprite",
