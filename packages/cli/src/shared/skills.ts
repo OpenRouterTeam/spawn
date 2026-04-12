@@ -11,8 +11,9 @@ import { toRecord } from "@openrouter/spawn-shared";
 import { uploadConfigFile } from "./agent-setup.js";
 import { parseJsonObj } from "./parse.js";
 import { getTmpDir } from "./paths.js";
-import { asyncTryCatch } from "./result.js";
-import { logInfo, logStep, logWarn } from "./ui.js";
+import { asyncTryCatch, tryCatch } from "./result.js";
+import { validateRemotePath } from "./ssh.js";
+import { logInfo, logStep, logWarn, shellQuote } from "./ui.js";
 
 // ─── Skill Filtering ───────────────────────────────────────────────────────────
 
@@ -269,18 +270,26 @@ async function injectInstructionSkill(
   remotePath: string,
   content: string,
 ): Promise<void> {
+  // Validate remotePath to prevent path traversal and shell injection
+  const pathResult = tryCatch(() => validateRemotePath(remotePath));
+  if (!pathResult.ok) {
+    logWarn(`Skill ${skillId}: invalid remote path "${remotePath}", skipping`);
+    return;
+  }
+  const safePath = pathResult.data;
+
   const b64 = Buffer.from(content).toString("base64");
   if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
     logWarn(`Skill ${skillId}: unexpected characters in base64 output, skipping`);
     return;
   }
 
-  const remoteDir = remotePath.slice(0, remotePath.lastIndexOf("/"));
-  const cmd = `mkdir -p ${remoteDir} && printf '%s' '${b64}' | base64 -d > ${remotePath} && chmod 644 ${remotePath}`;
+  const safeDir = safePath.slice(0, safePath.lastIndexOf("/"));
+  const cmd = `mkdir -p ${shellQuote(safeDir)} && printf '%s' '${b64}' | base64 -d > ${shellQuote(safePath)} && chmod 644 ${shellQuote(safePath)}`;
 
   const result = await asyncTryCatch(() => runner.runServer(cmd));
   if (result.ok) {
-    logInfo(`Skill injected: ${remotePath}`);
+    logInfo(`Skill injected: ${safePath}`);
   } else {
     logWarn(`Skill ${skillId} injection failed — agent will work without it`);
   }
