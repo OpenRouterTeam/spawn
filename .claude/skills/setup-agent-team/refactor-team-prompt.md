@@ -276,7 +276,7 @@ Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cy
 
 **The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: `TaskList` + `Bash("sleep 15")`.
 
-**EXCEPTION — After TeamDelete:** Once `TeamDelete` has been called and completed (step 4 of the shutdown sequence), your VERY NEXT response MUST be plain text only with **NO tool calls**. Do NOT call `TaskList`, `Bash`, or any other tool after `TeamDelete`. A text-only response is the termination signal for the non-interactive harness. Any tool call after `TeamDelete` causes an infinite loop of shutdown prompt injections.
+**EXCEPTION — After step 4 shutdown sequence:** Once `TeamDelete` has been called AND the step 4 Bash cleanup has completed, your VERY NEXT response MUST be plain text only with **NO tool calls**. Do NOT call `TaskList`, `Bash`, or any other tool. A text-only response is the termination signal for the non-interactive harness. Any tool call after the step 4 cleanup causes an infinite loop of shutdown prompt injections.
 
 Keep looping until:
 - All tasks are completed OR
@@ -294,12 +294,19 @@ Follow this exact shutdown sequence:
 1. At 20 min: broadcast "wrap up" to all teammates
 2. At 23 min: send `shutdown_request` to EACH teammate by name
 3. Poll `TaskList` waiting for confirmations. If a teammate has not responded after **3 rounds of shutdown_requests** (≈6 min), **stop waiting for that teammate** and proceed. In-process agents that never respond will block TeamDelete indefinitely — retrying is futile after 3 attempts.
-4. In ONE turn: call `TeamDelete`, then run `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` — do everything in this single turn
-5. **Output a plain-text summary and STOP** — do NOT call any tool after `TeamDelete`. This text-only response ends the session.
+4. In ONE turn: call `TeamDelete` (it will likely fail if agents are stuck — **proceed regardless of the result**). Then in the same turn run this cleanup as a single Bash call:
+   ```bash
+   rm -f ~/.claude/teams/spawn-refactor.json
+   rm -rf ~/.claude/tasks/spawn-refactor/
+   git worktree prune
+   rm -rf WORKTREE_BASE_PLACEHOLDER
+   ```
+   The manual `rm` of team files is the fallback for when TeamDelete fails with "Cannot cleanup team with N active member(s)" (see #3281). Do NOT retry TeamDelete.
+5. **Output a plain-text summary and STOP** — do NOT call any tool after the step 4 Bash cleanup. This text-only response ends the session.
 
 **If a teammate doesn't respond to shutdown_request within 2 minutes, send it again — but only up to 3 times total.** After 3 unanswered shutdown_requests, mark that teammate as non-responsive and proceed to step 4 without waiting. Non-responsive in-process teammates indicate a harness issue (see #3261) that cannot be solved by retrying.
 
-**CRITICAL — NO TOOLS AFTER TeamDelete.** After `TeamDelete` returns (whether success or "No team name found"), you MUST NOT make any further tool calls. Output your final summary as plain text and stop. Any tool call after `TeamDelete` triggers an infinite shutdown prompt loop in non-interactive (-p) mode. See issue #3103.
+**CRITICAL — NO TOOLS AFTER step 4 cleanup.** After `TeamDelete` returns AND the step 4 Bash cleanup completes (whether TeamDelete succeeded, returned "No team name found", or "Cannot cleanup team with N active member(s)"), you MUST NOT make any further tool calls. Output your final summary as plain text and stop. Any tool call after the step 4 cleanup triggers an infinite shutdown prompt loop in non-interactive (-p) mode. See issue #3103.
 
 ## Safety
 
