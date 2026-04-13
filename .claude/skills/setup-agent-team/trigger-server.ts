@@ -182,6 +182,7 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 const REPLY_SCRIPT = resolve(SKILL_DIR, "reply.sh");
+const X_REPLY_SCRIPT = resolve(SKILL_DIR, "x-reply.sh");
 const REPLY_SECRET = process.env.REPLY_SECRET ?? TRIGGER_SECRET;
 
 /** Check auth against a given secret (timing-safe). */
@@ -250,6 +251,68 @@ async function handleReply(req: Request): Promise<Response> {
   try {
     const result = JSON.parse(stdout.trim());
     console.log(`[trigger] Reply posted: ${JSON.stringify(result)}`);
+    return Response.json(result);
+  } catch {
+    return Response.json({ ok: true, raw: stdout.trim() });
+  }
+}
+
+/**
+ * Handle POST /x-reply — post a reply tweet via x-reply.sh.
+ * This is synchronous: it waits for x-reply.sh to finish and returns the result.
+ */
+async function handleXReply(req: Request): Promise<Response> {
+  if (!isAuthedWith(req, REPLY_SECRET)) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+
+  const obj = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
+  const tweetId = obj && typeof obj.tweetId === "string" ? obj.tweetId : "";
+  const replyText = obj && typeof obj.replyText === "string" ? obj.replyText : "";
+
+  if (!tweetId || !replyText) {
+    return Response.json({ error: "tweetId and replyText are required" }, { status: 400 });
+  }
+
+  // Validate tweetId format (numeric string)
+  if (!/^\d{1,20}$/.test(tweetId)) {
+    return Response.json({ error: "invalid tweetId format (must be numeric)" }, { status: 400 });
+  }
+
+  console.log(`[trigger] X reply request: tweetId=${tweetId}, replyText=${replyText.slice(0, 80)}...`);
+
+  const proc = Bun.spawn(["bash", X_REPLY_SCRIPT], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      TWEET_ID: tweetId,
+      REPLY_TEXT: replyText,
+    },
+  });
+
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    console.error(`[trigger] x-reply.sh failed (exit=${exitCode}): ${stderr}`);
+    return Response.json({ error: "x reply failed", stderr: stderr.slice(0, 500) }, { status: 502 });
+  }
+
+  // Parse x-reply.sh JSON output
+  try {
+    const result = JSON.parse(stdout.trim());
+    console.log(`[trigger] X reply posted: ${JSON.stringify(result)}`);
     return Response.json(result);
   } catch {
     return Response.json({ ok: true, raw: stdout.trim() });
@@ -353,6 +416,13 @@ const server = Bun.serve({
         return Response.json({ error: "server is shutting down" }, { status: 503 });
       }
       return handleReply(req);
+    }
+
+    if (req.method === "POST" && url.pathname === "/x-reply") {
+      if (shuttingDown) {
+        return Response.json({ error: "server is shutting down" }, { status: 503 });
+      }
+      return handleXReply(req);
     }
 
     if (req.method === "POST" && url.pathname === "/trigger") {

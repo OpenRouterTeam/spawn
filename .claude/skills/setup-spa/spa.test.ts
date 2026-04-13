@@ -1060,6 +1060,7 @@ function makeCandidate(overrides: Partial<CandidateRow> = {}): CandidateRow {
     subreddit: "SelfHosted",
     draftReply: "check out spawn, it does exactly this. disclosure: i help build this",
     status: "pending",
+    platform: "reddit",
     createdAt: new Date().toISOString(),
     ...overrides,
   };

@@ -47,6 +47,10 @@ const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
 const REDDIT_USERNAME = process.env.REDDIT_USERNAME ?? "";
 const REDDIT_PASSWORD = process.env.REDDIT_PASSWORD ?? "";
 const REDDIT_USER_AGENT = `spawn-growth:v1.0.0 (by /u/${REDDIT_USERNAME})`;
+const X_API_KEY = process.env.X_API_KEY ?? "";
+const X_API_SECRET = process.env.X_API_SECRET ?? "";
+const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN ?? "";
+const X_ACCESS_SECRET = process.env.X_ACCESS_SECRET ?? "";
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -1028,39 +1032,46 @@ app.action("growth_approve", async ({ ack, body, client }) => {
     actionedBy: userId,
   });
 
-  // POST to growth VM to send the Reddit reply
+  // POST to growth VM to send the reply (Reddit or X)
   if (!GROWTH_TRIGGER_URL) {
     await client.chat
       .postMessage({
         channel: candidate.slackChannel ?? "",
         thread_ts: candidate.slackTs ?? undefined,
-        text: ":x: GROWTH_TRIGGER_URL not configured — cannot post to Reddit",
+        text: ":x: GROWTH_TRIGGER_URL not configured — cannot post reply",
       })
       .catch(() => {});
     return;
   }
 
+  const isXCandidate = candidate.platform === "x";
+  const replyEndpoint = isXCandidate ? "/x-reply" : "/reply";
+  const replyBody = isXCandidate
+    ? { tweetId: candidate.postId.replace(/^tweet_/, ""), replyText: candidate.draftReply }
+    : { postId: candidate.postId, replyText: candidate.draftReply };
+  const platformName = isXCandidate ? "X" : "Reddit";
+
   try {
-    const res = await fetch(`${GROWTH_TRIGGER_URL}/reply`, {
+    const res = await fetch(`${GROWTH_TRIGGER_URL}${replyEndpoint}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        postId: candidate.postId,
-        replyText: candidate.draftReply,
-      }),
+      body: JSON.stringify(replyBody),
     });
 
     const result = toRecord(await res.json().catch(() => null));
     if (res.ok && result && result.ok) {
-      const commentUrl = isString(result.commentUrl) ? result.commentUrl : "";
+      const replyUrl = isXCandidate
+        ? (isString(result.tweetUrl) ? result.tweetUrl : "")
+        : (isString(result.commentUrl) ? result.commentUrl : "");
       updateCandidateStatus(db, postId, {
         status: "posted",
         actionedBy: userId,
         postedReply: candidate.draftReply,
-        redditCommentUrl: commentUrl,
+        redditCommentUrl: isXCandidate ? undefined : replyUrl,
+        replyUrl,
       });
       logDecision(candidate, "approved");
       // Update the Slack message — replace buttons with confirmation
@@ -1069,7 +1080,7 @@ app.action("growth_approve", async ({ ack, body, client }) => {
           client,
           candidate.slackChannel,
           candidate.slackTs,
-          `:white_check_mark: Posted by <@${userId}>${commentUrl ? ` — <${commentUrl}|view comment>` : ""}`,
+          `:white_check_mark: Posted by <@${userId}>${replyUrl ? ` — <${replyUrl}|view reply>` : ""}`,
         );
       }
     } else {
@@ -1082,7 +1093,7 @@ app.action("growth_approve", async ({ ack, body, client }) => {
         .postMessage({
           channel: candidate.slackChannel ?? "",
           thread_ts: candidate.slackTs ?? undefined,
-          text: `:x: Reddit reply failed: ${errMsg}`,
+          text: `:x: ${platformName} reply failed: ${errMsg}`,
         })
         .catch(() => {});
     }
@@ -1095,7 +1106,7 @@ app.action("growth_approve", async ({ ack, body, client }) => {
       .postMessage({
         channel: candidate.slackChannel ?? "",
         thread_ts: candidate.slackTs ?? undefined,
-        text: `:x: Reddit reply failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: `:x: ${platformName} reply failed: ${err instanceof Error ? err.message : String(err)}`,
       })
       .catch(() => {});
   }
@@ -1183,27 +1194,34 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
 
   if (!GROWTH_TRIGGER_URL) return;
 
+  const isXCandidate = candidate.platform === "x";
+  const replyEndpoint = isXCandidate ? "/x-reply" : "/reply";
+  const replyBody = isXCandidate
+    ? { tweetId: candidate.postId.replace(/^tweet_/, ""), replyText: editedReply }
+    : { postId: candidate.postId, replyText: editedReply };
+  const platformName = isXCandidate ? "X" : "Reddit";
+
   try {
-    const res = await fetch(`${GROWTH_TRIGGER_URL}/reply`, {
+    const res = await fetch(`${GROWTH_TRIGGER_URL}${replyEndpoint}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${GROWTH_REPLY_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        postId: candidate.postId,
-        replyText: editedReply,
-      }),
+      body: JSON.stringify(replyBody),
     });
 
     const result = toRecord(await res.json().catch(() => null));
     if (res.ok && result && result.ok) {
-      const commentUrl = isString(result.commentUrl) ? result.commentUrl : "";
+      const replyUrl = isXCandidate
+        ? (isString(result.tweetUrl) ? result.tweetUrl : "")
+        : (isString(result.commentUrl) ? result.commentUrl : "");
       updateCandidateStatus(db, postId, {
         status: "posted",
         actionedBy: userId,
         postedReply: editedReply,
-        redditCommentUrl: commentUrl,
+        redditCommentUrl: isXCandidate ? undefined : replyUrl,
+        replyUrl,
       });
       logDecision(candidate, "edited", editedReply);
       if (candidate.slackChannel && candidate.slackTs) {
@@ -1211,7 +1229,7 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
           client,
           candidate.slackChannel,
           candidate.slackTs,
-          `:white_check_mark: Posted (edited) by <@${userId}>${commentUrl ? ` — <${commentUrl}|view comment>` : ""}`,
+          `:white_check_mark: Posted (edited) by <@${userId}>${replyUrl ? ` — <${replyUrl}|view reply>` : ""}`,
         );
       }
     } else {
@@ -1224,7 +1242,7 @@ app.view("growth_edit_submit", async ({ ack, view, body, client }) => {
           .postMessage({
             channel: candidate.slackChannel,
             thread_ts: candidate.slackTs,
-            text: `:x: Reddit reply failed: ${isString(result?.error) ? result.error : `HTTP ${res.status}`}`,
+            text: `:x: ${platformName} reply failed: ${isString(result?.error) ? result.error : `HTTP ${res.status}`}`,
           })
           .catch(() => {});
       }
@@ -1314,6 +1332,7 @@ async function replaceButtonsWithStatus(
 /** Valibot schema for incoming candidate JSON from growth agent. */
 const CandidatePayloadSchema = v.object({
   found: v.boolean(),
+  platform: v.optional(v.picklist(["reddit", "x"]), "reddit"),
   title: v.optional(v.string()),
   url: v.optional(v.string()),
   permalink: v.optional(v.string()),
@@ -1390,8 +1409,10 @@ async function postCandidateCard(
   }
 
   // Candidate found — build Block Kit card
+  const platform = candidate.platform ?? "reddit";
+  const isX = platform === "x";
   const title = candidate.title ?? "Untitled";
-  const url = candidate.url ?? `https://reddit.com${candidate.permalink ?? ""}`;
+  const url = candidate.url ?? (isX ? candidate.permalink ?? "" : `https://reddit.com${candidate.permalink ?? ""}`);
   const postId = candidate.postId ?? "";
   const subreddit = candidate.subreddit ?? "";
   const upvotes = candidate.upvotes ?? 0;
@@ -1399,12 +1420,18 @@ async function postCandidateCard(
   const postedAgo = candidate.postedAgo ?? "";
   const draftReply = candidate.draftReply ?? "";
 
+  const platformLabel = isX ? "X Growth" : "Reddit Growth";
+  const engagementLabel = isX
+    ? `${upvotes} likes | ${numComments} replies`
+    : `${upvotes} upvotes | ${numComments} comments`;
+  const sourceLabel = isX ? `@${subreddit}` : `r/${subreddit}`;
+
   const blocks: (KnownBlock | Block)[] = [
     {
       type: "header",
       text: {
         type: "plain_text",
-        text: "Reddit Growth — Candidate Found",
+        text: `${platformLabel} — Candidate Found`,
         emoji: true,
       },
     },
@@ -1412,7 +1439,7 @@ async function postCandidateCard(
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*<${url}|${title}>*\nr/${subreddit} | ${upvotes} upvotes | ${numComments} comments | ${postedAgo}`,
+        text: `*<${url}|${title}>*\n${sourceLabel} | ${engagementLabel} | ${postedAgo}`,
       },
     },
   ];
@@ -1510,7 +1537,7 @@ async function postCandidateCard(
 
   const msg = await client.chat.postMessage({
     channel,
-    text: `Reddit Growth — ${title}`,
+    text: `${platformLabel} — ${title}`,
     blocks,
   });
 
@@ -1524,6 +1551,7 @@ async function postCandidateCard(
     slackChannel: channel,
     slackTs: msg.ts ?? undefined,
     status: "pending",
+    platform,
     createdAt: new Date().toISOString(),
   });
 

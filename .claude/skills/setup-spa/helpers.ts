@@ -182,9 +182,22 @@ export function openDb(path?: string): Database {
       actioned_at        TEXT,
       posted_reply       TEXT,
       reddit_comment_url TEXT,
+      reply_url          TEXT,
+      platform           TEXT NOT NULL DEFAULT 'reddit',
       created_at         TEXT NOT NULL
     )
   `);
+  // Migration: add platform and reply_url columns if missing (existing DBs)
+  try {
+    db.run("ALTER TABLE candidates ADD COLUMN platform TEXT NOT NULL DEFAULT 'reddit'");
+  } catch {
+    // column already exists
+  }
+  try {
+    db.run("ALTER TABLE candidates ADD COLUMN reply_url TEXT");
+  } catch {
+    // column already exists
+  }
   if (!path) {
     migrateFromJson(db);
   }
@@ -275,7 +288,7 @@ export function updateThread(
 
 // #region Candidates — Reddit growth pipeline
 
-/** A Reddit growth candidate tracked for approval. */
+/** A growth candidate tracked for approval (Reddit or X). */
 export interface CandidateRow {
   postId: string;
   permalink: string;
@@ -289,6 +302,8 @@ export interface CandidateRow {
   actionedAt?: string;
   postedReply?: string;
   redditCommentUrl?: string;
+  replyUrl?: string;
+  platform: "reddit" | "x";
   createdAt: string;
 }
 
@@ -306,6 +321,8 @@ interface RawCandidate {
   actioned_at: string | null;
   posted_reply: string | null;
   reddit_comment_url: string | null;
+  reply_url: string | null;
+  platform: string;
   created_at: string;
 }
 
@@ -326,6 +343,8 @@ function rowToCandidate(r: RawCandidate): CandidateRow {
     actionedAt: r.actioned_at ?? undefined,
     postedReply: r.posted_reply ?? undefined,
     redditCommentUrl: r.reddit_comment_url ?? undefined,
+    replyUrl: r.reply_url ?? undefined,
+    platform: r.platform === "x" ? "x" : "reddit",
     createdAt: r.created_at,
   };
 }
@@ -333,8 +352,8 @@ function rowToCandidate(r: RawCandidate): CandidateRow {
 /** Insert or update a candidate. On conflict (same post_id), updates Slack coordinates. */
 export function upsertCandidate(db: Database, candidate: CandidateRow): void {
   db.run(
-    `INSERT INTO candidates (post_id, permalink, title, subreddit, draft_reply, slack_channel, slack_ts, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO candidates (post_id, permalink, title, subreddit, draft_reply, slack_channel, slack_ts, status, platform, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (post_id) DO UPDATE SET
        slack_channel = excluded.slack_channel,
        slack_ts      = excluded.slack_ts`,
@@ -347,12 +366,13 @@ export function upsertCandidate(db: Database, candidate: CandidateRow): void {
       candidate.slackChannel ?? null,
       candidate.slackTs ?? null,
       candidate.status,
+      candidate.platform,
       candidate.createdAt,
     ],
   );
 }
 
-/** Look up a candidate by Reddit post ID. */
+/** Look up a candidate by post ID (Reddit or X). */
 export function findCandidate(db: Database, postId: string): CandidateRow | undefined {
   const row = db
     .query<
@@ -374,6 +394,7 @@ export function updateCandidateStatus(
     actionedBy?: string;
     postedReply?: string;
     redditCommentUrl?: string;
+    replyUrl?: string;
   },
 ): void {
   db.run(
@@ -382,7 +403,8 @@ export function updateCandidateStatus(
        actioned_by        = ?,
        actioned_at        = ?,
        posted_reply       = ?,
-       reddit_comment_url = ?
+       reddit_comment_url = ?,
+       reply_url          = ?
      WHERE post_id = ?`,
     [
       update.status,
@@ -390,6 +412,7 @@ export function updateCandidateStatus(
       new Date().toISOString(),
       update.postedReply ?? null,
       update.redditCommentUrl ?? null,
+      update.replyUrl ?? null,
       postId,
     ],
   );
@@ -411,11 +434,17 @@ export function logDecision(
 
   const date = new Date().toISOString().split("T")[0];
   const reply = editedReply ?? candidate.draftReply;
+  const isX = candidate.platform === "x";
+  const postUrl = isX
+    ? candidate.permalink
+    : `https://reddit.com${candidate.permalink}`;
+  const source = isX ? `@${candidate.subreddit}` : `r/${candidate.subreddit}`;
   const entry = `
 ## ${decision.toUpperCase()} — ${date}
 
-- **Post**: [${candidate.title}](https://reddit.com${candidate.permalink})
-- **Subreddit**: r/${candidate.subreddit}
+- **Platform**: ${candidate.platform}
+- **Post**: [${candidate.title}](${postUrl})
+- **Source**: ${source}
 - **Decision**: ${decision}
 ${editedReply ? "- **Edited**: yes (original draft was modified)\n" : ""}\
 - **Reply**: ${reply.replace(/\n/g, " ")}
