@@ -320,17 +320,28 @@ function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
         throw psResult.error;
       }
     } else {
-      // macOS/Linux: execute via bash -c
-      executor.execFileSync(
-        "bash",
-        [
-          "-c",
-          scriptContent,
-        ],
-        {
-          stdio: installStdio,
-        },
+      // macOS/Linux: write to temp file and execute via bash to avoid
+      // command injection and ARG_MAX limits (consistent with Windows path)
+      const tmpFile = path.join(tmpdir(), `spawn-install-${Date.now()}.sh`);
+      fs.writeFileSync(tmpFile, scriptContent, {
+        mode: 0o700,
+      });
+      const bashResult = tryCatch(() =>
+        executor.execFileSync(
+          "bash",
+          [
+            tmpFile,
+          ],
+          {
+            stdio: installStdio,
+          },
+        ),
       );
+      // Best-effort cleanup of temp file
+      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+      if (!bashResult.ok) {
+        throw bashResult.error;
+      }
     }
   });
 

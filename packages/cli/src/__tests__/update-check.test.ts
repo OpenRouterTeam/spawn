@@ -313,9 +313,9 @@ describe("update-check", () => {
       expect(execFileSyncCalls[0].file).toBe("curl");
       expect(execFileSyncCalls[0].args).toContain("-fsSL");
       expect(execFileSyncCalls[0].args.some((a: string) => a.includes("install.sh"))).toBe(true);
-      // 2. bash to execute fetched script
+      // 2. bash to execute fetched script via temp file (not -c)
       expect(execFileSyncCalls[1].file).toBe("bash");
-      expect(execFileSyncCalls[1].args[0]).toBe("-c");
+      expect(execFileSyncCalls[1].args[0]).toMatch(/spawn-install-.*\.sh$/);
       // 3. which spawn for binary lookup
       expect(execFileSyncCalls[2].file).toBe("which");
       expect(execFileSyncCalls[2].args).toEqual([
