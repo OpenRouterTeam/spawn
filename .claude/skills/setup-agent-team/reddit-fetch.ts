@@ -15,12 +15,28 @@ const CLIENT_ID = process.env.REDDIT_CLIENT_ID ?? "";
 const CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
 const USERNAME = process.env.REDDIT_USERNAME ?? "";
 const PASSWORD = process.env.REDDIT_PASSWORD ?? "";
-const USER_AGENT = `spawn-growth:v1.0.0 (by /u/${USERNAME})`;
 
 if (!CLIENT_ID || !CLIENT_SECRET || !USERNAME || !PASSWORD) {
   console.error("Missing Reddit credentials");
   process.exit(1);
 }
+
+// Validate credential format to prevent Basic-auth corruption and header
+// injection (colons split the user:pass pair; CR/LF splits HTTP headers).
+if (/[:\r\n]/.test(CLIENT_ID) || /[:\r\n]/.test(CLIENT_SECRET)) {
+  console.error("Invalid REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET: must not contain ':' or newlines");
+  process.exit(1);
+}
+
+// Reddit usernames are [A-Za-z0-9_-], 3–20 chars. Reject anything else so the
+// User-Agent header can't be CRLF-injected via a hostile env var.
+const REDDIT_USERNAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
+if (!REDDIT_USERNAME_RE.test(USERNAME)) {
+  console.error("Invalid REDDIT_USERNAME format");
+  process.exit(1);
+}
+
+const USER_AGENT = `spawn-growth:v1.0.0 (by /u/${USERNAME})`;
 
 // Subreddits — shuffled each run so we don't always hit the same ones first
 const SUBREDDITS = shuffle([
@@ -199,7 +215,12 @@ function extractPosts(data: unknown): Map<string, RedditPost> {
 /** Fetch a user's recent comments. */
 async function fetchUserComments(token: string, username: string): Promise<string[]> {
   if (!username || username === "[deleted]") return [];
-  const data = await redditGet(token, `/user/${username}/comments?limit=25&sort=new`);
+  // The author field comes from the Reddit API and is therefore untrusted.
+  // Reject anything outside Reddit's real username charset to prevent path
+  // traversal into other API endpoints, and encodeURIComponent as defense in
+  // depth.
+  if (!REDDIT_USERNAME_RE.test(username)) return [];
+  const data = await redditGet(token, `/user/${encodeURIComponent(username)}/comments?limit=25&sort=new`);
   if (!data || typeof data !== "object") return [];
   const listing = data as Record<string, unknown>;
   const listingData = listing.data as Record<string, unknown> | undefined;
