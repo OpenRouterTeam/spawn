@@ -266,17 +266,33 @@ export async function offerGithubAuth(runner: CloudRunner, explicitlyRequested?:
   }
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
+  // Upload the token to a remote temp file so it never appears in `ps auxe`
+  // process listings. We use runner.uploadFile() (SCP) — the same proven
+  // pattern as uploadConfigFile(). A heredoc won't work here because all
+  // cloud runners wrap commands in `bash -c ${shellQuote(cmd)}`, and
+  // heredocs are not valid inside single-quoted `bash -c '...'` strings.
+  let remoteTokenPath = "";
   if (githubToken) {
-    // Pass token via heredoc to avoid exposing it in process listings (`ps auxe`).
-    // The heredoc is read by the shell's parser, not passed as a command argument,
-    // so it never appears in /proc/*/cmdline. A local temp file won't work here
-    // because the command executes on the REMOTE server via runner.runServer().
-    ghCmd = `export GITHUB_TOKEN=$(cat <<'SPAWN_TOKEN_EOF'\n${githubToken}\nSPAWN_TOKEN_EOF\n) && ${ghCmd}`;
+    const localTmpFile = join(getTmpDir(), `spawn_gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    remoteTokenPath = `/tmp/spawn_gh_token_${Date.now()}`;
+    writeFileSync(localTmpFile, githubToken, {
+      mode: 0o600,
+    });
+    const uploadResult = await asyncTryCatch(() => runner.uploadFile(localTmpFile, remoteTokenPath));
+    tryCatchIf(isOperationalError, () => unlinkSync(localTmpFile));
+    if (!uploadResult.ok) {
+      throw uploadResult.error;
+    }
+    ghCmd = `export GITHUB_TOKEN=$(cat ${shellQuote(remoteTokenPath)}) && rm -f ${shellQuote(remoteTokenPath)} && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
   const ghSetup = await asyncTryCatchIf(isOperationalError, () => runner.runServer(ghCmd));
   if (!ghSetup.ok) {
+    // Best-effort cleanup of remote token file if the command failed before rm ran
+    if (remoteTokenPath) {
+      await asyncTryCatchIf(isOperationalError, () => runner.runServer(`rm -f ${shellQuote(remoteTokenPath)}`));
+    }
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
   }
 
