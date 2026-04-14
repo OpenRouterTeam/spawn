@@ -267,11 +267,11 @@ export async function offerGithubAuth(runner: CloudRunner, explicitlyRequested?:
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
   if (githubToken) {
-    const tmpFile = join(getTmpDir(), `spawn_gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-    writeFileSync(tmpFile, githubToken, {
-      mode: 0o600,
-    });
-    ghCmd = `export GITHUB_TOKEN=$(cat ${shellQuote(tmpFile)}) && rm -f ${shellQuote(tmpFile)} && ${ghCmd}`;
+    // Pass token via heredoc to avoid exposing it in process listings (`ps auxe`).
+    // The heredoc is read by the shell's parser, not passed as a command argument,
+    // so it never appears in /proc/*/cmdline. A local temp file won't work here
+    // because the command executes on the REMOTE server via runner.runServer().
+    ghCmd = `export GITHUB_TOKEN=$(cat <<'SPAWN_TOKEN_EOF'\n${githubToken}\nSPAWN_TOKEN_EOF\n) && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
