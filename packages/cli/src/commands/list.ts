@@ -15,6 +15,7 @@ import {
   updateRecordIp,
 } from "../history.js";
 import { agentKeys, cloudKeys, loadManifest } from "../manifest.js";
+import { trackSpawnConnected } from "../shared/lifecycle-telemetry.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { cmdConnect, cmdEnterAgent, cmdOpenDashboard } from "./connect.js";
 import { confirmAndDelete } from "./delete.js";
@@ -707,6 +708,10 @@ export async function handleRecordAction(
   }
 
   if (action === "reconnect") {
+    // Lifecycle telemetry: record the login BEFORE we hand off to SSH.
+    // cmdConnect spawns an interactive session and never returns under normal
+    // use, so calling trackSpawnConnected after would be unreachable code.
+    trackSpawnConnected(selected);
     const reconnectResult = await asyncTryCatch(() => cmdConnect(conn, selected.agent));
     if (!reconnectResult.ok) {
       p.log.error(`Connection failed: ${getErrorMessage(reconnectResult.error)}`);

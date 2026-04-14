@@ -28,6 +28,7 @@ import { isWindows } from "./shell.js";
 import { injectSpawnSkill } from "./spawn-skill.js";
 import { sleep, startSshTunnel } from "./ssh.js";
 import { ensureSshKeys, getSshKeyOpts } from "./ssh-keys.js";
+import { captureEvent, setTelemetryContext } from "./telemetry.js";
 import {
   logDebug,
   logError,
@@ -42,6 +43,25 @@ import {
   validateModelId,
   withRetry,
 } from "./ui.js";
+
+// ── Funnel telemetry ────────────────────────────────────────────────────────
+//
+// Tracks onboarding pipeline drop-off. Events flow through the shared
+// PostHog pipeline in shared/telemetry.ts and respect SPAWN_TELEMETRY=0 opt-out.
+// No PII — only agent/cloud names and elapsed timing. The goal is to answer
+// "where do users bail before reaching a running agent" at the fleet level.
+let _funnelStart = 0;
+
+function funnelElapsedMs(): number {
+  return _funnelStart > 0 ? Date.now() - _funnelStart : 0;
+}
+
+function trackFunnel(step: string, extra: Record<string, unknown> = {}): void {
+  captureEvent(step, {
+    elapsed_ms: funnelElapsedMs(),
+    ...extra,
+  });
+}
 
 /** Docker container name used by --beta docker deployments. */
 export const DOCKER_CONTAINER_NAME = "spawn-agent";
@@ -298,8 +318,16 @@ export async function runOrchestration(
   logInfo(`${agent.name} on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
 
+  // Funnel telemetry: mark the start of the onboarding pipeline and attach
+  // agent/cloud as context so every event carries them automatically.
+  _funnelStart = Date.now();
+  setTelemetryContext("agent", agentName);
+  setTelemetryContext("cloud", cloud.cloudName);
+  trackFunnel("funnel_started");
+
   // 1. Authenticate with cloud provider
   await cloud.authenticate();
+  trackFunnel("funnel_cloud_authed");
 
   const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
   const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
@@ -370,12 +398,14 @@ export async function runOrchestration(
       recordSpawn(spawnId, agentName, cloud.cloudName, connection);
       await cloud.waitForReady();
     }
+    trackFunnel("funnel_vm_ready");
 
     // API key must succeed
     if (apiKeyResult.status === "rejected") {
       throw apiKeyResult.reason;
     }
     const apiKey = apiKeyResult.value;
+    trackFunnel("funnel_credentials_ready");
 
     // Model ID
     const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
@@ -414,6 +444,7 @@ export async function runOrchestration(
         }
       }
     }
+    trackFunnel("funnel_install_completed");
 
     // Inject env + continue with shared post-install flow
     clearInterval(keepAlive);
@@ -434,6 +465,7 @@ export async function runOrchestration(
     // 2. Get API key
     const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
     const apiKey = await resolveApiKey(agentName, cloud.cloudName);
+    trackFunnel("funnel_credentials_ready");
 
     // 3. Pre-provision hooks
     if (agent.preProvision) {
@@ -473,6 +505,7 @@ export async function runOrchestration(
       logError(getErrorMessage(r.error));
       await retryOrQuit("Server may still be starting. Keep waiting?");
     }
+    trackFunnel("funnel_vm_ready");
 
     // 7. Env config
     const envPairs = agent.envVars(apiKey);
@@ -504,6 +537,7 @@ export async function runOrchestration(
         }
       }
     }
+    trackFunnel("funnel_install_completed");
 
     // Inject env + continue with shared post-install flow
     await injectEnvVars(cloud, envContent);
@@ -595,6 +629,7 @@ async function postInstall(
       logWarn("Agent configuration failed (continuing with defaults)");
     }
   }
+  trackFunnel("funnel_configure_completed");
 
   // GitHub CLI setup
   if (!enabledSteps || enabledSteps.has("github")) {
@@ -715,6 +750,7 @@ async function postInstall(
       await retryOrQuit("Retry pre-launch setup?");
     }
   }
+  trackFunnel("funnel_prelaunch_completed");
 
   // Web dashboard access
   let tunnelHandle: SshTunnelHandle | undefined;
@@ -808,6 +844,13 @@ async function postInstall(
   // Launch agent
   logInfo(`Agent setup complete — ${agent.name} is ready on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
+
+  // Final funnel event — pipeline completed all the way to handoff.
+  // Downstream analysis: (funnel_started count) - (funnel_handoff count) =
+  // total drop-off. Per-step counts reveal where the drop-off happens.
+  trackFunnel("funnel_handoff", {
+    headless: process.env.SPAWN_HEADLESS === "1",
+  });
 
   const launchCmd = agent.launchCmd();
   saveLaunchCmd(launchCmd, spawnId);

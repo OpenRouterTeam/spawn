@@ -22,6 +22,7 @@ import {
   validateServerIdentifier,
   validateUsername,
 } from "../security.js";
+import { trackSpawnDeleted } from "../shared/lifecycle-telemetry.js";
 import { getHistoryPath } from "../shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isNetworkError, tryCatch } from "../shared/result.js";
 import { ensureSpriteAuthenticated, ensureSpriteCli, destroyServer as spriteDestroyServer } from "../sprite/sprite.js";
@@ -259,6 +260,8 @@ export async function confirmAndDelete(
   if (success) {
     const detail = lastMessage ? `: ${lastMessage}` : "";
     p.log.success(`Server "${label}" deleted${detail}`);
+    // Lifecycle telemetry: lifetime hours + final login count.
+    trackSpawnDeleted(record);
   } else {
     const detail = lastMessage ? `: ${lastMessage}` : "";
     p.log.error(`Failed to delete "${label}"${detail}`);
@@ -448,6 +451,8 @@ export async function cmdDelete(
       const ok = await execDeleteServer(record);
       if (ok) {
         p.log.success(`Server "${label}" deleted`);
+        // Lifecycle telemetry: headless path also fires the event.
+        trackSpawnDeleted(record);
       }
     }
     return;

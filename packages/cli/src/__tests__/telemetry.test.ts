@@ -11,6 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 
 // ── Schemas for validating PostHog payloads ─────────────────────────────────
@@ -408,9 +409,62 @@ describe("telemetry", () => {
 
       mod.captureWarning("should not send");
       mod.captureError("test", new Error("should not send"));
+      mod.captureEvent("should_not_send", {
+        spawn_id: "abc",
+      });
       await flushAndWait();
 
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("captureEvent", () => {
+    it("emits a batched event with the given name and properties", async () => {
+      const mod = await import("../shared/telemetry.js");
+      mod.initTelemetry("1.2.3-test");
+      await drainStaleEvents();
+
+      mod.captureEvent("funnel_started", {
+        fast_mode: true,
+        elapsed_ms: 0,
+      });
+      await flushAndWait();
+
+      const body = getLastBatchBody(fetchMock);
+      expect(body).not.toBeNull();
+      const evt = body?.batch[0];
+      expect(evt?.event).toBe("funnel_started");
+      expect(evt?.properties.fast_mode).toBe(true);
+      expect(evt?.properties.elapsed_ms).toBe(0);
+      expect(evt?.properties.spawn_version).toBe("1.2.3-test");
+    });
+
+    it("scrubs string property values but leaves non-strings alone", async () => {
+      const mod = await import("../shared/telemetry.js");
+      mod.initTelemetry("1.2.3-test");
+      await drainStaleEvents();
+
+      mod.captureEvent("spawn_connected", {
+        spawn_id: "abc123",
+        note: "contact me at alice@example.com about sk-or-v1-1234567890abcdef",
+        connect_count: 5,
+        lifetime_hours: 3.5,
+      });
+      await flushAndWait();
+
+      const body = getLastBatchBody(fetchMock);
+      const props = body?.batch[0]?.properties;
+      // Non-string values pass through untouched.
+      expect(props?.spawn_id).toBe("abc123");
+      expect(props?.connect_count).toBe(5);
+      expect(props?.lifetime_hours).toBe(3.5);
+      // String values get scrubbed.
+      const rawNote = props?.note;
+      const note = isString(rawNote) ? rawNote : "";
+      expect(note).toContain("[REDACTED_EMAIL]");
+      expect(note).not.toContain("alice@example.com");
+      expect(note).toContain("[REDACTED_KEY]");
+      expect(note).not.toContain("sk-or-v1-1234567890abcdef");
     });
   });
 });
