@@ -684,6 +684,64 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   logInfo("OpenClaw gateway started");
 }
 
+// ─── Hermes Web Dashboard ────────────────────────────────────────────────────
+
+/**
+ * Start the Hermes Agent web dashboard as a session-scoped background process.
+ *
+ * Unlike OpenClaw's gateway (long-running, supervised by systemd), the Hermes
+ * dashboard only needs to live for the duration of the spawn session — the
+ * user's TUI in the foreground, dashboard reachable via SSH tunnel in the
+ * background. A simple setsid/nohup launch is sufficient; no systemd unit.
+ *
+ * The dashboard binds to 127.0.0.1:9119 by default (see `hermes dashboard` in
+ * hermes-agent/hermes_cli/main.py) and self-authenticates via a session token
+ * injected into the SPA HTML, so no token needs to be appended to the tunnel
+ * URL.
+ */
+export async function startHermesDashboard(runner: CloudRunner): Promise<void> {
+  logStep("Starting Hermes web dashboard...");
+
+  // Port check — same pattern as startGateway. Debian/Ubuntu bash is compiled
+  // without /dev/tcp, so we chain ss → /dev/tcp → nc.
+  const portCheck =
+    'ss -tln 2>/dev/null | grep -q ":9119 " || ' +
+    "(echo >/dev/tcp/127.0.0.1/9119) 2>/dev/null || " +
+    "nc -z 127.0.0.1 9119 2>/dev/null";
+
+  // `hermes` lives inside the install venv; mirror launchCmd's PATH exactly.
+  const hermesPath = 'export PATH="$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH"';
+
+  const script = [
+    "source ~/.spawnrc 2>/dev/null",
+    hermesPath,
+    `if ${portCheck}; then echo "Hermes dashboard already running on :9119"; exit 0; fi`,
+    "_hermes_bin=$(command -v hermes) || { echo 'hermes not found in PATH' >&2; exit 1; }",
+    // --no-open: we're on a remote VM, don't try to spawn a browser there.
+    // --host 127.0.0.1: loopback-only; the SSH tunnel is how the user reaches it.
+    "if command -v setsid >/dev/null 2>&1; then",
+    '  setsid "$_hermes_bin" dashboard --port 9119 --host 127.0.0.1 --no-open > /tmp/hermes-dashboard.log 2>&1 < /dev/null &',
+    "else",
+    '  nohup "$_hermes_bin" dashboard --port 9119 --host 127.0.0.1 --no-open > /tmp/hermes-dashboard.log 2>&1 < /dev/null &',
+    "fi",
+    "elapsed=0; while [ $elapsed -lt 60 ]; do",
+    `  if ${portCheck}; then echo "Hermes dashboard ready after \${elapsed}s"; exit 0; fi`,
+    "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
+    "done",
+    'echo "Hermes dashboard failed to start within 60s" >&2',
+    "tail -20 /tmp/hermes-dashboard.log 2>/dev/null || true",
+    "exit 1",
+  ].join("\n");
+
+  const result = await asyncTryCatch(() => runner.runServer(script));
+  if (result.ok) {
+    logInfo("Hermes web dashboard started on :9119");
+  } else {
+    // Non-fatal: the TUI still works even if the dashboard didn't come up.
+    logWarn("Hermes web dashboard failed to start — TUI still available");
+  }
+}
+
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 function openCodeInstallCmd(): string {
@@ -1273,10 +1331,17 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           logInfo("YOLO mode disabled — Hermes will prompt before installing tools");
         }
       },
+      preLaunch: () => startHermesDashboard(runner),
+      preLaunchMsg:
+        "Your Hermes web dashboard will open automatically — use it to configure settings, monitor sessions, and manage gateways.",
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes",
       promptCmd: (prompt) =>
         `source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH; hermes ${shellQuote(prompt)}`,
+      tunnel: {
+        remotePort: 9119,
+        browserUrl: (localPort: number) => `http://localhost:${localPort}/`,
+      },
       updateCmd:
         // Same SSH→HTTPS rewrite for auto-update runs
         'git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && ' +
