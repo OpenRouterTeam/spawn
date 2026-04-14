@@ -6,6 +6,9 @@ import path from "node:path";
 import { tryCatch } from "@openrouter/spawn-shared";
 import pkg from "../../package.json";
 
+// Fake install script returned by the mocked curl call — must pass validateInstallScript()
+const FAKE_INSTALL_SCRIPT = "#!/bin/bash\n# fake install script for tests\necho 'installing spawn'\n" + "x".repeat(200);
+
 // ── Test Helpers ───────────────────────────────────────────────────────────────
 
 /** Remove the .update-failed backoff file so it doesn't interfere with tests */
@@ -98,7 +101,9 @@ describe("update-check", () => {
 
       // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -113,7 +118,9 @@ describe("update-check", () => {
 
       // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -141,7 +148,9 @@ describe("update-check", () => {
 
       // Mock executor to prevent actual commands
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -223,7 +232,7 @@ describe("update-check", () => {
             args,
             options,
           });
-          return Buffer.from("");
+          return Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : "");
         },
       );
 
@@ -260,7 +269,7 @@ describe("update-check", () => {
             args,
             options,
           });
-          return Buffer.from("");
+          return Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : "");
         },
       );
 
@@ -300,7 +309,7 @@ describe("update-check", () => {
             args,
             options,
           });
-          return Buffer.from("");
+          return Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : "");
         },
       );
 
@@ -356,7 +365,7 @@ describe("update-check", () => {
 
       const { executor } = await import("../update-check.js");
       let callCount = 0;
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((): Buffer => {
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string): Buffer => {
         callCount++;
         // First 3 calls succeed (curl, bash, which), 4th call (re-exec) fails
         if (callCount >= 4) {
@@ -366,7 +375,7 @@ describe("update-check", () => {
           });
           throw err;
         }
-        return Buffer.from("");
+        return Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : "");
       });
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -443,7 +452,7 @@ describe("update-check", () => {
           file,
           args,
         });
-        return Buffer.from("");
+        return Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : "");
       });
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -481,7 +490,9 @@ describe("update-check", () => {
       process.env.SPAWN_AUTO_UPDATE = undefined;
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -501,7 +512,9 @@ describe("update-check", () => {
       process.env.SPAWN_AUTO_UPDATE = undefined;
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -523,7 +536,9 @@ describe("update-check", () => {
       process.env.SPAWN_AUTO_UPDATE = undefined;
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("2.0.0\n")));
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -540,7 +555,9 @@ describe("update-check", () => {
       process.env.SPAWN_AUTO_UPDATE = "1";
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -558,7 +575,9 @@ describe("update-check", () => {
       process.env.SPAWN_NO_AUTO_UPDATE = "1";
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
       const { executor } = await import("../update-check.js");
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
+        Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
+      );
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
