@@ -25,6 +25,7 @@ export const executor = {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const FETCH_TIMEOUT = 10000; // 10 seconds
+const MIN_INSTALL_SCRIPT_BYTES = 100; // reject suspiciously small scripts
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour — skip network check if last success was recent
 
@@ -259,6 +260,39 @@ function reExecWithArgs(): void {
   }
 }
 
+/**
+ * Validate a downloaded install script before execution.
+ *
+ * Checks:
+ * 1. Non-empty and above a minimum size threshold (rejects truncated downloads)
+ * 2. Starts with the expected shebang / header for its platform
+ *
+ * Security note: This is NOT a substitute for cryptographic integrity
+ * verification (SHA256 checksum or code signing). The release pipeline does
+ * not currently publish checksums for the install script, so we rely on
+ * HTTPS (TLS) for transport integrity. These checks catch corruption or
+ * truncation, not a compromised CDN. See GitHub issue #3297.
+ */
+function validateInstallScript(content: string, platform: "unix" | "windows"): void {
+  if (content.length < MIN_INSTALL_SCRIPT_BYTES) {
+    throw new Error(
+      `Install script too small (${content.length} bytes, minimum ${MIN_INSTALL_SCRIPT_BYTES}). ` +
+        "Download may be corrupted or truncated.",
+    );
+  }
+
+  if (platform === "unix") {
+    if (!content.startsWith("#!/")) {
+      throw new Error("Install script missing expected shebang (#!/...). Download may be corrupted.");
+    }
+  } else {
+    // PowerShell scripts should contain recognizable PS content
+    if (!content.includes("$") && !content.includes("function")) {
+      throw new Error("Install script does not appear to be valid PowerShell. Download may be corrupted.");
+    }
+  }
+}
+
 function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
   printUpdateBanner(latestVersion);
 
@@ -295,6 +329,8 @@ function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
       },
     );
     const scriptContent = scriptBytes ? scriptBytes.toString() : "";
+    const platform = isWindows() ? "windows" : "unix";
+    validateInstallScript(scriptContent, platform);
 
     if (isWindows()) {
       // Windows: write to temp file and execute via PowerShell
