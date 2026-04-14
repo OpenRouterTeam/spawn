@@ -118,6 +118,7 @@ bun test src/__tests__/manifest.test.ts
 - `check-entity.test.ts` / `check-entity-messages.test.ts` — Entity validation
 - `agent-tarball.test.ts` — `tryTarballInstall`: GitHub Release tarball install, fallback, URL validation
 - `gateway-resilience.test.ts` — `startGateway` systemd unit with auto-restart and cron heartbeat
+- `hermes-dashboard.test.ts` — `startHermesDashboard` session-scoped `hermes dashboard` launch on :9119 with setsid/nohup
 - `digitalocean-token.test.ts` — DigitalOcean token storage, retrieval, and API client helpers
 - `do-min-size.test.ts` — DigitalOcean minimum droplet size enforcement: `slugRamGb` RAM comparison, `AGENT_MIN_SIZE` map
 - `do-payment-warning.test.ts` — `ensureDoToken` proactive payment method reminder for first-time DigitalOcean users

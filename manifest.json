@@ -201,7 +201,7 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENAI_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY. Also works via OPENAI_BASE_URL + OPENAI_API_KEY for OpenAI-compatible mode. Installs Python 3.11 via uv.",
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY. Also works via OPENAI_BASE_URL + OPENAI_API_KEY for OpenAI-compatible mode. Installs Python 3.11 via uv. Ships a local web dashboard (port 9119) for configuration, session monitoring, skill browsing, and gateway management — auto-exposed via SSH tunnel when run through spawn.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/hermes.png",
       "featured_cloud": [
         "digitalocean",
