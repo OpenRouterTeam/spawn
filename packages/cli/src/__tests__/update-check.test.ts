@@ -468,4 +468,106 @@ describe("update-check", () => {
       process.argv = originalArgv;
     });
   });
+
+  // ── Update policy: patch = auto, minor/major = opt-in ────────────────────
+  //
+  // These tests lock in the behavior from fix/auto-update-patches:
+  //   - PATCH bumps (same major.minor) auto-install regardless of env vars
+  //   - MINOR / MAJOR bumps require SPAWN_AUTO_UPDATE=1 to auto-install
+  //   - SPAWN_NO_AUTO_UPDATE=1 suppresses auto-install entirely
+  describe("update policy", () => {
+    it("auto-installs patch bumps even without SPAWN_AUTO_UPDATE=1", async () => {
+      // 1.0.6 -> 1.0.99 is a patch bump (same major.minor)
+      process.env.SPAWN_AUTO_UPDATE = undefined;
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const { executor } = await import("../update-check.js");
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      const output = consoleErrorSpy.mock.calls.map((call: unknown[]) => call[0]).join("\n");
+      expect(output).toContain("Update available");
+      expect(output).toContain("Updating automatically");
+      expect(execFileSyncSpy).toHaveBeenCalled();
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+
+    it("shows notice only for minor bumps without SPAWN_AUTO_UPDATE=1", async () => {
+      // 1.0.6 -> 1.1.0 is a minor bump
+      process.env.SPAWN_AUTO_UPDATE = undefined;
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
+      const { executor } = await import("../update-check.js");
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      const output = consoleErrorSpy.mock.calls.map((call: unknown[]) => call[0]).join("\n");
+      // Notice should mention the version jump
+      expect(output).toContain("Update available");
+      expect(output).toContain("1.1.0");
+      // Must NOT auto-install — no curl, no bash, no re-exec
+      expect(execFileSyncSpy).not.toHaveBeenCalled();
+      expect(processExitSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+
+    it("shows notice only for major bumps without SPAWN_AUTO_UPDATE=1", async () => {
+      // 1.0.6 -> 2.0.0 is a major bump
+      process.env.SPAWN_AUTO_UPDATE = undefined;
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("2.0.0\n")));
+      const { executor } = await import("../update-check.js");
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      expect(execFileSyncSpy).not.toHaveBeenCalled();
+      expect(processExitSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+
+    it("auto-installs minor bumps WITH SPAWN_AUTO_UPDATE=1", async () => {
+      // 1.0.6 -> 1.1.0 with opt-in env var
+      process.env.SPAWN_AUTO_UPDATE = "1";
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
+      const { executor } = await import("../update-check.js");
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      expect(execFileSyncSpy).toHaveBeenCalled();
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+
+    it("SPAWN_NO_AUTO_UPDATE=1 suppresses patch auto-install (CI pinning)", async () => {
+      // Explicit opt-out — even patches should show notice only
+      process.env.SPAWN_AUTO_UPDATE = undefined;
+      process.env.SPAWN_NO_AUTO_UPDATE = "1";
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const { executor } = await import("../update-check.js");
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => Buffer.from(""));
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      expect(execFileSyncSpy).not.toHaveBeenCalled();
+      expect(processExitSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
+    });
+  });
 });
