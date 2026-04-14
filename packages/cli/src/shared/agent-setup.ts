@@ -267,8 +267,11 @@ export async function offerGithubAuth(runner: CloudRunner, explicitlyRequested?:
 
   let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
   if (githubToken) {
-    const tokenB64 = Buffer.from(githubToken).toString("base64");
-    ghCmd = `export GITHUB_TOKEN=$(printf '%s' ${shellQuote(tokenB64)} | base64 -d) && ${ghCmd}`;
+    const tmpFile = join(getTmpDir(), `spawn_gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    writeFileSync(tmpFile, githubToken, {
+      mode: 0o600,
+    });
+    ghCmd = `export GITHUB_TOKEN=$(cat ${shellQuote(tmpFile)}) && rm -f ${shellQuote(tmpFile)} && ${ghCmd}`;
   }
 
   logStep("Installing and authenticating GitHub CLI on the remote server...");
