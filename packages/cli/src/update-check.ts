@@ -332,11 +332,22 @@ function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
     const platform = isWindows() ? "windows" : "unix";
     validateInstallScript(scriptContent, platform);
 
-    if (isWindows()) {
-      // Windows: write to temp file and execute via PowerShell
-      const tmpFile = path.join(tmpdir(), `spawn-install-${Date.now()}.ps1`);
-      fs.writeFileSync(tmpFile, scriptContent);
-      const psResult = tryCatch(() =>
+    // Write install script to temp file, execute, and guarantee cleanup.
+    // Uses tryCatch so cleanup always runs before any error is re-thrown.
+    const tmpExt = isWindows() ? "ps1" : "sh";
+    const tmpFile = path.join(tmpdir(), `spawn-install-${Date.now()}.${tmpExt}`);
+    fs.writeFileSync(
+      tmpFile,
+      scriptContent,
+      isWindows()
+        ? undefined
+        : {
+            mode: 0o700,
+          },
+    );
+
+    const execResult = tryCatch(() => {
+      if (isWindows()) {
         executor.execFileSync(
           "powershell.exe",
           [
@@ -348,21 +359,8 @@ function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
           {
             stdio: installStdio,
           },
-        ),
-      );
-      // Best-effort cleanup of temp file
-      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
-      if (!psResult.ok) {
-        throw psResult.error;
-      }
-    } else {
-      // macOS/Linux: write to temp file and execute via bash to avoid
-      // command injection and ARG_MAX limits (consistent with Windows path)
-      const tmpFile = path.join(tmpdir(), `spawn-install-${Date.now()}.sh`);
-      fs.writeFileSync(tmpFile, scriptContent, {
-        mode: 0o700,
-      });
-      const bashResult = tryCatch(() =>
+        );
+      } else {
         executor.execFileSync(
           "bash",
           [
@@ -371,13 +369,16 @@ function performAutoUpdate(latestVersion: string, jsonOutput = false): void {
           {
             stdio: installStdio,
           },
-        ),
-      );
-      // Best-effort cleanup of temp file
-      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
-      if (!bashResult.ok) {
-        throw bashResult.error;
+        );
       }
+    });
+
+    // Cleanup runs unconditionally — tryCatch above captures any exec error
+    // without short-circuiting, so we always reach this line.
+    tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+
+    if (!execResult.ok) {
+      throw execResult.error;
     }
   });
 
