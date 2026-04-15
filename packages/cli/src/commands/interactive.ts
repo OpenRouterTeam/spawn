@@ -8,6 +8,7 @@ import { getAgentOptionalSteps } from "../shared/agents.js";
 import { hasSavedOpenRouterKey } from "../shared/oauth.js";
 import { asyncTryCatch, tryCatch, unwrapOr } from "../shared/result.js";
 import { maybeShowStarPrompt } from "../shared/star-prompt.js";
+import { captureEvent, setTelemetryContext } from "../shared/telemetry.js";
 import { validateModelId } from "../shared/ui.js";
 import { cmdLink } from "./link.js";
 import { activeServerPicker } from "./list.js";
@@ -278,10 +279,19 @@ export { getAndValidateCloudChoices, promptSetupOptions, promptSpawnName, select
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
+  // Funnel entry — fires BEFORE any prompt so we catch users who bail at
+  // the very first screen. See also: funnel_* events in orchestrate.ts.
+  captureEvent("spawn_launched", {
+    mode: "interactive",
+  });
+
   // If the user has existing spawns, offer a top-level menu so they can
   // reconnect without knowing about `spawn list` or `spawn last`.
   const activeServers = getActiveServers();
   if (activeServers.length > 0) {
+    captureEvent("menu_shown", {
+      active_servers: activeServers.length,
+    });
     const topChoice = await p.select({
       message: "What would you like to do?",
       options: [
@@ -296,8 +306,12 @@ export async function cmdInteractive(): Promise<void> {
       ],
     });
     if (p.isCancel(topChoice)) {
+      captureEvent("menu_cancelled");
       handleCancel();
     }
+    captureEvent("menu_selected", {
+      choice: String(topChoice),
+    });
     if (topChoice === "connect") {
       const manifestResult = await asyncTryCatch(() => loadManifestWithSpinner());
       const manifest = manifestResult.ok ? manifestResult.data : null;
@@ -307,10 +321,20 @@ export async function cmdInteractive(): Promise<void> {
   }
 
   const manifest = await loadManifestWithSpinner();
+  captureEvent("agent_picker_shown");
   const agentChoice = await selectAgent(manifest);
+  captureEvent("agent_selected", {
+    agent: agentChoice,
+  });
+  setTelemetryContext("agent", agentChoice);
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
+  captureEvent("cloud_picker_shown");
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+  captureEvent("cloud_selected", {
+    cloud: cloudChoice,
+  });
+  setTelemetryContext("cloud", cloudChoice);
 
   // Handle "Link Existing Server" — redirect to spawn link with the agent pre-selected
   if (cloudChoice === "link-existing") {
@@ -324,27 +348,37 @@ export async function cmdInteractive(): Promise<void> {
   }
 
   await preflightCredentialCheck(manifest, cloudChoice);
+  captureEvent("preflight_passed");
 
   // Skip setup prompt if steps already set via --steps or --config
   if (!process.env.SPAWN_ENABLED_STEPS) {
+    captureEvent("setup_options_shown");
     const enabledSteps = await promptSetupOptions(agentChoice);
     if (enabledSteps) {
       process.env.SPAWN_ENABLED_STEPS = [
         ...enabledSteps,
       ].join(",");
+      captureEvent("setup_options_selected", {
+        step_count: enabledSteps.size,
+      });
     }
   }
 
   // Skills picker (--beta skills)
   await maybePromptSkills(manifest, agentChoice);
 
+  captureEvent("name_prompt_shown");
   const spawnName = await promptSpawnName();
+  // promptSpawnName cancels via handleCancel() on its own path if the user
+  // bails; if we reach this line the name was entered successfully.
+  captureEvent("name_entered");
 
   const agentName = manifest.agents[agentChoice].name;
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
+  captureEvent("picker_completed");
 
   const success = await execScript(
     cloudChoice,
@@ -364,10 +398,19 @@ export async function cmdInteractive(): Promise<void> {
 export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun?: boolean): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
+  // Same funnel entry as cmdInteractive — mode distinguishes the short-form
+  // (`spawn claude`) entry point from the full interactive picker.
+  captureEvent("spawn_launched", {
+    mode: "agent_interactive",
+  });
+
   const manifest = await loadManifestWithSpinner();
   const resolvedAgent = resolveAgentKey(manifest, agent);
 
   if (!resolvedAgent) {
+    captureEvent("agent_invalid", {
+      raw: agent,
+    });
     const agentMatch = findClosestKeyByNameOrKey(agent, agentKeys(manifest), (k) => manifest.agents[k].name);
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
     if (agentMatch) {
@@ -377,8 +420,19 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
     process.exit(1);
   }
 
+  // Agent was pre-supplied on the command line — treat as implicitly selected.
+  captureEvent("agent_selected", {
+    agent: resolvedAgent,
+  });
+  setTelemetryContext("agent", resolvedAgent);
+
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
+  captureEvent("cloud_picker_shown");
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+  captureEvent("cloud_selected", {
+    cloud: cloudChoice,
+  });
+  setTelemetryContext("cloud", cloudChoice);
 
   // Handle "Link Existing Server" — redirect to spawn link with the agent pre-selected
   if (cloudChoice === "link-existing") {
@@ -397,24 +451,32 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   }
 
   await preflightCredentialCheck(manifest, cloudChoice);
+  captureEvent("preflight_passed");
 
   // Skip setup prompt if steps already set via --steps or --config
   if (!process.env.SPAWN_ENABLED_STEPS) {
+    captureEvent("setup_options_shown");
     const enabledSteps = await promptSetupOptions(resolvedAgent);
     if (enabledSteps) {
       process.env.SPAWN_ENABLED_STEPS = [
         ...enabledSteps,
       ].join(",");
+      captureEvent("setup_options_selected", {
+        step_count: enabledSteps.size,
+      });
     }
   }
 
+  captureEvent("name_prompt_shown");
   const spawnName = await promptSpawnName();
+  captureEvent("name_entered");
 
   const agentName = manifest.agents[resolvedAgent].name;
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${resolvedAgent} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
+  captureEvent("picker_completed");
 
   const success = await execScript(
     cloudChoice,
