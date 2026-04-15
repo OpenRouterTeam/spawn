@@ -6,38 +6,24 @@
 
 import type { SpawnRecord } from "../history";
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { isNumber, isString } from "@openrouter/spawn-shared";
+// Import the real modules so we can spy on their exports without
+// polluting the global module registry (mock.module contaminates
+// other test files when running under --coverage).
+import * as historyMod from "../history";
+import { trackSpawnConnected, trackSpawnDeleted } from "../shared/lifecycle-telemetry";
+import * as telemetryMod from "../shared/telemetry";
 
-// We mock the two modules our helpers depend on so we can assert on calls
-// without touching disk or the network.
 const savedMetadataCalls: Array<{
   entries: Record<string, string>;
   spawnId?: string;
 }> = [];
-mock.module("../history", () => ({
-  saveMetadata: (entries: Record<string, string>, spawnId?: string) => {
-    savedMetadataCalls.push({
-      entries,
-      spawnId,
-    });
-  },
-}));
 
 const capturedEvents: Array<{
   event: string;
   properties: Record<string, unknown>;
 }> = [];
-mock.module("../shared/telemetry", () => ({
-  captureEvent: (event: string, properties: Record<string, unknown>) => {
-    capturedEvents.push({
-      event,
-      properties,
-    });
-  },
-}));
-
-const { trackSpawnConnected, trackSpawnDeleted } = await import("../shared/lifecycle-telemetry");
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -60,12 +46,34 @@ function makeRecord(overrides: Partial<SpawnRecord> = {}): SpawnRecord {
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("lifecycle-telemetry", () => {
+  let saveMetadataSpy: ReturnType<typeof spyOn>;
+  let captureEventSpy: ReturnType<typeof spyOn>;
+
   beforeEach(() => {
     savedMetadataCalls.length = 0;
     capturedEvents.length = 0;
+
+    saveMetadataSpy = spyOn(historyMod, "saveMetadata").mockImplementation(
+      (entries: Record<string, string>, spawnId?: string) => {
+        savedMetadataCalls.push({
+          entries,
+          spawnId,
+        });
+      },
+    );
+    captureEventSpy = spyOn(telemetryMod, "captureEvent").mockImplementation(
+      (event: string, properties: Record<string, unknown>) => {
+        capturedEvents.push({
+          event,
+          properties,
+        });
+      },
+    );
   });
 
   afterEach(() => {
+    saveMetadataSpy.mockRestore();
+    captureEventSpy.mockRestore();
     savedMetadataCalls.length = 0;
     capturedEvents.length = 0;
   });
