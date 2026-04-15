@@ -1,7 +1,9 @@
-// shared/telemetry.ts — PostHog telemetry for errors, warnings, and crashes.
+// shared/telemetry.ts — PostHog telemetry for errors, warnings, crashes, and
+// low-volume product events (funnel steps, spawn lifecycle).
 // Default on. Disable with SPAWN_TELEMETRY=0.
-// Strictly errors/warnings/crashes — no command tracking, no session events.
+// Never sends command args, file paths, or user prompt content.
 
+import { isString } from "@openrouter/spawn-shared";
 import { asyncTryCatch } from "./result.js";
 
 // Same PostHog project as feedback.ts
@@ -175,6 +177,31 @@ export function captureWarning(message: string): void {
   pushEvent("cli_warning", {
     message: scrub(message),
   });
+}
+
+/**
+ * Capture a generic telemetry event (funnel steps, lifecycle events, etc.).
+ *
+ * Respects SPAWN_TELEMETRY=0 — when opt-out is set this is a no-op. All string
+ * values in `properties` are passed through the same scrubber as errors and
+ * warnings, so paths, API keys, emails, and IPs are redacted before upload.
+ *
+ * Intended for low-volume, high-signal product events like:
+ *   - funnel_* (onboarding pipeline drop-off tracking in orchestrate.ts)
+ *   - spawn_connected / spawn_deleted (lifecycle events)
+ *
+ * NOT intended for command tracking, keystroke tracking, or anything that
+ * could incidentally capture user-typed prompts or file paths.
+ */
+export function captureEvent(event: string, properties: Record<string, unknown> = {}): void {
+  if (!_enabled) {
+    return;
+  }
+  const scrubbed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(properties)) {
+    scrubbed[key] = isString(value) ? scrub(value) : value;
+  }
+  pushEvent(event, scrubbed);
 }
 
 /** Map our error types to PostHog mechanism types. */
