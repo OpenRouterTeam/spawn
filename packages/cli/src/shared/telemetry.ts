@@ -123,7 +123,14 @@ interface TelemetryEvent {
 
 // ── State ───────────────────────────────────────────────────────────────────
 
-let _enabled = true;
+// Telemetry is OPT-IN: nothing fires until initTelemetry() is called. This
+// matters for tests that import modules which call captureEvent — without
+// this default, every `bun test` run of orchestrate.test.ts fired real
+// PostHog events tagged agent=testagent, because the test imports
+// runOrchestration directly (bypassing index.ts's initTelemetry call) but
+// runOrchestration calls captureEvent unconditionally. Defaulting _enabled
+// to false means no events escape until a real process explicitly opts in.
+let _enabled = false;
 let _sessionId = "";
 let _context: Record<string, string> = {};
 const _events: TelemetryEvent[] = [];
@@ -133,6 +140,15 @@ let _flushScheduled = false;
 
 /** Initialize telemetry. Call once at startup. */
 export function initTelemetry(version: string): void {
+  // Never send telemetry from test environments. bun:test sets BUN_ENV=test,
+  // Node test runners set NODE_ENV=test. Without this guard, every CI run of
+  // orchestrate.test.ts fires real PostHog events tagged agent=testagent,
+  // polluting the onboarding funnel with fixture data. (See #3305 follow-up.)
+  if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
+    _enabled = false;
+    return;
+  }
+
   _enabled = process.env.SPAWN_TELEMETRY !== "0";
   if (!_enabled) {
     return;
