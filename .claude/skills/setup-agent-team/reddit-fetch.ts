@@ -10,6 +10,37 @@
 
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
+import * as v from "valibot";
+
+/** Valibot schemas for Reddit API responses. */
+const RedditTokenSchema = v.object({
+  access_token: v.string(),
+});
+
+const RedditChildDataSchema = v.looseObject({
+  name: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  title: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  permalink: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  subreddit: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  score: v.pipe(v.unknown(), v.transform((x) => Number(x ?? 0))),
+  num_comments: v.pipe(v.unknown(), v.transform((x) => Number(x ?? 0))),
+  created_utc: v.pipe(v.unknown(), v.transform((x) => Number(x ?? 0))),
+  selftext: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  author: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+});
+
+const RedditListingSchema = v.object({
+  data: v.object({
+    children: v.array(v.object({
+      data: RedditChildDataSchema,
+    })),
+  }),
+});
+
+const RedditCommentDataSchema = v.looseObject({
+  body: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+  subreddit: v.pipe(v.unknown(), v.transform((x) => String(x ?? ""))),
+});
 
 const CLIENT_ID = process.env.REDDIT_CLIENT_ID ?? "";
 const CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
@@ -156,13 +187,13 @@ async function getToken(): Promise<string> {
     },
     body: `grant_type=password&username=${encodeURIComponent(USERNAME)}&password=${encodeURIComponent(PASSWORD)}`,
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  const token = typeof data.access_token === "string" ? data.access_token : "";
-  if (!token) {
-    console.error("Reddit auth failed:", JSON.stringify(data));
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(RedditTokenSchema, json);
+  if (!parsed.success) {
+    console.error("Reddit auth failed:", JSON.stringify(json));
     process.exit(1);
   }
-  return token;
+  return parsed.output.access_token;
 }
 
 /** Fetch a Reddit API endpoint with auth. */
@@ -183,29 +214,23 @@ async function redditGet(token: string, path: string): Promise<unknown> {
 /** Extract posts from a Reddit listing response. */
 function extractPosts(data: unknown): Map<string, RedditPost> {
   const posts = new Map<string, RedditPost>();
-  if (!data || typeof data !== "object") return posts;
-  const listing = data as Record<string, unknown>;
-  const listingData = listing.data as Record<string, unknown> | undefined;
-  const children = listingData?.children;
-  if (!Array.isArray(children)) return posts;
+  const parsed = v.safeParse(RedditListingSchema, data);
+  if (!parsed.success) return posts;
 
-  for (const child of children) {
-    const c = child as Record<string, unknown>;
-    const d = c.data as Record<string, unknown> | undefined;
-    if (!d) continue;
-    const id = String(d.name ?? "");
-    if (!id || posts.has(id)) continue;
+  for (const child of parsed.output.data.children) {
+    const d = child.data;
+    if (!d.name || posts.has(d.name)) continue;
 
-    posts.set(id, {
-      title: String(d.title ?? ""),
-      permalink: String(d.permalink ?? ""),
-      subreddit: String(d.subreddit ?? ""),
-      postId: id,
-      score: Number(d.score ?? 0),
-      numComments: Number(d.num_comments ?? 0),
-      createdUtc: Number(d.created_utc ?? 0),
-      selftext: String(d.selftext ?? "").slice(0, 2000),
-      authorName: String(d.author ?? ""),
+    posts.set(d.name, {
+      title: d.title,
+      permalink: d.permalink,
+      subreddit: d.subreddit,
+      postId: d.name,
+      score: d.score,
+      numComments: d.num_comments,
+      createdUtc: d.created_utc,
+      selftext: d.selftext.slice(0, 2000),
+      authorName: d.author,
       authorComments: [],
     });
   }
@@ -221,18 +246,15 @@ async function fetchUserComments(token: string, username: string): Promise<strin
   // depth.
   if (!REDDIT_USERNAME_RE.test(username)) return [];
   const data = await redditGet(token, `/user/${encodeURIComponent(username)}/comments?limit=25&sort=new`);
-  if (!data || typeof data !== "object") return [];
-  const listing = data as Record<string, unknown>;
-  const listingData = listing.data as Record<string, unknown> | undefined;
-  const children = listingData?.children;
-  if (!Array.isArray(children)) return [];
+  const parsed = v.safeParse(RedditListingSchema, data);
+  if (!parsed.success) return [];
 
-  return children
+  return parsed.output.data.children
     .map((child) => {
-      const c = child as Record<string, unknown>;
-      const d = c.data as Record<string, unknown> | undefined;
-      const body = String(d?.body ?? "").slice(0, 500);
-      const sub = String(d?.subreddit ?? "");
+      const cp = v.safeParse(RedditCommentDataSchema, child.data);
+      if (!cp.success) return "";
+      const body = cp.output.body.slice(0, 500);
+      const sub = cp.output.subreddit;
       return sub ? `[r/${sub}] ${body}` : body;
     })
     .filter(Boolean);
