@@ -917,7 +917,7 @@ async function postInstall(
   if (isConnectionDrop(exitCode)) {
     process.stderr.write("\n");
     logWarn("Could not reconnect. Server is still running.");
-    logInfo("Reconnect manually: spawn connect");
+    logInfo("Reconnect manually: spawn last");
   }
 
   if (tunnelHandle) {
