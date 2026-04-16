@@ -164,12 +164,7 @@ export async function cmdConnect(connection: VMConnection, agentKey?: string): P
     p.log.step(`Connecting to Daytona sandbox ${pc.bold(connection.server_name || connection.server_id)}...`);
     const { buildInteractiveSshArgs } = await import("../daytona/daytona.js");
     const args = await buildInteractiveSshArgs(connection.server_id);
-    return runInteractiveCommand(
-      args[0],
-      args.slice(1),
-      "Daytona SSH connection failed",
-      `spawn connect ${connection.server_name || connection.server_id}`,
-    );
+    return runInteractiveCommand(args[0], args.slice(1), "Daytona SSH connection failed", "spawn last");
   }
 
   // Handle SSH connections
