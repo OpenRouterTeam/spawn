@@ -27,7 +27,7 @@ GIT_DATA_PLACEHOLDER
    - No corporate speak, no buzzwords, no "excited to announce"
    - At most 1 hashtag (only if it fits naturally)
    - Mention `@OpenRouterTeam` only if it fits naturally
-   - OK to include a short URL like `openrouter.ai/labs/spawn`
+   - OK to include a short URL like `https://openrouter.ai/spawn`
    - If referencing a specific feature, be concrete ("added Hetzner support" not "expanded cloud coverage")
 
 3. **If nothing is tweet-worthy** (no notable changes, or all recent commits are internal/infra), output `found: false`.
