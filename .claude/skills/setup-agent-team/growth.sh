@@ -6,8 +6,11 @@ set -eo pipefail
 # Phase 2: Pass results to Claude for scoring/qualification (no tool use)
 # Phase 3: POST candidate to SPA for Slack notification
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# Derive paths from git — works regardless of how the script is invoked
+# (direct execution, Bun.spawn, or process substitution). Avoids BASH_SOURCE
+# which breaks under bash <(curl ...) per .claude/rules/shell-scripts.md.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="${REPO_ROOT}/.claude/skills/setup-agent-team"
 cd "${REPO_ROOT}"
 
 SPAWN_REASON="${SPAWN_REASON:-manual}"
