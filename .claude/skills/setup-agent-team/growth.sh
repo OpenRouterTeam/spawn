@@ -14,7 +14,7 @@ cd "${REPO_ROOT}"
 
 SPAWN_REASON="${SPAWN_REASON:-manual}"
 TEAM_NAME="spawn-growth"
-HARD_TIMEOUT=600   # 10 min (claude scoring can take 5+ min with large post sets)
+HARD_TIMEOUT=1800  # 30 min (claude scoring can take 10+ min with 500+ post sets)
 
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""

@@ -2066,8 +2066,9 @@ async function getRedditToken(): Promise<string | null> {
     },
     body: `grant_type=password&username=${encodeURIComponent(REDDIT_USERNAME)}&password=${encodeURIComponent(REDDIT_PASSWORD)}`,
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  return typeof data.access_token === "string" ? data.access_token : null;
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(v.object({ access_token: v.string() }), json);
+  return parsed.success ? parsed.output.access_token : null;
 }
 
 /** Post a reply to a Reddit thread. Returns the comment URL or an error. */
@@ -2095,10 +2096,11 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
     body: `thing_id=${encodeURIComponent(postId)}&text=${encodeURIComponent(replyText)}`,
   });
 
-  const data = (await res.json()) as Record<string, unknown>;
+  const json: unknown = await res.json();
 
   if (!res.ok) {
-    const errMsg = typeof data.message === "string" ? data.message : `HTTP ${res.status}`;
+    const errParsed = v.safeParse(v.object({ message: v.string() }), json);
+    const errMsg = errParsed.success ? errParsed.output.message : `HTTP ${res.status}`;
     console.error(`[spa] Reddit reply failed: ${errMsg}`);
     return Response.json(
       {
@@ -2111,19 +2113,24 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
     );
   }
 
-  // Extract the comment URL from the response
-  const jquery = data.jquery as unknown[] | undefined;
+  // Reddit's legacy "comment" endpoint returns a jQuery-style response.
+  // Extract the permalink from nested arrays: jquery[n][3][m].data.permalink
+  const JqueryCommentSchema = v.object({
+    jquery: v.array(v.unknown()),
+  });
+  const JqueryInnerSchema = v.object({
+    data: v.object({ permalink: v.string() }),
+  });
+
   let commentUrl = "";
-  if (Array.isArray(jquery)) {
-    for (const item of jquery) {
+  const jqParsed = v.safeParse(JqueryCommentSchema, json);
+  if (jqParsed.success) {
+    for (const item of jqParsed.output.jquery) {
       if (Array.isArray(item) && item.length >= 4 && Array.isArray(item[3])) {
         for (const inner of item[3]) {
-          const rec = inner as Record<string, unknown> | undefined;
-          if (rec && typeof rec.data === "object" && rec.data !== null) {
-            const d = rec.data as Record<string, unknown>;
-            if (typeof d.permalink === "string") {
-              commentUrl = `https://reddit.com${d.permalink}`;
-            }
+          const innerParsed = v.safeParse(JqueryInnerSchema, inner);
+          if (innerParsed.success) {
+            commentUrl = `https://reddit.com${innerParsed.output.data.permalink}`;
           }
         }
       }
