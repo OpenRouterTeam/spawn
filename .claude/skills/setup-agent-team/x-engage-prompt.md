@@ -28,7 +28,7 @@ X_DATA_PLACEHOLDER
    - Answer their question or add to the conversation
    - Mention Spawn only if it genuinely fits what they are discussing
    - Casual, developer-to-developer tone
-   - Include `openrouter.ai/labs/spawn` only if it adds value
+   - Include `https://openrouter.ai/spawn` only if it adds value
    - Disclosure: include "disclosure: i help build this" if recommending Spawn
 
 4. **If no good engagement opportunity** (all scores < 7), output `found: false`.
