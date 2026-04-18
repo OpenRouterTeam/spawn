@@ -58,6 +58,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/cursor.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/pi.sh)
 ```
 
+#### T3 Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/t3code.sh)
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |

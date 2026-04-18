@@ -60,6 +60,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/cursor.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/pi.sh)
 ```
 
+#### T3 Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/gcp/t3code.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

@@ -60,6 +60,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/cursor.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/pi.sh)
 ```
 
+#### T3 Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/t3code.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
