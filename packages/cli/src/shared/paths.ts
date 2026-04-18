@@ -58,6 +58,11 @@ export function getSpawnPreferencesPath(): string {
   return join(getUserHome(), ".config", "spawn", "preferences.json");
 }
 
+/** Return the path to the install referrer file: ~/.config/spawn/.ref */
+export function getInstallRefPath(): string {
+  return join(getUserHome(), ".config", "spawn", ".ref");
+}
+
 /** Return the cache directory for spawn, respecting XDG_CACHE_HOME. */
 export function getCacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(getUserHome(), ".cache"), "spawn");
