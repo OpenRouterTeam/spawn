@@ -374,3 +374,19 @@ ensure_min_bun_version
 
 log_step "Installing spawn via bun..."
 build_and_install
+
+# Persist install referrer (e.g. SPAWN_REF=reddit) so the CLI can report
+# attribution on first run. Only written once — never overwritten on updates.
+if [ -n "${SPAWN_REF:-}" ]; then
+    _ref_dir="${HOME}/.config/spawn"
+    _ref_file="${_ref_dir}/.ref"
+    if [ ! -f "${_ref_file}" ]; then
+        mkdir -p "${_ref_dir}"
+        # Sanitize: allow only alphanumeric, hyphens, underscores (no injection)
+        _clean_ref=$(printf '%s' "${SPAWN_REF}" | tr -cd 'a-zA-Z0-9_-' | head -c 32)
+        if [ -n "${_clean_ref}" ]; then
+            printf '%s' "${_clean_ref}" > "${_ref_file}"
+            log_info "Install referrer: ${_clean_ref}"
+        fi
+    fi
+fi
