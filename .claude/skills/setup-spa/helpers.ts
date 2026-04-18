@@ -185,6 +185,24 @@ export function openDb(path?: string): Database {
       created_at         TEXT NOT NULL
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS tweets (
+      tweet_id         TEXT PRIMARY KEY,
+      tweet_text       TEXT NOT NULL,
+      topic            TEXT NOT NULL,
+      category         TEXT NOT NULL DEFAULT 'feature',
+      source_commits   TEXT,
+      source_tweet_id  TEXT,
+      reply_to_url     TEXT,
+      slack_channel    TEXT,
+      slack_ts         TEXT,
+      status           TEXT NOT NULL DEFAULT 'pending',
+      actioned_by      TEXT,
+      actioned_at      TEXT,
+      posted_text      TEXT,
+      created_at       TEXT NOT NULL
+    )
+  `);
   if (!path) {
     migrateFromJson(db);
   }
@@ -430,6 +448,169 @@ ${editedReply ? "- **Edited**: yes (original draft was modified)\n" : ""}\
 export function readDecisions(): string {
   if (!existsSync(DECISIONS_PATH)) return "";
   return readFileSync(DECISIONS_PATH, "utf-8");
+}
+
+// #endregion
+
+// #region Tweets — X/Twitter growth pipeline
+
+/** A tweet candidate tracked for approval. */
+export interface TweetRow {
+  tweetId: string;
+  tweetText: string;
+  topic: string;
+  category: string;
+  sourceCommits?: string;
+  sourceTweetId?: string;
+  replyToUrl?: string;
+  slackChannel?: string;
+  slackTs?: string;
+  status: "pending" | "approved" | "posted" | "skipped" | "error";
+  actionedBy?: string;
+  actionedAt?: string;
+  postedText?: string;
+  createdAt: string;
+}
+
+/** Raw SQLite row shape for tweets. */
+interface RawTweet {
+  tweet_id: string;
+  tweet_text: string;
+  topic: string;
+  category: string;
+  source_commits: string | null;
+  source_tweet_id: string | null;
+  reply_to_url: string | null;
+  slack_channel: string | null;
+  slack_ts: string | null;
+  status: string;
+  actioned_by: string | null;
+  actioned_at: string | null;
+  posted_text: string | null;
+  created_at: string;
+}
+
+function rowToTweet(r: RawTweet): TweetRow {
+  return {
+    tweetId: r.tweet_id,
+    tweetText: r.tweet_text,
+    topic: r.topic,
+    category: r.category,
+    sourceCommits: r.source_commits ?? undefined,
+    sourceTweetId: r.source_tweet_id ?? undefined,
+    replyToUrl: r.reply_to_url ?? undefined,
+    slackChannel: r.slack_channel ?? undefined,
+    slackTs: r.slack_ts ?? undefined,
+    status:
+      r.status === "approved" || r.status === "posted" || r.status === "skipped" || r.status === "error"
+        ? r.status
+        : "pending",
+    actionedBy: r.actioned_by ?? undefined,
+    actionedAt: r.actioned_at ?? undefined,
+    postedText: r.posted_text ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Insert or update a tweet. On conflict (same tweet_id), updates Slack coordinates. */
+export function upsertTweet(db: Database, tweet: TweetRow): void {
+  db.run(
+    `INSERT INTO tweets (tweet_id, tweet_text, topic, category, source_commits, source_tweet_id, reply_to_url, slack_channel, slack_ts, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (tweet_id) DO UPDATE SET
+       slack_channel = excluded.slack_channel,
+       slack_ts      = excluded.slack_ts`,
+    [
+      tweet.tweetId,
+      tweet.tweetText,
+      tweet.topic,
+      tweet.category,
+      tweet.sourceCommits ?? null,
+      tweet.sourceTweetId ?? null,
+      tweet.replyToUrl ?? null,
+      tweet.slackChannel ?? null,
+      tweet.slackTs ?? null,
+      tweet.status,
+      tweet.createdAt,
+    ],
+  );
+}
+
+/** Look up a tweet by tweet ID. */
+export function findTweet(db: Database, tweetId: string): TweetRow | undefined {
+  const row = db
+    .query<
+      RawTweet,
+      [
+        string,
+      ]
+    >("SELECT * FROM tweets WHERE tweet_id = ?")
+    .get(tweetId);
+  return row ? rowToTweet(row) : undefined;
+}
+
+/** Update a tweet's status and related fields after an action. */
+export function updateTweetStatus(
+  db: Database,
+  tweetId: string,
+  update: {
+    status: TweetRow["status"];
+    actionedBy?: string;
+    postedText?: string;
+  },
+): void {
+  db.run(
+    `UPDATE tweets SET
+       status       = ?,
+       actioned_by  = ?,
+       actioned_at  = ?,
+       posted_text  = ?
+     WHERE tweet_id = ?`,
+    [
+      update.status,
+      update.actionedBy ?? null,
+      new Date().toISOString(),
+      update.postedText ?? null,
+      tweetId,
+    ],
+  );
+}
+
+const TWEET_DECISIONS_PATH = `${process.env.HOME ?? "/tmp"}/.config/spawn/tweet-decisions.md`;
+
+/** Append a decision entry to the tweet decisions log. */
+export function logTweetDecision(
+  tweet: TweetRow,
+  decision: "approved" | "edited" | "skipped",
+  editedText?: string,
+): void {
+  const dir = dirname(TWEET_DECISIONS_PATH);
+  if (!existsSync(dir))
+    mkdirSync(dir, {
+      recursive: true,
+    });
+
+  const date = new Date().toISOString().split("T")[0];
+  const text = editedText ?? tweet.tweetText;
+  const entry = `
+## ${decision.toUpperCase()} — ${date}
+
+- **Topic**: ${tweet.topic}
+- **Category**: ${tweet.category}
+- **Decision**: ${decision}
+${editedText ? "- **Edited**: yes\n" : ""}\
+- **Tweet**: ${text.replace(/\n/g, " ")}
+
+---
+`;
+
+  appendFileSync(TWEET_DECISIONS_PATH, entry);
+}
+
+/** Read the tweet decisions log (returns empty string if no file). */
+export function readTweetDecisions(): string {
+  if (!existsSync(TWEET_DECISIONS_PATH)) return "";
+  return readFileSync(TWEET_DECISIONS_PATH, "utf-8");
 }
 
 // #endregion
