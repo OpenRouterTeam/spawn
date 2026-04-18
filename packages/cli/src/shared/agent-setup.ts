@@ -1166,6 +1166,34 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "npm install -g ${_NPM_G_FLAGS:-} @jetbrains/junie-cli@latest",
     },
 
+    t3code: {
+      name: "T3 Code",
+      cloudInitTier: "node" satisfies AgentConfig["cloudInitTier"],
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "T3 Code",
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} t3 && ${NPM_GLOBAL_PATH_PERSIST}`,
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+        `ANTHROPIC_API_KEY=${apiKey}`,
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
+        `OPENAI_API_KEY=${apiKey}`,
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
+      ],
+      preLaunchMsg: "T3 Code web GUI will open automatically — use it to interact with Claude Code and Codex agents.",
+      launchCmd: () =>
+        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; t3 --port 3773 --host 0.0.0.0 --no-browser",
+      tunnel: {
+        remotePort: 3773,
+        browserUrl: (localPort: number) => `http://localhost:${localPort}`,
+      },
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' + "npm install -g ${_NPM_G_FLAGS:-} t3@latest",
+    },
+
     cursor: {
       name: "Cursor CLI",
       cloudInitTier: "minimal",
