@@ -625,7 +625,7 @@ export async function handleRecordAction(
   if (!conn.deleted) {
     const reconnectHint =
       conn.cloud === "daytona"
-        ? `spawn connect ${conn.server_name || conn.server_id || conn.ip}`
+        ? "spawn last"
         : conn.ip === "sprite-console"
           ? `sprite console -s ${conn.server_name}`
           : `ssh ${conn.user}@${conn.ip}`;
