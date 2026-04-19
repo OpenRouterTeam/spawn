@@ -58,6 +58,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/cursor.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/pi.sh)
 ```
 
+#### T3 Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/t3code.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

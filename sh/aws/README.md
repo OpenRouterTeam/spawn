@@ -66,6 +66,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/cursor.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/pi.sh)
 ```
 
+#### T3 Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/t3code.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
