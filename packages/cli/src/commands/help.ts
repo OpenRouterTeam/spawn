@@ -10,6 +10,7 @@ function getHelpUsageSection(): string {
   spawn <agent> <cloud> --size <type>  Set instance size/type (works for all clouds)
   spawn <agent> <cloud> --model <id>  Set the LLM model (e.g. openai/gpt-5.3-codex)
   spawn <agent> <cloud> --custom      Show interactive size/region pickers
+  spawn <agent> <cloud> --fast        Enable all speed optimizations (images, tarballs, parallel)
   spawn <agent> <cloud> --headless   Provision and exit (no interactive session)
   spawn <agent> <cloud> --output json
                                      Headless mode with structured JSON on stdout
@@ -73,6 +74,7 @@ function getHelpExamplesSection(): string {
                                      ${pc.dim("# Use a specific machine type")}
   spawn codex gcp --model openai/gpt-5.3-codex
                                      ${pc.dim("# Override the default LLM model")}
+  spawn claude sprite --fast           ${pc.dim("# Fastest provisioning (images + tarballs + parallel)")}
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
