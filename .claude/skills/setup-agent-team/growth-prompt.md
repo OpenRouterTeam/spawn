@@ -99,7 +99,7 @@ Poster qualification:
 Relevance score: {score}/10
 
 Draft reply:
-{a short casual reply the team could use, written like a real dev on reddit. 2-3 sentences, no em dashes, no corporate speak, lowercase ok. end with "disclosure: i help build this" if mentioning spawn}
+{a short casual reply the team could use, written like a real dev on reddit. 2-3 sentences. **ABSOLUTELY NO em dashes (—) or en dashes (–) — use periods, commas, or rephrase. This is non-negotiable, em dashes are an AI tell.** No corporate speak, lowercase ok. end with "disclosure: i help build this" if mentioning spawn}
 === END CANDIDATE ===
 ```
 

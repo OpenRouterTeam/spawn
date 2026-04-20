@@ -25,6 +25,7 @@ GIT_DATA_PLACEHOLDER
 2. **Draft exactly 1 tweet**, max 280 characters. Rules:
    - Write like a developer sharing something cool, not a marketing team
    - No corporate speak, no buzzwords, no "excited to announce"
+   - **NEVER use em dashes (—) or en dashes (–).** Use a period, comma, or rephrase. This is non-negotiable — em dashes are a tell that AI wrote it.
    - At most 1 hashtag (only if it fits naturally)
    - Mention `@OpenRouterTeam` only if it fits naturally
    - OK to include a short URL like `https://openrouter.ai/spawn`

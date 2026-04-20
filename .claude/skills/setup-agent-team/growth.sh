@@ -143,15 +143,21 @@ if [[ -f "${TWEET_TEMPLATE}" && "${COMMIT_COUNT}" -gt 0 ]]; then
     await Bun.write(process.env._OUT, texts.join("\n"));
     ' 2>> "${LOG_FILE}" || true
 
-    # Extract json:tweet
+    # Extract json:tweet (with em/en dash stripping)
     TWEET_JSON=""
     if [[ -f "${TWEET_OUTPUT_FILE}" ]]; then
         TWEET_JSON=$(_OUT="${TWEET_OUTPUT_FILE}" bun -e '
         const text = await Bun.file(process.env._OUT).text();
         const blocks = [...text.matchAll(/```json:tweet\n([\s\S]*?)\n```/g)];
+        const stripDashes = (v) => typeof v === "string" ? v.replace(/\s*[\u2014\u2013]\s*/g, ", ") : v;
+        const walk = (obj) => {
+          if (Array.isArray(obj)) return obj.map(walk);
+          if (obj && typeof obj === "object") return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, walk(v)]));
+          return stripDashes(obj);
+        };
         let result = "";
         for (const block of blocks) {
-          try { result = JSON.stringify(JSON.parse(block[1].trim())); } catch {}
+          try { result = JSON.stringify(walk(JSON.parse(block[1].trim()))); } catch {}
         }
         if (result) console.log(result);
         ' 2>/dev/null) || true
@@ -178,7 +184,7 @@ else
 fi
 
 # --- Phase 0b: Search X for mentions + draft engagement ---
-if [[ -z "${X_API_KEY:-}" ]]; then
+if [[ -z "${X_CLIENT_ID:-}" ]]; then
     log "Phase 0b: Skipping (no X API credentials)"
 else
     log "Phase 0b: Searching X for Spawn mentions..."
@@ -252,9 +258,15 @@ else
                 XENG_JSON=$(_OUT="${XENG_OUTPUT_FILE}" bun -e '
                 const text = await Bun.file(process.env._OUT).text();
                 const blocks = [...text.matchAll(/```json:x_engage\n([\s\S]*?)\n```/g)];
+                const stripDashes = (v) => typeof v === "string" ? v.replace(/\s*[\u2014\u2013]\s*/g, ", ") : v;
+                const walk = (obj) => {
+                  if (Array.isArray(obj)) return obj.map(walk);
+                  if (obj && typeof obj === "object") return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, walk(v)]));
+                  return stripDashes(obj);
+                };
                 let result = "";
                 for (const block of blocks) {
-                  try { result = JSON.stringify(JSON.parse(block[1].trim())); } catch {}
+                  try { result = JSON.stringify(walk(JSON.parse(block[1].trim()))); } catch {}
                 }
                 if (result) console.log(result);
                 ' 2>/dev/null) || true
@@ -407,9 +419,15 @@ if [[ -f "${CLAUDE_OUTPUT_FILE}" ]]; then
     CANDIDATE_JSON=$(_OUT="${CLAUDE_OUTPUT_FILE}" bun -e '
 const text = await Bun.file(process.env._OUT).text();
 const blocks = [...text.matchAll(/```json:candidate\n([\s\S]*?)\n```/g)];
+const stripDashes = (v) => typeof v === "string" ? v.replace(/\s*[\u2014\u2013]\s*/g, ", ") : v;
+const walk = (obj) => {
+  if (Array.isArray(obj)) return obj.map(walk);
+  if (obj && typeof obj === "object") return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, walk(v)]));
+  return stripDashes(obj);
+};
 let result = "";
 for (const block of blocks) {
-  try { result = JSON.stringify(JSON.parse(block[1].trim())); } catch {}
+  try { result = JSON.stringify(walk(JSON.parse(block[1].trim()))); } catch {}
 }
 if (result) console.log(result);
 ' 2>/dev/null)

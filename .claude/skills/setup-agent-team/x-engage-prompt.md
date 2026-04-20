@@ -28,6 +28,7 @@ X_DATA_PLACEHOLDER
    - Answer their question or add to the conversation
    - Mention Spawn only if it genuinely fits what they are discussing
    - Casual, developer-to-developer tone
+   - **NEVER use em dashes (—) or en dashes (–).** Use a period, comma, or rephrase. Em dashes are an AI tell and must be avoided.
    - Include `https://openrouter.ai/spawn` only if it adds value
    - Disclosure: include "disclosure: i help build this" if recommending Spawn
 

@@ -1,33 +1,30 @@
 /**
  * X (Twitter) Fetch — Search for Spawn/OpenRouter mentions on X.
  *
- * Uses X API v2 to find tweets mentioning Spawn, OpenRouter, or related topics.
- * Gracefully exits with empty results if credentials are not configured.
+ * Uses X API v2 with OAuth 2.0 Bearer tokens (stored in state.db by x-auth.ts).
+ * Auto-refreshes tokens when expired. Gracefully exits empty if no tokens.
  *
- * Env vars: X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET
+ * Env vars: X_CLIENT_ID, X_CLIENT_SECRET (for token refresh)
  */
 
 import { Database } from "bun:sqlite";
-import { createHmac, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import * as v from "valibot";
 
-const API_KEY = process.env.X_API_KEY ?? "";
-const API_SECRET = process.env.X_API_SECRET ?? "";
-const ACCESS_TOKEN = process.env.X_ACCESS_TOKEN ?? "";
-const ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET ?? "";
+const CLIENT_ID = process.env.X_CLIENT_ID ?? "";
+const CLIENT_SECRET = process.env.X_CLIENT_SECRET ?? "";
+const DB_PATH = `${process.env.HOME ?? "/tmp"}/.config/spawn/state.db`;
 
 // Graceful skip if credentials are not configured
-if (!API_KEY || !API_SECRET || !ACCESS_TOKEN || !ACCESS_TOKEN_SECRET) {
-  console.error("[x-fetch] No X API credentials configured — outputting empty results");
-  console.log(JSON.stringify({ posts: [], postsScanned: 0 }));
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error("[x-fetch] No X_CLIENT_ID/SECRET configured — outputting empty results");
+  console.log(
+    JSON.stringify({
+      posts: [],
+      postsScanned: 0,
+    }),
+  );
   process.exit(0);
-}
-
-// Validate credential format — reject newlines that could corrupt headers
-if (/[\r\n]/.test(API_KEY) || /[\r\n]/.test(API_SECRET)) {
-  console.error("Invalid X_API_KEY / X_API_SECRET: must not contain newlines");
-  process.exit(1);
 }
 
 // Search queries — shuffled each run for variety
@@ -79,6 +76,12 @@ const XSearchResponseSchema = v.object({
   ),
 });
 
+const TokenResponseSchema = v.object({
+  access_token: v.string(),
+  refresh_token: v.optional(v.string()),
+  expires_in: v.optional(v.number()),
+});
+
 interface XPost {
   tweetId: string;
   text: string;
@@ -91,52 +94,119 @@ interface XPost {
   url: string;
 }
 
+interface StoredTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
 /** Fisher-Yates shuffle. */
 function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
+  const a = [
+    ...arr,
+  ];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+    [a[i], a[j]] = [
+      a[j],
+      a[i],
+    ];
   }
   return a;
 }
 
-/**
- * Generate OAuth 1.0a signature for X API requests.
- * Reference: https://developer.x.com/en/docs/authentication/oauth-1-0a
- */
-function generateOAuthHeader(method: string, url: string, params: Record<string, string>): string {
-  const oauthParams: Record<string, string> = {
-    oauth_consumer_key: API_KEY,
-    oauth_nonce: randomBytes(16).toString("hex"),
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
-    oauth_token: ACCESS_TOKEN,
-    oauth_version: "1.0",
+function loadTokens(): StoredTokens | null {
+  if (!existsSync(DB_PATH)) return null;
+  try {
+    const db = new Database(DB_PATH, {
+      readonly: true,
+    });
+    const row = db
+      .query<
+        {
+          access_token: string;
+          refresh_token: string;
+          expires_at: number;
+        },
+        []
+      >("SELECT access_token, refresh_token, expires_at FROM x_tokens WHERE id = 1")
+      .get();
+    db.close();
+    if (!row) return null;
+    return {
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      expiresAt: row.expires_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveTokens(tokens: StoredTokens): void {
+  const db = new Database(DB_PATH);
+  db.run(
+    `INSERT INTO x_tokens (id, access_token, refresh_token, expires_at, updated_at)
+     VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET
+       access_token  = excluded.access_token,
+       refresh_token = excluded.refresh_token,
+       expires_at    = excluded.expires_at,
+       updated_at    = excluded.updated_at`,
+    [
+      tokens.accessToken,
+      tokens.refreshToken,
+      tokens.expiresAt,
+      new Date().toISOString(),
+    ],
+  );
+  db.close();
+}
+
+async function refreshToken(currentRefresh: string): Promise<StoredTokens | null> {
+  const basicAuth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: currentRefresh,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[x-fetch] Token refresh failed: ${res.status}`);
+    return null;
+  }
+
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(TokenResponseSchema, json);
+  if (!parsed.success) return null;
+
+  const newTokens: StoredTokens = {
+    accessToken: parsed.output.access_token,
+    refreshToken: parsed.output.refresh_token ?? currentRefresh,
+    expiresAt: Date.now() + (parsed.output.expires_in ?? 7200) * 1000,
   };
+  saveTokens(newTokens);
+  return newTokens;
+}
 
-  const allParams = { ...params, ...oauthParams };
-  const sortedKeys = Object.keys(allParams).sort();
-  const paramString = sortedKeys
-    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(allParams[k])}`)
-    .join("&");
-
-  const signatureBase = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-  const signingKey = `${encodeURIComponent(API_SECRET)}&${encodeURIComponent(ACCESS_TOKEN_SECRET)}`;
-  const signature = createHmac("sha1", signingKey).update(signatureBase).digest("base64");
-
-  oauthParams.oauth_signature = signature;
-
-  const headerParts = Object.keys(oauthParams)
-    .sort()
-    .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
-    .join(", ");
-
-  return `OAuth ${headerParts}`;
+async function getAccessToken(): Promise<string | null> {
+  const tokens = loadTokens();
+  if (!tokens) return null;
+  if (Date.now() > tokens.expiresAt - 300_000) {
+    const refreshed = await refreshToken(tokens.refreshToken);
+    return refreshed?.accessToken ?? null;
+  }
+  return tokens.accessToken;
 }
 
 /** Search X API v2 for recent tweets matching a query. */
-async function searchTweets(query: string): Promise<XPost[]> {
+async function searchTweets(query: string, accessToken: string): Promise<XPost[]> {
   const baseUrl = "https://api.x.com/2/tweets/search/recent";
   const params: Record<string, string> = {
     query,
@@ -151,11 +221,9 @@ async function searchTweets(query: string): Promise<XPost[]> {
     .join("&");
   const fullUrl = `${baseUrl}?${queryString}`;
 
-  const authHeader = generateOAuthHeader("GET", baseUrl, params);
-
   const res = await fetch(fullUrl, {
     headers: {
-      Authorization: authHeader,
+      Authorization: `Bearer ${accessToken}`,
       "User-Agent": "spawn-growth/1.0",
     },
   });
@@ -192,14 +260,18 @@ async function searchTweets(query: string): Promise<XPost[]> {
 
 /** Load tweet IDs already processed from the tweets DB. */
 function loadSeenTweetIds(): Set<string> {
-  const dbPath = `${process.env.HOME ?? "/tmp"}/.config/spawn/state.db`;
-  if (!existsSync(dbPath)) return new Set();
+  if (!existsSync(DB_PATH)) return new Set();
   try {
-    const db = new Database(dbPath, { readonly: true });
+    const db = new Database(DB_PATH, {
+      readonly: true,
+    });
     const rows = db
-      .query<{ source_tweet_id: string }, []>(
-        "SELECT source_tweet_id FROM tweets WHERE source_tweet_id IS NOT NULL",
-      )
+      .query<
+        {
+          source_tweet_id: string;
+        },
+        []
+      >("SELECT source_tweet_id FROM tweets WHERE source_tweet_id IS NOT NULL")
       .all();
     db.close();
     return new Set(rows.map((r) => r.source_tweet_id));
@@ -221,20 +293,34 @@ async function pooled<T>(tasks: Array<() => Promise<T>>, limit: number): Promise
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(limit, tasks.length) }, () => worker()),
+    Array.from(
+      {
+        length: Math.min(limit, tasks.length),
+      },
+      () => worker(),
+    ),
   );
   return results;
 }
 
 async function main(): Promise<void> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    console.error("[x-fetch] No valid tokens — run x-auth.ts first");
+    console.log(
+      JSON.stringify({
+        posts: [],
+        postsScanned: 0,
+      }),
+    );
+    process.exit(0);
+  }
   console.error("[x-fetch] Authenticated");
 
   const seenIds = loadSeenTweetIds();
   console.error(`[x-fetch] ${seenIds.size} tweets already seen in DB`);
 
-  const searchTasks = QUERIES.map(
-    (query) => () => searchTweets(query),
-  );
+  const searchTasks = QUERIES.map((query) => () => searchTweets(query, accessToken));
 
   console.error(`[x-fetch] Firing ${searchTasks.length} searches (concurrency=${MAX_CONCURRENT})...`);
 
@@ -256,7 +342,9 @@ async function main(): Promise<void> {
 
   console.error(`[x-fetch] Found ${allPosts.size} unique tweets (${skippedSeen} already seen, skipped)`);
 
-  const postsArray = [...allPosts.values()];
+  const postsArray = [
+    ...allPosts.values(),
+  ];
   const filtered = postsArray.filter((p) => p.likes >= 1 || p.replies >= 1);
   filtered.sort((a, b) => b.likes - a.likes);
 
