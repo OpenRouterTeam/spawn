@@ -203,6 +203,15 @@ export function openDb(path?: string): Database {
       created_at       TEXT NOT NULL
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS x_tokens (
+      id             INTEGER PRIMARY KEY CHECK (id = 1),
+      access_token   TEXT NOT NULL,
+      refresh_token  TEXT NOT NULL,
+      expires_at     INTEGER NOT NULL,
+      updated_at     TEXT NOT NULL
+    )
+  `);
   if (!path) {
     migrateFromJson(db);
   }

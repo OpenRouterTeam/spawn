@@ -5,7 +5,7 @@ import type { ActionsBlock, ContextBlock, KnownBlock, SectionBlock } from "@slac
 import type { Block } from "@slack/types";
 import type { ToolCall } from "./helpers";
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { isString, toRecord } from "@openrouter/spawn-shared";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
@@ -51,10 +51,8 @@ const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
 const REDDIT_USERNAME = process.env.REDDIT_USERNAME ?? "";
 const REDDIT_PASSWORD = process.env.REDDIT_PASSWORD ?? "";
 const REDDIT_USER_AGENT = `spawn-growth:v1.0.0 (by /u/${REDDIT_USERNAME})`;
-const X_API_KEY = process.env.X_API_KEY ?? "";
-const X_API_SECRET = process.env.X_API_SECRET ?? "";
-const X_ACCESS_TOKEN = process.env.X_ACCESS_TOKEN ?? "";
-const X_ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET ?? "";
+const X_CLIENT_ID = process.env.X_CLIENT_ID ?? "";
+const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET ?? "";
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -68,41 +66,13 @@ for (const [name, value] of Object.entries({
 
 // #endregion
 
-// #region X (Twitter) posting
+// #region X (Twitter) posting — OAuth 2.0 with PKCE token refresh
 
 interface XPostResult {
   ok: boolean;
   tweetId?: string;
   tweetUrl?: string;
   error?: string;
-}
-
-/** Generate OAuth 1.0a Authorization header for X API. */
-function generateXOAuthHeader(method: string, url: string): string {
-  const oauthParams: Record<string, string> = {
-    oauth_consumer_key: X_API_KEY,
-    oauth_nonce: randomBytes(16).toString("hex"),
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
-    oauth_token: X_ACCESS_TOKEN,
-    oauth_version: "1.0",
-  };
-
-  const sortedKeys = Object.keys(oauthParams).sort();
-  const paramString = sortedKeys.map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(oauthParams[k])}`).join("&");
-
-  const signatureBase = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-  const signingKey = `${encodeURIComponent(X_API_SECRET)}&${encodeURIComponent(X_ACCESS_TOKEN_SECRET)}`;
-  const signature = createHmac("sha1", signingKey).update(signatureBase).digest("base64");
-
-  oauthParams.oauth_signature = signature;
-
-  const headerParts = Object.keys(oauthParams)
-    .sort()
-    .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
-    .join(", ");
-
-  return `OAuth ${headerParts}`;
 }
 
 const XPostResponseSchema = v.object({
@@ -112,12 +82,117 @@ const XPostResponseSchema = v.object({
   }),
 });
 
-/** Post a tweet (or reply) to X. Returns result with tweet URL on success. */
+const XTokenResponseSchema = v.object({
+  access_token: v.string(),
+  refresh_token: v.optional(v.string()),
+  expires_in: v.optional(v.number()),
+});
+
+interface StoredTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+/** Load X OAuth 2.0 tokens from state.db. */
+function loadXTokens(): StoredTokens | null {
+  try {
+    const row = db
+      .query<
+        {
+          access_token: string;
+          refresh_token: string;
+          expires_at: number;
+        },
+        []
+      >("SELECT access_token, refresh_token, expires_at FROM x_tokens WHERE id = 1")
+      .get();
+    if (!row) return null;
+    return {
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      expiresAt: row.expires_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Save refreshed tokens back to state.db. */
+function saveXTokens(tokens: StoredTokens): void {
+  db.run(
+    `INSERT INTO x_tokens (id, access_token, refresh_token, expires_at, updated_at)
+     VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET
+       access_token  = excluded.access_token,
+       refresh_token = excluded.refresh_token,
+       expires_at    = excluded.expires_at,
+       updated_at    = excluded.updated_at`,
+    [
+      tokens.accessToken,
+      tokens.refreshToken,
+      tokens.expiresAt,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+/** Refresh the X OAuth 2.0 access token using the refresh token. */
+async function refreshXToken(refreshToken: string): Promise<StoredTokens | null> {
+  if (!X_CLIENT_ID || !X_CLIENT_SECRET) return null;
+
+  const basicAuth = Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[x-post] Token refresh failed: ${res.status}`);
+    return null;
+  }
+
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(XTokenResponseSchema, json);
+  if (!parsed.success) return null;
+
+  const newTokens: StoredTokens = {
+    accessToken: parsed.output.access_token,
+    refreshToken: parsed.output.refresh_token ?? refreshToken,
+    expiresAt: Date.now() + (parsed.output.expires_in ?? 7200) * 1000,
+  };
+  saveXTokens(newTokens);
+  return newTokens;
+}
+
+/** Get a valid X access token, refreshing if expired. */
+async function getXAccessToken(): Promise<string | null> {
+  const tokens = loadXTokens();
+  if (!tokens) return null;
+
+  // Refresh if expires within 5 minutes
+  if (Date.now() > tokens.expiresAt - 300_000) {
+    const refreshed = await refreshXToken(tokens.refreshToken);
+    return refreshed?.accessToken ?? null;
+  }
+
+  return tokens.accessToken;
+}
+
+/** Post a tweet (or reply) to X using OAuth 2.0 Bearer token. */
 async function postToX(text: string, replyToTweetId?: string): Promise<XPostResult> {
-  if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_TOKEN_SECRET) {
+  const accessToken = await getXAccessToken();
+  if (!accessToken) {
     return {
       ok: false,
-      error: "X API credentials not configured",
+      error: "No X OAuth 2.0 tokens — run x-auth.ts to authorize",
     };
   }
   if (!text || text.length > 280) {
@@ -137,13 +212,11 @@ async function postToX(text: string, replyToTweetId?: string): Promise<XPostResu
     };
   }
 
-  const authHeader = generateXOAuthHeader("POST", url);
-
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: authHeader,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
         "User-Agent": "spawn-growth/1.0",
       },

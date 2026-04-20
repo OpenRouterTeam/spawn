@@ -1,12 +1,10 @@
 /**
- * X (Twitter) Post — Post a tweet via X API v2.
+ * X (Twitter) Post — Post a tweet via X API v2 (OAuth 2.0).
  *
- * Uses OAuth 1.0a to authenticate and POST /2/tweets.
- * Can post standalone tweets or replies (pass in_reply_to_tweet_id).
+ * Reads tokens from state.db (written by x-auth.ts), auto-refreshes if expired.
  *
  * Usage:
- *   X_API_KEY=... X_API_SECRET=... X_ACCESS_TOKEN=... X_ACCESS_TOKEN_SECRET=... \
- *   TWEET_TEXT="Hello world" bun run x-post.ts
+ *   X_CLIENT_ID=... X_CLIENT_SECRET=... TWEET_TEXT="Hello world" bun run x-post.ts
  *
  * Optional env:
  *   REPLY_TO_TWEET_ID — if set, the tweet is posted as a reply to this tweet ID
@@ -14,18 +12,18 @@
  * Outputs JSON: { "id": "...", "text": "..." } on success, exits 1 on failure.
  */
 
-import { createHmac, randomBytes } from "node:crypto";
+import { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 import * as v from "valibot";
 
-const API_KEY = process.env.X_API_KEY ?? "";
-const API_SECRET = process.env.X_API_SECRET ?? "";
-const ACCESS_TOKEN = process.env.X_ACCESS_TOKEN ?? "";
-const ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET ?? "";
+const CLIENT_ID = process.env.X_CLIENT_ID ?? "";
+const CLIENT_SECRET = process.env.X_CLIENT_SECRET ?? "";
 const TWEET_TEXT = process.env.TWEET_TEXT ?? "";
 const REPLY_TO = process.env.REPLY_TO_TWEET_ID ?? "";
+const DB_PATH = `${process.env.HOME ?? "/tmp"}/.config/spawn/state.db`;
 
-if (!API_KEY || !API_SECRET || !ACCESS_TOKEN || !ACCESS_TOKEN_SECRET) {
-  console.error("[x-post] Missing X API credentials");
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error("[x-post] X_CLIENT_ID and X_CLIENT_SECRET are required");
   process.exit(1);
 }
 
@@ -46,53 +44,120 @@ const PostResponseSchema = v.object({
   }),
 });
 
-const ErrorResponseSchema = v.object({
-  detail: v.optional(v.string()),
-  title: v.optional(v.string()),
-  errors: v.optional(
-    v.array(
-      v.object({
-        message: v.optional(v.string()),
-      }),
-    ),
-  ),
+const TokenResponseSchema = v.object({
+  access_token: v.string(),
+  refresh_token: v.optional(v.string()),
+  expires_in: v.optional(v.number()),
 });
 
-/**
- * Generate OAuth 1.0a Authorization header for X API requests.
- */
-function generateOAuthHeader(method: string, url: string, body?: string): string {
-  const oauthParams: Record<string, string> = {
-    oauth_consumer_key: API_KEY,
-    oauth_nonce: randomBytes(16).toString("hex"),
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
-    oauth_token: ACCESS_TOKEN,
-    oauth_version: "1.0",
+interface StoredTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+function loadTokens(): StoredTokens | null {
+  if (!existsSync(DB_PATH)) return null;
+  try {
+    const db = new Database(DB_PATH, {
+      readonly: true,
+    });
+    const row = db
+      .query<
+        {
+          access_token: string;
+          refresh_token: string;
+          expires_at: number;
+        },
+        []
+      >("SELECT access_token, refresh_token, expires_at FROM x_tokens WHERE id = 1")
+      .get();
+    db.close();
+    if (!row) return null;
+    return {
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      expiresAt: row.expires_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveTokens(tokens: StoredTokens): void {
+  const db = new Database(DB_PATH);
+  db.run(
+    `INSERT INTO x_tokens (id, access_token, refresh_token, expires_at, updated_at)
+     VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET
+       access_token  = excluded.access_token,
+       refresh_token = excluded.refresh_token,
+       expires_at    = excluded.expires_at,
+       updated_at    = excluded.updated_at`,
+    [
+      tokens.accessToken,
+      tokens.refreshToken,
+      tokens.expiresAt,
+      new Date().toISOString(),
+    ],
+  );
+  db.close();
+}
+
+async function refreshToken(currentRefresh: string): Promise<StoredTokens | null> {
+  const basicAuth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: currentRefresh,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[x-post] Token refresh failed: ${res.status} ${await res.text()}`);
+    return null;
+  }
+
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(TokenResponseSchema, json);
+  if (!parsed.success) return null;
+
+  const newTokens: StoredTokens = {
+    accessToken: parsed.output.access_token,
+    refreshToken: parsed.output.refresh_token ?? currentRefresh,
+    expiresAt: Date.now() + (parsed.output.expires_in ?? 7200) * 1000,
   };
+  saveTokens(newTokens);
+  return newTokens;
+}
 
-  // For POST with JSON body, only OAuth params go into the signature base
-  const allParams = {
-    ...oauthParams,
-  };
-  const sortedKeys = Object.keys(allParams).sort();
-  const paramString = sortedKeys.map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(allParams[k])}`).join("&");
+async function getAccessToken(): Promise<string> {
+  const tokens = loadTokens();
+  if (!tokens) {
+    console.error("[x-post] No tokens in state.db — run x-auth.ts first");
+    process.exit(1);
+  }
 
-  const signatureBase = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-  const signingKey = `${encodeURIComponent(API_SECRET)}&${encodeURIComponent(ACCESS_TOKEN_SECRET)}`;
-  const signature = createHmac("sha1", signingKey).update(signatureBase).digest("base64");
+  if (Date.now() > tokens.expiresAt - 300_000) {
+    console.error("[x-post] Token expired, refreshing...");
+    const refreshed = await refreshToken(tokens.refreshToken);
+    if (!refreshed) {
+      console.error("[x-post] Refresh failed — re-run x-auth.ts");
+      process.exit(1);
+    }
+    return refreshed.accessToken;
+  }
 
-  oauthParams.oauth_signature = signature;
-
-  const headerParts = Object.keys(oauthParams)
-    .sort()
-    .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
-    .join(", ");
-
-  return `OAuth ${headerParts}`;
+  return tokens.accessToken;
 }
 
 async function postTweet(): Promise<void> {
+  const accessToken = await getAccessToken();
   const url = "https://api.x.com/2/tweets";
 
   const payload: Record<string, unknown> = {
@@ -104,27 +169,20 @@ async function postTweet(): Promise<void> {
     };
   }
 
-  const body = JSON.stringify(payload);
-  const authHeader = generateOAuthHeader("POST", url, body);
-
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: authHeader,
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       "User-Agent": "spawn-growth/1.0",
     },
-    body,
+    body: JSON.stringify(payload),
   });
 
   const json: unknown = await res.json();
 
   if (!res.ok) {
-    const err = v.safeParse(ErrorResponseSchema, json);
-    const detail = err.success
-      ? (err.output.detail ?? err.output.errors?.[0]?.message ?? `HTTP ${res.status}`)
-      : `HTTP ${res.status}`;
-    console.error(`[x-post] Failed: ${detail}`);
+    console.error(`[x-post] Failed: ${res.status} ${JSON.stringify(json).slice(0, 300)}`);
     process.exit(1);
   }
 
