@@ -10,11 +10,8 @@ import { logInfo } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
   AGENT_MIN_SIZE,
-  checkAccountStatus,
   createServer as createDroplet,
   downloadFile,
-  ensureDoToken,
-  ensureSshKey,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -27,6 +24,7 @@ import {
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean.js";
+import { runDigitalOceanReadinessGate } from "./readiness.js";
 
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
@@ -64,11 +62,11 @@ async function main() {
     },
     async authenticate() {
       await promptSpawnName();
-      await ensureDoToken();
-      await ensureSshKey();
     },
-    async checkAccountReady() {
-      await checkAccountStatus();
+    async ensureReadyBeforeSizing() {
+      await runDigitalOceanReadinessGate({
+        agentName,
+      });
     },
     async promptSize() {
       dropletSize = await promptDropletSize();
