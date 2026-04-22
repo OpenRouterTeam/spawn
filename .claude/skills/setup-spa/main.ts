@@ -1657,7 +1657,7 @@ app.action("tweet_skip", async ({ ack, body, client }) => {
   }
 });
 
-// --- xeng_approve: mark engagement reply as approved ---
+// --- xeng_approve: post engagement reply to X ---
 app.action("xeng_approve", async ({ ack, body, client }) => {
   await ack();
   const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
@@ -1668,19 +1668,39 @@ app.action("xeng_approve", async ({ ack, body, client }) => {
   const tweet = findTweet(db, engageId);
   if (!tweet || tweet.status !== "pending") return;
 
-  updateTweetStatus(db, engageId, {
-    status: "approved",
-    actionedBy: userId,
-  });
-  logTweetDecision(tweet, "approved");
+  const xResult = await postToX(tweet.tweetText, tweet.sourceTweetId ?? undefined);
 
-  if (tweet.slackChannel && tweet.slackTs) {
-    await replaceButtonsWithStatus(
-      client,
-      tweet.slackChannel,
-      tweet.slackTs,
-      `:white_check_mark: Reply approved by <@${userId}> — ready to post on X`,
-    );
+  if (xResult.ok) {
+    updateTweetStatus(db, engageId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: tweet.tweetText,
+    });
+    logTweetDecision(tweet, "approved");
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Reply posted by <@${userId}> <${xResult.tweetUrl}|view on X>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, engageId, {
+      status: "error",
+      actionedBy: userId,
+    });
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Failed to post reply: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
   }
 });
 
@@ -1734,7 +1754,7 @@ app.action("xeng_edit", async ({ ack, body, client }) => {
     .catch(() => {});
 });
 
-// --- xeng_edit_submit: modal submitted with edited reply ---
+// --- xeng_edit_submit: modal submitted with edited reply, post to X ---
 app.view("xeng_edit_submit", async ({ ack, view, body, client }) => {
   await ack();
   const engageId = view.private_metadata;
@@ -1754,20 +1774,41 @@ app.view("xeng_edit_submit", async ({ ack, view, body, client }) => {
     engageId,
   ]);
 
-  updateTweetStatus(db, engageId, {
-    status: "approved",
-    actionedBy: userId,
-    postedText: editedText,
-  });
-  logTweetDecision(tweet, "edited", editedText);
+  const xResult = await postToX(editedText, tweet.sourceTweetId ?? undefined);
 
-  if (tweet.slackChannel && tweet.slackTs) {
-    await replaceButtonsWithStatus(
-      client,
-      tweet.slackChannel,
-      tweet.slackTs,
-      `:white_check_mark: Reply edited & approved by <@${userId}> — ready to post on X`,
-    );
+  if (xResult.ok) {
+    updateTweetStatus(db, engageId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Reply edited & posted by <@${userId}> <${xResult.tweetUrl}|view on X>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, engageId, {
+      status: "error",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Reply edited but failed to post: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
   }
 });
 
