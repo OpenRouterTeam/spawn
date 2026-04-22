@@ -1145,7 +1145,10 @@ async function main(): Promise<void> {
 }
 
 main().then(
-  () => process.exit(0),
+  // Let the process exit naturally so fire-and-forget telemetry fetches
+  // complete before the event loop drains. process.exit(0) would abort
+  // in-flight requests, silently dropping spawn_deleted and funnel events.
+  () => {},
   (err) => {
     handleError(err);
   },

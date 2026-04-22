@@ -2,9 +2,12 @@
 // low-volume product events (funnel steps, spawn lifecycle).
 // Default on. Disable with SPAWN_TELEMETRY=0.
 // Never sends command args, file paths, or user prompt content.
+// Events are sent immediately — no batching, no lost events on process.exit().
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { isString } from "@openrouter/spawn-shared";
-import { asyncTryCatch } from "./result.js";
+import { asyncTryCatch, tryCatch } from "./result.js";
 
 // Same PostHog project as feedback.ts
 const POSTHOG_TOKEN = "phc_7ToS2jDeWBlMu4n2JoNzoA1FnArdKwFMFoHVnAqQ6O1";
@@ -15,42 +18,34 @@ const SENSITIVE_PATTERNS: [
   RegExp,
   string,
 ][] = [
-  // API keys: sk-or-v1-..., sk-ant-..., sk-..., key-...
   [
     /\b(sk-or-v1-|sk-ant-api03-|sk-|key-)[A-Za-z0-9_-]{10,}\b/g,
     "[REDACTED_KEY]",
   ],
-  // GitHub tokens: ghp_..., gho_..., github_pat_...
   [
     /\b(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9_]{10,}\b/g,
     "[REDACTED_GITHUB_TOKEN]",
   ],
-  // Bearer tokens in headers
   [
     /Bearer\s+[A-Za-z0-9_.\-/+=]{10,}/gi,
     "Bearer [REDACTED]",
   ],
-  // Email addresses
   [
     /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
     "[REDACTED_EMAIL]",
   ],
-  // IP addresses (IPv4)
   [
     /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
     "[REDACTED_IP]",
   ],
-  // Hetzner/DO/cloud API tokens (64-char hex or similar)
   [
     /\b[A-Za-z0-9]{60,}\b/g,
     "[REDACTED_TOKEN]",
   ],
-  // Base64-encoded blobs that might contain secrets (40+ chars)
   [
     /[A-Za-z0-9+/]{40,100}={0,2}/g,
     "[REDACTED_B64]",
   ],
-  // Home directory paths — replace with ~
   [
     /\/(?:home|Users)\/[a-zA-Z0-9._-]+/g,
     "~/[USER]",
@@ -59,7 +54,6 @@ const SENSITIVE_PATTERNS: [
 
 /**
  * Parse a JS Error stack string into PostHog stack frames.
- * Each line like "    at functionName (filename:line:col)" becomes a frame.
  */
 function parseStackFrames(stack: string): {
   platform: string;
@@ -115,35 +109,50 @@ function scrub(text: string): string {
   return result;
 }
 
-interface TelemetryEvent {
-  event: string;
-  timestamp: string;
-  properties: Record<string, unknown>;
-}
-
 // ── State ───────────────────────────────────────────────────────────────────
 
-// Telemetry is OPT-IN: nothing fires until initTelemetry() is called. This
-// matters for tests that import modules which call captureEvent — without
-// this default, every `bun test` run of orchestrate.test.ts fired real
-// PostHog events tagged agent=testagent, because the test imports
-// runOrchestration directly (bypassing index.ts's initTelemetry call) but
-// runOrchestration calls captureEvent unconditionally. Defaulting _enabled
-// to false means no events escape until a real process explicitly opts in.
+// Telemetry is OPT-IN: nothing fires until initTelemetry() is called.
 let _enabled = false;
+let _userId = "";
 let _sessionId = "";
 let _context: Record<string, string> = {};
-const _events: TelemetryEvent[] = [];
-let _flushScheduled = false;
+
+// ── Persistent User ID ─────────────────────────────────────────────────────
+
+function getTelemetryIdPath(): string {
+  return join(process.env.HOME ?? "/tmp", ".config", "spawn", ".telemetry-id");
+}
+
+function loadOrCreateUserId(): string {
+  const idPath = getTelemetryIdPath();
+  const loadResult = tryCatch(() => {
+    if (existsSync(idPath)) {
+      const id = readFileSync(idPath, "utf-8").trim();
+      if (id.length > 0) {
+        return id;
+      }
+    }
+    return null;
+  });
+  if (loadResult.ok && loadResult.data) {
+    return loadResult.data;
+  }
+  const id = crypto.randomUUID();
+  tryCatch(() => {
+    mkdirSync(dirname(idPath), {
+      recursive: true,
+    });
+    writeFileSync(idPath, id, {
+      mode: 0o600,
+    });
+  });
+  return id;
+}
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /** Initialize telemetry. Call once at startup. */
 export function initTelemetry(version: string): void {
-  // Never send telemetry from test environments. bun:test sets BUN_ENV=test,
-  // Node test runners set NODE_ENV=test. Without this guard, every CI run of
-  // orchestrate.test.ts fires real PostHog events tagged agent=testagent,
-  // polluting the onboarding funnel with fixture data. (See #3305 follow-up.)
   if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
     _enabled = false;
     return;
@@ -154,26 +163,27 @@ export function initTelemetry(version: string): void {
     return;
   }
 
-  _sessionId = crypto.randomUUID();
+  // Persistent user ID — same across all runs
+  _userId = loadOrCreateUserId();
+
+  // Session ID — shared between parent and child processes within one spawn run
+  _sessionId = process.env.SPAWN_TELEMETRY_SESSION || crypto.randomUUID();
+  process.env.SPAWN_TELEMETRY_SESSION = _sessionId;
+
   _context = {
     spawn_version: version,
     os: process.platform,
     arch: process.arch,
+    source: "cli",
   };
 
   // Capture uncaught errors
   process.on("uncaughtException", (err) => {
     captureError("uncaught_exception", err);
-    flushSync();
     process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {
     captureError("unhandled_rejection", reason);
-  });
-
-  // Flush buffered events before exit
-  process.on("beforeExit", () => {
-    flushSync();
   });
 }
 
@@ -190,24 +200,13 @@ export function captureWarning(message: string): void {
   if (!_enabled) {
     return;
   }
-  pushEvent("cli_warning", {
+  sendEvent("cli_warning", {
     message: scrub(message),
   });
 }
 
 /**
  * Capture a generic telemetry event (funnel steps, lifecycle events, etc.).
- *
- * Respects SPAWN_TELEMETRY=0 — when opt-out is set this is a no-op. All string
- * values in `properties` are passed through the same scrubber as errors and
- * warnings, so paths, API keys, emails, and IPs are redacted before upload.
- *
- * Intended for low-volume, high-signal product events like:
- *   - funnel_* (onboarding pipeline drop-off tracking in orchestrate.ts)
- *   - spawn_connected / spawn_deleted (lifecycle events)
- *
- * NOT intended for command tracking, keystroke tracking, or anything that
- * could incidentally capture user-typed prompts or file paths.
  */
 export function captureEvent(event: string, properties: Record<string, unknown> = {}): void {
   if (!_enabled) {
@@ -217,7 +216,7 @@ export function captureEvent(event: string, properties: Record<string, unknown> 
   for (const [key, value] of Object.entries(properties)) {
     scrubbed[key] = isString(value) ? scrub(value) : value;
   }
-  pushEvent(event, scrubbed);
+  sendEvent(event, scrubbed);
 }
 
 /** Map our error types to PostHog mechanism types. */
@@ -261,7 +260,7 @@ export function captureError(type: string, err: unknown): void {
     }
   }
 
-  pushEvent("$exception", {
+  sendEvent("$exception", {
     $exception_list: [
       exceptionEntry,
     ],
@@ -269,58 +268,24 @@ export function captureError(type: string, err: unknown): void {
   });
 }
 
-// ── Internals ───────────────────────────────────────────────────────────────
+// ── Send ────────────────────────────────────────────────────────────────────
 
-function pushEvent(event: string, properties: Record<string, unknown>): void {
-  _events.push({
-    event,
-    timestamp: new Date().toISOString(),
-    properties: {
-      ..._context,
-      ...properties,
-      $session_id: _sessionId,
-    },
-  });
-
-  // Schedule a flush — batch events that happen in quick succession
-  if (!_flushScheduled && _events.length >= 10) {
-    _flushScheduled = true;
-    setTimeout(() => {
-      _flushScheduled = false;
-      flush();
-    }, 1000);
-  }
-}
-
-/** Async flush — best effort, doesn't block. */
-function flush(): void {
-  if (_events.length === 0) {
-    return;
-  }
-  const batch = _events.splice(0);
-  sendBatch(batch);
-}
-
-/** Sync-safe flush for exit handlers. Uses fetch without await. */
-function flushSync(): void {
-  if (_events.length === 0) {
-    return;
-  }
-  const batch = _events.splice(0);
-  sendBatch(batch);
-}
-
-function sendBatch(batch: TelemetryEvent[]): void {
+/** Send a single event to PostHog immediately. Fire-and-forget. */
+function sendEvent(event: string, properties: Record<string, unknown>): void {
   const body = JSON.stringify({
     api_key: POSTHOG_TOKEN,
-    batch: batch.map((e) => ({
-      event: e.event,
-      timestamp: e.timestamp,
-      properties: {
-        ...e.properties,
-        distinct_id: _sessionId,
+    batch: [
+      {
+        event,
+        timestamp: new Date().toISOString(),
+        properties: {
+          ..._context,
+          ...properties,
+          distinct_id: _userId,
+          $session_id: _sessionId,
+        },
       },
-    })),
+    ],
   });
 
   // Fire-and-forget — never block the CLI on telemetry
