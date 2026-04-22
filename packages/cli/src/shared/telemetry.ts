@@ -154,11 +154,16 @@ export function initTelemetry(version: string): void {
     return;
   }
 
-  _sessionId = crypto.randomUUID();
+  // Inherit session ID from parent process (picker → orchestration continuity)
+  // or generate a new one. Export it so child processes can inherit it too.
+  _sessionId = process.env.SPAWN_TELEMETRY_SESSION || crypto.randomUUID();
+  process.env.SPAWN_TELEMETRY_SESSION = _sessionId;
+
   _context = {
     spawn_version: version,
     os: process.platform,
     arch: process.arch,
+    source: "cli",
   };
 
   // Capture uncaught errors
