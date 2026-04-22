@@ -585,6 +585,11 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
     return;
   }
 
+  // Interactive DigitalOcean runs use the guided readiness checklist for credentials and OpenRouter.
+  if (cloud === "digitalocean" && isInteractiveTTY()) {
+    return;
+  }
+
   const authVars = parseAuthEnvVars(cloudAuth);
   const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) {

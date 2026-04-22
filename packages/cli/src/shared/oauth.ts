@@ -18,7 +18,8 @@ const OAuthKeySchema = v.object({
 
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
-async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
+/** Validate an OpenRouter API key via the public auth endpoint (used by readiness + key flows). */
+export async function verifyOpenRouterApiKey(apiKey: string): Promise<boolean> {
   if (!apiKey) {
     return false;
   }
@@ -333,7 +334,7 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
   // 1. Check env var
   if (process.env.OPENROUTER_API_KEY) {
     logInfo("Using OpenRouter API key from environment");
-    if (await verifyOpenrouterKey(process.env.OPENROUTER_API_KEY)) {
+    if (await verifyOpenRouterApiKey(process.env.OPENROUTER_API_KEY)) {
       return process.env.OPENROUTER_API_KEY;
     }
     logWarn("Environment key failed validation, prompting for a new one...");
@@ -345,7 +346,7 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
     const savedKey = loadSavedOpenRouterKey();
     if (savedKey) {
       logInfo("Using saved OpenRouter API key");
-      if (await verifyOpenrouterKey(savedKey)) {
+      if (await verifyOpenRouterApiKey(savedKey)) {
         process.env.OPENROUTER_API_KEY = savedKey;
         return savedKey;
       }
@@ -358,7 +359,7 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
     for (let attempt = 1; attempt <= 3; attempt++) {
       // Try OAuth first
       const key = await tryOauthFlow(5180, agentSlug, cloudSlug);
-      if (key && (await verifyOpenrouterKey(key))) {
+      if (key && (await verifyOpenRouterApiKey(key))) {
         process.env.OPENROUTER_API_KEY = key;
         await saveOpenRouterKey(key);
         return key;
@@ -371,7 +372,7 @@ export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string):
       process.stderr.write("\n");
 
       const manualKey = await promptAndValidateApiKey();
-      if (manualKey && (await verifyOpenrouterKey(manualKey))) {
+      if (manualKey && (await verifyOpenRouterApiKey(manualKey))) {
         process.env.OPENROUTER_API_KEY = manualKey;
         await saveOpenRouterKey(manualKey);
         return manualKey;
