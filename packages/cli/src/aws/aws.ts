@@ -1235,7 +1235,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
   logInfo("To delete from CLI:");
   logInfo("  spawn delete");
   logInfo("To reconnect:");
-  logInfo(`  ssh ${SSH_USER}@${_state.instanceIp}`);
+  logInfo("  spawn last");
+  logInfo(`  or: ssh ${SSH_USER}@${_state.instanceIp}`);
 
   return exitCode;
 }

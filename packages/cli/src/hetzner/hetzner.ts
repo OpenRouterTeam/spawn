@@ -938,7 +938,8 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   logInfo("To delete from CLI:");
   logInfo("  spawn delete");
   logInfo("To reconnect:");
-  logInfo(`  ssh root@${serverIp}`);
+  logInfo("  spawn last");
+  logInfo(`  or: ssh root@${serverIp}`);
 
   return exitCode;
 }

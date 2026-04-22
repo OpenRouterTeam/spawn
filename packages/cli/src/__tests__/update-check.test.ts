@@ -97,7 +97,7 @@ describe("update-check", () => {
     });
 
     it("should check for updates on every run", async () => {
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
@@ -114,7 +114,7 @@ describe("update-check", () => {
     });
 
     it("should auto-update when newer version is available", async () => {
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
@@ -128,7 +128,7 @@ describe("update-check", () => {
       // Should have printed update message to stderr
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Update available");
-      expect(output).toContain("1.0.99");
+      expect(output).toContain("99.0.0");
       expect(output).toContain("Updating automatically");
 
       // Should have called execFileSync for curl, bash, which, and re-exec
@@ -176,7 +176,7 @@ describe("update-check", () => {
     });
 
     it("should handle update failures gracefully", async () => {
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       // Mock execFileSync to throw an error (curl fetch fails)
       const { executor } = await import("../update-check.js");
@@ -217,7 +217,7 @@ describe("update-check", () => {
     });
 
     it("should redirect install script stdout to stderr when jsonOutput=true", async () => {
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       const { executor } = await import("../update-check.js");
       const execFileSyncCalls: {
@@ -254,7 +254,7 @@ describe("update-check", () => {
     });
 
     it("should use inherit stdio for install script when jsonOutput=false", async () => {
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       const { executor } = await import("../update-check.js");
       const execFileSyncCalls: {
@@ -294,7 +294,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       const { executor } = await import("../update-check.js");
       const execFileSyncCalls: {
@@ -361,7 +361,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       const { executor } = await import("../update-check.js");
       let callCount = 0;
@@ -440,7 +440,7 @@ describe("update-check", () => {
         "/usr/local/bin/spawn",
       ];
 
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
 
       const { executor } = await import("../update-check.js");
       const execFileSyncCalls: {
@@ -486,9 +486,9 @@ describe("update-check", () => {
   //   - SPAWN_NO_AUTO_UPDATE=1 suppresses auto-install entirely
   describe("update policy", () => {
     it("auto-installs patch bumps even without SPAWN_AUTO_UPDATE=1", async () => {
-      // 1.0.6 -> 1.0.99 is a patch bump (same major.minor)
+      // 1.1.0 -> 1.1.99 is a patch bump (same major.minor)
       process.env.SPAWN_AUTO_UPDATE = undefined;
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.99\n")));
       const { executor } = await import("../update-check.js");
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
         Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
@@ -508,9 +508,9 @@ describe("update-check", () => {
     });
 
     it("shows notice only for minor bumps without SPAWN_AUTO_UPDATE=1", async () => {
-      // 1.0.6 -> 1.1.0 is a minor bump
+      // 1.1.0 -> 1.2.0 is a minor bump
       process.env.SPAWN_AUTO_UPDATE = undefined;
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.2.0\n")));
       const { executor } = await import("../update-check.js");
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
         Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
@@ -522,7 +522,7 @@ describe("update-check", () => {
       const output = consoleErrorSpy.mock.calls.map((call: unknown[]) => call[0]).join("\n");
       // Notice should mention the version jump
       expect(output).toContain("Update available");
-      expect(output).toContain("1.1.0");
+      expect(output).toContain("1.2.0");
       // Must NOT auto-install — no curl, no bash, no re-exec
       expect(execFileSyncSpy).not.toHaveBeenCalled();
       expect(processExitSpy).not.toHaveBeenCalled();
@@ -532,7 +532,7 @@ describe("update-check", () => {
     });
 
     it("shows notice only for major bumps without SPAWN_AUTO_UPDATE=1", async () => {
-      // 1.0.6 -> 2.0.0 is a major bump
+      // 1.1.0 -> 2.0.0 is a major bump
       process.env.SPAWN_AUTO_UPDATE = undefined;
       const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("2.0.0\n")));
       const { executor } = await import("../update-check.js");
@@ -551,9 +551,9 @@ describe("update-check", () => {
     });
 
     it("auto-installs minor bumps WITH SPAWN_AUTO_UPDATE=1", async () => {
-      // 1.0.6 -> 1.1.0 with opt-in env var
+      // 1.1.0 -> 1.2.0 with opt-in env var
       process.env.SPAWN_AUTO_UPDATE = "1";
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.1.0\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.2.0\n")));
       const { executor } = await import("../update-check.js");
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
         Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),
@@ -573,7 +573,7 @@ describe("update-check", () => {
       // Explicit opt-out — even patches should show notice only
       process.env.SPAWN_AUTO_UPDATE = undefined;
       process.env.SPAWN_NO_AUTO_UPDATE = "1";
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("1.0.99\n")));
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(() => Promise.resolve(new Response("99.0.0\n")));
       const { executor } = await import("../update-check.js");
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) =>
         Buffer.from(file === "curl" ? FAKE_INSTALL_SCRIPT : ""),

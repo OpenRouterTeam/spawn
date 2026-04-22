@@ -789,7 +789,8 @@ export async function interactiveSession(cmd: string, spawnFn?: (args: string[])
   logInfo("To destroy:");
   logInfo(`  sprite destroy ${_state.name}`);
   logInfo("To reconnect:");
-  logInfo(`  sprite console -s ${_state.name}`);
+  logInfo("  spawn last");
+  logInfo(`  or: sprite console -s ${_state.name}`);
 
   return exitCode;
 }

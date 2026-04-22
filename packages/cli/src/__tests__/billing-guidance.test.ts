@@ -2,7 +2,7 @@ import type { BillingGuidanceDeps } from "../shared/billing-guidance";
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { awsBilling } from "../aws/billing";
-import { digitaloceanBilling } from "../digitalocean/billing";
+import { DIGITALOCEAN_BILLING_ADD_PAYMENT_URL, digitaloceanBilling } from "../digitalocean/billing";
 import { gcpBilling } from "../gcp/billing";
 import { hetznerBilling } from "../hetzner/billing";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance";
@@ -140,6 +140,14 @@ describe("handleBillingError", () => {
     mockPrompt.mockImplementation(() => Promise.reject(new Error("cancelled")));
     const result = await handleBillingError(digitaloceanBilling, createMockDeps());
     expect(result).toBe(false);
+  });
+
+  it("opens DigitalOcean add-payment billing URL (readiness payment_required step)", async () => {
+    mockPrompt.mockImplementation(() => Promise.resolve(""));
+    const deps = createMockDeps();
+    const result = await handleBillingError(digitaloceanBilling, deps);
+    expect(result).toBe(true);
+    expect(deps.openBrowser).toHaveBeenCalledWith(DIGITALOCEAN_BILLING_ADD_PAYMENT_URL);
   });
 
   it("works for config without billing URL", async () => {
