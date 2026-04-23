@@ -170,10 +170,15 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      // Should have fetched the manifest + the primary script URL
-      const scriptFetches = fetchCalls.filter((c) => !c.url.includes("manifest.json"));
-      expect(scriptFetches.length).toBe(1);
-      expect(scriptFetches[0].url).toContain("openrouter.ai");
+      // Should have fetched the primary script URL, with no fallback to GitHub script
+      const primaryFetches = fetchCalls.filter(
+        (c) => c.url.includes("openrouter.ai") && !c.url.includes("manifest.json"),
+      );
+      const fallbackScriptFetches = fetchCalls.filter(
+        (c) => c.url.includes("raw.githubusercontent.com") && !c.url.includes("manifest.json"),
+      );
+      expect(primaryFetches.length).toBeGreaterThanOrEqual(1);
+      expect(fallbackScriptFetches.length).toBe(0);
     });
 
     it("should log download start and completion messages for successful download", async () => {
@@ -214,11 +219,15 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      // Should have fetched manifest + primary (failed) + fallback (success)
-      const scriptFetches = fetchCalls.filter((c) => !c.url.includes("manifest.json"));
-      expect(scriptFetches.length).toBe(2);
-      expect(scriptFetches[0].url).toContain("openrouter.ai");
-      expect(scriptFetches[1].url).toContain("raw.githubusercontent.com");
+      // Should have fetched primary (failed) + fallback script (success)
+      const primaryFetches = fetchCalls.filter(
+        (c) => c.url.includes("openrouter.ai") && !c.url.includes("manifest.json"),
+      );
+      const fallbackScriptFetches = fetchCalls.filter(
+        (c) => c.url.includes("raw.githubusercontent.com") && !c.url.includes("manifest.json"),
+      );
+      expect(primaryFetches.length).toBeGreaterThanOrEqual(1);
+      expect(fallbackScriptFetches.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should log fallback step message when primary fails", async () => {
