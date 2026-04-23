@@ -985,17 +985,19 @@ function runBundleHeadless(
   });
 }
 
-export async function cmdRunHeadless(agent: string, cloud: string, opts: HeadlessOptions = {}): Promise<void> {
-  const { prompt, debug, outputFormat, spawnName } = opts;
+interface HeadlessValidated {
+  manifest: Manifest;
+  resolvedAgent: string;
+  resolvedCloud: string;
+}
 
-  // Funnel entry for headless runs. No picker to instrument — headless either
-  // validates and proceeds straight to runOrchestration, or it errors out.
-  // The orchestrate.ts funnel_* events cover the rest.
-  captureEvent("spawn_launched", {
-    mode: "headless",
-  });
-
-  // Phase 1: Validate inputs (exit code 3)
+/** Phase 1: validate inputs, load manifest, resolve names, check credentials */
+async function validateHeadlessInputs(
+  agent: string,
+  cloud: string,
+  prompt: string | undefined,
+  outputFormat: string | undefined,
+): Promise<HeadlessValidated> {
   const validationResult = tryCatch(() => {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
@@ -1007,18 +1009,15 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     headlessError(agent, cloud, "VALIDATION_ERROR", getErrorMessage(validationResult.error), outputFormat, 3);
   }
 
-  // Load manifest (silently - no spinner in headless mode)
   const manifestResult = await asyncTryCatch(loadManifest);
   if (!manifestResult.ok) {
     headlessError(agent, cloud, "MANIFEST_ERROR", getErrorMessage(manifestResult.error), outputFormat, 3);
   }
   const manifest = manifestResult.data;
 
-  // Resolve agent/cloud names
   const resolvedAgent = resolveAgentKey(manifest, agent) ?? agent;
   const resolvedCloud = resolveCloudKey(manifest, cloud) ?? cloud;
 
-  // Validate entities exist
   if (!manifest.agents[resolvedAgent]) {
     headlessError(resolvedAgent, resolvedCloud, "UNKNOWN_AGENT", `Unknown agent: ${resolvedAgent}`, outputFormat, 3);
   }
@@ -1038,7 +1037,6 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     );
   }
 
-  // Check credentials upfront
   const cloudAuth = manifest.clouds[resolvedCloud].auth;
   if (cloudAuth.toLowerCase() !== "none") {
     const authVars = parseAuthEnvVars(cloudAuth);
@@ -1055,126 +1053,207 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     }
   }
 
-  // Phase 2+3: Load and execute
-  let exitCode: number;
+  return {
+    manifest,
+    resolvedAgent,
+    resolvedCloud,
+  };
+}
 
-  if (isWindows()) {
-    // Windows: download JS bundle and run with bun (bash wrappers won't work)
-    const cliDir = process.env.SPAWN_CLI_DIR;
-    let localMainResolved = "";
+/** Windows path: resolve local bundle or download from GitHub, then run with bun */
+async function fetchAndRunWindows(
+  resolvedAgent: string,
+  resolvedCloud: string,
+  opts: {
+    prompt?: string;
+    debug?: boolean;
+    outputFormat?: string;
+    spawnName?: string;
+  },
+): Promise<number> {
+  const { prompt, debug, outputFormat, spawnName } = opts;
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  let localMainResolved = "";
 
-    if (cliDir) {
-      const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
-      if (!hasBadChars(resolvedCloud) && !hasBadChars(resolvedAgent)) {
-        const resolvedCliDir = resolveTrustedCliDir(cliDir);
-        const candidatePath = path.join(resolvedCliDir, "packages", "cli", "src", resolvedCloud, "main.ts");
-        const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
-        if (realResult.ok) {
-          const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
-          if (realResult.data.startsWith(prefix)) {
-            localMainResolved = realResult.data;
-          }
+  if (cliDir) {
+    const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+    if (!hasBadChars(resolvedCloud) && !hasBadChars(resolvedAgent)) {
+      const resolvedCliDir = resolveTrustedCliDir(cliDir);
+      const candidatePath = path.join(resolvedCliDir, "packages", "cli", "src", resolvedCloud, "main.ts");
+      const realResult = tryCatchIf(isFileError, () => fs.realpathSync(candidatePath));
+      if (realResult.ok) {
+        const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+        if (realResult.data.startsWith(prefix)) {
+          localMainResolved = realResult.data;
         }
       }
     }
+  }
 
+  if (debug) {
+    console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud} (Windows bundle mode)...`);
+  }
+
+  if (localMainResolved) {
+    return runBundleHeadless(localMainResolved, resolvedAgent, prompt, debug, spawnName);
+  }
+
+  const bundleUrl = `https://github.com/${REPO}/releases/download/${resolvedCloud}-latest/${resolvedCloud}.js`;
+  const fetchResult = await asyncTryCatch(async () => {
+    const res = await fetch(bundleUrl, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      redirect: "follow",
+    });
+    if (!res.ok) {
+      headlessError(
+        resolvedAgent,
+        resolvedCloud,
+        "DOWNLOAD_ERROR",
+        `Bundle not found (HTTP ${res.status})`,
+        outputFormat,
+        2,
+      );
+    }
+    return res.text();
+  });
+  if (!fetchResult.ok) {
+    headlessError(
+      resolvedAgent,
+      resolvedCloud,
+      "DOWNLOAD_ERROR",
+      `Failed to download bundle: ${getErrorMessage(fetchResult.error)}`,
+      outputFormat,
+      2,
+    );
+  }
+
+  const tmpFile = path.join(fs.mkdtempSync(path.join(tmpdir(), "spawn-")), `${resolvedCloud}.js`);
+  fs.writeFileSync(tmpFile, fetchResult.data);
+  const exitCode = await runBundleHeadless(tmpFile, resolvedAgent, prompt, debug, spawnName);
+  tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+  return exitCode;
+}
+
+/** macOS/Linux path: resolve local script or download from CDN/GitHub, then run via shell */
+async function fetchAndRunUnix(
+  resolvedAgent: string,
+  resolvedCloud: string,
+  opts: {
+    prompt?: string;
+    debug?: boolean;
+    outputFormat?: string;
+    spawnName?: string;
+  },
+): Promise<number> {
+  const { prompt, debug, outputFormat, spawnName } = opts;
+  let scriptContent: string;
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  const localScriptResolved = cliDir ? resolveLocalWrapperScript(cliDir, resolvedCloud, resolvedAgent) : "";
+
+  if (localScriptResolved) {
+    scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
     if (debug) {
-      console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud} (Windows bundle mode)...`);
-    }
-
-    if (localMainResolved) {
-      exitCode = await runBundleHeadless(localMainResolved, resolvedAgent, prompt, debug, spawnName);
-    } else {
-      const bundleUrl = `https://github.com/${REPO}/releases/download/${resolvedCloud}-latest/${resolvedCloud}.js`;
-      const fetchResult = await asyncTryCatch(async () => {
-        const res = await fetch(bundleUrl, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT),
-          redirect: "follow",
-        });
-        if (!res.ok) {
-          headlessError(
-            resolvedAgent,
-            resolvedCloud,
-            "DOWNLOAD_ERROR",
-            `Bundle not found (HTTP ${res.status})`,
-            outputFormat,
-            2,
-          );
-        }
-        return res.text();
-      });
-      if (!fetchResult.ok) {
-        headlessError(
-          resolvedAgent,
-          resolvedCloud,
-          "DOWNLOAD_ERROR",
-          `Failed to download bundle: ${getErrorMessage(fetchResult.error)}`,
-          outputFormat,
-          2,
-        );
-      }
-      // Write bundle to temp file and run with bun
-      const tmpFile = path.join(fs.mkdtempSync(path.join(tmpdir(), "spawn-")), `${resolvedCloud}.js`);
-      fs.writeFileSync(tmpFile, fetchResult.data);
-      exitCode = await runBundleHeadless(tmpFile, resolvedAgent, prompt, debug, spawnName);
-      tryCatchIf(isFileError, () => fs.unlinkSync(tmpFile));
+      console.error(`[headless] Using local script: ${localScriptResolved}`);
     }
   } else {
-    // macOS/Linux: download bash wrapper script
-    let scriptContent: string;
-    const cliDir = process.env.SPAWN_CLI_DIR;
-    const localScriptResolved = cliDir ? resolveLocalWrapperScript(cliDir, resolvedCloud, resolvedAgent) : "";
+    const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
+    const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
 
-    if (localScriptResolved) {
-      scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
-      if (debug) {
-        console.error(`[headless] Using local script: ${localScriptResolved}`);
-      }
-    } else {
-      const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
-      const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
-
-      const fetchResult = await asyncTryCatch(async () => {
-        const res = await fetch(url, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT),
-        });
-        if (res.ok) {
-          return res.text();
-        }
-        const ghRes = await fetch(ghUrl, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT),
-        });
-        if (!ghRes.ok) {
-          headlessError(
-            resolvedAgent,
-            resolvedCloud,
-            "DOWNLOAD_ERROR",
-            `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
-            outputFormat,
-            2,
-          );
-        }
-        return ghRes.text();
+    const fetchResult = await asyncTryCatch(async () => {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
-      if (!fetchResult.ok) {
+      if (res.ok) {
+        return res.text();
+      }
+      const ghRes = await fetch(ghUrl, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      });
+      if (!ghRes.ok) {
         headlessError(
           resolvedAgent,
           resolvedCloud,
           "DOWNLOAD_ERROR",
-          `Failed to download script: ${getErrorMessage(fetchResult.error)}`,
+          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
           outputFormat,
           2,
         );
       }
-      scriptContent = fetchResult.data;
+      return ghRes.text();
+    });
+    if (!fetchResult.ok) {
+      headlessError(
+        resolvedAgent,
+        resolvedCloud,
+        "DOWNLOAD_ERROR",
+        `Failed to download script: ${getErrorMessage(fetchResult.error)}`,
+        outputFormat,
+        2,
+      );
     }
-
-    if (debug) {
-      console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
-    }
-
-    exitCode = await runScriptHeadless(scriptContent, prompt, debug, spawnName);
+    scriptContent = fetchResult.data;
   }
+
+  if (debug) {
+    console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
+  }
+
+  return runScriptHeadless(scriptContent, prompt, debug, spawnName);
+}
+
+/** Extract validated connection fields from the most recent matching spawn record */
+function extractConnectionFields(
+  resolvedAgent: string,
+  resolvedCloud: string,
+): Partial<Pick<SpawnResult, "ip_address" | "ssh_user" | "server_id" | "server_name">> {
+  const history = loadHistory();
+  const record = history
+    .filter((r) => r.agent === resolvedAgent && r.cloud === resolvedCloud && r.connection && !r.connection.deleted)
+    .pop();
+
+  const fields: Partial<Pick<SpawnResult, "ip_address" | "ssh_user" | "server_id" | "server_name">> = {};
+  if (record?.connection) {
+    const conn = record.connection;
+    if (conn.ip && tryCatch(() => validateConnectionIP(conn.ip)).ok) {
+      fields.ip_address = conn.ip;
+    }
+    if (conn.user && tryCatch(() => validateUsername(conn.user)).ok) {
+      fields.ssh_user = conn.user;
+    }
+    const serverId = conn.server_id;
+    if (serverId && tryCatch(() => validateServerIdentifier(serverId)).ok) {
+      fields.server_id = serverId;
+    }
+    const serverName = conn.server_name;
+    if (serverName && tryCatch(() => validateServerIdentifier(serverName)).ok) {
+      fields.server_name = serverName;
+    }
+  }
+  return fields;
+}
+
+export async function cmdRunHeadless(agent: string, cloud: string, opts: HeadlessOptions = {}): Promise<void> {
+  const { prompt, debug, outputFormat, spawnName } = opts;
+
+  captureEvent("spawn_launched", {
+    mode: "headless",
+  });
+
+  const { resolvedAgent, resolvedCloud } = await validateHeadlessInputs(agent, cloud, prompt, outputFormat);
+
+  const exitCode = isWindows()
+    ? await fetchAndRunWindows(resolvedAgent, resolvedCloud, {
+        prompt,
+        debug,
+        outputFormat,
+        spawnName,
+      })
+    : await fetchAndRunUnix(resolvedAgent, resolvedCloud, {
+        prompt,
+        debug,
+        outputFormat,
+        spawnName,
+      });
 
   if (exitCode !== 0) {
     headlessError(
@@ -1187,32 +1266,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     );
   }
 
-  // Read the spawn record saved during orchestration to populate connection fields.
-  // Validate each field individually — silently omit any that fail validation to avoid
-  // surfacing attacker-controlled data from a tampered history file in headless output.
-  const history = loadHistory();
-  const record = history
-    .filter((r) => r.agent === resolvedAgent && r.cloud === resolvedCloud && r.connection && !r.connection.deleted)
-    .pop();
-
-  const connectionFields: Partial<Pick<SpawnResult, "ip_address" | "ssh_user" | "server_id" | "server_name">> = {};
-  if (record?.connection) {
-    const conn = record.connection;
-    if (conn.ip && tryCatch(() => validateConnectionIP(conn.ip)).ok) {
-      connectionFields.ip_address = conn.ip;
-    }
-    if (conn.user && tryCatch(() => validateUsername(conn.user)).ok) {
-      connectionFields.ssh_user = conn.user;
-    }
-    const serverId = conn.server_id;
-    if (serverId && tryCatch(() => validateServerIdentifier(serverId)).ok) {
-      connectionFields.server_id = serverId;
-    }
-    const serverName = conn.server_name;
-    if (serverName && tryCatch(() => validateServerIdentifier(serverName)).ok) {
-      connectionFields.server_name = serverName;
-    }
-  }
+  const connectionFields = extractConnectionFields(resolvedAgent, resolvedCloud);
 
   const result: SpawnResult = {
     status: "success",
