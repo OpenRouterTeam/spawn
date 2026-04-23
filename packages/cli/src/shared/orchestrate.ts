@@ -608,6 +608,192 @@ async function injectEnvVars(cloud: CloudOrchestrator, envContent: string): Prom
   await injectEnvVarsToRunner(cloud.runner, envContent);
 }
 
+/** Append skill env vars to .spawnrc so MCP servers can resolve ${VAR} at runtime. */
+async function installSkillEnvVars(runner: CloudRunner): Promise<void> {
+  const skillEnvPairs = (process.env.SPAWN_SKILL_ENV_PAIRS ?? "").split(",").filter(Boolean);
+  if (skillEnvPairs.length === 0) {
+    return;
+  }
+  const validKeyRe = /^[A-Z_][A-Z0-9_]*$/;
+  const envLines = skillEnvPairs
+    .map((pair) => {
+      const eqIdx = pair.indexOf("=");
+      if (eqIdx === -1) {
+        return "";
+      }
+      const key = pair.slice(0, eqIdx);
+      if (!validKeyRe.test(key)) {
+        logWarn(`Skipping invalid skill env var key: ${key}`);
+        return "";
+      }
+      const val = pair.slice(eqIdx + 1);
+      const valB64 = Buffer.from(val).toString("base64");
+      if (!/^[A-Za-z0-9+/=]+$/.test(valB64)) {
+        logWarn(`Skipping skill env var with invalid base64: ${key}`);
+        return "";
+      }
+      return `export ${key}="$(echo '${valB64}' | base64 -d)"`;
+    })
+    .filter(Boolean)
+    .join("\n");
+  if (envLines) {
+    const payload = `\n# [spawn:skills]\n${envLines}\n`;
+    const payloadB64 = Buffer.from(payload).toString("base64");
+    if (!/^[A-Za-z0-9+/=]+$/.test(payloadB64)) {
+      logWarn("Unexpected characters in skill env payload base64");
+    } else {
+      await asyncTryCatch(() => runner.runServer(`printf '%s' '${payloadB64}' | base64 -d >> ~/.spawnrc`));
+    }
+  }
+}
+
+/** Set up SSH tunnel or signed preview URL for agents with a web dashboard. */
+async function setupDashboardTunnel(
+  cloud: CloudOrchestrator,
+  tunnelCfg: NonNullable<AgentConfig["tunnel"]>,
+  spawnId: string,
+): Promise<SshTunnelHandle | undefined> {
+  let tunnelHandle: SshTunnelHandle | undefined;
+  const templateUrl = tunnelCfg.browserUrl?.(0);
+
+  if (cloud.getConnectionInfo) {
+    const getConnInfo = cloud.getConnectionInfo; // capture for closure
+    const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
+      const conn = getConnInfo();
+      const keys = await ensureSshKeys();
+      tunnelHandle = await startSshTunnel({
+        host: conn.host,
+        user: conn.user,
+        remotePort: tunnelCfg.remotePort,
+        sshKeyOpts: getSshKeyOpts(keys),
+      });
+      if (tunnelCfg.browserUrl) {
+        const url = tunnelCfg.browserUrl(tunnelHandle.localPort);
+        if (url) {
+          openBrowser(url);
+        }
+      }
+    });
+    if (!tunnelResult.ok) {
+      logWarn("Web dashboard tunnel failed — use the TUI instead");
+    }
+  } else if (cloud.getSignedPreviewUrl) {
+    const previewResult = await asyncTryCatchIf(isOperationalError, async () => {
+      const urlSuffix = templateUrl ? templateUrl.replace("http://localhost:0", "") : undefined;
+      const url = await cloud.getSignedPreviewUrl!(tunnelCfg.remotePort, urlSuffix, 3600);
+      openBrowser(url);
+    });
+    if (!previewResult.ok) {
+      logWarn("Web dashboard preview failed — use the TUI instead");
+    }
+  } else if (cloud.cloudName === "local") {
+    if (tunnelCfg.browserUrl) {
+      const url = tunnelCfg.browserUrl(tunnelCfg.remotePort);
+      if (url) {
+        openBrowser(url);
+      }
+    }
+  }
+
+  const tunnelMeta: Record<string, string> = {
+    tunnel_remote_port: String(tunnelCfg.remotePort),
+  };
+  if (templateUrl) {
+    tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
+  }
+  saveMetadata(tunnelMeta, spawnId);
+
+  return tunnelHandle;
+}
+
+/** Prompt the user for a Telegram pairing code and pair via openclaw. */
+async function setupTelegramPairing(runner: CloudRunner): Promise<void> {
+  const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
+  logStep("Telegram pairing...");
+  logInfo("To pair your Telegram account:");
+  logInfo("  1. Open Telegram on your phone");
+  logInfo("  2. Search for the bot you created with @BotFather");
+  logInfo('  3. Send it any message (e.g. "hello")');
+  logInfo("  4. The bot will reply with a pairing code");
+  logInfo("  5. Enter the code below");
+  process.stderr.write("\n");
+  const pairingCode = (await prompt("Telegram pairing code: ")).trim();
+  if (pairingCode) {
+    const escaped = shellQuote(pairingCode);
+    const result = await asyncTryCatchIf(isOperationalError, () =>
+      runner.runServer(`source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw pairing approve telegram ${escaped}`),
+    );
+    if (result.ok) {
+      logInfo("Telegram paired successfully");
+    } else {
+      logWarn("Pairing failed — you can pair later via: openclaw pairing approve telegram <CODE>");
+    }
+  } else {
+    logInfo("No code entered — pair later via: openclaw pairing approve telegram <CODE>");
+  }
+}
+
+/** Run the interactive agent session with auto-reconnect on connection drops. */
+async function runInteractiveSession(
+  cloud: CloudOrchestrator,
+  launchCmd: string,
+  spawnId: string,
+  tunnelHandle: SshTunnelHandle | undefined,
+): Promise<never> {
+  logStep("Provisioning complete. Connecting to agent session...");
+
+  // Reset terminal state before handing off to the interactive SSH session.
+  // @clack/prompts may have left the cursor hidden or set ANSI attributes
+  // (e.g. color, bold) that would corrupt the remote agent's TUI rendering.
+  if (process.stderr.isTTY) {
+    process.stderr.write("\x1b[?25h\x1b[0m");
+  }
+
+  prepareStdinForHandoff();
+
+  const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
+
+  // Auto-reconnect on connection drops. Ctrl+C (exit 0 or 130) exits immediately.
+  // Only applies to remote clouds — local sessions don't have connection drops.
+  // SSH exits 255 on connection loss; Sprite CLI exits 1 on "connection closed".
+  const maxReconnects = cloud.cloudName === "local" ? 0 : 5;
+  const isConnectionDrop = (code: number): boolean => code === 255 || (cloud.cloudName === "sprite" && code === 1);
+  let exitCode = 0;
+
+  for (let attempt = 0; attempt <= maxReconnects; attempt++) {
+    if (attempt > 0) {
+      process.stderr.write("\n");
+      logWarn(`Connection lost. Reconnecting... (${attempt}/${maxReconnects})`);
+      await sleep(3000);
+      prepareStdinForHandoff();
+    }
+    exitCode = await cloud.interactiveSession(sessionCmd);
+
+    if (!isConnectionDrop(exitCode)) {
+      break;
+    }
+  }
+
+  if (isConnectionDrop(exitCode)) {
+    process.stderr.write("\n");
+    logWarn("Could not reconnect. Server is still running.");
+    logInfo("Reconnect manually: spawn last");
+  }
+
+  if (tunnelHandle) {
+    tunnelHandle.stop();
+  }
+
+  // Pull child's spawn history back to the parent for `spawn tree`.
+  // Fire-and-forget — never delay exit for a convenience feature.
+  // process.exit() below kills any in-flight SSH calls.
+  if (cloud.cloudName !== "local") {
+    pullChildHistory(cloud.runner, spawnId).catch(() => {});
+  }
+
+  process.exit(exitCode);
+}
+
 async function postInstall(
   cloud: CloudOrchestrator,
   agent: AgentConfig,
@@ -746,44 +932,7 @@ async function postInstall(
       if (manifestForSkills.skills) {
         const { installSkills } = await import("./skills.js");
         await installSkills(cloud.runner, manifestForSkills, agentName, skillIds);
-
-        // Append skill env vars to .spawnrc so MCP servers can resolve ${VAR} at runtime
-        const skillEnvPairs = (process.env.SPAWN_SKILL_ENV_PAIRS ?? "").split(",").filter(Boolean);
-        if (skillEnvPairs.length > 0) {
-          const validKeyRe = /^[A-Z_][A-Z0-9_]*$/;
-          const envLines = skillEnvPairs
-            .map((pair) => {
-              const eqIdx = pair.indexOf("=");
-              if (eqIdx === -1) {
-                return "";
-              }
-              const key = pair.slice(0, eqIdx);
-              if (!validKeyRe.test(key)) {
-                logWarn(`Skipping invalid skill env var key: ${key}`);
-                return "";
-              }
-              const val = pair.slice(eqIdx + 1);
-              const valB64 = Buffer.from(val).toString("base64");
-              if (!/^[A-Za-z0-9+/=]+$/.test(valB64)) {
-                logWarn(`Skipping skill env var with invalid base64: ${key}`);
-                return "";
-              }
-              return `export ${key}="$(echo '${valB64}' | base64 -d)"`;
-            })
-            .filter(Boolean)
-            .join("\n");
-          if (envLines) {
-            const payload = `\n# [spawn:skills]\n${envLines}\n`;
-            const payloadB64 = Buffer.from(payload).toString("base64");
-            if (!/^[A-Za-z0-9+/=]+$/.test(payloadB64)) {
-              logWarn("Unexpected characters in skill env payload base64");
-            } else {
-              await asyncTryCatch(() =>
-                cloud.runner.runServer(`printf '%s' '${payloadB64}' | base64 -d >> ~/.spawnrc`),
-              );
-            }
-          }
-        }
+        await installSkillEnvVars(cloud.runner);
       }
     }
   }
@@ -808,87 +957,11 @@ async function postInstall(
   trackFunnel("funnel_prelaunch_completed");
 
   // Web dashboard access
-  let tunnelHandle: SshTunnelHandle | undefined;
-  if (agent.tunnel) {
-    const tunnelCfg = agent.tunnel; // capture for closure (TS can't narrow across async boundaries)
-    const templateUrl = tunnelCfg.browserUrl?.(0);
-
-    if (cloud.getConnectionInfo) {
-      const getConnInfo = cloud.getConnectionInfo; // capture for closure
-      const tunnelResult = await asyncTryCatchIf(isOperationalError, async () => {
-        const conn = getConnInfo();
-        const keys = await ensureSshKeys();
-        tunnelHandle = await startSshTunnel({
-          host: conn.host,
-          user: conn.user,
-          remotePort: tunnelCfg.remotePort,
-          sshKeyOpts: getSshKeyOpts(keys),
-        });
-        if (tunnelCfg.browserUrl) {
-          const url = tunnelCfg.browserUrl(tunnelHandle.localPort);
-          if (url) {
-            openBrowser(url);
-          }
-        }
-      });
-      if (!tunnelResult.ok) {
-        logWarn("Web dashboard tunnel failed — use the TUI instead");
-      }
-    } else if (cloud.getSignedPreviewUrl) {
-      const previewResult = await asyncTryCatchIf(isOperationalError, async () => {
-        const urlSuffix = templateUrl ? templateUrl.replace("http://localhost:0", "") : undefined;
-        const url = await cloud.getSignedPreviewUrl!(tunnelCfg.remotePort, urlSuffix, 3600);
-        openBrowser(url);
-      });
-      if (!previewResult.ok) {
-        logWarn("Web dashboard preview failed — use the TUI instead");
-      }
-    } else if (cloud.cloudName === "local") {
-      if (agent.tunnel.browserUrl) {
-        const url = agent.tunnel.browserUrl(agent.tunnel.remotePort);
-        if (url) {
-          openBrowser(url);
-        }
-      }
-    }
-
-    const tunnelMeta: Record<string, string> = {
-      tunnel_remote_port: String(agent.tunnel.remotePort),
-    };
-    if (templateUrl) {
-      tunnelMeta.tunnel_browser_url_template = templateUrl.replace("localhost:0", "localhost:__PORT__");
-    }
-    saveMetadata(tunnelMeta, spawnId);
-  }
+  const tunnelHandle = agent.tunnel ? await setupDashboardTunnel(cloud, agent.tunnel, spawnId) : undefined;
 
   // Channel setup
-  const ocPath = "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH";
-
   if (enabledSteps?.has("telegram")) {
-    logStep("Telegram pairing...");
-    logInfo("To pair your Telegram account:");
-    logInfo("  1. Open Telegram on your phone");
-    logInfo("  2. Search for the bot you created with @BotFather");
-    logInfo('  3. Send it any message (e.g. "hello")');
-    logInfo("  4. The bot will reply with a pairing code");
-    logInfo("  5. Enter the code below");
-    process.stderr.write("\n");
-    const pairingCode = (await prompt("Telegram pairing code: ")).trim();
-    if (pairingCode) {
-      const escaped = shellQuote(pairingCode);
-      const result = await asyncTryCatchIf(isOperationalError, () =>
-        cloud.runner.runServer(
-          `source ~/.spawnrc 2>/dev/null; ${ocPath}; openclaw pairing approve telegram ${escaped}`,
-        ),
-      );
-      if (result.ok) {
-        logInfo("Telegram paired successfully");
-      } else {
-        logWarn("Pairing failed — you can pair later via: openclaw pairing approve telegram <CODE>");
-      }
-    } else {
-      logInfo("No code entered — pair later via: openclaw pairing approve telegram <CODE>");
-    }
+    await setupTelegramPairing(cloud.runner);
   }
 
   if (agent.preLaunchMsg) {
@@ -940,58 +1013,7 @@ async function postInstall(
     process.exit(0);
   }
 
-  logStep("Provisioning complete. Connecting to agent session...");
-
-  // Reset terminal state before handing off to the interactive SSH session.
-  // @clack/prompts may have left the cursor hidden or set ANSI attributes
-  // (e.g. color, bold) that would corrupt the remote agent's TUI rendering.
-  if (process.stderr.isTTY) {
-    process.stderr.write("\x1b[?25h\x1b[0m");
-  }
-
-  prepareStdinForHandoff();
-
-  const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
-
-  // Auto-reconnect on connection drops. Ctrl+C (exit 0 or 130) exits immediately.
-  // Only applies to remote clouds — local sessions don't have connection drops.
-  // SSH exits 255 on connection loss; Sprite CLI exits 1 on "connection closed".
-  const maxReconnects = cloud.cloudName === "local" ? 0 : 5;
-  const isConnectionDrop = (code: number): boolean => code === 255 || (cloud.cloudName === "sprite" && code === 1);
-  let exitCode = 0;
-
-  for (let attempt = 0; attempt <= maxReconnects; attempt++) {
-    if (attempt > 0) {
-      process.stderr.write("\n");
-      logWarn(`Connection lost. Reconnecting... (${attempt}/${maxReconnects})`);
-      await sleep(3000);
-      prepareStdinForHandoff();
-    }
-    exitCode = await cloud.interactiveSession(sessionCmd);
-
-    if (!isConnectionDrop(exitCode)) {
-      break;
-    }
-  }
-
-  if (isConnectionDrop(exitCode)) {
-    process.stderr.write("\n");
-    logWarn("Could not reconnect. Server is still running.");
-    logInfo("Reconnect manually: spawn last");
-  }
-
-  if (tunnelHandle) {
-    tunnelHandle.stop();
-  }
-
-  // Pull child's spawn history back to the parent for `spawn tree`.
-  // Fire-and-forget — never delay exit for a convenience feature.
-  // process.exit() below kills any in-flight SSH calls.
-  if (cloud.cloudName !== "local") {
-    pullChildHistory(cloud.runner, spawnId).catch(() => {});
-  }
-
-  process.exit(exitCode);
+  await runInteractiveSession(cloud, launchCmd, spawnId, tunnelHandle);
 }
 
 /**
