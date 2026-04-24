@@ -6,8 +6,10 @@ import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import * as p from "@clack/prompts";
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import pkg from "../../package.json" with { type: "json" };
 import { createCloudAgents } from "../shared/agent-setup.js";
 import { makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
+import { initTelemetry } from "../shared/telemetry.js";
 import { logWarn } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -117,6 +119,7 @@ async function main() {
   await runOrchestration(cloud, agent, agentName);
 }
 
+initTelemetry(pkg.version);
 main().catch((err) => {
   process.stderr.write(`\x1b[0;31mFatal: ${getErrorMessage(err)}\x1b[0m\n`);
   process.exit(1);
