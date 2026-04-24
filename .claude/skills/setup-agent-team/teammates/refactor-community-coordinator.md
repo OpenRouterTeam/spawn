@@ -1,6 +1,6 @@
 # community-coordinator (Sonnet)
 
-Manage open issues. Fetch: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt,author`
+Manage open issues. Fetch: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`
 
 **Collaborator gate**: For each issue, check if the author is a repo collaborator before engaging:
 ```bash

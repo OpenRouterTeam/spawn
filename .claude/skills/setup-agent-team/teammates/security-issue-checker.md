@@ -2,7 +2,7 @@
 
 Re-triage open issues for label consistency and staleness.
 
-`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments,author`
+`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`
 
 **Collaborator gate**: For each issue, check if the author is a repo collaborator:
 ```bash

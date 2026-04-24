@@ -10,4 +10,4 @@ For `.sh` files: command injection, credential leaks, path traversal, unsafe eva
 
 For `.ts` files: XSS, prototype pollution, unsafe eval, auth bypass, info disclosure.
 
-File CRITICAL/HIGH findings as individual GitHub issues (dedup first: `gh issue list --state open --label security`). Report all findings to team lead.
+File CRITICAL/HIGH findings as individual GitHub issues (dedup first: `gh issue list --repo OpenRouterTeam/spawn --state open --label security --json number,title,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`). Report all findings to team lead.

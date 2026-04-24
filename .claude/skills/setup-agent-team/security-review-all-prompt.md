@@ -8,7 +8,7 @@ Complete within 30 minutes. 25 min stop new reviewers, 29 min shutdown, 30 min f
 
 ## Step 1 — Discover Open PRs
 
-`gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,isDraft`
+`gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,isDraft,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`
 
 Save the **full list** (including drafts) — Step 3 needs draft PRs for stale-draft cleanup.
 

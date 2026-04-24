@@ -21,6 +21,7 @@ Reject proactive plans with vague justifications, targeting working code, duplic
 ## Issue-First Policy
 
 Labeled issues are mandates. FIRST fetch all actionable issues:
+<!-- IMPORTANT: pipe through collaborator filter (see _shared-rules.md § Collaborator Gate) -->
 ```bash
 gh issue list --repo OpenRouterTeam/spawn --state open --label "safe-to-work" --json number,title,labels
 gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title,labels

@@ -8,7 +8,7 @@ Keep README.md in sync with source of truth. **Conservative — if nothing chang
 
 **Gate 2 — Commands drift**: Compare `packages/cli/src/commands/help.ts` → `getHelpUsageSection()` against README commands table. Triggers when a command exists in code but not README, or vice versa.
 
-**Gate 3 — Troubleshooting gaps**: Fetch `gh issue list --limit 30 --state all`, cluster by similar problem. Triggers ONLY when: same problem in 2+ issues, clear actionable fix, AND fix not already in README Troubleshooting section.
+**Gate 3 — Troubleshooting gaps**: Fetch `gh issue list --repo OpenRouterTeam/spawn --limit 30 --state all --json number,title,labels,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`, cluster by similar problem. Triggers ONLY when: same problem in 2+ issues, clear actionable fix, AND fix not already in README Troubleshooting section.
 
 ## Rules
 - For each triggered gate: make the **minimal edit** to sync README

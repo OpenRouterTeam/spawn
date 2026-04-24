@@ -2,7 +2,7 @@
 
 Keep PRs healthy and mergeable. Do NOT review/approve/merge — security team handles that.
 
-First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision,isDraft`
+First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision,isDraft,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'`
 
 For EACH PR, fetch full context (comments + reviews). Read ALL comments — they contain decisions and scope changes.
 

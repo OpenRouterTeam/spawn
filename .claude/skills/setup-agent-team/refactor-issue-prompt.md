@@ -17,7 +17,7 @@ If the issue has ANY of these labels: `discovery-team`, `cloud-proposal`, `agent
 Fetch the COMPLETE issue thread before starting:
 ```bash
 gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --comments
-gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --json number,title,url,state,headRefName
+gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --json number,title,url,state,headRefName,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
 ```
 For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
 
@@ -28,7 +28,7 @@ Read ALL comments — prior discussion contains decisions, rejected approaches, 
 After gathering context, check if there is ALREADY a PR addressing this issue (open or recently merged):
 
 ```bash
-gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --state all --json number,title,url,state,headRefName
+gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --state all --json number,title,url,state,headRefName,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
 ```
 
 **If an OPEN PR exists:**
