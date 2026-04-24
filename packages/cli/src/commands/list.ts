@@ -448,7 +448,7 @@ async function handleGoneServer(record: SpawnRecord, cloud: string): Promise<"de
   // Remap to selected instance
   const actionStr = String(action);
   if (actionStr.startsWith("remap-")) {
-    const idx = Number.parseInt(action.slice(6), 10);
+    const idx = Number.parseInt(actionStr.slice(6), 10);
     const inst = instances[idx];
     if (inst) {
       updateRecordConnection(record, {
