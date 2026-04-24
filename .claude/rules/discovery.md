@@ -68,7 +68,7 @@ To add: same steps as before (manifest.json entry, matrix entries, implement on 
 
 ## 4. Respond to GitHub issues
 
-Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests:
+Check `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'` for user requests:
 - If someone requests an agent or cloud, implement it and comment with the PR link
 - If something is already implemented, close the issue with a note
 - If a bug is reported, fix it

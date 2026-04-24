@@ -21,11 +21,10 @@ Reject proactive plans with vague justifications, targeting working code, duplic
 ## Issue-First Policy
 
 Labeled issues are mandates. FIRST fetch all actionable issues:
-<!-- IMPORTANT: pipe through collaborator filter (see _shared-rules.md § Collaborator Gate) -->
 ```bash
-gh issue list --repo OpenRouterTeam/spawn --state open --label "safe-to-work" --json number,title,labels
-gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title,labels
-gh issue list --repo OpenRouterTeam/spawn --state open --label "bug" --json number,title,labels
+gh issue list --repo OpenRouterTeam/spawn --state open --label "safe-to-work" --json number,title,labels,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
+gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title,labels,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
+gh issue list --repo OpenRouterTeam/spawn --state open --label "bug" --json number,title,labels,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
 ```
 Filter out discovery-team issues. Assign each to the most relevant teammate. Priority: security > bug > safe-to-work. Only AFTER all assigned do remaining teammates scan proactively.
 
