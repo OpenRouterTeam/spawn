@@ -261,7 +261,8 @@ const McpServerEntrySchema = v.object({
 export const SpawnMdSchema = v.object({
   name: v.optional(v.string()),
   description: v.optional(v.string()),
-  steps: v.optional(v.array(v.string())),
+  // Built-in steps (github, auto-update, etc.) go in the CLI --steps flag,
+  // not here.  spawn.md only handles custom setup that Spawn doesn't know about.
   setup: v.optional(v.array(SetupStepSchema)),
   mcp_servers: v.optional(v.array(McpServerEntrySchema)),
   setup_commands: v.optional(v.array(v.string())),
@@ -302,13 +303,6 @@ export function generateSpawnMd(config: SpawnMdConfig, body?: string): string {
   }
   if (config.description) {
     lines.push(`description: ${config.description}`);
-  }
-
-  if (config.steps && config.steps.length > 0) {
-    lines.push("steps:");
-    for (const step of config.steps) {
-      lines.push(`  - ${step}`);
-    }
   }
 
   if (config.setup && config.setup.length > 0) {

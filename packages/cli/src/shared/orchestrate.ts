@@ -646,7 +646,7 @@ async function postInstall(
     }
   }
 
-  // Parse enabled setup steps
+  // Parse enabled setup steps (from --steps CLI flag)
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
   const isHeadless = process.env.SPAWN_HEADLESS === "1";
@@ -667,16 +667,6 @@ async function postInstall(
     enabledSteps = new Set([
       "auto-update",
     ]);
-  }
-
-  // Merge spawn.md steps into enabledSteps
-  if (spawnMdConfig?.steps && spawnMdConfig.steps.length > 0) {
-    if (!enabledSteps) {
-      enabledSteps = new Set<string>();
-    }
-    for (const step of spawnMdConfig.steps) {
-      enabledSteps.add(step);
-    }
   }
 
   // Agent-specific configuration

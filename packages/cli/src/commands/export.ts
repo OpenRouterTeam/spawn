@@ -267,11 +267,10 @@ export async function cmdExport(): Promise<void> {
     return;
   }
 
-  // 5. Generate spawn.md
+  // 5. Generate spawn.md (steps go in the CLI command, not in spawn.md)
   const config: SpawnMdConfig = {
     name: repoName,
     description: isString(description) ? description : undefined,
-    steps,
     setup: setup.length > 0 ? setup : undefined,
     mcp_servers: mcpServers.length > 0 ? mcpServers : undefined,
   };
@@ -367,12 +366,13 @@ export async function cmdExport(): Promise<void> {
     repoSlug = `${ghUserResult.data}/${repoName}`;
   }
 
-  // 9. Print the shareable command
+  // 9. Print the shareable command (steps baked into the command, not spawn.md)
+  const stepsArg = steps.length > 0 ? ` --steps ${steps.join(",")}` : "";
   console.error();
   p.log.success("Template exported!");
   console.error();
   console.error("  Share this command to replicate your setup:");
   console.error();
-  console.error(`    ${pc.cyan(`spawn ${record.agent} ${record.cloud} --repo ${repoSlug}`)}`);
+  console.error(`    ${pc.cyan(`spawn ${record.agent} ${record.cloud} --repo ${repoSlug}${stepsArg}`)}`);
   console.error();
 }
