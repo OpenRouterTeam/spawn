@@ -669,6 +669,16 @@ async function postInstall(
     ]);
   }
 
+  // Merge spawn.md steps into enabledSteps
+  if (spawnMdConfig?.steps && spawnMdConfig.steps.length > 0) {
+    if (!enabledSteps) {
+      enabledSteps = new Set<string>();
+    }
+    for (const step of spawnMdConfig.steps) {
+      enabledSteps.add(step);
+    }
+  }
+
   // Agent-specific configuration
   if (agent.configure) {
     const configResult = await asyncTryCatch(() =>

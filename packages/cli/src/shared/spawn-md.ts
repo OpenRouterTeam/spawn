@@ -1,4 +1,4 @@
-// shared/spawn-md.ts — Parse and apply spawn.md template files
+// shared/spawn-md.ts — Parse, generate, and apply spawn.md template files
 //
 // spawn.md lives at the root of a user's repo and declares the "recipe" for
 // setting up an agent: custom auth flows, MCP servers, and setup commands.
@@ -261,8 +261,7 @@ const McpServerEntrySchema = v.object({
 export const SpawnMdSchema = v.object({
   name: v.optional(v.string()),
   description: v.optional(v.string()),
-  // Built-in steps (github, auto-update, etc.) go in the CLI --steps flag,
-  // not here.  spawn.md only handles custom setup that Spawn doesn't know about.
+  steps: v.optional(v.array(v.string())),
   setup: v.optional(v.array(SetupStepSchema)),
   mcp_servers: v.optional(v.array(McpServerEntrySchema)),
   setup_commands: v.optional(v.array(v.string())),
@@ -288,6 +287,80 @@ export function parseSpawnMd(content: string): SpawnMdConfig | null {
     return null;
   }
   return result.output;
+}
+
+// ── Generation ─────────────────────────────────────────────────────────────
+
+/** Generate spawn.md content from a config */
+export function generateSpawnMd(config: SpawnMdConfig, body?: string): string {
+  const lines: string[] = [
+    "---",
+  ];
+
+  if (config.name) {
+    lines.push(`name: ${config.name}`);
+  }
+  if (config.description) {
+    lines.push(`description: ${config.description}`);
+  }
+
+  if (config.steps && config.steps.length > 0) {
+    lines.push("steps:");
+    for (const step of config.steps) {
+      lines.push(`  - ${step}`);
+    }
+  }
+
+  if (config.setup && config.setup.length > 0) {
+    lines.push("setup:");
+    for (const step of config.setup) {
+      lines.push(`  - type: ${step.type}`);
+      lines.push(`    name: ${step.name ?? ""}`);
+      if ("url" in step) {
+        lines.push(`    url: ${step.url}`);
+      }
+      if ("command" in step) {
+        lines.push(`    command: ${step.command}`);
+      }
+      if (step.description) {
+        lines.push(`    description: ${step.description}`);
+      }
+      if ("guide_url" in step && step.guide_url) {
+        lines.push(`    guide_url: ${step.guide_url}`);
+      }
+    }
+  }
+
+  if (config.mcp_servers && config.mcp_servers.length > 0) {
+    lines.push("mcp_servers:");
+    for (const server of config.mcp_servers) {
+      lines.push(`  - name: ${server.name}`);
+      lines.push(`    command: ${server.command}`);
+      lines.push(`    args: [${server.args.map((a) => `"${a}"`).join(", ")}]`);
+      if (server.env) {
+        lines.push("    env:");
+        for (const [k, val] of Object.entries(server.env)) {
+          lines.push(`      ${k}: "${val}"`);
+        }
+      }
+    }
+  }
+
+  if (config.setup_commands && config.setup_commands.length > 0) {
+    lines.push("setup_commands:");
+    for (const cmd of config.setup_commands) {
+      lines.push(`  - ${cmd}`);
+    }
+  }
+
+  lines.push("---");
+  lines.push("");
+
+  if (body) {
+    lines.push(body);
+  }
+
+  return lines.join("\n");
 }
 
 // ── Applying spawn.md on a VM ──────────────────────────────────────────────

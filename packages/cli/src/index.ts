@@ -13,6 +13,7 @@ import {
   cmdCloudInfo,
   cmdClouds,
   cmdDelete,
+  cmdExport,
   cmdFeedback,
   cmdFix,
   cmdHelp,
@@ -778,6 +779,14 @@ async function dispatchCommand(
   }
   if (cmd === "pull-history") {
     await cmdPullHistory();
+    return;
+  }
+  if (cmd === "export") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    await cmdExport();
     return;
   }
   if (LIST_COMMANDS.has(cmd)) {
