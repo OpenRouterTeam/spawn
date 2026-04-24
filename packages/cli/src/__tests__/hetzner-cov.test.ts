@@ -586,7 +586,12 @@ describe("hetzner/createServer", () => {
       },
     };
     let callCount = 0;
-    global.fetch = mock(() => {
+    global.fetch = mock((url: string | URL | Request) => {
+      const urlStr = String(url instanceof Request ? url.url : url);
+      // Ignore background telemetry calls (PostHog) that leak from other test files
+      if (!urlStr.includes("hetzner.cloud")) {
+        return Promise.resolve(new Response("ok"));
+      }
       callCount++;
       if (callCount <= 1) {
         // Token validation
