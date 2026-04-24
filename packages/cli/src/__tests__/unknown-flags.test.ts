@@ -227,6 +227,7 @@ describe("KNOWN_FLAGS completeness", () => {
       "-m",
       "--config",
       "--steps",
+      "--repo",
       "--fast",
       "--flat",
       "--user",

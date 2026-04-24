@@ -617,6 +617,33 @@ async function postInstall(
   spawnId: string,
   _options?: OrchestrationOptions,
 ): Promise<void> {
+  // ── Repo clone + spawn.md (--repo mode) ────────────────────────────────
+  // Clone early so spawn.md `steps` can merge into enabledSteps before
+  // the built-in step logic runs.
+  let spawnMdConfig: import("./spawn-md.js").SpawnMdConfig | null = null;
+  const repoSlug = process.env.SPAWN_REPO;
+  if (repoSlug && cloud.cloudName !== "local") {
+    // Validate slug format (user/repo, no path traversal)
+    if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoSlug)) {
+      logWarn(`Invalid repo slug: ${repoSlug} — skipping repo clone`);
+    } else {
+      logStep("Cloning template repository...");
+      const cloneResult = await asyncTryCatch(() =>
+        cloud.runner.runServer(`git clone https://github.com/${repoSlug}.git ~/project 2>&1 || true`),
+      );
+      if (!cloneResult.ok) {
+        logWarn("Repo clone failed — continuing without template");
+      } else {
+        // Try to read spawn.md from the cloned repo
+        const { readRemoteSpawnMd } = await import("./spawn-md.js");
+        spawnMdConfig = await readRemoteSpawnMd(cloud.runner);
+        if (spawnMdConfig) {
+          logInfo(`Template loaded: ${spawnMdConfig.name ?? repoSlug}`);
+        }
+      }
+    }
+  }
+
   // Parse enabled setup steps
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
@@ -638,6 +665,16 @@ async function postInstall(
     enabledSteps = new Set([
       "auto-update",
     ]);
+  }
+
+  // Merge spawn.md steps into enabledSteps
+  if (spawnMdConfig?.steps && spawnMdConfig.steps.length > 0) {
+    if (!enabledSteps) {
+      enabledSteps = new Set<string>();
+    }
+    for (const step of spawnMdConfig.steps) {
+      enabledSteps.add(step);
+    }
   }
 
   // Agent-specific configuration
@@ -759,6 +796,12 @@ async function postInstall(
     }
   }
 
+  // Apply spawn.md custom setup (after built-in steps, before pre-launch)
+  if (spawnMdConfig) {
+    const { applySpawnMdSetup } = await import("./spawn-md.js");
+    await applySpawnMdSetup(cloud.runner, spawnMdConfig, agentName);
+  }
+
   // Pre-launch hooks (retry loop)
   if (agent.preLaunch) {
     for (;;) {
@@ -872,7 +915,9 @@ async function postInstall(
     headless: process.env.SPAWN_HEADLESS === "1",
   });
 
-  const launchCmd = agent.launchCmd();
+  // When --repo is set, launch the agent inside the cloned project directory
+  const baseLaunchCmd = agent.launchCmd();
+  const launchCmd = repoSlug ? `cd ~/project && ${baseLaunchCmd}` : baseLaunchCmd;
   saveLaunchCmd(launchCmd, spawnId);
 
   // In headless mode, provisioning is done — skip the interactive session.

@@ -22,6 +22,9 @@ function getHelpUsageSection(): string {
                                      Load all options from a JSON config file
   spawn <agent> <cloud> --steps <list>
                                      Comma-separated setup steps to enable
+  spawn <agent> <cloud> --repo <user/repo>
+                                     Clone a template repo and apply spawn.md setup
+  spawn export                       Export a running spawn as a shareable template
   spawn <agent>                      Interactive cloud picker for agent
   spawn <cloud>                      Show available agents for cloud
   spawn list                         Browse and rerun previous spawns (aliases: ls, history)
@@ -87,7 +90,10 @@ function getHelpExamplesSection(): string {
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
   spawn list codex                   ${pc.dim("# Filter history by agent name")}
   spawn last                         ${pc.dim("# Instantly rerun the most recent spawn")}
-  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
+  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
+  spawn claude sprite --repo user/my-template
+                                     ${pc.dim("# Clone template and auto-setup agent")}
+  spawn export                       ${pc.dim("# Export current spawn as a template")}`;
 }
 
 function getHelpAuthSection(): string {
