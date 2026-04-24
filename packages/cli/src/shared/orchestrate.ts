@@ -561,8 +561,9 @@ async function postInstall(
   _options?: OrchestrationOptions,
 ): Promise<void> {
   // ── Repo clone + spawn.md (--repo mode) ────────────────────────────────
-  // Clone early so spawn.md `steps` can merge into enabledSteps before
-  // the built-in step logic runs.
+  // Built-in steps (github, auto-update, etc.) come from the CLI --steps
+  // flag, not from spawn.md.  spawn.md only handles custom setup (OAuth,
+  // MCP servers, setup commands).
   let spawnMdConfig: import("./spawn-md.js").SpawnMdConfig | null = null;
   const repoSlug = process.env.SPAWN_REPO;
   if (repoSlug && cloud.cloudName !== "local") {
@@ -577,7 +578,6 @@ async function postInstall(
       if (!cloneResult.ok) {
         logWarn("Repo clone failed — continuing without template");
       } else {
-        // Try to read spawn.md from the cloned repo
         const { readRemoteSpawnMd } = await import("./spawn-md.js");
         spawnMdConfig = await readRemoteSpawnMd(cloud.runner);
         if (spawnMdConfig) {
@@ -587,7 +587,7 @@ async function postInstall(
     }
   }
 
-  // Parse enabled setup steps
+  // Parse enabled setup steps (from --steps CLI flag)
   let enabledSteps: Set<string> | undefined;
   const stepsEnv = process.env.SPAWN_ENABLED_STEPS;
   if (stepsEnv !== undefined) {
@@ -601,16 +601,6 @@ async function postInstall(
       enabledSteps = new Set(valid);
     } else {
       enabledSteps = new Set();
-    }
-  }
-
-  // Merge spawn.md steps into enabledSteps
-  if (spawnMdConfig?.steps && spawnMdConfig.steps.length > 0) {
-    if (!enabledSteps) {
-      enabledSteps = new Set<string>();
-    }
-    for (const step of spawnMdConfig.steps) {
-      enabledSteps.add(step);
     }
   }
 
