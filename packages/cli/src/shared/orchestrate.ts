@@ -63,6 +63,49 @@ function trackFunnel(step: string, extra: Record<string, unknown> = {}): void {
   });
 }
 
+/**
+ * Normalize a `--repo` argument into a git clone URL.
+ *
+ * Accepts:
+ *   - GitHub shorthand:  user/repo                  → https://github.com/user/repo.git
+ *   - HTTP(S) URL:       https://host/path[.git]    → unchanged
+ *   - SSH URL:           ssh://user@host/path       → unchanged
+ *   - SCP-style SSH:     git@host:path              → unchanged
+ *   - git:// URL:        git://host/path            → unchanged
+ *
+ * Returns null for anything that contains shell metacharacters, whitespace,
+ * leading `-` (would be parsed as a git option), or doesn't look like a URL
+ * or `user/repo` slug at all. Defense in depth — the URL is always passed
+ * through `shellQuote` at the call site as well.
+ */
+export function normalizeRepoUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0 || trimmed.length > 500) {
+    return null;
+  }
+  // No shell metacharacters, no whitespace, no NUL bytes
+  if (/[\s\0`$;&|<>(){}[\]"'\\!*?#]/.test(trimmed)) {
+    return null;
+  }
+  // Reject leading `-` so the URL can't masquerade as a git flag
+  if (trimmed.startsWith("-")) {
+    return null;
+  }
+  // Full URL with scheme
+  if (/^(https?|git|ssh|git\+ssh|git\+https?):\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  // SCP-style: user@host:path (host must contain a dot to disambiguate from GitHub shorthand)
+  if (/^[a-zA-Z0-9_.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9.-]+:[a-zA-Z0-9._/~-]+(\.git)?$/.test(trimmed)) {
+    return trimmed;
+  }
+  // GitHub shorthand: user/repo
+  if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(trimmed)) {
+    return `https://github.com/${trimmed}.git`;
+  }
+  return null;
+}
+
 /** Docker container name used by --beta docker deployments. */
 export const DOCKER_CONTAINER_NAME = "spawn-agent";
 /** Docker registry hosting spawn agent images. */
@@ -623,15 +666,15 @@ async function postInstall(
   // MCP servers, setup commands).
   let spawnMdConfig: import("./spawn-md.js").SpawnMdConfig | null = null;
   let repoCloned = false;
-  const repoSlug = process.env.SPAWN_REPO;
-  if (repoSlug && cloud.cloudName !== "local") {
-    // Validate slug format (user/repo, no path traversal)
-    if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoSlug)) {
-      logWarn(`Invalid repo slug: ${repoSlug} — skipping repo clone`);
+  const repoArg = process.env.SPAWN_REPO;
+  if (repoArg && cloud.cloudName !== "local") {
+    const cloneUrl = normalizeRepoUrl(repoArg);
+    if (!cloneUrl) {
+      logWarn(`Invalid --repo value: ${repoArg} — skipping repo clone`);
     } else {
       logStep("Cloning template repository...");
       const cloneResult = await asyncTryCatch(() =>
-        cloud.runner.runServer(`git clone https://github.com/${repoSlug}.git ~/project`),
+        cloud.runner.runServer(`git clone ${shellQuote(cloneUrl)} ~/project`),
       );
       if (!cloneResult.ok) {
         logWarn(`Repo clone failed (${getErrorMessage(cloneResult.error)}) — continuing without template`);
@@ -640,7 +683,7 @@ async function postInstall(
         const { readRemoteSpawnMd } = await import("./spawn-md.js");
         spawnMdConfig = await readRemoteSpawnMd(cloud.runner);
         if (spawnMdConfig) {
-          logInfo(`Template loaded: ${spawnMdConfig.name ?? repoSlug}`);
+          logInfo(`Template loaded: ${spawnMdConfig.name ?? repoArg}`);
         }
       }
     }
