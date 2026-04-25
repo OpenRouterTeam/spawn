@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { isString } from "@openrouter/spawn-shared";
 import * as v from "valibot";
+import { _testHelpers as telemetryTestHelpers } from "../shared/telemetry.js";
 
 // ── Schemas for validating PostHog payloads ─────────────────────────────────
 
@@ -127,6 +128,10 @@ describe("telemetry", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    // Disable telemetry so fire-and-forget fetch calls don't leak into other
+    // test files running in the same process (the root cause of flaky
+    // hetzner-cov and digitalocean-token test failures).
+    telemetryTestHelpers.enabled = false;
     if (originalTelemetry !== undefined) {
       process.env.SPAWN_TELEMETRY = originalTelemetry;
     } else {
