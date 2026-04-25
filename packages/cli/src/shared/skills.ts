@@ -204,7 +204,10 @@ export async function installSkills(
 }
 
 /** Merge MCP servers into Claude Code's ~/.claude/settings.json. */
-async function installClaudeMcpServers(runner: CloudRunner, servers: Record<string, McpServerConfig>): Promise<void> {
+export async function installClaudeMcpServers(
+  runner: CloudRunner,
+  servers: Record<string, McpServerConfig>,
+): Promise<void> {
   const tmpLocal = join(getTmpDir(), `claude_settings_${Date.now()}.json`);
   const dlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.claude/settings.json", tmpLocal));
 
@@ -226,7 +229,10 @@ async function installClaudeMcpServers(runner: CloudRunner, servers: Record<stri
 }
 
 /** Write MCP servers to Cursor's ~/.cursor/mcp.json. */
-async function installCursorMcpServers(runner: CloudRunner, servers: Record<string, McpServerConfig>): Promise<void> {
+export async function installCursorMcpServers(
+  runner: CloudRunner,
+  servers: Record<string, McpServerConfig>,
+): Promise<void> {
   const tmpLocal = join(getTmpDir(), `cursor_mcp_${Date.now()}.json`);
   const dlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.cursor/mcp.json", tmpLocal));
 
@@ -248,7 +254,7 @@ async function installCursorMcpServers(runner: CloudRunner, servers: Record<stri
 }
 
 /** Generic MCP install — writes a .mcp.json in the agent's config directory. */
-async function installGenericMcpServers(
+export async function installGenericMcpServers(
   runner: CloudRunner,
   agentName: string,
   servers: Record<string, McpServerConfig>,
@@ -261,6 +267,60 @@ async function installGenericMcpServers(
     2,
   );
   await uploadConfigFile(runner, config, `$HOME/.${agentName}/mcp.json`);
+}
+
+/**
+ * Append MCP server entries to Codex's ~/.codex/config.toml under
+ * [mcp_servers.NAME] sections. Existing sections with the same name are
+ * left untouched (we don't try to merge mid-file); new ones are appended.
+ */
+export async function installCodexMcpServers(
+  runner: CloudRunner,
+  servers: Record<string, McpServerConfig>,
+): Promise<void> {
+  const tmpLocal = join(getTmpDir(), `codex_config_${Date.now()}.toml`);
+  const dlResult = await asyncTryCatch(() => runner.downloadFile("$HOME/.codex/config.toml", tmpLocal));
+
+  let existing = "";
+  if (dlResult.ok) {
+    const readResult = tryCatch(() => readFileSync(tmpLocal, "utf-8"));
+    if (readResult.ok) {
+      existing = readResult.data;
+    }
+  }
+
+  const existingNames = new Set<string>();
+  for (const m of existing.matchAll(/^\[mcp_servers\.([^.\]]+)\]/gm)) {
+    existingNames.add(m[1]);
+  }
+
+  const lines: string[] = [];
+  for (const [name, cfg] of Object.entries(servers)) {
+    if (existingNames.has(name)) {
+      continue;
+    }
+    lines.push("");
+    lines.push(`[mcp_servers.${name}]`);
+    lines.push(`command = ${tomlString(cfg.command)}`);
+    lines.push(`args = [${cfg.args.map((a) => tomlString(a)).join(", ")}]`);
+    if (cfg.env) {
+      lines.push(`[mcp_servers.${name}.env]`);
+      for (const [k, val] of Object.entries(cfg.env)) {
+        lines.push(`${k} = ${tomlString(val)}`);
+      }
+    }
+  }
+
+  if (lines.length === 0) {
+    return;
+  }
+
+  const merged = `${existing.replace(/\n+$/, "")}\n${lines.join("\n")}\n`;
+  await uploadConfigFile(runner, merged, "$HOME/.codex/config.toml");
+}
+
+function tomlString(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 /** Inject an instruction skill (SKILL.md) onto the remote VM. */
