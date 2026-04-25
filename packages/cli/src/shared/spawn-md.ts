@@ -390,11 +390,15 @@ async function applySetupStep(runner: CloudRunner, step: SetupStep): Promise<voi
       if (value) {
         const escapedName = step.name.replace(/[^A-Za-z0-9_]/g, "");
         const b64Val = Buffer.from(value).toString("base64");
+        // Store as NAME=BASE64VALUE (not shell-executable) to prevent injection
         await runner.runServer(
-          `mkdir -p /etc/spawn && printf 'export %s="%s"\\n' '${escapedName}' "$(echo '${b64Val}' | base64 -d)" >> /etc/spawn/secrets && chmod 600 /etc/spawn/secrets`,
+          `mkdir -p /etc/spawn && printf '%s=%s\\n' '${escapedName}' '${b64Val}' >> /etc/spawn/secrets && chmod 600 /etc/spawn/secrets`,
         );
+        // Install a loader that decodes base64 at source-time instead of shell-sourcing
+        const loaderSnippet =
+          'while IFS="=" read -r k v; do [ -n "$k" ] && export "$k=$(printf "%s" "$v" | base64 -d)"; done < /etc/spawn/secrets';
         await runner.runServer(
-          `grep -q '/etc/spawn/secrets' ~/.bashrc 2>/dev/null || echo 'source /etc/spawn/secrets 2>/dev/null' >> ~/.bashrc`,
+          `grep -q 'while IFS.*secrets' ~/.bashrc 2>/dev/null || { sed -i '/source.*\\/etc\\/spawn\\/secrets/d' ~/.bashrc 2>/dev/null; echo '${loaderSnippet}' >> ~/.bashrc; }`,
         );
         logInfo(`    ${step.name} saved`);
       } else {
