@@ -270,3 +270,15 @@ function sendEvent(event: string, properties: Record<string, unknown>): void {
     }),
   );
 }
+
+// ── Test Helpers ──────────────────────────────────────────────────────────────
+
+/** Exposed for test cleanup — prevents telemetry from leaking across test files. */
+export const _testHelpers = {
+  get enabled(): boolean {
+    return _enabled;
+  },
+  set enabled(val: boolean) {
+    _enabled = val;
+  },
+};
