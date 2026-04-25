@@ -34,5 +34,9 @@
   "pi": {
     "url": "custom:shittycodingagent.ai/logo.svg (official Pi logo, converted to PNG with dark background)",
     "ext": "png"
+  },
+  "t3code": {
+    "url": "https://t3.codes/icon.png",
+    "ext": "png"
   }
 }

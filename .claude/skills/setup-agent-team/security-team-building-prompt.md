@@ -9,7 +9,7 @@ Implement changes from GitHub issue #ISSUE_NUM_PLACEHOLDER.
 Fetch the COMPLETE issue thread before starting:
 ```bash
 gh issue view ISSUE_NUM_PLACEHOLDER --repo OpenRouterTeam/spawn --comments
-gh pr list --repo OpenRouterTeam/spawn --search "ISSUE_NUM_PLACEHOLDER" --json number,title,url
+gh pr list --repo OpenRouterTeam/spawn --search "ISSUE_NUM_PLACEHOLDER" --json number,title,url,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))]'
 ```
 For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
 

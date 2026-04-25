@@ -908,7 +908,7 @@ describe("runOrchestration", () => {
 
       await runOrchestrationSafe(cloud, agent, "testagent");
 
-      // launchCmd should be called (to save it for later `spawn connect`)
+      // launchCmd should be called (to save it for later `spawn last`)
       expect(agent.launchCmd).toHaveBeenCalledTimes(1);
       expect(cloud.interactiveSession).toHaveBeenCalledTimes(0);
       expect(capturedExitCode).toBe(0);

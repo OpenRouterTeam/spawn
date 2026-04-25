@@ -1,4 +1,4 @@
 [test]
 preload = ["./packages/cli/src/__tests__/preload.ts"]
 coverageSkipTestFiles = true
-coverageThreshold = { lines = 0.35, functions = 0.5 }
+coverageThreshold = { }

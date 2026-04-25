@@ -5,8 +5,10 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import pkg from "../../package.json" with { type: "json" };
 import { shouldSkipCloudInit } from "../shared/cloud-init.js";
 import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY, makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
+import { initTelemetry } from "../shared/telemetry.js";
 import { logInfo, logStep, shellQuote } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
@@ -124,6 +126,7 @@ async function main() {
   await runOrchestration(cloud, agent, agentName);
 }
 
+initTelemetry(pkg.version);
 main().catch((err) => {
   process.stderr.write(`\x1b[0;31mFatal: ${getErrorMessage(err)}\x1b[0m\n`);
   process.exit(1);

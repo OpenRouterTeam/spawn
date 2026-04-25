@@ -2,6 +2,7 @@
 
 import type { Manifest } from "./manifest.js";
 
+import { readFileSync } from "node:fs";
 import { getErrorMessage, isString, toRecord } from "@openrouter/spawn-shared";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -38,6 +39,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
+import { getInstallRefPath } from "./shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
 import { checkForUpdates } from "./update-check.js";
@@ -47,6 +49,16 @@ const VERSION = pkg.version;
 // Initialize telemetry early — captures uncaught errors and exit flush.
 // Disabled with SPAWN_TELEMETRY=0.
 initTelemetry(VERSION);
+
+// Attribution: if the user installed via a tagged URL (SPAWN_REF=reddit|x|...),
+// the install script persisted the ref to ~/.config/spawn/.ref. Read it once
+// and attach to every telemetry event so PostHog can segment by acquisition channel.
+tryCatchIf(isFileError, () => {
+  const ref = readFileSync(getInstallRefPath(), "utf8").trim();
+  if (ref && /^[a-zA-Z0-9_-]+$/.test(ref)) {
+    setTelemetryContext("ref", ref);
+  }
+});
 
 function handleError(err: unknown): never {
   captureError("cli_error", err);
@@ -1133,7 +1145,10 @@ async function main(): Promise<void> {
 }
 
 main().then(
-  () => process.exit(0),
+  // Let the process exit naturally so fire-and-forget telemetry fetches
+  // complete before the event loop drains. process.exit(0) would abort
+  // in-flight requests, silently dropping spawn_deleted and funnel events.
+  () => {},
   (err) => {
     handleError(err);
   },

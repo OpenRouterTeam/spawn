@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import * as p from "@clack/prompts";
 import { getErrorMessage, isNumber, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
+import { isInteractiveTTY } from "../commands/shared.js";
 import { handleBillingError, isBillingError, showNonBillingError } from "../shared/billing-guidance.js";
 import { getPackagesForTier, NODE_INSTALL_CMD, needsBun, needsNode } from "../shared/cloud-init.js";
 import { generateCsrfState, OAUTH_CSS } from "../shared/oauth.js";
@@ -107,7 +108,11 @@ const DO_SCOPES = [
   "sizes:read",
   "image:read",
   "actions:read",
+  "tag:create",
 ].join(" ");
+
+/** Droplet tag for Spawn-sourced attribution (API name: letters, numbers, colons, dashes, underscores). */
+export const SPAWN_DIGITALOCEAN_ATTRIBUTION_TAG = "spawn";
 
 const DO_OAUTH_CALLBACK_PORT = 5190;
 
@@ -330,6 +335,81 @@ async function testDoToken(): Promise<boolean> {
   );
 }
 
+/** Parsed /v2/account fields for readiness checks (single source for snapshot). */
+export interface DoAccountSnapshot {
+  status: string;
+  email_verified: boolean | undefined;
+  droplet_limit: number;
+}
+
+/** Fetch account record for readiness (requires valid `_state.token`). */
+export async function fetchDoAccountSnapshot(): Promise<DoAccountSnapshot | null> {
+  if (!_state.token) {
+    return null;
+  }
+  const r = await asyncTryCatch(async () => {
+    const text = await doApi("GET", "/account", undefined, 1);
+    const data = parseJsonObj(text);
+    const rec = toRecord(data?.account);
+    if (!rec) {
+      return null;
+    }
+    const ev = rec.email_verified;
+    return {
+      status: isString(rec.status) ? rec.status : "",
+      email_verified: ev === false ? false : ev === true ? true : undefined,
+      droplet_limit: isNumber(rec.droplet_limit) ? rec.droplet_limit : 0,
+    };
+  });
+  return r.ok ? r.data : null;
+}
+
+/**
+ * True if at least one local SSH key fingerprint is registered on the DO account.
+ */
+export async function areSshKeysRegisteredOnDigitalOcean(): Promise<boolean> {
+  if (!_state.token) {
+    return false;
+  }
+  const selectedKeys = await ensureSshKeys();
+  if (selectedKeys.length === 0) {
+    return false;
+  }
+  const keys = await doGetAll("/account/keys", "ssh_keys");
+  for (const key of selectedKeys) {
+    const fingerprint = getSshFingerprint(key.pubPath);
+    if (!fingerprint) {
+      continue;
+    }
+    if (keys.some((k: Record<string, unknown>) => (k.fingerprint || "") === fingerprint)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Ensure attribution tag exists (ignore if already present or insufficient scope). */
+async function ensureSpawnAttributionTag(): Promise<void> {
+  await asyncTryCatch(() =>
+    doApi(
+      "POST",
+      "/tags",
+      JSON.stringify({
+        name: SPAWN_DIGITALOCEAN_ATTRIBUTION_TAG,
+      }),
+    ),
+  );
+}
+
+/** Current droplet count for quota checks (null on API failure). */
+export async function getDropletCount(): Promise<number | null> {
+  if (!_state.token) {
+    return null;
+  }
+  const r = await asyncTryCatch(() => doGetAll("/droplets", "droplets"));
+  return r.ok ? r.data.length : null;
+}
+
 // ─── Account Info & Switch ──────────────────────────────────────────────────
 
 async function getAccountInfo(): Promise<{
@@ -400,15 +480,13 @@ export async function checkAccountStatus(): Promise<void> {
     return;
   }
   const r = await asyncTryCatch(async () => {
-    const text = await doApi("GET", "/account", undefined, 1);
-    const data = parseJsonObj(text);
-    const rec = toRecord(data?.account);
-    if (!rec) {
+    const snapshot = await fetchDoAccountSnapshot();
+    if (!snapshot) {
       return;
     }
-    const status = isString(rec.status) ? rec.status : "";
-    const emailVerified = rec.email_verified;
-    const dropletLimit = isNumber(rec.droplet_limit) ? rec.droplet_limit : 0;
+    const status = snapshot.status;
+    const emailVerified = snapshot.email_verified;
+    const dropletLimit = snapshot.droplet_limit;
 
     if (status === "locked") {
       logWarn("Your DigitalOcean account is locked (usually a billing issue).");
@@ -654,11 +732,73 @@ async function tryDoOAuth(): Promise<string | null> {
   logStep("Opening browser to authorize with DigitalOcean...");
   openBrowser(authUrl);
 
-  // Wait up to 120 seconds
-  logStep("Waiting for authorization in browser (timeout: 120s)...");
-  const deadline = Date.now() + 120_000;
-  while (!oauthCode && !oauthDenied && Date.now() < deadline) {
+  // Initial wait window (after this, interactive TTY keeps the OAuth server up until callback or Escape)
+  logStep("Waiting for authorization in browser (extended-wait hint after 120s)...");
+  const initialDeadline = Date.now() + 120_000;
+  while (!oauthCode && !oauthDenied && Date.now() < initialDeadline) {
     await sleep(500);
+  }
+
+  if (!oauthCode && !oauthDenied && process.env.SPAWN_NON_INTERACTIVE === "1") {
+    server.stop(true);
+    logError("OAuth authentication timed out after 120 seconds");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
+    return null;
+  }
+
+  // Past the initial window without callback: keep OAuth server up and keep waiting
+  let manualTokenRequested = false;
+  if (!oauthCode && !oauthDenied) {
+    logWarn("Still waiting for you to complete authorization in your browser.");
+    if (isInteractiveTTY()) {
+      logInfo("Press Escape to enter a DigitalOcean API token instead.");
+
+      let pendingEscTimer: ReturnType<typeof setTimeout> | null = null;
+      const onData = (data: Buffer | string) => {
+        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
+        if (buf.length === 0) {
+          return;
+        }
+        if (pendingEscTimer) {
+          clearTimeout(pendingEscTimer);
+          pendingEscTimer = null;
+          return;
+        }
+        if (buf[0] === 0x1b && buf.length === 1) {
+          pendingEscTimer = setTimeout(() => {
+            pendingEscTimer = null;
+            manualTokenRequested = true;
+          }, 75);
+          return;
+        }
+        if (buf[0] === 0x1b && buf.length > 1 && (buf[1] === 0x5b || buf[1] === 0x4f)) {
+          return;
+        }
+      };
+
+      process.stdin.resume();
+      process.stdin.setRawMode?.(true);
+      process.stdin.on("data", onData);
+      const waitResult = await asyncTryCatch(async () => {
+        while (!oauthCode && !oauthDenied && !manualTokenRequested) {
+          await sleep(500);
+        }
+      });
+      if (pendingEscTimer) {
+        clearTimeout(pendingEscTimer);
+      }
+      process.stdin.off("data", onData);
+      process.stdin.setRawMode?.(false);
+      process.stdin.pause();
+      if (!waitResult.ok) {
+        throw waitResult.error;
+      }
+    } else {
+      while (!oauthCode && !oauthDenied) {
+        await sleep(500);
+      }
+    }
   }
 
   server.stop(true);
@@ -670,8 +810,13 @@ async function tryDoOAuth(): Promise<string | null> {
     return null;
   }
 
+  if (manualTokenRequested) {
+    logInfo("Switching to manual API token entry.");
+    return null;
+  }
+
   if (!oauthCode) {
-    logError("OAuth authentication timed out after 120 seconds");
+    logError("OAuth authentication did not complete");
     logError("Alternative: Use a manual API token instead");
     logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
     return null;
@@ -782,14 +927,6 @@ export async function ensureDoToken(): Promise<boolean> {
   }
 
   // 3. Try OAuth browser flow
-  // Show payment method reminder for first-time users (no saved config, no env token)
-  if (!saved && !envToken) {
-    process.stderr.write("\n");
-    logWarn("DigitalOcean requires a payment method before you can create servers.");
-    logWarn("If you haven't added one yet, visit: https://cloud.digitalocean.com/account/billing");
-    process.stderr.write("\n");
-  }
-
   const oauthToken = await tryDoOAuth();
   if (oauthToken) {
     _state.token = oauthToken;
@@ -1096,11 +1233,25 @@ export async function createServer(
     dropletConfig.user_data = getCloudInitUserdata(tier);
   }
 
-  const body = JSON.stringify(dropletConfig);
+  await ensureSpawnAttributionTag();
+  dropletConfig.tags = [
+    SPAWN_DIGITALOCEAN_ATTRIBUTION_TAG,
+  ];
+
+  let body = JSON.stringify(dropletConfig);
 
   // Wrap in asyncTryCatch so billing-related 403 errors thrown by doApi()
   // can be caught and handled before propagating as a generic "API error".
-  const createApiResult = await asyncTryCatch(() => doApi("POST", "/droplets", body));
+  let createApiResult = await asyncTryCatch(() => doApi("POST", "/droplets", body));
+  if (!createApiResult.ok && dropletConfig.tags) {
+    const tagErr = createApiResult.error.message;
+    if (/tag|scope|forbidden|403|unauthor/i.test(tagErr)) {
+      logWarn("Droplet tags unavailable for this token — creating without attribution tag.");
+      delete dropletConfig.tags;
+      body = JSON.stringify(dropletConfig);
+      createApiResult = await asyncTryCatch(() => doApi("POST", "/droplets", body));
+    }
+  }
   if (!createApiResult.ok) {
     const errMsg = createApiResult.error.message;
     logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
@@ -1516,7 +1667,8 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   logInfo("To delete from CLI:");
   logInfo("  spawn delete");
   logInfo("To reconnect:");
-  logInfo(`  ssh root@${serverIp}`);
+  logInfo("  spawn last");
+  logInfo(`  or: ssh root@${serverIp}`);
 
   return exitCode;
 }

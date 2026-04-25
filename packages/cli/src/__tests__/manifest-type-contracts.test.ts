@@ -361,6 +361,7 @@ describe("Agent metadata field types", () => {
         [
           "cli",
           "tui",
+          "gui",
           "ide-extension",
         ],
         `agent "${key}" category value`,

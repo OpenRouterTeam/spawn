@@ -5,16 +5,15 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import pkg from "../../package.json" with { type: "json" };
 import { runOrchestration } from "../shared/orchestrate.js";
+import { initTelemetry } from "../shared/telemetry.js";
 import { logInfo } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
   AGENT_MIN_SIZE,
-  checkAccountStatus,
   createServer as createDroplet,
   downloadFile,
-  ensureDoToken,
-  ensureSshKey,
   getConnectionInfo,
   getServerName,
   interactiveSession,
@@ -27,6 +26,7 @@ import {
   waitForCloudInit,
   waitForSshOnly,
 } from "./digitalocean.js";
+import { runDigitalOceanReadinessGate } from "./readiness.js";
 
 /** DO marketplace image slugs — hardcoded from vendor portal (approved 2026-03-13) */
 const MARKETPLACE_IMAGES: Record<string, string> = {
@@ -64,11 +64,11 @@ async function main() {
     },
     async authenticate() {
       await promptSpawnName();
-      await ensureDoToken();
-      await ensureSshKey();
     },
-    async checkAccountReady() {
-      await checkAccountStatus();
+    async ensureReadyBeforeSizing() {
+      await runDigitalOceanReadinessGate({
+        agentName,
+      });
     },
     async promptSize() {
       dropletSize = await promptDropletSize();
@@ -110,6 +110,7 @@ async function main() {
   await runOrchestration(cloud, agent, agentName);
 }
 
+initTelemetry(pkg.version);
 main().catch((err) => {
   process.stderr.write(`\x1b[0;31mFatal: ${getErrorMessage(err)}\x1b[0m\n`);
   process.exit(1);

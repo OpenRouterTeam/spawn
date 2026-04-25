@@ -1136,7 +1136,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
   logInfo("To delete from CLI:");
   logInfo("  spawn delete");
   logInfo("To reconnect:");
-  logInfo(`  gcloud compute ssh ${_state.instanceName} --zone=${_state.zone} --project=${_state.project}`);
+  logInfo("  spawn last");
+  logInfo(`  or: gcloud compute ssh ${_state.instanceName} --zone=${_state.zone} --project=${_state.project}`);
 
   return exitCode;
 }

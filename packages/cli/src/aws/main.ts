@@ -5,7 +5,9 @@
 import type { CloudOrchestrator } from "../shared/orchestrate.js";
 
 import { getErrorMessage } from "@openrouter/spawn-shared";
+import pkg from "../../package.json" with { type: "json" };
 import { runOrchestration } from "../shared/orchestrate.js";
+import { initTelemetry } from "../shared/telemetry.js";
 import { agents, resolveAgent } from "./agents.js";
 import {
   authenticate,
@@ -72,6 +74,7 @@ async function main() {
   await runOrchestration(cloud, agent, agentName);
 }
 
+initTelemetry(pkg.version);
 main().catch((err) => {
   process.stderr.write(`\x1b[0;31mFatal: ${getErrorMessage(err)}\x1b[0m\n`);
   process.exit(1);

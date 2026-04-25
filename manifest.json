@@ -340,6 +340,43 @@
         "agentic",
         "cursor"
       ]
+    },
+    "t3code": {
+      "name": "T3 Code",
+      "description": "Minimal web GUI for coding agents by Ping.gg — wraps Claude Code and Codex with a browser-based interface",
+      "url": "https://github.com/pingdotgg/t3code",
+      "install": "npm install -g t3",
+      "launch": "t3",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+        "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1"
+      },
+      "notes": "Web GUI that spawns Claude Code and Codex as subprocesses via node-pty. OpenRouter integration works through inherited env vars on the child agent processes. Requires Node.js 22+. Default port 3773.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/t3code.png",
+      "featured_cloud": [
+        "digitalocean",
+        "sprite"
+      ],
+      "creator": "Ping.gg",
+      "repo": "pingdotgg/t3code",
+      "license": "MIT",
+      "created": "2025-06",
+      "added": "2026-04",
+      "github_stars": 9500,
+      "stars_updated": "2026-04-18",
+      "language": "TypeScript",
+      "runtime": "node",
+      "category": "gui",
+      "tagline": "Minimal web GUI for coding agents — browse, code, and ship via Claude or Codex",
+      "tags": [
+        "coding",
+        "web-gui",
+        "wrapper",
+        "pinggg"
+      ]
     }
   },
   "clouds": {
@@ -518,6 +555,13 @@
     "digitalocean/cursor": "implemented",
     "gcp/cursor": "implemented",
     "daytona/cursor": "implemented",
-    "sprite/cursor": "implemented"
+    "sprite/cursor": "implemented",
+    "local/t3code": "implemented",
+    "hetzner/t3code": "implemented",
+    "aws/t3code": "implemented",
+    "digitalocean/t3code": "implemented",
+    "gcp/t3code": "implemented",
+    "daytona/t3code": "implemented",
+    "sprite/t3code": "implemented"
   }
 }

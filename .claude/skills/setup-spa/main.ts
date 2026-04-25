@@ -13,8 +13,10 @@ import {
   downloadSlackFile,
   findCandidate,
   findThread,
+  findTweet,
   formatToolStats,
   logDecision,
+  logTweetDecision,
   markdownToRichTextBlocks,
   openDb,
   PR_URL_REGEX,
@@ -26,8 +28,10 @@ import {
   stripMention,
   updateCandidateStatus,
   updateThread,
+  updateTweetStatus,
   upsertCandidate,
   upsertThread,
+  upsertTweet,
 } from "./helpers";
 
 type SlackClient = InstanceType<typeof App>["client"];
@@ -47,6 +51,8 @@ const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET ?? "";
 const REDDIT_USERNAME = process.env.REDDIT_USERNAME ?? "";
 const REDDIT_PASSWORD = process.env.REDDIT_PASSWORD ?? "";
 const REDDIT_USER_AGENT = `spawn-growth:v1.0.0 (by /u/${REDDIT_USERNAME})`;
+const X_CLIENT_ID = process.env.X_CLIENT_ID ?? "";
+const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET ?? "";
 
 for (const [name, value] of Object.entries({
   SLACK_BOT_TOKEN,
@@ -55,6 +61,195 @@ for (const [name, value] of Object.entries({
   if (!value) {
     console.error(`ERROR: ${name} env var is required`);
     process.exit(1);
+  }
+}
+
+// #endregion
+
+// #region X (Twitter) posting — OAuth 2.0 with PKCE token refresh
+
+interface XPostResult {
+  ok: boolean;
+  tweetId?: string;
+  tweetUrl?: string;
+  error?: string;
+}
+
+const XPostResponseSchema = v.object({
+  data: v.object({
+    id: v.string(),
+    text: v.string(),
+  }),
+});
+
+const XTokenResponseSchema = v.object({
+  access_token: v.string(),
+  refresh_token: v.optional(v.string()),
+  expires_in: v.optional(v.number()),
+});
+
+interface StoredTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+/** Load X OAuth 2.0 tokens from state.db. */
+function loadXTokens(): StoredTokens | null {
+  try {
+    const row = db
+      .query<
+        {
+          access_token: string;
+          refresh_token: string;
+          expires_at: number;
+        },
+        []
+      >("SELECT access_token, refresh_token, expires_at FROM x_tokens WHERE id = 1")
+      .get();
+    if (!row) return null;
+    return {
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      expiresAt: row.expires_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Save refreshed tokens back to state.db. */
+function saveXTokens(tokens: StoredTokens): void {
+  db.run(
+    `INSERT INTO x_tokens (id, access_token, refresh_token, expires_at, updated_at)
+     VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET
+       access_token  = excluded.access_token,
+       refresh_token = excluded.refresh_token,
+       expires_at    = excluded.expires_at,
+       updated_at    = excluded.updated_at`,
+    [
+      tokens.accessToken,
+      tokens.refreshToken,
+      tokens.expiresAt,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+/** Refresh the X OAuth 2.0 access token using the refresh token. */
+async function refreshXToken(refreshToken: string): Promise<StoredTokens | null> {
+  if (!X_CLIENT_ID || !X_CLIENT_SECRET) return null;
+
+  const basicAuth = Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[x-post] Token refresh failed: ${res.status}`);
+    return null;
+  }
+
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(XTokenResponseSchema, json);
+  if (!parsed.success) return null;
+
+  const newTokens: StoredTokens = {
+    accessToken: parsed.output.access_token,
+    refreshToken: parsed.output.refresh_token ?? refreshToken,
+    expiresAt: Date.now() + (parsed.output.expires_in ?? 7200) * 1000,
+  };
+  saveXTokens(newTokens);
+  return newTokens;
+}
+
+/** Get a valid X access token, refreshing if expired. */
+async function getXAccessToken(): Promise<string | null> {
+  const tokens = loadXTokens();
+  if (!tokens) return null;
+
+  // Refresh if expires within 5 minutes
+  if (Date.now() > tokens.expiresAt - 300_000) {
+    const refreshed = await refreshXToken(tokens.refreshToken);
+    return refreshed?.accessToken ?? null;
+  }
+
+  return tokens.accessToken;
+}
+
+/** Post a tweet (or reply) to X using OAuth 2.0 Bearer token. */
+async function postToX(text: string, replyToTweetId?: string): Promise<XPostResult> {
+  const accessToken = await getXAccessToken();
+  if (!accessToken) {
+    return {
+      ok: false,
+      error: "No X OAuth 2.0 tokens — run x-auth.ts to authorize",
+    };
+  }
+  if (!text || text.length > 280) {
+    return {
+      ok: false,
+      error: `Invalid tweet length (${text.length} chars)`,
+    };
+  }
+
+  const url = "https://api.x.com/2/tweets";
+  const payload: Record<string, unknown> = {
+    text,
+  };
+  if (replyToTweetId) {
+    payload.reply = {
+      in_reply_to_tweet_id: replyToTweetId,
+    };
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": "spawn-growth/1.0",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      return {
+        ok: false,
+        error: `X API ${res.status}: ${errBody.slice(0, 200)}`,
+      };
+    }
+
+    const json: unknown = await res.json();
+    const parsed = v.safeParse(XPostResponseSchema, json);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Unexpected X API response shape",
+      };
+    }
+
+    return {
+      ok: true,
+      tweetId: parsed.output.data.id,
+      tweetUrl: `https://x.com/i/status/${parsed.output.data.id}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -115,12 +310,26 @@ function sanitizeStdinInput(input: string): string {
 
 const SYSTEM_PROMPT = `You are SPA (Spawn's Personal Agent), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
-Your primary job is to help manage GitHub issues based on Slack conversations:
+Your primary job is to help manage GitHub issues and X/Twitter posts based on Slack conversations:
 
-1. **Create issues**: When a thread describes a bug, feature request, or task — create a GitHub issue with \`gh issue create --repo ${GITHUB_REPO}\`. Use a clear title and include the Slack context in the body.
-2. **Update issues**: When a thread references an existing issue (by number like #123) — add comments, update labels, or close issues as appropriate using \`gh issue comment\`, \`gh issue edit\`, etc.
+1. **Create issues**: When a thread describes a bug, feature request, or task, create a GitHub issue with \`gh issue create --repo ${GITHUB_REPO}\`. Use a clear title and include the Slack context in the body.
+2. **Update issues**: When a thread references an existing issue (by number like #123), add comments, update labels, or close issues as appropriate using \`gh issue comment\`, \`gh issue edit\`, etc.
 3. **Search issues**: When asked about existing issues, search with \`gh issue list --repo ${GITHUB_REPO}\` or \`gh issue view\`.
-4. **General help**: Answer questions about the Spawn codebase, suggest fixes, or help triage.
+4. **Post tweets to X/Twitter**: When a user asks to post to X/Twitter, run:
+   \`\`\`
+   TWEET_TEXT="<your tweet, max 280 chars>" bun run /home/lab/spawn/.claude/skills/setup-agent-team/x-post.ts
+   \`\`\`
+   Required env vars (X_CLIENT_ID, X_CLIENT_SECRET) are already in your environment. Tokens auto-refresh.
+   To reply to a tweet, also set \`REPLY_TO_TWEET_ID=<id>\`.
+   On success, the script prints JSON \`{"id":"...","text":"..."}\` — share the tweet URL \`https://x.com/i/status/<id>\` in the Slack thread.
+   **IMPORTANT**: Never use em dashes (—) or en dashes (–) in tweets. Use periods, commas, or rephrase. Em dashes are an AI tell.
+5. **Query tweet/reddit state**: Inspect pending or posted candidates with SQLite:
+   \`\`\`
+   sqlite3 ~/.config/spawn/state.db "SELECT tweet_text, status, posted_text FROM tweets ORDER BY created_at DESC LIMIT 10"
+   sqlite3 ~/.config/spawn/state.db "SELECT title, subreddit, status FROM candidates ORDER BY created_at DESC LIMIT 10"
+   \`\`\`
+   Use this to answer questions like "what tweets have we posted today?" or "what's in the queue?"
+6. **General help**: Answer questions about the Spawn codebase, suggest fixes, or help triage.
 
 Always use the \`gh\` CLI for GitHub operations. You are already authenticated.
 
@@ -1264,6 +1473,372 @@ app.action("growth_skip", async ({ ack, body, client }) => {
   }
 });
 
+// --- tweet_approve: post tweet to X ---
+app.action("tweet_approve", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const tweetId = payload && isString(payload.value) ? payload.value : "";
+  if (!tweetId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const tweet = findTweet(db, tweetId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  // Post to X
+  const xResult = await postToX(tweet.tweetText, tweet.sourceTweetId ?? undefined);
+
+  if (xResult.ok) {
+    updateTweetStatus(db, tweetId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: tweet.tweetText,
+    });
+    logTweetDecision(tweet, "approved");
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Posted to X by <@${userId}> — <${xResult.tweetUrl}|view tweet>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, tweetId, {
+      status: "error",
+      actionedBy: userId,
+    });
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Failed to post to X: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
+  }
+});
+
+// --- tweet_edit: open modal with tweet text for editing ---
+app.action("tweet_edit", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const tweetId = payload && isString(payload.value) ? payload.value : "";
+  if (!tweetId) return;
+
+  const triggerId = "trigger_id" in body && isString(body.trigger_id) ? body.trigger_id : "";
+  if (!triggerId) return;
+
+  const tweet = findTweet(db, tweetId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  await client.views
+    .open({
+      trigger_id: triggerId,
+      view: {
+        type: "modal",
+        callback_id: "tweet_edit_submit",
+        private_metadata: tweetId,
+        title: {
+          type: "plain_text",
+          text: "Edit Tweet",
+        },
+        submit: {
+          type: "plain_text",
+          text: "Save",
+        },
+        blocks: [
+          {
+            type: "input",
+            block_id: "tweet_block",
+            label: {
+              type: "plain_text",
+              text: "Tweet text",
+            },
+            element: {
+              type: "plain_text_input",
+              action_id: "tweet_text",
+              multiline: true,
+              max_length: 280,
+              initial_value: tweet.tweetText,
+            },
+          },
+        ],
+      },
+    })
+    .catch(() => {});
+});
+
+// --- tweet_edit_submit: modal submitted with edited tweet, post to X ---
+app.view("tweet_edit_submit", async ({ ack, view, body, client }) => {
+  await ack();
+  const tweetId = view.private_metadata;
+  if (!tweetId) return;
+
+  const tweet = findTweet(db, tweetId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  const tweetBlock = toRecord(view.state?.values?.tweet_block?.tweet_text);
+  const editedText = tweetBlock && isString(tweetBlock.value) ? tweetBlock.value : "";
+  if (!editedText || editedText.length > 280) return;
+
+  const userId = toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+
+  db.run("UPDATE tweets SET tweet_text = ? WHERE tweet_id = ?", [
+    editedText,
+    tweetId,
+  ]);
+
+  // Post edited tweet to X
+  const xResult = await postToX(editedText, tweet.sourceTweetId ?? undefined);
+
+  if (xResult.ok) {
+    updateTweetStatus(db, tweetId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Tweet edited & posted to X by <@${userId}> — <${xResult.tweetUrl}|view tweet>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, tweetId, {
+      status: "error",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Tweet edited but failed to post to X: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
+  }
+});
+
+// --- tweet_skip: skip this tweet ---
+app.action("tweet_skip", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const tweetId = payload && isString(payload.value) ? payload.value : "";
+  if (!tweetId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const tweet = findTweet(db, tweetId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  updateTweetStatus(db, tweetId, {
+    status: "skipped",
+    actionedBy: userId,
+  });
+  logTweetDecision(tweet, "skipped");
+
+  if (tweet.slackChannel && tweet.slackTs) {
+    await replaceButtonsWithStatus(
+      client,
+      tweet.slackChannel,
+      tweet.slackTs,
+      `:no_entry_sign: Skipped by <@${userId}>`,
+    );
+  }
+});
+
+// --- xeng_approve: post engagement reply to X ---
+app.action("xeng_approve", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const engageId = payload && isString(payload.value) ? payload.value : "";
+  if (!engageId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const tweet = findTweet(db, engageId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  const xResult = await postToX(tweet.tweetText, tweet.sourceTweetId ?? undefined);
+
+  if (xResult.ok) {
+    updateTweetStatus(db, engageId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: tweet.tweetText,
+    });
+    logTweetDecision(tweet, "approved");
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Reply posted by <@${userId}> <${xResult.tweetUrl}|view on X>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, engageId, {
+      status: "error",
+      actionedBy: userId,
+    });
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Failed to post reply: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
+  }
+});
+
+// --- xeng_edit: open modal with reply text for editing ---
+app.action("xeng_edit", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const engageId = payload && isString(payload.value) ? payload.value : "";
+  if (!engageId) return;
+
+  const triggerId = "trigger_id" in body && isString(body.trigger_id) ? body.trigger_id : "";
+  if (!triggerId) return;
+
+  const tweet = findTweet(db, engageId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  await client.views
+    .open({
+      trigger_id: triggerId,
+      view: {
+        type: "modal",
+        callback_id: "xeng_edit_submit",
+        private_metadata: engageId,
+        title: {
+          type: "plain_text",
+          text: "Edit Reply",
+        },
+        submit: {
+          type: "plain_text",
+          text: "Save",
+        },
+        blocks: [
+          {
+            type: "input",
+            block_id: "reply_block",
+            label: {
+              type: "plain_text",
+              text: "Reply text",
+            },
+            element: {
+              type: "plain_text_input",
+              action_id: "reply_text",
+              multiline: true,
+              max_length: 280,
+              initial_value: tweet.tweetText,
+            },
+          },
+        ],
+      },
+    })
+    .catch(() => {});
+});
+
+// --- xeng_edit_submit: modal submitted with edited reply, post to X ---
+app.view("xeng_edit_submit", async ({ ack, view, body, client }) => {
+  await ack();
+  const engageId = view.private_metadata;
+  if (!engageId) return;
+
+  const tweet = findTweet(db, engageId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  const replyBlock = toRecord(view.state?.values?.reply_block?.reply_text);
+  const editedText = replyBlock && isString(replyBlock.value) ? replyBlock.value : "";
+  if (!editedText || editedText.length > 280) return;
+
+  const userId = toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+
+  db.run("UPDATE tweets SET tweet_text = ? WHERE tweet_id = ?", [
+    editedText,
+    engageId,
+  ]);
+
+  const xResult = await postToX(editedText, tweet.sourceTweetId ?? undefined);
+
+  if (xResult.ok) {
+    updateTweetStatus(db, engageId, {
+      status: "posted",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await replaceButtonsWithStatus(
+        client,
+        tweet.slackChannel,
+        tweet.slackTs,
+        `:white_check_mark: Reply edited & posted by <@${userId}> <${xResult.tweetUrl}|view on X>`,
+      );
+    }
+  } else {
+    updateTweetStatus(db, engageId, {
+      status: "error",
+      actionedBy: userId,
+      postedText: editedText,
+    });
+    logTweetDecision(tweet, "edited", editedText);
+
+    if (tweet.slackChannel && tweet.slackTs) {
+      await client.chat
+        .postMessage({
+          channel: tweet.slackChannel,
+          thread_ts: tweet.slackTs,
+          text: `:x: Reply edited but failed to post: ${xResult.error}`,
+        })
+        .catch(() => {});
+    }
+  }
+});
+
+// --- xeng_skip: skip this engagement opportunity ---
+app.action("xeng_skip", async ({ ack, body, client }) => {
+  await ack();
+  const payload = toRecord("actions" in body && Array.isArray(body.actions) ? body.actions[0] : null);
+  const engageId = payload && isString(payload.value) ? payload.value : "";
+  if (!engageId) return;
+
+  const userId = "user" in body && toRecord(body.user) ? String((toRecord(body.user) ?? {}).id ?? "") : "";
+  const tweet = findTweet(db, engageId);
+  if (!tweet || tweet.status !== "pending") return;
+
+  updateTweetStatus(db, engageId, {
+    status: "skipped",
+    actionedBy: userId,
+  });
+  logTweetDecision(tweet, "skipped");
+
+  if (tweet.slackChannel && tweet.slackTs) {
+    await replaceButtonsWithStatus(
+      client,
+      tweet.slackChannel,
+      tweet.slackTs,
+      `:no_entry_sign: Skipped by <@${userId}>`,
+    );
+  }
+});
+
 /** Replace the actions block in a candidate card with a status context line. */
 async function replaceButtonsWithStatus(
   client: SlackClient,
@@ -1328,6 +1903,31 @@ const CandidatePayloadSchema = v.object({
   relevanceScore: v.optional(v.number()),
   draftReply: v.optional(v.string()),
   postsScanned: v.optional(v.number()),
+});
+
+const TweetPayloadSchema = v.object({
+  found: v.boolean(),
+  type: v.literal("tweet"),
+  tweetText: v.optional(v.string()),
+  topic: v.optional(v.string()),
+  category: v.optional(v.string()),
+  sourceCommits: v.optional(v.array(v.string())),
+  charCount: v.optional(v.number()),
+  reason: v.optional(v.string()),
+});
+
+const XEngagePayloadSchema = v.object({
+  found: v.boolean(),
+  type: v.literal("x_engage"),
+  replyText: v.optional(v.string()),
+  sourceTweetId: v.optional(v.string()),
+  sourceTweetUrl: v.optional(v.string()),
+  sourceTweetText: v.optional(v.string()),
+  sourceAuthor: v.optional(v.string()),
+  whyEngage: v.optional(v.string()),
+  relevanceScore: v.optional(v.number()),
+  charCount: v.optional(v.number()),
+  reason: v.optional(v.string()),
 });
 
 /** Timing-safe auth for the HTTP trigger endpoint. */
@@ -1534,6 +2134,266 @@ async function postCandidateCard(
   });
 }
 
+/** Post a tweet draft card to Slack for approval. */
+async function postTweetCard(client: SlackClient, payload: typeof TweetPayloadSchema._types.output): Promise<Response> {
+  const db = openDb();
+
+  if (!payload.found) {
+    const text = payload.reason ?? "No tweet-worthy content this cycle.";
+    await client.chat.postMessage({
+      channel: SLACK_CHANNEL_ID,
+      text,
+    });
+    return Response.json({
+      ok: true,
+      action: "no_tweet",
+    });
+  }
+
+  const tweetText = payload.tweetText ?? "";
+  const topic = payload.topic ?? "Spawn update";
+  const category = payload.category ?? "feature";
+  const commits = payload.sourceCommits ?? [];
+  const charCount = payload.charCount ?? tweetText.length;
+  const now = new Date();
+  const tweetId = `tweet_${now.toISOString().replace(/[-:T]/g, "").slice(0, 15)}`;
+
+  const commitLinks = commits
+    .slice(0, 5)
+    .map((h) => `<https://github.com/${GITHUB_REPO}/commit/${h}|${h.slice(0, 7)}>`)
+    .join(", ");
+
+  const categoryIcon = category === "fix" ? ":wrench:" : category === "best-practice" ? ":bulb:" : ":rocket:";
+
+  const blocks: KnownBlock[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🐦 Tweet Draft — " + category,
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `>${tweetText.replace(/\n/g, "\n>")}`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `${categoryIcon} *${category}* | ${charCount}/280 chars${commitLinks ? ` | Commits: ${commitLinks}` : ""}`,
+        },
+      ],
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Topic:* ${topic}`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Approve",
+            emoji: true,
+          },
+          style: "primary",
+          action_id: "tweet_approve",
+          value: tweetId,
+        },
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Edit",
+            emoji: true,
+          },
+          action_id: "tweet_edit",
+          value: tweetId,
+        },
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Skip",
+            emoji: true,
+          },
+          style: "danger",
+          action_id: "tweet_skip",
+          value: tweetId,
+        },
+      ],
+    },
+  ];
+
+  const msg = await client.chat.postMessage({
+    channel: SLACK_CHANNEL_ID,
+    text: `🐦 Tweet draft: ${topic}`,
+    blocks,
+  });
+
+  upsertTweet(db, {
+    tweetId,
+    tweetText,
+    topic,
+    category,
+    sourceCommits: commits.length > 0 ? JSON.stringify(commits) : undefined,
+    slackChannel: SLACK_CHANNEL_ID,
+    slackTs: msg.ts ?? undefined,
+    status: "pending",
+    createdAt: now.toISOString(),
+  });
+
+  return Response.json({
+    ok: true,
+    action: "posted",
+    tweetId,
+  });
+}
+
+/** Post an X engagement opportunity card to Slack for approval. */
+async function postXEngageCard(
+  client: SlackClient,
+  payload: typeof XEngagePayloadSchema._types.output,
+): Promise<Response> {
+  const db = openDb();
+
+  if (!payload.found) {
+    const text = payload.reason ?? "No engagement opportunities this cycle.";
+    await client.chat.postMessage({
+      channel: SLACK_CHANNEL_ID,
+      text,
+    });
+    return Response.json({
+      ok: true,
+      action: "no_engage",
+    });
+  }
+
+  const replyText = payload.replyText ?? "";
+  const sourceUrl = payload.sourceTweetUrl ?? "";
+  const sourceText = payload.sourceTweetText ?? "";
+  const sourceAuthor = payload.sourceAuthor ?? "unknown";
+  const whyEngage = payload.whyEngage ?? "";
+  const relevance = payload.relevanceScore ?? 0;
+  const charCount = payload.charCount ?? replyText.length;
+  const now = new Date();
+  const engageId = `xeng_${now.toISOString().replace(/[-:T]/g, "").slice(0, 15)}`;
+
+  const blocks: KnownBlock[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🔍 X Mention — Engagement Opportunity",
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*<${sourceUrl}|@${sourceAuthor}>:*\n>${sourceText.slice(0, 500).replace(/\n/g, "\n>")}`,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Why engage:* ${whyEngage}`,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Draft reply:*\n>${replyText.replace(/\n/g, "\n>")}`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `Relevance: ${relevance}/10 | ${charCount}/280 chars`,
+        },
+      ],
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Approve",
+            emoji: true,
+          },
+          style: "primary",
+          action_id: "xeng_approve",
+          value: engageId,
+        },
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Edit",
+            emoji: true,
+          },
+          action_id: "xeng_edit",
+          value: engageId,
+        },
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "Skip",
+            emoji: true,
+          },
+          style: "danger",
+          action_id: "xeng_skip",
+          value: engageId,
+        },
+      ],
+    },
+  ];
+
+  const msg = await client.chat.postMessage({
+    channel: SLACK_CHANNEL_ID,
+    text: `🔍 X engagement: @${sourceAuthor}`,
+    blocks,
+  });
+
+  upsertTweet(db, {
+    tweetId: engageId,
+    tweetText: replyText,
+    topic: `Reply to @${sourceAuthor}`,
+    category: "engage",
+    sourceTweetId: payload.sourceTweetId ?? undefined,
+    replyToUrl: sourceUrl || undefined,
+    slackChannel: SLACK_CHANNEL_ID,
+    slackTs: msg.ts ?? undefined,
+    status: "pending",
+    createdAt: now.toISOString(),
+  });
+
+  return Response.json({
+    ok: true,
+    action: "posted",
+    engageId,
+  });
+}
+
 /** Get a Reddit OAuth access token. */
 async function getRedditToken(): Promise<string | null> {
   if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET || !REDDIT_USERNAME || !REDDIT_PASSWORD) {
@@ -1549,8 +2409,14 @@ async function getRedditToken(): Promise<string | null> {
     },
     body: `grant_type=password&username=${encodeURIComponent(REDDIT_USERNAME)}&password=${encodeURIComponent(REDDIT_PASSWORD)}`,
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  return typeof data.access_token === "string" ? data.access_token : null;
+  const json: unknown = await res.json();
+  const parsed = v.safeParse(
+    v.object({
+      access_token: v.string(),
+    }),
+    json,
+  );
+  return parsed.success ? parsed.output.access_token : null;
 }
 
 /** Post a reply to a Reddit thread. Returns the comment URL or an error. */
@@ -1578,10 +2444,16 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
     body: `thing_id=${encodeURIComponent(postId)}&text=${encodeURIComponent(replyText)}`,
   });
 
-  const data = (await res.json()) as Record<string, unknown>;
+  const json: unknown = await res.json();
 
   if (!res.ok) {
-    const errMsg = typeof data.message === "string" ? data.message : `HTTP ${res.status}`;
+    const errParsed = v.safeParse(
+      v.object({
+        message: v.string(),
+      }),
+      json,
+    );
+    const errMsg = errParsed.success ? errParsed.output.message : `HTTP ${res.status}`;
     console.error(`[spa] Reddit reply failed: ${errMsg}`);
     return Response.json(
       {
@@ -1594,19 +2466,26 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
     );
   }
 
-  // Extract the comment URL from the response
-  const jquery = data.jquery as unknown[] | undefined;
+  // Reddit's legacy "comment" endpoint returns a jQuery-style response.
+  // Extract the permalink from nested arrays: jquery[n][3][m].data.permalink
+  const JqueryCommentSchema = v.object({
+    jquery: v.array(v.unknown()),
+  });
+  const JqueryInnerSchema = v.object({
+    data: v.object({
+      permalink: v.string(),
+    }),
+  });
+
   let commentUrl = "";
-  if (Array.isArray(jquery)) {
-    for (const item of jquery) {
+  const jqParsed = v.safeParse(JqueryCommentSchema, json);
+  if (jqParsed.success) {
+    for (const item of jqParsed.output.jquery) {
       if (Array.isArray(item) && item.length >= 4 && Array.isArray(item[3])) {
         for (const inner of item[3]) {
-          const rec = inner as Record<string, unknown> | undefined;
-          if (rec && typeof rec.data === "object" && rec.data !== null) {
-            const d = rec.data as Record<string, unknown>;
-            if (typeof d.permalink === "string") {
-              commentUrl = `https://reddit.com${d.permalink}`;
-            }
+          const innerParsed = v.safeParse(JqueryInnerSchema, inner);
+          if (innerParsed.success) {
+            commentUrl = `https://reddit.com${innerParsed.output.data.permalink}`;
           }
         }
       }
@@ -1621,10 +2500,19 @@ async function postRedditReply(postId: string, replyText: string): Promise<Respo
 }
 
 /** Simple token-bucket rate limiter: max 10 requests per minute per endpoint. */
-const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+const rateLimitBuckets = new Map<
+  string,
+  {
+    count: number;
+    resetAt: number;
+  }
+>();
 function checkRateLimit(endpoint: string): boolean {
   const now = Date.now();
-  const bucket = rateLimitBuckets.get(endpoint) ?? { count: 0, resetAt: now + 60_000 };
+  const bucket = rateLimitBuckets.get(endpoint) ?? {
+    count: 0,
+    resetAt: now + 60_000,
+  };
   if (now > bucket.resetAt) {
     bucket.count = 0;
     bucket.resetAt = now + 60_000;
@@ -1648,7 +2536,14 @@ function startHttpServer(client: SlackClient): void {
 
       if (req.method === "GET" && url.pathname === "/health") {
         if (!checkRateLimit("/health")) {
-          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
+          return Response.json(
+            {
+              error: "rate limit exceeded",
+            },
+            {
+              status: 429,
+            },
+          );
         }
         return Response.json({
           status: "ok",
@@ -1667,7 +2562,14 @@ function startHttpServer(client: SlackClient): void {
           );
         }
         if (!checkRateLimit("/candidate")) {
-          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
+          return Response.json(
+            {
+              error: "rate limit exceeded",
+            },
+            {
+              status: 429,
+            },
+          );
         }
 
         let body: unknown;
@@ -1682,6 +2584,36 @@ function startHttpServer(client: SlackClient): void {
               status: 400,
             },
           );
+        }
+
+        const bodyObj = toRecord(body);
+        if (bodyObj && bodyObj.type === "tweet") {
+          const parsed = v.safeParse(TweetPayloadSchema, body);
+          if (!parsed.success) {
+            return Response.json(
+              {
+                error: "invalid tweet payload",
+              },
+              {
+                status: 400,
+              },
+            );
+          }
+          return postTweetCard(client, parsed.output);
+        }
+        if (bodyObj && bodyObj.type === "x_engage") {
+          const parsed = v.safeParse(XEngagePayloadSchema, body);
+          if (!parsed.success) {
+            return Response.json(
+              {
+                error: "invalid engage payload",
+              },
+              {
+                status: 400,
+              },
+            );
+          }
+          return postXEngageCard(client, parsed.output);
         }
 
         const parsed = v.safeParse(CandidatePayloadSchema, body);
@@ -1712,7 +2644,14 @@ function startHttpServer(client: SlackClient): void {
           );
         }
         if (!checkRateLimit("/reply")) {
-          return Response.json({ error: "rate limit exceeded" }, { status: 429 });
+          return Response.json(
+            {
+              error: "rate limit exceeded",
+            },
+            {
+              status: 429,
+            },
+          );
         }
 
         const replySchema = v.object({

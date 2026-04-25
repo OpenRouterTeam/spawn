@@ -478,45 +478,31 @@ async function setupOpenclawConfig(
     await uploadConfigFile(runner, fallbackConfig, "$HOME/.openclaw/openclaw.json");
   }
 
-  // Always set the model after onboard — `openclaw onboard` may pick its own
-  // default (e.g. arcee/trinity-large-thinking) instead of openrouter/auto.
-  const modelResult = await asyncTryCatchIf(isOperationalError, () =>
-    runner.runServer(
-      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
-    ),
-  );
-  if (!modelResult.ok) {
-    logWarn("Model config failed (non-fatal)");
-  }
+  // Batch all `openclaw config set` calls into ONE exec to reduce Sprite
+  // connection overhead. Previously 4 separate exec calls, each triggering a
+  // "Config overwrite" log line from OpenClaw. On Sprite (container-exec, not
+  // persistent SSH), many sequential execs exhaust the connection and cause
+  // "connection closed" / "context deadline exceeded" on later steps.
+  //
+  // Each individual config set is chained with `;` (not `&&`) so a failure
+  // in one doesn't skip the rest — these are all non-fatal preferences.
+  const configCmds = [
+    // Model — openclaw onboard writes arcee/trinity-large-thinking to the
+    // agent-specific config (agents.main.model.primary) which overrides
+    // the defaults path. Set BOTH so our model always wins.
+    `openclaw config set agents.defaults.model.primary ${shellQuote(modelId)} >/dev/null`,
+    `openclaw config set agents.main.model.primary ${shellQuote(modelId)} >/dev/null`,
+    // Disable Docker sandboxing — auto-detected Docker hangs the session
+    "openclaw config set agents.defaults.sandbox.mode off >/dev/null",
+    "openclaw config set agents.main.sandbox.mode off >/dev/null",
+    // Browser (requires Chrome installed above)
+    "openclaw config set browser.executablePath /usr/bin/google-chrome-stable >/dev/null",
+    "openclaw config set browser.noSandbox true >/dev/null",
+    "openclaw config set browser.headless true >/dev/null",
+    "openclaw config set browser.defaultProfile openclaw >/dev/null",
+  ];
 
-  // Disable Docker sandboxing — when Docker is installed on the VM, openclaw
-  // auto-detects it and runs agents inside containers, which hangs the session.
-  await asyncTryCatchIf(isOperationalError, () =>
-    runner.runServer(
-      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set agents.defaults.sandbox.mode off >/dev/null",
-    ),
-  );
-
-  // Configure browser via CLI (openclaw config set) — the supported way to set
-  // browser options. Redirect stdout to suppress doctor warnings on each call.
-  const browserResult = await asyncTryCatchIf(isOperationalError, () =>
-    runner.runServer(
-      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        "openclaw config set browser.executablePath /usr/bin/google-chrome-stable >/dev/null; " +
-        "openclaw config set browser.noSandbox true >/dev/null; " +
-        "openclaw config set browser.headless true >/dev/null; " +
-        "openclaw config set browser.defaultProfile openclaw >/dev/null",
-    ),
-  );
-  if (!browserResult.ok) {
-    logWarn("Browser config setup failed (non-fatal)");
-  }
-
-  // Write channel stubs so the dashboard renders channel cards properly,
-  // even when the user hasn't configured them yet. Without stubs the
-  // dashboard shows "Unsupported type: . Use Raw mode."
+  // Channel stubs so the dashboard renders channel cards
   const channelNames = [
     "telegram",
     "whatsapp",
@@ -526,11 +512,17 @@ async function setupOpenclawConfig(
     "googlechat",
     "bluebubbles",
   ].filter((ch) => !enabledSteps || enabledSteps.has(ch));
-  if (channelNames.length > 0) {
-    const stubCmds = channelNames.map((ch) => `openclaw config set channels.${ch}.enabled true >/dev/null`).join("; ");
-    await asyncTryCatchIf(isOperationalError, () =>
-      runner.runServer("export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " + stubCmds),
-    );
+  for (const ch of channelNames) {
+    configCmds.push(`openclaw config set channels.${ch}.enabled true >/dev/null`);
+  }
+
+  const batchResult = await asyncTryCatchIf(isOperationalError, () =>
+    runner.runServer(
+      "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " + configCmds.join("; "),
+    ),
+  );
+  if (!batchResult.ok) {
+    logWarn("Some config settings may have failed (non-fatal)");
   }
 
   // Configure Telegram channel if a bot token was provided.
@@ -1405,6 +1397,34 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       promptCmd: (prompt) =>
         `source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; pi --prompt ${shellQuote(prompt)}`,
       updateCmd: `${NPM_AUTO_UPDATE_SETUP} && ` + "npm install -g $_NPM_G_FLAGS @mariozechner/pi-coding-agent@latest",
+    },
+
+    t3code: {
+      name: "T3 Code",
+      cloudInitTier: "node" satisfies AgentConfig["cloudInitTier"],
+      preProvision: detectGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "T3 Code",
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} t3 && ${NPM_GLOBAL_PATH_PERSIST}`,
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+        `ANTHROPIC_API_KEY=${apiKey}`,
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
+        `OPENAI_API_KEY=${apiKey}`,
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
+      ],
+      preLaunchMsg: "T3 Code web GUI will open automatically — use it to interact with Claude Code and Codex agents.",
+      launchCmd: () =>
+        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; t3 --port 3773 --host 0.0.0.0 --no-browser",
+      tunnel: {
+        remotePort: 3773,
+        browserUrl: (localPort: number) => `http://localhost:${localPort}`,
+      },
+      updateCmd:
+        'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"; ' + "npm install -g ${_NPM_G_FLAGS:-} t3@latest",
     },
 
     cursor: {

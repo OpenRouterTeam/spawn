@@ -2,7 +2,7 @@ name: Trigger Refactor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */2 * * *'
   issues:
     types: [opened, reopened, labeled]
   workflow_dispatch:

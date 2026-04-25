@@ -105,13 +105,21 @@ function getFirstExceptionEntry(
 describe("telemetry", () => {
   let originalFetch: typeof global.fetch;
   let originalTelemetry: string | undefined;
+  let originalBunEnv: string | undefined;
+  let originalNodeEnv: string | undefined;
   let fetchMock: ReturnType<typeof mock>;
 
   beforeEach(() => {
     originalFetch = global.fetch;
     originalTelemetry = process.env.SPAWN_TELEMETRY;
-    // Enable telemetry
+    originalBunEnv = process.env.BUN_ENV;
+    originalNodeEnv = process.env.NODE_ENV;
+    // Enable telemetry — these tests need initTelemetry() to actually flip
+    // _enabled to true so they can assert on the sent payloads. Clearing
+    // BUN_ENV/NODE_ENV lets the test-env guard in initTelemetry pass.
     delete process.env.SPAWN_TELEMETRY;
+    delete process.env.BUN_ENV;
+    delete process.env.NODE_ENV;
     // Mock fetch to capture PostHog payloads
     fetchMock = mock(() => Promise.resolve(new Response("ok")));
     global.fetch = fetchMock;
@@ -123,6 +131,16 @@ describe("telemetry", () => {
       process.env.SPAWN_TELEMETRY = originalTelemetry;
     } else {
       delete process.env.SPAWN_TELEMETRY;
+    }
+    if (originalBunEnv !== undefined) {
+      process.env.BUN_ENV = originalBunEnv;
+    } else {
+      delete process.env.BUN_ENV;
+    }
+    if (originalNodeEnv !== undefined) {
+      process.env.NODE_ENV = originalNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
     }
   });
 
@@ -411,6 +429,37 @@ describe("telemetry", () => {
       mod.captureError("test", new Error("should not send"));
       mod.captureEvent("should_not_send", {
         spawn_id: "abc",
+      });
+      await flushAndWait();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("does not send events when BUN_ENV=test (CI guard)", async () => {
+      process.env.BUN_ENV = "test";
+
+      const mod = await import("../shared/telemetry.js");
+      mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
+
+      mod.captureEvent("funnel_started", {
+        agent: "claude",
+      });
+      mod.captureError("test", new Error("ci"));
+      await flushAndWait();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("does not send events when NODE_ENV=test (CI guard)", async () => {
+      process.env.NODE_ENV = "test";
+
+      const mod = await import("../shared/telemetry.js");
+      mod.initTelemetry("0.0.0-test");
+      await drainStaleEvents();
+
+      mod.captureEvent("funnel_started", {
+        agent: "claude",
       });
       await flushAndWait();
 

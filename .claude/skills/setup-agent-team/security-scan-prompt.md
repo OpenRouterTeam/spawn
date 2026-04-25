@@ -21,7 +21,7 @@ Cleanup: `cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOL
 
 ## Issue Filing
 
-**DEDUP first**: `gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title --jq '.[].title'`
+**DEDUP first**: `gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title,author | jq --slurpfile c <(jq -R . /tmp/spawn-collaborators-cache | jq -s .) '[.[] | select(.author.login as $a | $c[0] | index($a))] | .[].title'`
 
 CRITICAL/HIGH → individual issues:
 `gh issue create --repo OpenRouterTeam/spawn --title "Security: [desc]" --body "**Severity**: [level]\n**File**: path:line\n**Category**: [type]\n\n### Description\n[details]\n\n### Remediation\n[steps]\n\n-- security/scan" --label "security" --label "safe-to-work"`

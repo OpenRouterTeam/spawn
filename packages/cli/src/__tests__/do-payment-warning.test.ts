@@ -1,8 +1,9 @@
 /**
  * do-payment-warning.test.ts
  *
- * Verifies that ensureDoToken() shows a proactive payment method reminder to
- * first-time DigitalOcean users who have no saved config and no env token.
+ * Verifies that ensureDoToken() does not show a preemptive payment-method banner
+ * before OAuth (billing guidance is shown when resolving the payment_required
+ * readiness step via handleBillingError).
  *
  * Uses spyOn on the real ui module to avoid mock.module contamination.
  */
@@ -16,7 +17,7 @@ mockClackPrompts();
 
 const { ensureDoToken } = await import("../digitalocean/digitalocean");
 
-describe("ensureDoToken — payment method warning for first-time users", () => {
+describe("ensureDoToken — no preemptive payment banner before OAuth", () => {
   const savedEnv: Record<string, string | undefined> = {};
   const originalFetch = globalThis.fetch;
   let stderrSpy: ReturnType<typeof spyOn>;
@@ -62,12 +63,12 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
     }
   });
 
-  it("shows payment method warning for first-time users (no saved token, no env var)", async () => {
+  it("does not show payment method warning for first-time users (no saved token, no env var)", async () => {
     await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
 
     const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
-    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(true);
-    expect(warnMessages.some((msg: string) => msg.includes("cloud.digitalocean.com/account/billing"))).toBe(true);
+    expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
+    expect(warnMessages.some((msg: string) => msg.includes("cloud.digitalocean.com/account/billing"))).toBe(false);
   });
 
   it("does NOT show payment warning when a saved token exists (returning user)", async () => {
@@ -104,14 +105,5 @@ describe("ensureDoToken — payment method warning for first-time users", () => 
 
     const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
     expect(warnMessages.some((msg: string) => msg.includes("payment method"))).toBe(false);
-  });
-
-  it("billing URL in warning points to the DigitalOcean billing page", async () => {
-    await expect(ensureDoToken()).rejects.toThrow("User chose to exit");
-
-    const warnMessages = warnSpy.mock.calls.map((c: unknown[]) => String(c[0]));
-    const billingWarning = warnMessages.find((msg: string) => msg.includes("billing"));
-    expect(billingWarning).toBeDefined();
-    expect(billingWarning).toContain("https://cloud.digitalocean.com/account/billing");
   });
 });

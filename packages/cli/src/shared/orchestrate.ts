@@ -100,6 +100,8 @@ export interface CloudOrchestrator {
   skipCloudInit?: boolean;
   authenticate(): Promise<void>;
   checkAccountReady?(): Promise<void>;
+  /** DigitalOcean: blocking readiness (account, SSH, OpenRouter) before region/size. */
+  ensureReadyBeforeSizing?(): Promise<void>;
   promptSize(): Promise<void>;
   createServer(name: string): Promise<VMConnection>;
   getServerName(): Promise<string>;
@@ -315,7 +317,11 @@ export async function runOrchestration(
   agentName: string,
   options?: OrchestrationOptions,
 ): Promise<void> {
-  logInfo(`${agent.name} on ${cloud.cloudLabel}`);
+  if (cloud.cloudName === "digitalocean") {
+    logStep(`Starting guided ${agent.name} on ${cloud.cloudLabel}`);
+  } else {
+    logInfo(`${agent.name} on ${cloud.cloudLabel}`);
+  }
   process.stderr.write("\n");
 
   // Funnel telemetry: mark the start of the onboarding pipeline and attach
@@ -325,223 +331,237 @@ export async function runOrchestration(
   setTelemetryContext("cloud", cloud.cloudName);
   trackFunnel("funnel_started");
 
-  // 1. Authenticate with cloud provider
-  await cloud.authenticate();
-  trackFunnel("funnel_cloud_authed");
+  const orchestrationResult = await asyncTryCatch(async () => {
+    // 1. Authenticate with cloud provider
+    await cloud.authenticate();
+    trackFunnel("funnel_cloud_authed");
 
-  const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
-  const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
-  const useTarball = fastMode || betaFeatures.has("tarball");
+    if (cloud.ensureReadyBeforeSizing) {
+      await cloud.ensureReadyBeforeSizing();
+    }
 
-  // Skip cloud-init for minimal-tier agents when using tarballs or snapshots.
-  // Ubuntu 24.04 base images already have curl + git, so minimal agents (claude,
-  // opencode, hermes) don't need the cloud-init package install step.
-  // This saves ~30-60s by just waiting for SSH instead of polling for cloud-init completion.
-  if (
-    cloud.cloudName !== "local" &&
-    (useTarball || cloud.skipAgentInstall) &&
-    (agent.cloudInitTier === "minimal" || !agent.cloudInitTier)
-  ) {
-    cloud.skipCloudInit = true;
-  }
+    const betaFeatures = new Set((process.env.SPAWN_BETA ?? "").split(",").filter(Boolean));
+    const fastMode = process.env.SPAWN_FAST === "1" || betaFeatures.has("parallel");
+    const useTarball = fastMode || betaFeatures.has("tarball");
 
-  // 1b. Size/bundle selection (must happen before createServer)
-  await cloud.promptSize();
+    // Skip cloud-init for minimal-tier agents when using tarballs or snapshots.
+    // Ubuntu 24.04 base images already have curl + git, so minimal agents (claude,
+    // opencode, hermes) don't need the cloud-init package install step.
+    // This saves ~30-60s by just waiting for SSH instead of polling for cloud-init completion.
+    if (
+      cloud.cloudName !== "local" &&
+      (useTarball || cloud.skipAgentInstall) &&
+      (agent.cloudInitTier === "minimal" || !agent.cloudInitTier)
+    ) {
+      cloud.skipCloudInit = true;
+    }
 
-  // 2. Provision server
-  const spawnId = generateSpawnId();
-  const serverName = await cloud.getServerName();
+    // 1b. Size/bundle selection (must happen before createServer)
+    await cloud.promptSize();
 
-  if (fastMode && cloud.cloudName !== "local") {
-    // ── Fast mode: server boot + setup prompts run concurrently ─────────
-    // Start server creation, then do API key prompt, pre-provision, tarball
-    // download, and account check in parallel with server boot.
-    //
-    // Keep a dummy timer on the event loop so Bun doesn't exit prematurely.
-    // When all concurrent promises settle (especially after Bun.serve.stop()
-    // in the OAuth flow removes its handle), the event loop can appear empty
-    // before the continuation starts new I/O — causing a silent exit(0).
-    const keepAlive = setInterval(() => {}, 60_000);
+    // 2. Provision server
+    const spawnId = generateSpawnId();
+    const serverName = await cloud.getServerName();
 
-    const serverBootPromise = (async () => {
-      const conn = await cloud.createServer(serverName);
-      recordSpawn(spawnId, agentName, cloud.cloudName, conn);
-      await cloud.waitForReady();
-      return conn;
-    })();
+    if (fastMode && cloud.cloudName !== "local") {
+      // ── Fast mode: server boot + setup prompts run concurrently ─────────
+      // Start server creation, then do API key prompt, pre-provision, tarball
+      // download, and account check in parallel with server boot.
+      //
+      // Keep a dummy timer on the event loop so Bun doesn't exit prematurely.
+      // When all concurrent promises settle (especially after Bun.serve.stop()
+      // in the OAuth flow removes its handle), the event loop can appear empty
+      // before the continuation starts new I/O — causing a silent exit(0).
+      const keepAlive = setInterval(() => {}, 60_000);
 
-    const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
+      const serverBootPromise = (async () => {
+        const conn = await cloud.createServer(serverName);
+        recordSpawn(spawnId, agentName, cloud.cloudName, conn);
+        await cloud.waitForReady();
+        return conn;
+      })();
 
-    // These all run concurrently with server boot
-    const [bootResult, apiKeyResult] = await Promise.allSettled([
-      serverBootPromise,
-      resolveApiKey(agentName, cloud.cloudName),
-      cloud.checkAccountReady
-        ? asyncTryCatch(() => cloud.checkAccountReady!())
-        : Promise.resolve({
-            ok: true,
-          }),
-      agent.preProvision
-        ? asyncTryCatch(() => agent.preProvision!())
-        : Promise.resolve({
-            ok: true,
-          }),
-    ]);
+      const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
 
-    // Server boot must succeed — retry if it failed
-    if (bootResult.status === "rejected") {
-      logError(getErrorMessage(bootResult.reason));
-      await retryOrQuit("Retry server creation?");
-      // User chose to retry — fall through to sequential path which has full retry loops
-      // (Re-running the concurrent path would re-prompt for API key, etc.)
-      const connection = await cloud.createServer(serverName);
+      // These all run concurrently with server boot
+      const [bootResult, apiKeyResult] = await Promise.allSettled([
+        serverBootPromise,
+        resolveApiKey(agentName, cloud.cloudName),
+        cloud.cloudName === "digitalocean"
+          ? Promise.resolve({
+              ok: true as const,
+            })
+          : cloud.checkAccountReady
+            ? asyncTryCatch(() => cloud.checkAccountReady!())
+            : Promise.resolve({
+                ok: true,
+              }),
+        agent.preProvision
+          ? asyncTryCatch(() => agent.preProvision!())
+          : Promise.resolve({
+              ok: true,
+            }),
+      ]);
+
+      // Server boot must succeed — retry if it failed
+      if (bootResult.status === "rejected") {
+        logError(getErrorMessage(bootResult.reason));
+        await retryOrQuit("Retry server creation?");
+        // User chose to retry — fall through to sequential path which has full retry loops
+        // (Re-running the concurrent path would re-prompt for API key, etc.)
+        const connection = await cloud.createServer(serverName);
+        recordSpawn(spawnId, agentName, cloud.cloudName, connection);
+        await cloud.waitForReady();
+      }
+      trackFunnel("funnel_vm_ready");
+
+      // API key must succeed
+      if (apiKeyResult.status === "rejected") {
+        throw apiKeyResult.reason;
+      }
+      const apiKey = apiKeyResult.value;
+      trackFunnel("funnel_credentials_ready");
+
+      // Model ID
+      const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
+      const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+      if (rawModelId && !modelId) {
+        logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+      }
+
+      // Env config (computed locally, no SSH needed)
+      const envPairs = agent.envVars(apiKey);
+      if (modelId && agent.modelEnvVar) {
+        envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+      }
+      if (betaFeatures.has("recursive")) {
+        appendRecursiveEnvVars(envPairs, spawnId);
+      }
+      const envContent = generateEnvConfig(envPairs);
+
+      // Install agent — remote tarball, fallback to live install
+      if (cloud.skipAgentInstall) {
+        logInfo("Snapshot boot — skipping agent install");
+      } else {
+        let installed = false;
+        if (useTarball && !agent.skipTarball) {
+          const tarball = options?.tryTarball ?? tryTarballInstall;
+          installed = await tarball(cloud.runner, agentName);
+        }
+        if (!installed) {
+          for (;;) {
+            const r = await asyncTryCatch(() => agent.install());
+            if (r.ok) {
+              break;
+            }
+            logError(getErrorMessage(r.error));
+            await retryOrQuit("Retry agent install?");
+          }
+        }
+      }
+      trackFunnel("funnel_install_completed");
+
+      // Inject env + continue with shared post-install flow
+      clearInterval(keepAlive);
+      await injectEnvVars(cloud, envContent);
+      await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
+    } else {
+      // ── Standard sequential flow ────────────────────────────────────────
+
+      // 1b. Pre-flight account readiness check (DigitalOcean uses ensureReadyBeforeSizing instead)
+      if (cloud.checkAccountReady && cloud.cloudName !== "digitalocean") {
+        const r = await asyncTryCatch(() => cloud.checkAccountReady!());
+        if (!r.ok) {
+          logWarn("Account readiness check failed — proceeding anyway");
+          logDebug(getErrorMessage(r.error));
+        }
+      }
+
+      // 2. Get API key
+      const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
+      const apiKey = await resolveApiKey(agentName, cloud.cloudName);
+      trackFunnel("funnel_credentials_ready");
+
+      // 3. Pre-provision hooks
+      if (agent.preProvision) {
+        const r = await asyncTryCatch(() => agent.preProvision!());
+        if (!r.ok) {
+          logWarn("Pre-provision hook failed — continuing");
+          logDebug(getErrorMessage(r.error));
+        }
+      }
+
+      // 4. Model ID
+      const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
+      const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+      if (rawModelId && !modelId) {
+        logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+      }
+
+      // 5. Provision server (retry loop)
+      let connection: VMConnection;
+      for (;;) {
+        const r = await asyncTryCatch(() => cloud.createServer(serverName));
+        if (r.ok) {
+          connection = r.data;
+          break;
+        }
+        logError(getErrorMessage(r.error));
+        await retryOrQuit("Retry server creation?");
+      }
       recordSpawn(spawnId, agentName, cloud.cloudName, connection);
-      await cloud.waitForReady();
-    }
-    trackFunnel("funnel_vm_ready");
 
-    // API key must succeed
-    if (apiKeyResult.status === "rejected") {
-      throw apiKeyResult.reason;
-    }
-    const apiKey = apiKeyResult.value;
-    trackFunnel("funnel_credentials_ready");
-
-    // Model ID
-    const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
-    const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
-    if (rawModelId && !modelId) {
-      logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
-    }
-
-    // Env config (computed locally, no SSH needed)
-    const envPairs = agent.envVars(apiKey);
-    if (modelId && agent.modelEnvVar) {
-      envPairs.push(`${agent.modelEnvVar}=${modelId}`);
-    }
-    if (betaFeatures.has("recursive")) {
-      appendRecursiveEnvVars(envPairs, spawnId);
-    }
-    const envContent = generateEnvConfig(envPairs);
-
-    // Install agent — remote tarball, fallback to live install
-    if (cloud.skipAgentInstall) {
-      logInfo("Snapshot boot — skipping agent install");
-    } else {
-      let installed = false;
-      if (useTarball && !agent.skipTarball) {
-        const tarball = options?.tryTarball ?? tryTarballInstall;
-        installed = await tarball(cloud.runner, agentName);
+      // 6. Wait for readiness (retry loop)
+      for (;;) {
+        const r = await asyncTryCatch(() => cloud.waitForReady());
+        if (r.ok) {
+          break;
+        }
+        logError(getErrorMessage(r.error));
+        await retryOrQuit("Server may still be starting. Keep waiting?");
       }
-      if (!installed) {
-        for (;;) {
-          const r = await asyncTryCatch(() => agent.install());
-          if (r.ok) {
-            break;
+      trackFunnel("funnel_vm_ready");
+
+      // 7. Env config
+      const envPairs = agent.envVars(apiKey);
+      if (modelId && agent.modelEnvVar) {
+        envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+      }
+      if (betaFeatures.has("recursive")) {
+        appendRecursiveEnvVars(envPairs, spawnId);
+      }
+      const envContent = generateEnvConfig(envPairs);
+
+      // 8. Install agent
+      if (cloud.skipAgentInstall) {
+        logInfo("Snapshot boot — skipping agent install");
+      } else {
+        let installedFromTarball = false;
+        if (cloud.cloudName !== "local" && !agent.skipTarball && useTarball) {
+          const tarball = options?.tryTarball ?? tryTarballInstall;
+          installedFromTarball = await tarball(cloud.runner, agentName);
+        }
+        if (!installedFromTarball) {
+          for (;;) {
+            const r = await asyncTryCatch(() => agent.install());
+            if (r.ok) {
+              break;
+            }
+            logError(getErrorMessage(r.error));
+            await retryOrQuit("Retry agent install?");
           }
-          logError(getErrorMessage(r.error));
-          await retryOrQuit("Retry agent install?");
         }
       }
+      trackFunnel("funnel_install_completed");
+
+      // Inject env + continue with shared post-install flow
+      await injectEnvVars(cloud, envContent);
+      await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
     }
-    trackFunnel("funnel_install_completed");
+  });
 
-    // Inject env + continue with shared post-install flow
-    clearInterval(keepAlive);
-    await injectEnvVars(cloud, envContent);
-    await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
-  } else {
-    // ── Standard sequential flow ────────────────────────────────────────
-
-    // 1b. Pre-flight account readiness check
-    if (cloud.checkAccountReady) {
-      const r = await asyncTryCatch(() => cloud.checkAccountReady!());
-      if (!r.ok) {
-        logWarn("Account readiness check failed — proceeding anyway");
-        logDebug(getErrorMessage(r.error));
-      }
-    }
-
-    // 2. Get API key
-    const resolveApiKey = options?.getApiKey ?? getOrPromptApiKey;
-    const apiKey = await resolveApiKey(agentName, cloud.cloudName);
-    trackFunnel("funnel_credentials_ready");
-
-    // 3. Pre-provision hooks
-    if (agent.preProvision) {
-      const r = await asyncTryCatch(() => agent.preProvision!());
-      if (!r.ok) {
-        logWarn("Pre-provision hook failed — continuing");
-        logDebug(getErrorMessage(r.error));
-      }
-    }
-
-    // 4. Model ID
-    const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
-    const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
-    if (rawModelId && !modelId) {
-      logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
-    }
-
-    // 5. Provision server (retry loop)
-    let connection: VMConnection;
-    for (;;) {
-      const r = await asyncTryCatch(() => cloud.createServer(serverName));
-      if (r.ok) {
-        connection = r.data;
-        break;
-      }
-      logError(getErrorMessage(r.error));
-      await retryOrQuit("Retry server creation?");
-    }
-    recordSpawn(spawnId, agentName, cloud.cloudName, connection);
-
-    // 6. Wait for readiness (retry loop)
-    for (;;) {
-      const r = await asyncTryCatch(() => cloud.waitForReady());
-      if (r.ok) {
-        break;
-      }
-      logError(getErrorMessage(r.error));
-      await retryOrQuit("Server may still be starting. Keep waiting?");
-    }
-    trackFunnel("funnel_vm_ready");
-
-    // 7. Env config
-    const envPairs = agent.envVars(apiKey);
-    if (modelId && agent.modelEnvVar) {
-      envPairs.push(`${agent.modelEnvVar}=${modelId}`);
-    }
-    if (betaFeatures.has("recursive")) {
-      appendRecursiveEnvVars(envPairs, spawnId);
-    }
-    const envContent = generateEnvConfig(envPairs);
-
-    // 8. Install agent
-    if (cloud.skipAgentInstall) {
-      logInfo("Snapshot boot — skipping agent install");
-    } else {
-      let installedFromTarball = false;
-      if (cloud.cloudName !== "local" && !agent.skipTarball && useTarball) {
-        const tarball = options?.tryTarball ?? tryTarballInstall;
-        installedFromTarball = await tarball(cloud.runner, agentName);
-      }
-      if (!installedFromTarball) {
-        for (;;) {
-          const r = await asyncTryCatch(() => agent.install());
-          if (r.ok) {
-            break;
-          }
-          logError(getErrorMessage(r.error));
-          await retryOrQuit("Retry agent install?");
-        }
-      }
-    }
-    trackFunnel("funnel_install_completed");
-
-    // Inject env + continue with shared post-install flow
-    await injectEnvVars(cloud, envContent);
-    await postInstall(cloud, agent, agentName, apiKey, modelId, spawnId, options);
+  if (!orchestrationResult.ok) {
+    throw orchestrationResult.error;
   }
 }
 
@@ -917,7 +937,7 @@ async function postInstall(
   if (isConnectionDrop(exitCode)) {
     process.stderr.write("\n");
     logWarn("Could not reconnect. Server is still running.");
-    logInfo("Reconnect manually: spawn connect");
+    logInfo("Reconnect manually: spawn last");
   }
 
   if (tunnelHandle) {

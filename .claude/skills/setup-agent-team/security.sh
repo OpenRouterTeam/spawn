@@ -41,6 +41,21 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
     fi
 fi
 
+# --- Collaborator gate (OSS readiness) ---
+GATE_SCRIPT="${SCRIPT_DIR}/../../../.claude/scripts/collaborator-gate.sh"
+if [[ -f "${GATE_SCRIPT}" ]]; then
+    source "${GATE_SCRIPT}"
+fi
+
+if [[ -n "${SPAWN_ISSUE}" ]]; then
+    if command -v is_issue_from_collaborator &>/dev/null; then
+        if ! is_issue_from_collaborator "${SPAWN_ISSUE}"; then
+            echo "[security] Skipping issue #${SPAWN_ISSUE} — author is not a collaborator" >&2
+            exit 0
+        fi
+    fi
+fi
+
 if [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
     # Workflow passed raw event_name — detect mode from issue labels
     if gh issue view "${SPAWN_ISSUE}" --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name' 2>/dev/null | grep -q '^team-building$'; then
@@ -320,8 +335,12 @@ HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
 # Run claude in background, output goes to log file.
-# Triage uses gemini-3-flash (lightweight safety check); other modes use default (Opus) for team lead.
-CLAUDE_MODEL_FLAG=""
+# Triage uses gemini-3-flash (lightweight safety check).
+# All other modes use Sonnet for the team lead — the lead's job is coordination
+# (spawn teammates, monitor, shut down), not deep reasoning. Opus is 5x more
+# expensive on output tokens and the quality difference for coordination is
+# negligible. Teammates (spawned by the lead) use their own model flags.
+CLAUDE_MODEL_FLAG="--model sonnet"
 if [[ "${RUN_MODE}" == "triage" ]]; then
     CLAUDE_MODEL_FLAG="--model google/gemini-3-flash-preview"
 fi

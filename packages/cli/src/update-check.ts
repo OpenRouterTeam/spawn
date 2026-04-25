@@ -89,13 +89,6 @@ function compareVersions(current: string, latest: string): boolean {
   return false;
 }
 
-/** Check if two versions share the same major.minor (e.g. 1.0.x). */
-function isSameMinor(current: string, latest: string): boolean {
-  const c = parseSemver(current);
-  const l = parseSemver(latest);
-  return c[0] === l[0] && c[1] === l[1];
-}
-
 // ── Failure Backoff ──────────────────────────────────────────────────────────
 
 function isUpdateBackedOff(): boolean {
@@ -439,25 +432,22 @@ export async function checkForUpdates(jsonOutput = false): Promise<void> {
 
   // Notify (or auto-install) if a newer version is available.
   if (compareVersions(VERSION, latestVersion)) {
-    // Update policy, semver-aligned:
+    // Update policy:
     //
-    //   PATCH bumps (same major.minor, e.g. 1.0.5 → 1.0.7) are always
-    //   auto-installed. Patches are reserved for bug fixes and security
-    //   hardening — users benefit from getting them without opting in, and
-    //   the blast radius is bounded by semver: no behavior changes, no
-    //   breaking changes, no new features.
+    //   PATCH and MINOR bumps (e.g. 1.0.5 → 1.0.7, 1.0.x → 1.1.0) are
+    //   auto-installed. These contain bug fixes, security hardening, and
+    //   new features that users benefit from getting promptly.
     //
-    //   MINOR / MAJOR bumps (e.g. 1.0.x → 1.1.0, 1.x.x → 2.0.0) respect
-    //   SPAWN_AUTO_UPDATE=1 as opt-in. These can contain behavior changes
-    //   and users should decide when to move to them.
+    //   MAJOR bumps (e.g. 1.x.x → 2.0.0) respect SPAWN_AUTO_UPDATE=1
+    //   as opt-in, since these can contain breaking changes.
     //
-    //   SPAWN_NO_AUTO_UPDATE=1 lets users opt OUT of patch-level auto-update
-    //   entirely if they need a fully pinned CLI (CI environments, etc.).
-    const patchOnly = isSameMinor(VERSION, latestVersion);
+    //   SPAWN_NO_AUTO_UPDATE=1 lets users opt OUT of auto-update entirely
+    //   if they need a fully pinned CLI (CI environments, etc.).
+    const sameMajor = parseSemver(VERSION)[0] === parseSemver(latestVersion)[0];
     const explicitOptOut = process.env.SPAWN_NO_AUTO_UPDATE === "1";
     const explicitOptIn = process.env.SPAWN_AUTO_UPDATE === "1";
 
-    const shouldAutoInstall = !explicitOptOut && (patchOnly || explicitOptIn);
+    const shouldAutoInstall = !explicitOptOut && (sameMajor || explicitOptIn);
 
     if (shouldAutoInstall) {
       const r = tryCatch(() => performAutoUpdate(latestVersion, jsonOutput));
@@ -466,7 +456,7 @@ export async function checkForUpdates(jsonOutput = false): Promise<void> {
         logDebug(getErrorMessage(r.error));
       }
     } else {
-      // Minor/major bump without opt-in, or explicit opt-out — show notice.
+      // Major bump without opt-in, or explicit opt-out — show notice.
       printUpdateNotice(latestVersion);
     }
   }
