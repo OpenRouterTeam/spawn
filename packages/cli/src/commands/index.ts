@@ -2,6 +2,8 @@
 
 // delete.ts — cmdDelete, cascadeDelete
 export { cascadeDelete, cmdDelete } from "./delete.js";
+// export.ts — cmdExport (agent template export)
+export { cmdExport } from "./export.js";
 // feedback.ts — cmdFeedback
 export { cmdFeedback } from "./feedback.js";
 // fix.ts — cmdFix, fixSpawn
