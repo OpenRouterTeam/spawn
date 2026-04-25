@@ -146,7 +146,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
     console.error(`    ${pc.cyan("--config <path>")}     Load config from JSON file`);
     console.error(`    ${pc.cyan("--steps <list>")}      Comma-separated setup steps to enable`);
-    console.error(`    ${pc.cyan("--repo <user/repo>")} Clone a template repo and apply spawn.md`);
+    console.error(`    ${pc.cyan("--repo <slug|url>")}  Clone a template repo and apply spawn.md`);
     console.error(`    ${pc.cyan("--beta tarball")}      Use pre-built tarball for agent install (repeatable)`);
     console.error(`    ${pc.cyan("--beta images")}       Use pre-built DO marketplace images (faster boot)`);
     console.error(`    ${pc.cyan("--beta parallel")}     Parallelize server boot with setup prompts`);
