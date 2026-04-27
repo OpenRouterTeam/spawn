@@ -39,6 +39,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
+import { getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
 import { getInstallRefPath } from "./shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
@@ -845,6 +846,11 @@ async function dispatchCommand(
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
 
+  // Fetch feature flags early (1.5s timeout, fail-open). Must run before any
+  // code path that gates on a flag — currently the SPAWN_BETA composition
+  // for the `fast_provision` experiment.
+  await initFeatureFlags();
+
   // ── `spawn pick` — bypass all flag parsing; used by bash scripts ──────────
   // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
   // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
@@ -927,6 +933,7 @@ async function main(): Promise<void> {
     "skills",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
+  const userOptedIntoBeta = betaFeatures.length > 0 || process.env.SPAWN_FAST === "1";
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
@@ -945,6 +952,18 @@ async function main(): Promise<void> {
   if (process.env.SPAWN_FAST === "1") {
     betaFeatures.push("tarball", "images", "parallel", "docker");
   }
+
+  // fast_provision experiment: if the user did NOT pass --beta or --fast,
+  // bucket them on the PostHog `fast_provision` flag. The `test` variant
+  // turns on tarball + images by default; control behaves as before.
+  // Exposure is captured for both variants so PostHog can compute conversion.
+  if (!userOptedIntoBeta) {
+    const variant = getFeatureFlag("fast_provision", "control");
+    if (variant === "test") {
+      betaFeatures.push("tarball", "images");
+    }
+  }
+
   if (betaFeatures.length > 0) {
     process.env.SPAWN_BETA = [
       ...new Set(betaFeatures),
