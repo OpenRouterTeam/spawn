@@ -101,12 +101,29 @@ export async function tryTarballInstall(
   // - Non-root user: use tar --transform to remap /root/ to $HOME/ during extraction.
   //   This avoids needing sudo entirely (Sprite VMs don't have it).
   //   Falls back to sudo-based extraction for clouds with passwordless sudo (AWS, GCP).
+  //
+  // After non-root extraction we also have to rewrite SYMLINK TARGETS — tar's
+  // --transform only rewrites file names, not the absolute paths stored inside
+  // symlinks. Without this, the agent's binary symlinks (e.g.
+  // ~/.local/bin/claude -> /root/.claude/local/claude) extract as dangling
+  // links and `claude` shows up as "command not found" on PATH.
+  const fixSymlinks = [
+    'find "$HOME" -type l 2>/dev/null | while IFS= read -r _l; do',
+    '  _t=$(readlink "$_l" 2>/dev/null) || continue',
+    '  case "$_t" in',
+    '    /root/*) ln -snf "$HOME${_t#/root}" "$_l" 2>/dev/null ;;',
+    "  esac",
+    "done",
+    "true",
+  ].join(" ");
+
   const extractCmd = [
     'if [ "$(id -u)" = "0" ]; then',
     "  tar xz -C /",
     "else",
-    // Try transform first (no sudo needed) — remap /root/ paths to $HOME/
-    '  tar xz --transform "s|^root/|${HOME#/}/|" -C / 2>/dev/null ||',
+    // Try transform first (no sudo needed) — remap /root/ paths to $HOME/,
+    // then walk $HOME and rewrite any leftover absolute /root/ symlinks.
+    `  { tar xz --transform "s|^root/|\${HOME#/}/|" -C / 2>/dev/null && { ${fixSymlinks}; }; } ||`,
     // Fallback: sudo extract + mirror (for clouds with passwordless sudo)
     "  sudo tar xz -C / 2>/dev/null",
     "fi",
