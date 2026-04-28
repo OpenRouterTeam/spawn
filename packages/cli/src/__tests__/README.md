@@ -97,6 +97,8 @@ bun test src/__tests__/manifest.test.ts
 - `orchestrate.test.ts` — `runOrchestration`
 - `shell.test.ts` — `getLocalShell`, `isWindows`, `getInstallCmd`, `getWhichCommand`, `getInstallScriptUrl`: platform-aware shell detection
 - `fs-sandbox.test.ts` — Guardrail: verifies test preload sandbox isolates filesystem writes
+- `feature-flags.test.ts` — PostHog feature flags fetch, cache, exposure events, SWR behavior
+- `install-id.test.ts` — Persistent install ID generation, roundtrip, format validation
 
 ### Parsing and type utilities
 - `parse.test.ts` — `parseJsonWith`
