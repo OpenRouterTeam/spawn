@@ -39,7 +39,6 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
-import { getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
 import { getInstallRefPath } from "./shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
@@ -849,8 +848,6 @@ async function main(): Promise<void> {
   // ── `spawn pick` — bypass all flag parsing; used by bash scripts ──────────
   // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
   // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
-  // Runs before initFeatureFlags() — this is a hot path called by shell
-  // scripts and must stay fast; it has no code paths that gate on a flag.
   if (rawArgs[0] === "pick") {
     const pickResult = await asyncTryCatch(() => cmdPick(expandEqualsFlags(rawArgs.slice(1))));
     if (!pickResult.ok) {
@@ -860,17 +857,10 @@ async function main(): Promise<void> {
   }
 
   // ── `spawn feedback` — bypass flag parsing; rest of args are the message ───
-  // Also runs before initFeatureFlags() for the same reason as `pick`.
   if (rawArgs[0] === "feedback") {
     await cmdFeedback(rawArgs.slice(1));
     return;
   }
-
-  // Fetch feature flags (1.5s timeout, fail-open). Must run before any code
-  // path that gates on a flag — currently the SPAWN_BETA composition for the
-  // `fast_provision` experiment. Placed AFTER the pick/feedback bypasses so
-  // those fast paths never pay the flag-fetch cost.
-  await initFeatureFlags();
 
   const args = expandEqualsFlags(rawArgs);
 
@@ -937,7 +927,6 @@ async function main(): Promise<void> {
     "skills",
   ]);
   const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
-  const userOptedIntoBeta = betaFeatures.length > 0 || process.env.SPAWN_FAST === "1";
   for (const flag of betaFeatures) {
     if (!VALID_BETA_FEATURES.has(flag)) {
       console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
@@ -956,18 +945,6 @@ async function main(): Promise<void> {
   if (process.env.SPAWN_FAST === "1") {
     betaFeatures.push("tarball", "images", "parallel", "docker");
   }
-
-  // fast_provision experiment: if the user did NOT pass --beta or --fast,
-  // bucket them on the PostHog `fast_provision` flag. The `test` variant
-  // turns on tarball + images by default; control behaves as before.
-  // Exposure is captured for both variants so PostHog can compute conversion.
-  if (!userOptedIntoBeta) {
-    const variant = getFeatureFlag("fast_provision", "control");
-    if (variant === "test") {
-      betaFeatures.push("tarball", "images");
-    }
-  }
-
   if (betaFeatures.length > 0) {
     process.env.SPAWN_BETA = [
       ...new Set(betaFeatures),

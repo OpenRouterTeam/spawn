@@ -4,9 +4,10 @@
 // Never sends command args, file paths, or user prompt content.
 // Events are sent immediately — no batching, no lost events on process.exit().
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { isString } from "@openrouter/spawn-shared";
-import { getInstallId } from "./install-id.js";
-import { asyncTryCatch } from "./result.js";
+import { asyncTryCatch, tryCatch } from "./result.js";
 
 // Same PostHog project as feedback.ts
 const POSTHOG_TOKEN = "phc_7ToS2jDeWBlMu4n2JoNzoA1FnArdKwFMFoHVnAqQ6O1";
@@ -116,8 +117,37 @@ let _userId = "";
 let _sessionId = "";
 let _context: Record<string, string> = {};
 
-// Persistent user ID is provided by shared/install-id.ts so feature flags and
-// telemetry share the same PostHog identity.
+// ── Persistent User ID ─────────────────────────────────────────────────────
+
+function getTelemetryIdPath(): string {
+  return join(process.env.HOME ?? "/tmp", ".config", "spawn", ".telemetry-id");
+}
+
+function loadOrCreateUserId(): string {
+  const idPath = getTelemetryIdPath();
+  const loadResult = tryCatch(() => {
+    if (existsSync(idPath)) {
+      const id = readFileSync(idPath, "utf-8").trim();
+      if (id.length > 0) {
+        return id;
+      }
+    }
+    return null;
+  });
+  if (loadResult.ok && loadResult.data) {
+    return loadResult.data;
+  }
+  const id = crypto.randomUUID();
+  tryCatch(() => {
+    mkdirSync(dirname(idPath), {
+      recursive: true,
+    });
+    writeFileSync(idPath, id, {
+      mode: 0o600,
+    });
+  });
+  return id;
+}
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -133,8 +163,8 @@ export function initTelemetry(version: string): void {
     return;
   }
 
-  // Persistent user ID — same across all runs (shared with feature flags)
-  _userId = getInstallId();
+  // Persistent user ID — same across all runs
+  _userId = loadOrCreateUserId();
 
   // Session ID — shared between parent and child processes within one spawn run
   _sessionId = process.env.SPAWN_TELEMETRY_SESSION || crypto.randomUUID();

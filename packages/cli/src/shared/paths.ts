@@ -63,16 +63,6 @@ export function getInstallRefPath(): string {
   return join(getUserHome(), ".config", "spawn", ".ref");
 }
 
-/**
- * Return the path to the persistent install ID file.
- * Stable per machine across `spawn` invocations — used as PostHog `distinct_id`
- * for telemetry events and feature-flag bucketing. Path matches the legacy
- * telemetry-id location so existing users keep their identity.
- */
-export function getInstallIdPath(): string {
-  return join(getUserHome(), ".config", "spawn", ".telemetry-id");
-}
-
 /** Return the cache directory for spawn, respecting XDG_CACHE_HOME. */
 export function getCacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(getUserHome(), ".cache"), "spawn");
