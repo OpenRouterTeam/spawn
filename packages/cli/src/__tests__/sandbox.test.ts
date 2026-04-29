@@ -83,7 +83,7 @@ describe("ensureDocker", () => {
     spy.mockRestore();
   });
 
-  it("attempts brew install on macOS when docker not installed", async () => {
+  it("attempts brew install on macOS when docker not installed and brew is present", async () => {
     const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     Object.defineProperty(process, "platform", {
       value: "darwin",
@@ -112,7 +112,8 @@ describe("ensureDocker", () => {
         pid: 1234,
       } satisfies ReturnType<typeof Bun.spawnSync>;
       // 1: docker info → fail, 2: which docker → fail (not installed),
-      // 3: brew install → ok, 4: open -a OrbStack → ok, 5: docker info → ok
+      // 3: which brew → ok, 4: brew install → ok,
+      // 5: open -a OrbStack → ok, 6: docker info → ok (waitForReady loop)
       if (callCount <= 2) {
         return fail;
       }
@@ -121,18 +122,112 @@ describe("ensureDocker", () => {
 
     await ensureDocker();
 
-    // Call 1: docker info, 2: which docker, 3: brew install orbstack
+    // Call 3: which brew (probe)
     expect(spy.mock.calls[2][0]).toEqual([
+      "which",
+      "brew",
+    ]);
+    // Call 4: brew install orbstack
+    expect(spy.mock.calls[3][0]).toEqual([
       "brew",
       "install",
       "orbstack",
     ]);
-    // Call 4: open -a OrbStack (starts daemon)
-    expect(spy.mock.calls[3][0]).toEqual([
+    // Call 5: open -a OrbStack (starts daemon)
+    expect(spy.mock.calls[4][0]).toEqual([
       "open",
       "-a",
       "OrbStack",
     ]);
+
+    spy.mockRestore();
+    if (origPlatform) {
+      Object.defineProperty(process, "platform", origPlatform);
+    }
+  });
+
+  it("falls back to DMG download on macOS when brew is missing", async () => {
+    const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+
+    // The DMG installer size-checks the downloaded file; have the curl mock
+    // write a real fake-DMG large enough to pass the threshold.
+    const { writeFileSync } = await import("node:fs");
+    const { isString } = await import("@openrouter/spawn-shared");
+
+    let callCount = 0;
+    const sawCurl = {
+      hit: false,
+    };
+    const sawHdiutilAttach = {
+      hit: false,
+    };
+    const sawCp = {
+      hit: false,
+    };
+    const sawHdiutilDetach = {
+      hit: false,
+    };
+
+    const spy = spyOn(Bun, "spawnSync").mockImplementation((...args: unknown[]) => {
+      callCount++;
+      const argv = Array.isArray(args[0]) ? args[0] : [];
+      const ok = {
+        exitCode: 0,
+        stdout: new TextEncoder().encode(argv[0] === "uname" ? "arm64\n" : ""),
+        stderr: new Uint8Array(),
+        success: true,
+        signalCode: null,
+        resourceUsage: undefined,
+        pid: 1234,
+      } satisfies ReturnType<typeof Bun.spawnSync>;
+      const fail = {
+        exitCode: 1,
+        stdout: new Uint8Array(),
+        stderr: new Uint8Array(),
+        success: false,
+        signalCode: null,
+        resourceUsage: undefined,
+        pid: 1234,
+      } satisfies ReturnType<typeof Bun.spawnSync>;
+
+      // Track which steps of the DMG installer ran.
+      if (argv[0] === "curl") {
+        sawCurl.hit = true;
+        // Write a fake DMG large enough to pass the >1MB sanity check.
+        const outIdx = argv.indexOf("-o");
+        const outPath = outIdx >= 0 ? argv[outIdx + 1] : undefined;
+        if (isString(outPath)) {
+          writeFileSync(outPath, Buffer.alloc(2_000_000));
+        }
+      }
+      if (argv[0] === "hdiutil" && argv[1] === "attach") {
+        sawHdiutilAttach.hit = true;
+      }
+      if (argv[0] === "cp") {
+        sawCp.hit = true;
+      }
+      if (argv[0] === "hdiutil" && argv[1] === "detach") {
+        sawHdiutilDetach.hit = true;
+      }
+
+      // 1: docker info → fail, 2: which docker → fail, 3: which brew → fail.
+      if (callCount <= 3) {
+        return fail;
+      }
+      // Everything else (uname, curl, hdiutil, cp, xattr, open, docker info) → ok.
+      return ok;
+    });
+
+    await ensureDocker();
+
+    expect(sawCurl.hit).toBe(true);
+    expect(sawHdiutilAttach.hit).toBe(true);
+    expect(sawCp.hit).toBe(true);
+    expect(sawHdiutilDetach.hit).toBe(true);
 
     spy.mockRestore();
     if (origPlatform) {
