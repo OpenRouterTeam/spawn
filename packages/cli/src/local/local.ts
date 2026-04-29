@@ -1,7 +1,9 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
-import { copyFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { tryCatch } from "@openrouter/spawn-shared";
 import { DOCKER_CONTAINER_NAME, DOCKER_REGISTRY } from "../shared/orchestrate.js";
 import { getUserHome } from "../shared/paths.js";
 import { getLocalShell } from "../shared/shell.js";
@@ -175,6 +177,175 @@ function isDockerInstalled(): boolean {
   );
 }
 
+/** Check whether Homebrew is on PATH. */
+function hasBrew(): boolean {
+  return (
+    Bun.spawnSync(
+      [
+        "which",
+        "brew",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
+  );
+}
+
+/**
+ * Install OrbStack on macOS by downloading the official DMG over HTTPS,
+ * mounting it, copying OrbStack.app into /Applications, and unmounting.
+ *
+ * Why: Homebrew may not be installed, and our previous fallback message
+ * (`brew install orbstack`) would also fail on those machines. The DMG
+ * is the same artifact OrbStack publishes for manual install.
+ *
+ * Returns true on success, false if any step fails (caller falls back
+ * to printed instructions).
+ */
+function installOrbStackViaDmg(): boolean {
+  // Pick the right architecture build. OrbStack labels Apple Silicon as
+  // `arm64` and Intel as `amd64`.
+  const uname = Bun.spawnSync([
+    "uname",
+    "-m",
+  ]);
+  const arch = uname.stdout.toString().trim() === "arm64" ? "arm64" : "amd64";
+  const dmgUrl = `https://orbstack.dev/download/stable/latest/${arch}`;
+
+  const tempDir = mkdtempSync(join(tmpdir(), "spawn-orbstack-"));
+  const dmgPath = join(tempDir, "OrbStack.dmg");
+  const mountPoint = join(tempDir, "mnt");
+  let attached = false;
+
+  // Wrap all the work; cleanup runs unconditionally afterwards.
+  const work = tryCatch((): boolean => {
+    logStep(`Downloading OrbStack (${arch})...`);
+    const dl = Bun.spawnSync(
+      [
+        "curl",
+        "-fsSL",
+        "-o",
+        dmgPath,
+        dmgUrl,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
+    );
+    if (dl.exitCode !== 0) {
+      return false;
+    }
+
+    // Sanity-check: a real DMG is at least a few megabytes; any HTML error
+    // page or truncated download will be tiny.
+    if (statSync(dmgPath).size < 1_000_000) {
+      return false;
+    }
+
+    logStep("Mounting OrbStack disk image...");
+    mkdirSync(mountPoint, {
+      recursive: true,
+    });
+    const attach = Bun.spawnSync(
+      [
+        "hdiutil",
+        "attach",
+        "-nobrowse",
+        "-quiet",
+        "-mountpoint",
+        mountPoint,
+        dmgPath,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "inherit",
+        ],
+      },
+    );
+    if (attach.exitCode !== 0) {
+      return false;
+    }
+    attached = true;
+
+    logStep("Copying OrbStack.app to /Applications...");
+    const cp = Bun.spawnSync(
+      [
+        "cp",
+        "-R",
+        join(mountPoint, "OrbStack.app"),
+        "/Applications/",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "inherit",
+        ],
+      },
+    );
+    if (cp.exitCode !== 0) {
+      return false;
+    }
+
+    // Clear the quarantine xattr — curl downloads have no Safari attribution
+    // but some macOS versions still flag the unpacked .app. The user opted
+    // in by running spawn, so remove it explicitly.
+    Bun.spawnSync(
+      [
+        "xattr",
+        "-dr",
+        "com.apple.quarantine",
+        "/Applications/OrbStack.app",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    );
+
+    logInfo("OrbStack installed to /Applications/OrbStack.app");
+    return true;
+  });
+
+  if (attached) {
+    Bun.spawnSync(
+      [
+        "hdiutil",
+        "detach",
+        "-quiet",
+        mountPoint,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "ignore",
+          "ignore",
+        ],
+      },
+    );
+  }
+  rmSync(tempDir, {
+    recursive: true,
+    force: true,
+  });
+
+  return work.ok && work.data === true;
+}
+
 /** Try to start the Docker daemon and wait up to 30s for it to respond. */
 function startAndWaitForDocker(isMac: boolean): void {
   if (isMac) {
@@ -261,23 +432,31 @@ export async function ensureDocker(): Promise<void> {
 
   // Not installed at all — install first
   if (isMac) {
-    logStep("Docker not found — installing OrbStack...");
-    const result = Bun.spawnSync(
-      [
-        "brew",
-        "install",
-        "orbstack",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "inherit",
-          "inherit",
+    let installed = false;
+    if (hasBrew()) {
+      logStep("Docker not found — installing OrbStack via Homebrew...");
+      const result = Bun.spawnSync(
+        [
+          "brew",
+          "install",
+          "orbstack",
         ],
-      },
-    );
-    if (result.exitCode !== 0) {
-      logInfo("Auto-install failed. Install OrbStack manually: brew install orbstack");
+        {
+          stdio: [
+            "ignore",
+            "inherit",
+            "inherit",
+          ],
+        },
+      );
+      installed = result.exitCode === 0;
+    } else {
+      logStep("Docker not found — installing OrbStack from orbstack.dev...");
+      installed = installOrbStackViaDmg();
+    }
+    if (!installed) {
+      logInfo("OrbStack auto-install failed. Install it manually from https://orbstack.dev/download");
+      logInfo("(or, if you have Homebrew: brew install orbstack), then rerun this command.");
       process.exit(1);
     }
   } else {
