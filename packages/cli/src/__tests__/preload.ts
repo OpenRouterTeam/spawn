@@ -60,6 +60,10 @@ cleanupStrayTestFiles();
 
 const TEST_HOME = mkdtempSync(join(tmpdir(), "spawn-test-home-"));
 
+// Disable telemetry in tests to prevent fire-and-forget fetch calls from
+// interfering with other test files' global.fetch mocks.
+process.env.SPAWN_TELEMETRY = "0";
+
 // Redirect all user-directory env vars to the isolated temp
 process.env.HOME = TEST_HOME;
 process.env.XDG_CACHE_HOME = join(TEST_HOME, ".cache");
