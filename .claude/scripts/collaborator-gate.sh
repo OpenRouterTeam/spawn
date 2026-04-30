@@ -79,3 +79,8 @@ is_issue_from_collaborator() {
     author=$(gh issue view "$issue_num" --repo "$_COLLAB_REPO" --json author --jq '.author.login' 2>/dev/null) || return 1
     is_collaborator "$author"
 }
+
+# Auto-warm cache at source time so schedule-triggered runs always start with a fresh list.
+# is_collaborator() calls _refresh_collaborator_cache, but only on issue-mode runs.
+# This ensures schedule-mode runs also get a warm cache before Claude starts.
+_refresh_collaborator_cache
