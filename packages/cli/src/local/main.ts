@@ -10,6 +10,7 @@ import { createCloudAgents } from "../shared/agent-setup.js";
 import { makeDockerRunner, runOrchestration } from "../shared/orchestrate.js";
 import { logWarn } from "../shared/ui.js";
 import { agents, resolveAgent } from "./agents.js";
+import { resolveShellLevelPaths, resolveShellRcPaths, snapshotPaths } from "./backup.js";
 import {
   cleanupContainer,
   dockerInteractiveSession,
@@ -18,6 +19,7 @@ import {
   interactiveSession,
   pullAndStartContainer,
   runLocal,
+  setBackupAgent,
   uploadFile,
 } from "./local.js";
 
@@ -49,6 +51,15 @@ async function main() {
   // If sandboxed, ensure Docker is installed (auto-install if missing)
   if (useSandbox) {
     await ensureDocker();
+  }
+
+  // Snapshot config files spawn is about to overwrite so `spawn local-restore`
+  // (and `spawn uninstall`) can put the user's machine back to how it was.
+  // Skip in sandbox mode — writes happen inside the container, not on the host.
+  if (!useSandbox) {
+    setBackupAgent(agentName);
+    snapshotPaths(resolveShellRcPaths(), agentName);
+    snapshotPaths(resolveShellLevelPaths(agentName), agentName);
   }
 
   // Warn about security implications of installing OpenClaw locally

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { listBackups, restoreBackups } from "../local/backup.js";
 import {
   getCacheDir,
   getSpawnDir,
@@ -110,8 +111,10 @@ export async function cmdUninstall(): Promise<void> {
   const cacheExists = fs.existsSync(cacheDir);
   const spawnDirExists = fs.existsSync(spawnDir);
   const configDirExists = fs.existsSync(configDir);
+  const localBackups = listBackups();
+  const hasLocalBackups = localBackups.length > 0;
 
-  if (!binaryExists && !symlinkExists && !cacheExists && !spawnDirExists && !configDirExists) {
+  if (!binaryExists && !symlinkExists && !cacheExists && !spawnDirExists && !configDirExists && !hasLocalBackups) {
     p.log.info("Nothing to uninstall — spawn does not appear to be installed.");
     p.outro("Done");
     return;
@@ -123,6 +126,16 @@ export async function cmdUninstall(): Promise<void> {
     label: string;
     hint: string;
   }[] = [];
+  if (hasLocalBackups) {
+    const tracked = [
+      ...new Set(localBackups.map((e) => e.agent)),
+    ].sort();
+    options.push({
+      value: "restore-local",
+      label: "Restore local agent configs to pre-spawn state",
+      hint: `${localBackups.length} file(s) across ${tracked.join(", ") || "agents"}`,
+    });
+  }
   if (spawnDirExists) {
     options.push({
       value: "history",
@@ -140,12 +153,19 @@ export async function cmdUninstall(): Promise<void> {
 
   let removeHistory = false;
   let removeConfig = false;
+  let restoreLocal = false;
 
   if (options.length > 0) {
+    const initialValues = hasLocalBackups
+      ? [
+          "restore-local",
+        ]
+      : [];
     const selected = await p.multiselect({
       message: "Also remove data? (space to toggle, enter to continue)",
       options,
       required: false,
+      initialValues,
     });
     if (p.isCancel(selected)) {
       p.outro("Cancelled");
@@ -154,6 +174,7 @@ export async function cmdUninstall(): Promise<void> {
     const selections = selected;
     removeHistory = selections.includes("history");
     removeConfig = selections.includes("config");
+    restoreLocal = selections.includes("restore-local");
   }
 
   // Summary of what will be removed
@@ -168,6 +189,9 @@ export async function cmdUninstall(): Promise<void> {
     p.log.info(`  Cache:     ${cacheDir}`);
   }
   p.log.info("  Shell RC:  spawn PATH entries");
+  if (restoreLocal) {
+    p.log.info(`  Restore:   ${localBackups.length} local agent config file(s)`);
+  }
   if (removeHistory) {
     p.log.info(`  History:   ${spawnDir}`);
   }
@@ -214,6 +238,24 @@ export async function cmdUninstall(): Promise<void> {
       force: true,
     });
     removed.push(`Cache: ${cacheDir}`);
+  }
+
+  // Optional: restore local agent configs (must run before config dir removal,
+  // because the backup manifest lives under ~/.config/spawn/local-backups).
+  if (restoreLocal) {
+    const summary = restoreBackups();
+    if (summary.restored.length > 0) {
+      removed.push(`Restored: ${summary.restored.length} local config file(s)`);
+    }
+    if (summary.removed.length > 0) {
+      removed.push(`Reverted: ${summary.removed.length} spawn-created file(s)`);
+    }
+    if (summary.failed.length > 0) {
+      p.log.warn(`Could not revert ${summary.failed.length} file(s):`);
+      for (const dest of summary.failed) {
+        p.log.warn(`  ${dest}`);
+      }
+    }
   }
 
   // Shell RC files

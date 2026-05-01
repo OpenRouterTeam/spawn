@@ -32,6 +32,8 @@ export {
   cmdListClear,
   formatRelativeTime,
 } from "./list.js";
+// local-restore.ts — cmdLocalRestore (revert local agent config writes)
+export { cmdLocalRestore } from "./local-restore.js";
 // pick.ts — cmdPick
 export { cmdPick } from "./pick.js";
 // pull-history.ts — cmdPullHistory (recursive child history pull)

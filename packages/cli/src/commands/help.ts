@@ -52,6 +52,7 @@ function getHelpUsageSection(): string {
   spawn history export               Dump history as JSON to stdout
   spawn feedback "message"            Send feedback to the Spawn team
   spawn uninstall                    Uninstall spawn CLI and optionally remove data
+  spawn local-restore [agent]        Restore local agent configs to pre-spawn state
   spawn update                       Check for CLI updates
   spawn version                      Show version (or --version, -v)
   spawn help                         Show this help message (or --help, -h)`;

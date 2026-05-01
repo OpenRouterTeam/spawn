@@ -21,6 +21,7 @@ import {
   cmdLink,
   cmdList,
   cmdListClear,
+  cmdLocalRestore,
   cmdMatrix,
   cmdPick,
   cmdPullHistory,
@@ -803,6 +804,15 @@ async function dispatchCommand(
       return;
     }
     await cmdLink(filteredArgs);
+    return;
+  }
+  if (cmd === "local-restore" || cmd === "restore") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    const agentArg = filteredArgs[1] && !filteredArgs[1].startsWith("-") ? filteredArgs[1] : undefined;
+    await cmdLocalRestore(agentArg);
     return;
   }
   if (VERB_ALIASES.has(cmd)) {

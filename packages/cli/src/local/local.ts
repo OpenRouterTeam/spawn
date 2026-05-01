@@ -7,6 +7,17 @@ import { getUserHome } from "../shared/paths.js";
 import { getLocalShell } from "../shared/shell.js";
 import { spawnInteractive } from "../shared/ssh.js";
 import { logInfo, logStep } from "../shared/ui.js";
+import { snapshotBeforeWrite } from "./backup.js";
+
+// Set by local/main.ts before agent install begins so uploadFile() snapshots
+// destination paths under the right agent label. Empty string disables it
+// (e.g. when the runner is wrapped in Docker for sandbox mode).
+let backupAgent = "";
+
+/** Tag subsequent uploadFile() calls with the agent that triggered them. */
+export function setBackupAgent(agent: string): void {
+  backupAgent = agent;
+}
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 
@@ -107,6 +118,9 @@ export async function runLocalArgs(args: ReadonlyArray<string>): Promise<void> {
 /** Copy a file locally, expanding ~ in the destination path. */
 export function uploadFile(localPath: string, remotePath: string): void {
   const validated = validateLocalPath(remotePath);
+  if (backupAgent) {
+    snapshotBeforeWrite(validated, backupAgent);
+  }
   mkdirSync(dirname(validated), {
     recursive: true,
   });
