@@ -13,6 +13,7 @@ import {
   cmdCloudInfo,
   cmdClouds,
   cmdDelete,
+  cmdExport,
   cmdFeedback,
   cmdFix,
   cmdHelp,
@@ -817,6 +818,15 @@ async function dispatchCommand(
       return;
     }
     await cmdLink(filteredArgs);
+    return;
+  }
+  if (cmd === "export") {
+    if (hasTrailingHelpFlag(filteredArgs)) {
+      cmdHelp();
+      return;
+    }
+    const targetArg = filteredArgs[1] && !filteredArgs[1].startsWith("-") ? filteredArgs[1] : undefined;
+    await cmdExport(targetArg);
     return;
   }
   if (VERB_ALIASES.has(cmd)) {
