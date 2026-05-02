@@ -44,6 +44,8 @@ function getHelpUsageSection(): string {
   spawn link <ip>                    Register an existing VM by IP (alias: reconnect)
   spawn link <ip> --agent <agent>    Specify the agent running on the VM
   spawn link <ip> --cloud <cloud>    Specify the cloud provider
+  spawn export                       Export a claude spawn to a github repo (re-spawn via --repo)
+  spawn export <name>                Export a specific spawn by name or ID
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions

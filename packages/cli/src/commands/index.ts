@@ -2,6 +2,16 @@
 
 // delete.ts — cmdDelete, cascadeDelete
 export { cascadeDelete, cmdDelete } from "./delete.js";
+// export.ts — cmdExport (capture a claude spawn into a redistributable github repo)
+export {
+  buildExportScript,
+  buildGitignore,
+  buildReadmeTemplate,
+  buildSpawnMd,
+  cmdExport,
+  parseStepsFromLaunchCmd,
+  resolveSteps,
+} from "./export.js";
 // feedback.ts — cmdFeedback
 export { cmdFeedback } from "./feedback.js";
 // fix.ts — cmdFix, fixSpawn
