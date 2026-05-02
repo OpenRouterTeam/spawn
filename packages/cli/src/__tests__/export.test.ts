@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { mockClackPrompts } from "./test-helpers";
 
 const clackMocks = mockClackPrompts();
@@ -536,5 +539,132 @@ describe("cmdExport", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].allowRedact).toBe("0");
     expect(exitSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ── E2E: redact pass actually works at runtime ────────────────────────────────
+//
+// This test exercises the generated bash against a real temp git repo to catch
+// runtime quoting/escaping bugs like the sed delimiter regression in #3384.
+// It is purely local (no network, no subprocess cloud calls) and deterministic.
+
+describe("export redact pass (e2e bash execution)", () => {
+  const redactOpts = {
+    spawnMd: "---\nname: test\n---\n",
+    readmeTemplate: "# __NAME__\n",
+    gitignore: "node_modules/\n",
+    cloud: "hetzner",
+    steps: "github",
+    visibility: "private" as const,
+    resultPath: "/dev/null",
+    allowRedact: true,
+  };
+
+  /**
+   * Extract the SECRET_REGEX, REDACT_PLACEHOLDER definitions and the
+   * while-read redact loop from the generated script. We build a
+   * self-contained bash snippet that: defines the vars, receives a file
+   * list as $1, and runs the sed replacements.
+   */
+  function extractRedactSnippet(): string {
+    const full = buildExportScript(redactOpts);
+
+    const regexMatch = full.match(/^SECRET_REGEX='[^']*'/m);
+    if (!regexMatch) {
+      throw new Error("Could not extract SECRET_REGEX from generated script");
+    }
+
+    const placeholderMatch = full.match(/^REDACT_PLACEHOLDER='[^']*'/m);
+    if (!placeholderMatch) {
+      throw new Error("Could not extract REDACT_PLACEHOLDER from generated script");
+    }
+
+    return [
+      "#!/bin/bash",
+      "set -eo pipefail",
+      regexMatch[0],
+      placeholderMatch[0],
+      'FILE_LIST="$1"',
+      "while IFS= read -r f; do",
+      '  [ -z "$f" ] && continue',
+      '  sed -i -E "s#${SECRET_REGEX}#${REDACT_PLACEHOLDER}#g" "$f"',
+      'done <<< "$FILE_LIST"',
+    ].join("\n");
+  }
+
+  // Synthetic secrets — one per regex family in SECRET_REGEX.
+  const syntheticSecrets: Record<string, string> = {
+    openrouter: "sk-or-v1-abcdef1234567890abcdef",
+    anthropic: "sk-ant-api03-12_abcdefghijklmnopqrstu",
+    openai: "sk-proj-ABCDEFGHIJKLMNOPQRSTUv",
+    github: "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij",
+    aws: "AKIA0123456789ABCDEF",
+    hetzner: "hcloud_abcdefghijklmnopqrstuvwx",
+    digitalocean: "dop_v1_abcdef0123456789abcdef0123456789ab",
+    pem: "-----BEGIN PRIVATE KEY-----",
+  };
+
+  const REDACT = "***REDACTED-BY-SPAWN-EXPORT***";
+
+  /** Create a temp dir with git init, write a file, stage it, run the redact
+   *  snippet against it, and return the file contents after redaction. */
+  function runRedactOn(filename: string, content: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "spawn-redact-e2e-"));
+    const filePath = join(dir, filename);
+    writeFileSync(filePath, content);
+    execSync("git init -q -b main", {
+      cwd: dir,
+    });
+    execSync("git add -A", {
+      cwd: dir,
+    });
+    const snippetPath = join(dir, "_redact.sh");
+    writeFileSync(snippetPath, extractRedactSnippet(), {
+      mode: 0o755,
+    });
+    execSync(`bash "${snippetPath}" "${filePath}"`, {
+      cwd: dir,
+    });
+    const result = readFileSync(filePath, "utf8");
+    execSync(`rm -rf "${dir}"`);
+    return result;
+  }
+
+  it("redacts every secret family in a staged file", () => {
+    const lines = Object.entries(syntheticSecrets).map(([family, secret]) => `${family}: ${secret}`);
+    const after = runRedactOn("leaky.env", lines.join("\n") + "\n");
+    for (const [family, secret] of Object.entries(syntheticSecrets)) {
+      expect(after).not.toContain(secret);
+      expect(after).toContain(`${family}: ${REDACT}`);
+    }
+  });
+
+  it("leaves non-secret content untouched", () => {
+    const innocentContent =
+      [
+        "DATABASE_URL=postgres://localhost:5432/mydb",
+        "NODE_ENV=production",
+        "PORT=3000",
+        "some normal code here",
+        'const x = "hello world";',
+      ].join("\n") + "\n";
+    const after = runRedactOn("config.ts", innocentContent);
+    expect(after).toBe(innocentContent);
+  });
+
+  it("handles multiple secrets on the same line", () => {
+    const multiLine = "KEY1=sk-or-v1-abcdef1234567890abcdef KEY2=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij\n";
+    const after = runRedactOn("multi.env", multiLine);
+    expect(after).not.toContain("sk-or-v1-");
+    expect(after).not.toContain("ghp_");
+    const count = (after.match(/\*\*\*REDACTED-BY-SPAWN-EXPORT\*\*\*/g) ?? []).length;
+    expect(count).toBe(2);
+  });
+
+  it("handles PEM block with algorithm prefix", () => {
+    const pemContent = "-----BEGIN RSA PRIVATE KEY-----\nMIIE...base64data\n-----END RSA PRIVATE KEY-----\n";
+    const after = runRedactOn("key.pem", pemContent);
+    expect(after).not.toContain("-----BEGIN RSA PRIVATE KEY-----");
+    expect(after).toContain(REDACT);
   });
 });
