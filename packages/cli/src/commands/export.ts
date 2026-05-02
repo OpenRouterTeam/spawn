@@ -13,8 +13,17 @@
 //   comes from `gh api user`.
 // - Before the commit, every staged file is scanned for known API-key
 //   shapes (Anthropic, OpenRouter, OpenAI, GitHub, AWS, PEM, Hetzner,
-//   DigitalOcean). Hits are redacted in-place; the file list is
-//   surfaced to the host CLI as a warning.
+//   DigitalOcean). When hits are found, the VM pauses before commit
+//   and writes a `needs_confirmation` result. The host lists the files
+//   and asks the user whether to redact and push. Only on approval
+//   does a second pass run with ALLOW_REDACT=1, which replaces the
+//   matches with a loud placeholder and finalizes the export.
+//
+// The gate exists because redaction depends on a regex with known
+// gaps (#3381): auto-redacting and pushing means a regex miss gets
+// published without the user ever seeing the file list. The prompt
+// moves the decision back to the human before the `gh repo create
+// --push` happens.
 
 import type { SpawnRecord } from "../history.js";
 
@@ -65,13 +74,23 @@ export function resolveSteps(record: SpawnRecord): string {
   return parseStepsFromLaunchCmd(record.connection?.launch_cmd) ?? DEFAULT_STEPS;
 }
 
-/** Result the on-VM script writes to REMOTE_RESULT_PATH. */
+/** Result the on-VM script writes to REMOTE_RESULT_PATH.
+ *  Three shapes:
+ *  - success: ok=true with the repo URL (and optionally the redacted list).
+ *  - needs_confirmation: ok=false with hits=[...]. The host prompts, and
+ *    on approval re-runs the script with ALLOW_REDACT=1.
+ *  - error: ok=false with a human-readable error string. */
 const ResultSchema = v.union([
   v.object({
     ok: v.literal(true),
     slug: v.string(),
     url: v.string(),
     redacted: v.optional(v.array(v.string())),
+  }),
+  v.object({
+    ok: v.literal(false),
+    needsConfirmation: v.literal(true),
+    hits: v.array(v.string()),
   }),
   v.object({
     ok: v.literal(false),
@@ -196,8 +215,13 @@ export function buildExportScript(opts: {
   steps: string;
   visibility: "private" | "public";
   resultPath: string;
+  /** First pass = false → the script stops before commit when hits are
+   *  found and writes a needs_confirmation result. Second pass = true →
+   *  the script redacts in-place and pushes. */
+  allowRedact: boolean;
 }): string {
   const visibilityFlag = opts.visibility === "public" ? "--public" : "--private";
+  const allowRedact = opts.allowRedact ? "1" : "0";
   return [
     "#!/bin/bash",
     "set -eo pipefail",
@@ -206,6 +230,7 @@ export function buildExportScript(opts: {
     `CLOUD=${shSingleQuote(opts.cloud)}`,
     `STEPS=${shSingleQuote(opts.steps)}`,
     `VISIBILITY_FLAG=${visibilityFlag}`,
+    `ALLOW_REDACT=${allowRedact}`,
     "",
     'EXPORT_DIR="$(mktemp -d)"',
     'trap "rm -rf \\"$EXPORT_DIR\\"" EXIT',
@@ -295,14 +320,27 @@ export function buildExportScript(opts: {
     "git init -q -b main",
     "git add -A",
     "",
-    "# 9. SECRETS SCAN — redact any matched API-key shapes in-place. The export",
-    "# proceeds; the redacted file list is included in the result JSON so the",
-    "# host CLI can warn the user.",
+    "# 9. SECRETS SCAN — first pass just detects and stops if hits exist so the",
+    "# host can confirm before pushing. Second pass (ALLOW_REDACT=1) redacts",
+    "# in-place and continues to commit/push.",
     "SECRET_REGEX='(sk-or-v1-[a-f0-9]{20,})|(sk-ant-api[0-9-]+_[A-Za-z0-9_-]{20,})|(sk-proj-[A-Za-z0-9_-]{20,})|(gh[ops]_[A-Za-z0-9]{36})|(AKIA[0-9A-Z]{16})|(hcloud_[a-zA-Z0-9_-]{20,})|(dop_v1_[a-f0-9]{32,})|(-----BEGIN ([A-Z]+ )?PRIVATE KEY-----)'",
     "REDACT_PLACEHOLDER='***REDACTED-BY-SPAWN-EXPORT***'",
     'SECRET_HITS="$(git ls-files -z | xargs -0 grep -lEa "$SECRET_REGEX" 2>/dev/null || true)"',
     'REDACTED_JSON="[]"',
     'if [ -n "$SECRET_HITS" ]; then',
+    '  HITS_JSON="$(_PATHS_RAW="$SECRET_HITS" bun -e "',
+    "    const raw = process.env._PATHS_RAW || '';",
+    "    const arr = raw.split('\\n').map(s => s.trim()).filter(Boolean);",
+    "    process.stdout.write(JSON.stringify(arr));",
+    '  ")"',
+    '  if [ "$ALLOW_REDACT" != "1" ]; then',
+    "    # First pass: stop before commit; host will prompt the user.",
+    '    echo "⚠ Potential secrets detected in:" >&2',
+    '    printf "%s\\n" "$SECRET_HITS" >&2',
+    '    printf \'{"ok":false,"needsConfirmation":true,"hits":%s}\\n\' "$HITS_JSON" > "$RESULT_PATH"',
+    "    exit 0",
+    "  fi",
+    "  # Second pass: redact in-place and continue.",
     '  echo "⚠ Redacting potential secrets in:" >&2',
     '  printf "%s\\n" "$SECRET_HITS" >&2',
     "  while IFS= read -r f; do",
@@ -311,11 +349,7 @@ export function buildExportScript(opts: {
     '  done <<< "$SECRET_HITS"',
     "  # Re-stage so the redacted blobs replace the originals in the index.",
     "  git add -A",
-    '  REDACTED_JSON="$(printf "%s\\n" "$SECRET_HITS" | _PATHS_RAW="$SECRET_HITS" bun -e "',
-    "    const raw = process.env._PATHS_RAW || '';",
-    "    const arr = raw.split('\\n').map(s => s.trim()).filter(Boolean);",
-    "    process.stdout.write(JSON.stringify(arr));",
-    '  ")"',
+    '  REDACTED_JSON="$HITS_JSON"',
     "fi",
     "",
     "# 10. Commit and push.",
@@ -461,7 +495,12 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     visibility = makePublic === true ? "public" : "private";
   }
   const steps = resolveSteps(r);
-  const script = buildExportScript({
+
+  // Pick a runner: tests inject one; sprite uses sprite's exec channel; everything
+  // else goes over SSH using the connection's ip/user.
+  const runner = options?.makeRunner ? options.makeRunner(conn.ip, conn.user, []) : await buildRunnerForRecord(r);
+
+  const scriptOpts = {
     spawnMd: buildSpawnMd(r),
     readmeTemplate: buildReadmeTemplate(),
     gitignore: buildGitignore(),
@@ -469,14 +508,80 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     steps,
     visibility,
     resultPath: REMOTE_RESULT_PATH,
-  });
+  };
 
-  // Pick a runner: tests inject one; sprite uses sprite's exec channel; everything
-  // else goes over SSH using the connection's ip/user.
-  const runner = options?.makeRunner ? options.makeRunner(conn.ip, conn.user, []) : await buildRunnerForRecord(r);
-
-  // Run the export script. 10-min timeout — large repos take time to push.
+  // First pass: never redact. If hits are found, the script writes a
+  // needs_confirmation result and exits. If not, it pushes.
   p.log.step("Running export on the VM (claude is naming the repo)...");
+  let parsed = await runPassAndParseResult(
+    runner,
+    buildExportScript({
+      ...scriptOpts,
+      allowRedact: false,
+    }),
+  );
+
+  // Gate: if the VM reported needs_confirmation, show the file list and
+  // prompt the user. On approval, re-run with ALLOW_REDACT=1.
+  if (!parsed.ok && "needsConfirmation" in parsed && parsed.needsConfirmation === true) {
+    console.log();
+    p.log.warn(`Potential secrets detected in ${parsed.hits.length} file${parsed.hits.length === 1 ? "" : "s"}:`);
+    for (const f of parsed.hits) {
+      console.log(pc.dim(`  - ${f}`));
+    }
+    console.log();
+    p.log.info(
+      "Matches will be replaced with '***REDACTED-BY-SPAWN-EXPORT***' before the repo is pushed. The regex has known gaps — review the list above and cancel if anything looks like a real secret you'd rather scrub by hand.",
+    );
+    const approved = await p.confirm({
+      message: `Redact ${parsed.hits.length === 1 ? "this file" : "these files"} and continue pushing to GitHub?`,
+      initialValue: false,
+    });
+    if (p.isCancel(approved) || approved !== true) {
+      p.log.info("Export cancelled. Nothing was pushed.");
+      process.exit(0);
+    }
+    p.log.step("Re-running export with redaction enabled...");
+    parsed = await runPassAndParseResult(
+      runner,
+      buildExportScript({
+        ...scriptOpts,
+        allowRedact: true,
+      }),
+    );
+  }
+
+  if (!parsed.ok) {
+    // Any remaining non-ok shape is a hard error.
+    p.log.error("error" in parsed ? parsed.error : "Export ran but produced no parseable result.");
+    process.exit(1);
+  }
+
+  console.log();
+  p.log.success(`Exported to ${pc.cyan(parsed.url)}`);
+  if (parsed.redacted && parsed.redacted.length > 0) {
+    p.log.warn(
+      `Redacted potential secrets in ${parsed.redacted.length} file${parsed.redacted.length === 1 ? "" : "s"}:`,
+    );
+    for (const f of parsed.redacted) {
+      console.log(pc.dim(`  - ${f}`));
+    }
+  }
+  console.log();
+  console.log(pc.dim("Re-spawn with:"));
+  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug} --steps ${steps}`)}`);
+  console.log();
+}
+
+/** Run the export script on the VM, download the result file, parse it, and
+ *  return the validated shape. Exits the process on any infrastructure-level
+ *  failure (ssh, download, unparseable JSON) — the caller only has to handle
+ *  the three valid result shapes. */
+async function runPassAndParseResult(
+  runner: ExportRunner,
+  script: string,
+): Promise<v.InferOutput<typeof ResultSchema>> {
+  // 10-min timeout — large repos take time to push.
   const runResult = await asyncTryCatch(() => runner.runServer(script, 600));
   if (!runResult.ok) {
     p.log.error(`Export failed: ${getErrorMessage(runResult.error)}`);
@@ -484,7 +589,6 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     process.exit(1);
   }
 
-  // Download result file
   const localTmp = mkdtempSync(join(tmpdir(), "spawn-export-"));
   const localResult = join(localTmp, "result.json");
   const dlResult = await asyncTryCatch(() => runner.downloadFile(REMOTE_RESULT_PATH, localResult));
@@ -506,22 +610,5 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     p.log.error("Export ran but produced no parseable result.");
     process.exit(1);
   }
-  if (!parsed.ok) {
-    p.log.error(parsed.error);
-    process.exit(1);
-  }
-  console.log();
-  p.log.success(`Exported to ${pc.cyan(parsed.url)}`);
-  if (parsed.redacted && parsed.redacted.length > 0) {
-    p.log.warn(
-      `Redacted potential secrets in ${parsed.redacted.length} file${parsed.redacted.length === 1 ? "" : "s"}:`,
-    );
-    for (const f of parsed.redacted) {
-      console.log(pc.dim(`  - ${f}`));
-    }
-  }
-  console.log();
-  console.log(pc.dim("Re-spawn with:"));
-  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug} --steps ${steps}`)}`);
-  console.log();
+  return parsed;
 }
