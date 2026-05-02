@@ -242,6 +242,11 @@ export function captureError(type: string, err: unknown): void {
 
 /** Send a single event to PostHog immediately. Fire-and-forget. */
 function sendEvent(event: string, properties: Record<string, unknown>): void {
+  // Re-check at send time — guards against singleton state leaking in tests
+  // where initTelemetry() was called with _enabled=true but env was later restored.
+  if (process.env.BUN_ENV === "test" || process.env.NODE_ENV === "test" || process.env.SPAWN_TELEMETRY === "0") {
+    return;
+  }
   const body = JSON.stringify({
     api_key: POSTHOG_TOKEN,
     batch: [
