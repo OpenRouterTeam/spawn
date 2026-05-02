@@ -77,8 +77,8 @@ const ResultSchema = v.union([
   }),
 ]);
 
-/** Filter to records the export can actually drive: claude, with a live SSH
- *  connection, not deleted, not sprite-console. */
+/** Filter to records the export can actually drive: claude, with a live
+ *  connection (SSH or sprite-console), not deleted. */
 function exportableClaudeRecords(records: SpawnRecord[]): SpawnRecord[] {
   return records.filter((r) => {
     if (r.agent !== CLAUDE_AGENT) {
@@ -89,9 +89,6 @@ function exportableClaudeRecords(records: SpawnRecord[]): SpawnRecord[] {
       return false;
     }
     if (c.deleted) {
-      return false;
-    }
-    if (c.ip === "sprite-console") {
       return false;
     }
     return true;
@@ -322,6 +319,37 @@ function shSingleQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
+interface ExportRunner {
+  runServer: (cmd: string, timeoutSecs?: number) => Promise<void>;
+  uploadFile: (localPath: string, remotePath: string) => Promise<void>;
+  downloadFile: (remotePath: string, localPath: string) => Promise<void>;
+}
+
+/** Build the runner for a specific spawn record. Sprite has its own exec
+ *  channel (`sprite exec`, etc.); everything else uses SSH. */
+async function buildRunnerForRecord(record: SpawnRecord): Promise<ExportRunner> {
+  const conn = record.connection;
+  if (!conn) {
+    throw new Error("Cannot build runner: spawn has no connection info.");
+  }
+  if (record.cloud === "sprite") {
+    if (!conn.server_name) {
+      throw new Error("Cannot export sprite: connection is missing server_name.");
+    }
+    const sprite = await import("../sprite/sprite.js");
+    await sprite.ensureSpriteCli();
+    await sprite.ensureSpriteAuthenticated();
+    sprite.setSpriteName(conn.server_name);
+    return {
+      runServer: sprite.runSprite,
+      uploadFile: sprite.uploadFileSprite,
+      downloadFile: sprite.downloadFileSprite,
+    };
+  }
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+  return makeSshRunner(conn.ip, conn.user, keyOpts);
+}
+
 /** Pick one record from a list of claude spawns. */
 async function pickOne(records: SpawnRecord[]): Promise<SpawnRecord | null> {
   const options = records.map((r) => ({
@@ -428,11 +456,9 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     resultPath: REMOTE_RESULT_PATH,
   });
 
-  // SSH runner
-  const keyOpts = options?.makeRunner ? [] : getSshKeyOpts(await ensureSshKeys());
-  const runner = options?.makeRunner
-    ? options.makeRunner(conn.ip, conn.user, keyOpts)
-    : makeSshRunner(conn.ip, conn.user, keyOpts);
+  // Pick a runner: tests inject one; sprite uses sprite's exec channel; everything
+  // else goes over SSH using the connection's ip/user.
+  const runner = options?.makeRunner ? options.makeRunner(conn.ip, conn.user, []) : await buildRunnerForRecord(r);
 
   // Run the export script. 10-min timeout — large repos take time to push.
   p.log.step("Running export on the VM (claude is naming the repo)...");

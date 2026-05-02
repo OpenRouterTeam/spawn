@@ -270,6 +270,16 @@ function orgFlags(): string[] {
 
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
+/** Set the active sprite name for subsequent runSprite/uploadFileSprite/
+ *  downloadFileSprite calls. Used by reconnect-style flows (e.g. spawn export)
+ *  that operate on an existing sprite without going through createSprite. */
+export function setSpriteName(name: string): void {
+  if (!name || !/^[a-zA-Z0-9_.-]+$/.test(name)) {
+    throw new Error("setSpriteName: name must be non-empty and match [a-zA-Z0-9_.-]+");
+  }
+  _state.name = name;
+}
+
 export async function promptSpawnName(): Promise<void> {
   return promptSpawnNameShared("Sprite");
 }
