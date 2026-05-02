@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { writeFileSync } from "node:fs";
 import { mockClackPrompts } from "./test-helpers";
 
-mockClackPrompts();
+const clackMocks = mockClackPrompts();
 
 import type { SpawnRecord } from "../history";
 
@@ -154,6 +155,10 @@ describe("buildExportScript", () => {
     steps: "github,auto-update,security-scan",
     visibility: "private" as const,
     resultPath: "/tmp/spawn-export-result.json",
+    // Second-pass behaviour. Flipping this to true is what enables the
+    // sed-based redact + commit + push. Flipping to false exercises the
+    // pre-commit gate that pauses for host confirmation.
+    allowRedact: true,
   };
 
   it("uses set -eo pipefail", () => {
@@ -185,7 +190,7 @@ describe("buildExportScript", () => {
     expect(s).toContain('"error":"gh is not authenticated');
   });
 
-  it("scans staged files for known API-key patterns and aborts on hit", () => {
+  it("scans staged files for known API-key patterns", () => {
     const s = buildExportScript(opts);
     expect(s).toContain("SECRET_REGEX=");
     // Verify a representative pattern from each provider family is present
@@ -197,7 +202,39 @@ describe("buildExportScript", () => {
     expect(s).toContain("hcloud_"); // Hetzner
     expect(s).toContain("dop_v1_"); // DigitalOcean
     expect(s).toContain("BEGIN ([A-Z]+ )?PRIVATE KEY"); // PEM
-    expect(s).toContain("Possible secrets detected");
+  });
+
+  it("redacts matched secrets in-place when ALLOW_REDACT=1 (second pass)", () => {
+    const s = buildExportScript(opts); // opts.allowRedact = true
+    expect(s).toContain("ALLOW_REDACT=1");
+    // Redact placeholder is defined and used as the sed replacement.
+    expect(s).toContain("REDACT_PLACEHOLDER='***REDACTED-BY-SPAWN-EXPORT***'");
+    expect(s).toContain("sed -i -E");
+    // The script re-stages after redacting so the redacted blobs replace
+    // the originals.
+    expect(s).toMatch(/sed -i -E[\s\S]*git add -A/);
+    // The legacy abort path is gone — no false "ok":false on secret hits.
+    expect(s).not.toContain("Possible secrets detected in staged files; aborting");
+  });
+
+  it("pauses before commit with needs_confirmation when ALLOW_REDACT=0 (first pass)", () => {
+    const s = buildExportScript({
+      ...opts,
+      allowRedact: false,
+    });
+    expect(s).toContain("ALLOW_REDACT=0");
+    // The gate path emits a structured result the host can parse.
+    expect(s).toContain('"needsConfirmation":true,"hits":%s');
+    // Exit 0, not 1 — a gate is not a failure.
+    expect(s).toMatch(/needsConfirmation":true[\s\S]*exit 0/);
+    // The redact path is conditional on ALLOW_REDACT=1.
+    expect(s).toContain('if [ "$ALLOW_REDACT" != "1" ]; then');
+  });
+
+  it("includes the redacted file list in the success result", () => {
+    const s = buildExportScript(opts);
+    expect(s).toContain('REDACTED_JSON="[]"');
+    expect(s).toContain('"redacted":%s');
   });
 
   it("uses gh repo create with the cloud and slug from the script", () => {
@@ -366,5 +403,126 @@ describe("cmdExport", () => {
       }),
     ).rejects.toThrow("__exit__");
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  // ── Gate flow ─────────────────────────────────────────────────────────────
+  //
+  // When the first pass returns needs_confirmation, the host prompts the user.
+  // Approve → re-run with ALLOW_REDACT=1 → success. Decline → exit 0, no push.
+
+  function makeSequencedRunner(resultsJson: string[]) {
+    const calls: {
+      allowRedact: string;
+    }[] = [];
+    let callIndex = 0;
+    const runner = {
+      runServer: async (script: string) => {
+        const m = script.match(/\nALLOW_REDACT=([01])\n/);
+        calls.push({
+          allowRedact: m ? m[1] : "?",
+        });
+      },
+      uploadFile: async () => {},
+      downloadFile: async (_remote: string, local: string) => {
+        const idx = Math.min(callIndex, resultsJson.length - 1);
+        callIndex += 1;
+        writeFileSync(local, resultsJson[idx]);
+      },
+    };
+    return {
+      runner,
+      calls,
+    };
+  }
+
+  it("prompts and re-runs with ALLOW_REDACT=1 when the user approves redaction", async () => {
+    const { runner, calls } = makeSequencedRunner([
+      JSON.stringify({
+        ok: false,
+        needsConfirmation: true,
+        hits: [
+          "project/test/brain-sync.test.ts",
+        ],
+      }),
+      JSON.stringify({
+        ok: true,
+        slug: "alice/my-vm",
+        url: "https://github.com/alice/my-vm",
+        redacted: [
+          "project/test/brain-sync.test.ts",
+        ],
+      }),
+    ]);
+    // Default confirm returns true → user approves the gate.
+    clackMocks.confirm.mockImplementation(async () => true);
+
+    await cmdExport(undefined, {
+      records: [
+        baseRecord,
+      ],
+      visibility: "private",
+      makeRunner: () => runner,
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].allowRedact).toBe("0");
+    expect(calls[1].allowRedact).toBe("1");
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it("cancels the export cleanly when the user declines redaction", async () => {
+    const { runner, calls } = makeSequencedRunner([
+      JSON.stringify({
+        ok: false,
+        needsConfirmation: true,
+        hits: [
+          "project/leaky.ts",
+        ],
+      }),
+    ]);
+    // User declines at the gate.
+    clackMocks.confirm.mockImplementation(async () => false);
+
+    await expect(
+      cmdExport(undefined, {
+        records: [
+          baseRecord,
+        ],
+        visibility: "private",
+        makeRunner: () => runner,
+      }),
+    ).rejects.toThrow("__exit__");
+
+    // Exactly one pass happened (ALLOW_REDACT=0) — nothing got pushed.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].allowRedact).toBe("0");
+    // exit(0) — cancellation is not a failure.
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it("runs once and succeeds when the first pass finds no secrets", async () => {
+    const { runner, calls } = makeSequencedRunner([
+      JSON.stringify({
+        ok: true,
+        slug: "alice/clean-repo",
+        url: "https://github.com/alice/clean-repo",
+      }),
+    ]);
+    // confirm shouldn't fire at all on the happy path.
+    clackMocks.confirm.mockImplementation(async () => {
+      throw new Error("confirm should not be called when no secrets are found");
+    });
+
+    await cmdExport(undefined, {
+      records: [
+        baseRecord,
+      ],
+      visibility: "private",
+      makeRunner: () => runner,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].allowRedact).toBe("0");
+    expect(exitSpy).not.toHaveBeenCalled();
   });
 });
