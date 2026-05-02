@@ -356,7 +356,7 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
 
   p.log.step(`Exporting ${pc.bold(buildRecordLabel(r))} ${pc.dim(`(${buildRecordSubtitle(r, null)})`)}`);
 
-  const visibility = options?.visibility ?? "private";
+  const visibility = options?.visibility ?? "public";
   const script = buildExportScript({
     spawnMd: buildSpawnMd(r),
     readmeTemplate: buildReadmeTemplate(),
