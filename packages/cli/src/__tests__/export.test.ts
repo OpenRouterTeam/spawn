@@ -217,6 +217,18 @@ describe("buildExportScript", () => {
     expect(s).not.toContain("Possible secrets detected in staged files; aborting");
   });
 
+  it("uses '#' as the sed delimiter — '|' would clash with SECRET_REGEX alternation", () => {
+    // Regression: the sed substitution previously used '|' as its delimiter
+    // ("s|${SECRET_REGEX}|${REDACT}|g"). Because SECRET_REGEX itself contains
+    // '|' (it's a |-separated alternation of provider patterns), bash
+    // expansion produced a string sed parsed with the wrong number of fields,
+    // failing with "unknown option to `s'". '#' is absent from both the regex
+    // and the placeholder, so the substitution is unambiguous.
+    const s = buildExportScript(opts);
+    expect(s).toContain('sed -i -E "s#${SECRET_REGEX}#${REDACT_PLACEHOLDER}#g"');
+    expect(s).not.toContain('sed -i -E "s|${SECRET_REGEX}|${REDACT_PLACEHOLDER}|g"');
+  });
+
   it("pauses before commit with needs_confirmation when ALLOW_REDACT=0 (first pass)", () => {
     const s = buildExportScript({
       ...opts,
