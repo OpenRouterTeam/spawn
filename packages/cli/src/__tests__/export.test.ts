@@ -5,7 +5,15 @@ mockClackPrompts();
 
 import type { SpawnRecord } from "../history";
 
-import { buildExportScript, buildGitignore, buildReadmeTemplate, buildSpawnMd, cmdExport } from "../commands/export";
+import {
+  buildExportScript,
+  buildGitignore,
+  buildReadmeTemplate,
+  buildSpawnMd,
+  cmdExport,
+  parseStepsFromLaunchCmd,
+  resolveSteps,
+} from "../commands/export";
 import { parseSpawnMd } from "../shared/spawn-md";
 
 const baseRecord: SpawnRecord = {
@@ -69,7 +77,8 @@ describe("buildReadmeTemplate", () => {
     expect(tpl).toContain("__NAME__");
     expect(tpl).toContain("__CLOUD__");
     expect(tpl).toContain("__SLUG__");
-    expect(tpl).toContain("spawn claude __CLOUD__ --repo __SLUG__");
+    expect(tpl).toContain("__STEPS__");
+    expect(tpl).toContain("spawn claude __CLOUD__ --repo __SLUG__ --steps __STEPS__");
   });
 
   it("renders a github-friendly checklist", () => {
@@ -92,12 +101,50 @@ describe("buildGitignore", () => {
   });
 });
 
+describe("parseStepsFromLaunchCmd", () => {
+  it("returns null when launch_cmd is undefined or has no --steps", () => {
+    expect(parseStepsFromLaunchCmd(undefined)).toBeNull();
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner")).toBeNull();
+  });
+
+  it("parses space-separated --steps", () => {
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner --steps github,browser")).toBe("github,browser");
+  });
+
+  it("parses --steps=value form", () => {
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner --steps=github,auto-update")).toBe("github,auto-update");
+  });
+
+  it("ignores --steps inside other flags", () => {
+    // --no-steps shouldn't match
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner --no-steps")).toBeNull();
+  });
+});
+
+describe("resolveSteps", () => {
+  it("returns the parsed value when launch_cmd carries --steps", () => {
+    const r: SpawnRecord = {
+      ...baseRecord,
+      connection: {
+        ...baseRecord.connection!,
+        launch_cmd: "spawn claude hetzner --steps github,reuse-api-key",
+      },
+    };
+    expect(resolveSteps(r)).toBe("github,reuse-api-key");
+  });
+
+  it("falls back to a default when launch_cmd has no --steps", () => {
+    expect(resolveSteps(baseRecord)).toBe("github,auto-update,security-scan");
+  });
+});
+
 describe("buildExportScript", () => {
   const opts = {
     spawnMd: "---\nname: x\n---\n",
     readmeTemplate: "# __NAME__\n",
     gitignore: "node_modules/\n",
     cloud: "hetzner",
+    steps: "github,auto-update,security-scan",
     visibility: "private" as const,
     resultPath: "/tmp/spawn-export-result.json",
   };
@@ -178,6 +225,12 @@ describe("buildExportScript", () => {
     const s = buildExportScript(opts);
     expect(s).toContain("const scrub = (obj) =>");
     expect(s).toContain("scrub(parsed)");
+  });
+
+  it("bakes the steps list into the script and substitutes __STEPS__", () => {
+    const s = buildExportScript(opts);
+    expect(s).toContain("STEPS='github,auto-update,security-scan'");
+    expect(s).toContain("s|__STEPS__|$STEPS|g");
   });
 });
 

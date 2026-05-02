@@ -34,6 +34,34 @@ import { handleCancel } from "./shared.js";
 
 const CLAUDE_AGENT = "claude";
 const REMOTE_RESULT_PATH = "/tmp/spawn-export-result.json";
+/** Default --steps list when the original launch_cmd doesn't carry one.
+ *  Picked to be the standard "0 prompts" claude provisioning set:
+ *  github auth + auto-update + security-scan are all defaultOn-equivalent
+ *  for normal spawns. */
+const DEFAULT_STEPS = "github,auto-update,security-scan";
+
+/** Parse `--steps <value>` (or `--steps=<value>`) out of a saved launch_cmd.
+ *  Returns the comma-separated string verbatim, or null if the flag is
+ *  absent. The respawn consumer re-validates the names. */
+export function parseStepsFromLaunchCmd(cmd: string | undefined): string | null {
+  if (!cmd) {
+    return null;
+  }
+  const eq = cmd.match(/--steps=([^\s]+)/);
+  if (eq) {
+    return eq[1];
+  }
+  const space = cmd.match(/--steps\s+([^\s]+)/);
+  if (space) {
+    return space[1];
+  }
+  return null;
+}
+
+/** Resolve the --steps value to bake into the spawn link. */
+export function resolveSteps(record: SpawnRecord): string {
+  return parseStepsFromLaunchCmd(record.connection?.launch_cmd) ?? DEFAULT_STEPS;
+}
 
 /** Result the on-VM script writes to REMOTE_RESULT_PATH. */
 const ResultSchema = v.union([
@@ -128,7 +156,7 @@ export function buildGitignore(): string {
 }
 
 /** README template — the bash script substitutes __SLUG__, __CLOUD__,
- *  __NAME__ at runtime once claude has picked a name. */
+ *  __NAME__, __STEPS__ at runtime once claude has picked a name. */
 export function buildReadmeTemplate(): string {
   return [
     "# __NAME__",
@@ -138,8 +166,11 @@ export function buildReadmeTemplate(): string {
     "## Quickstart",
     "",
     "```bash",
-    "spawn claude __CLOUD__ --repo __SLUG__",
+    "spawn claude __CLOUD__ --repo __SLUG__ --steps __STEPS__",
     "```",
+    "",
+    "Re-spawning is non-interactive — the `--steps` list bakes in the same",
+    "setup decisions the original spawn made, so you won't be prompted.",
     "",
     "## First-run checklist",
     "",
@@ -162,6 +193,7 @@ export function buildExportScript(opts: {
   readmeTemplate: string;
   gitignore: string;
   cloud: string;
+  steps: string;
   visibility: "private" | "public";
   resultPath: string;
 }): string {
@@ -172,6 +204,7 @@ export function buildExportScript(opts: {
     "",
     `RESULT_PATH=${shSingleQuote(opts.resultPath)}`,
     `CLOUD=${shSingleQuote(opts.cloud)}`,
+    `STEPS=${shSingleQuote(opts.steps)}`,
     `VISIBILITY_FLAG=${visibilityFlag}`,
     "",
     'EXPORT_DIR="$(mktemp -d)"',
@@ -255,7 +288,7 @@ export function buildExportScript(opts: {
     'SLUG="$GH_USER/$PROJECT_NAME"',
     "",
     "# 7. Substitute placeholders into README.",
-    'sed -i "s|__NAME__|$PROJECT_NAME|g; s|__CLOUD__|$CLOUD|g; s|__SLUG__|$SLUG|g" "$EXPORT_DIR/README.md"',
+    'sed -i "s|__NAME__|$PROJECT_NAME|g; s|__CLOUD__|$CLOUD|g; s|__SLUG__|$SLUG|g; s|__STEPS__|$STEPS|g" "$EXPORT_DIR/README.md"',
     "",
     "# 8. Stage everything.",
     'cd "$EXPORT_DIR"',
@@ -357,11 +390,13 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
   p.log.step(`Exporting ${pc.bold(buildRecordLabel(r))} ${pc.dim(`(${buildRecordSubtitle(r, null)})`)}`);
 
   const visibility = options?.visibility ?? "public";
+  const steps = resolveSteps(r);
   const script = buildExportScript({
     spawnMd: buildSpawnMd(r),
     readmeTemplate: buildReadmeTemplate(),
     gitignore: buildGitignore(),
     cloud: r.cloud,
+    steps,
     visibility,
     resultPath: REMOTE_RESULT_PATH,
   });
@@ -411,6 +446,6 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
   p.log.success(`Exported to ${pc.cyan(parsed.url)}`);
   console.log();
   console.log(pc.dim("Re-spawn with:"));
-  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug}`)}`);
+  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug} --steps ${steps}`)}`);
   console.log();
 }

@@ -9,6 +9,8 @@ export {
   buildReadmeTemplate,
   buildSpawnMd,
   cmdExport,
+  parseStepsFromLaunchCmd,
+  resolveSteps,
 } from "./export.js";
 // feedback.ts — cmdFeedback
 export { cmdFeedback } from "./feedback.js";
