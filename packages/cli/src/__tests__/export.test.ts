@@ -317,22 +317,44 @@ describe("cmdExport", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it("filters out sprite-console connections", async () => {
-    const spriteConsole: SpawnRecord = {
+  it("includes sprite-console connections (sprite has its own runner)", async () => {
+    const spriteRecord: SpawnRecord = {
       ...baseRecord,
+      cloud: "sprite",
       connection: {
         ...baseRecord.connection!,
+        cloud: "sprite",
         ip: "sprite-console",
+      },
+    };
+    // The injected runner short-circuits the sprite-module import, so we just
+    // need cmdExport to attempt the export rather than filtering the record out.
+    const ranWith: {
+      script?: string;
+    } = {};
+    const stubRunner = {
+      runServer: async (cmd: string) => {
+        ranWith.script = cmd;
+      },
+      uploadFile: async () => {},
+      // downloadFile must succeed so the parser sees a result file. Make it
+      // throw a recognisable error and assert we got past the filter step.
+      downloadFile: async () => {
+        throw new Error("__downloadFile_called__");
       },
     };
     await expect(
       cmdExport(undefined, {
         records: [
-          spriteConsole,
+          spriteRecord,
         ],
+        visibility: "private",
+        makeRunner: () => stubRunner,
       }),
     ).rejects.toThrow("__exit__");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    // The script ran (record passed the filter), then the download stub threw,
+    // which cmdExport surfaces as exit(1). What matters: ranWith.script is set.
+    expect(ranWith.script).toBeDefined();
   });
 
   it("errors with a target hint when the named spawn doesn't exist", async () => {
