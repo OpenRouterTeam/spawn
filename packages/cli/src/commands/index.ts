@@ -6,7 +6,7 @@ export { cascadeDelete, cmdDelete } from "./delete.js";
 export {
   buildExportScript,
   buildGitignore,
-  buildReadme,
+  buildReadmeTemplate,
   buildSpawnMd,
   cmdExport,
 } from "./export.js";

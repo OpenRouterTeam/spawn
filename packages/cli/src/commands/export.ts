@@ -6,19 +6,14 @@
 // gets a `spawn claude <cloud> --repo user/<slug>` line they can hand off
 // or re-run.
 //
-// v1 scope: claude only. Mechanical capture (no agent introspection):
-//   - ~/project/         (working tree, with aggressive .gitignore)
-//   - ~/.claude/{skills,commands,hooks,CLAUDE.md,AGENTS.md,settings.json}
-//     (settings.json is sanitized to strip likely tokens)
-//   - generated spawn.md (frontmatter only — re-spawn metadata)
-//   - generated README.md (re-spawn command + re-auth checklist for github)
-//
-// Followups (not in v1):
-//   - claude reads its own session history to enumerate MCPs / OAuth
-//     providers and writes them into spawn.md's setup steps
-//   - local cloud target (currently routed through SshRunner like every
-//     other cloud — works for SSH-backed clouds; local cloud uses a
-//     trivial direct branch added below)
+// v1 scope: claude only.
+// - When the user has multiple claude spawns, a picker lists them.
+// - The repo name is decided by claude on the VM (`claude -p` with a
+//   name-suggestion prompt) — the human is never asked. The gh username
+//   comes from `gh api user`.
+// - Before the commit, every staged file is scanned for known API-key
+//   shapes (Anthropic, OpenRouter, OpenAI, GitHub, AWS, PEM, Hetzner,
+//   DigitalOcean). Hits abort the export.
 
 import type { SpawnRecord } from "../history.js";
 
@@ -34,44 +29,49 @@ import { parseJsonWith } from "../shared/parse.js";
 import { asyncTryCatch } from "../shared/result.js";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys.js";
 import { makeSshRunner } from "../shared/ssh-runner.js";
-import { shellQuote } from "../shared/ui.js";
 import { buildRecordLabel, buildRecordSubtitle } from "./list.js";
-import { handleCancel, isInteractiveTTY } from "./shared.js";
+import { handleCancel } from "./shared.js";
 
 const CLAUDE_AGENT = "claude";
 const REMOTE_RESULT_PATH = "/tmp/spawn-export-result.json";
 
-const ResultSchema = v.object({
-  slug: v.string(),
-  url: v.string(),
-});
+/** Result the on-VM script writes to REMOTE_RESULT_PATH. */
+const ResultSchema = v.union([
+  v.object({
+    ok: v.literal(true),
+    slug: v.string(),
+    url: v.string(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    error: v.string(),
+  }),
+]);
 
-const SLUG_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
-const REPO_NAME_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-
-/** Find a claude spawn by name, id, or fall back to most-recent. */
-function resolveTarget(target: string | undefined, records?: SpawnRecord[]): SpawnRecord | null {
-  const all = records ?? filterHistory();
-  const claudeRecords = all.filter((r) => r.agent === CLAUDE_AGENT);
-  if (claudeRecords.length === 0) {
-    return null;
-  }
-  if (!target) {
-    return claudeRecords[0];
-  }
-  return (
-    claudeRecords.find((r) => r.id === target || r.name === target || r.connection?.server_name === target) ?? null
-  );
+/** Filter to records the export can actually drive: claude, with a live SSH
+ *  connection, not deleted, not sprite-console. */
+function exportableClaudeRecords(records: SpawnRecord[]): SpawnRecord[] {
+  return records.filter((r) => {
+    if (r.agent !== CLAUDE_AGENT) {
+      return false;
+    }
+    const c = r.connection;
+    if (!c) {
+      return false;
+    }
+    if (c.deleted) {
+      return false;
+    }
+    if (c.ip === "sprite-console") {
+      return false;
+    }
+    return true;
+  });
 }
 
-/** Sanitize a session name into a valid GitHub repo name. */
-function sanitizeRepoName(input: string): string {
-  const cleaned = input
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "")
-    .slice(0, 80);
-  return cleaned || "spawn-export";
+/** Find a claude spawn by name or id. */
+function matchTarget(records: SpawnRecord[], target: string): SpawnRecord | null {
+  return records.find((r) => r.id === target || r.name === target || r.connection?.server_name === target) ?? null;
 }
 
 /** Build the spawn.md content from a record. Re-spawning consumes this. */
@@ -93,19 +93,52 @@ export function buildSpawnMd(record: SpawnRecord): string {
   return lines.join("\n");
 }
 
-/** Build the README. Renders as a re-auth checklist on github. */
-export function buildReadme(record: SpawnRecord, slug: string): string {
-  const cloud = record.cloud;
-  const respawn = `spawn ${CLAUDE_AGENT} ${cloud} --repo ${slug}`;
+/** Aggressive default .gitignore. The pre-commit secret scan is the real
+ *  backstop; this just keeps obviously-private paths out of the staged tree
+ *  before the scan runs. */
+export function buildGitignore(): string {
   return [
-    `# ${record.name ?? slug}`,
+    "# spawn export defaults",
+    "node_modules/",
+    "dist/",
+    "build/",
+    ".next/",
+    "target/",
+    ".cache/",
+    "coverage/",
+    "*.log",
+    ".env",
+    ".env.*",
+    ".spawnrc",
+    ".bash_history",
+    ".zsh_history",
+    ".aws/",
+    ".config/spawn/",
+    ".config/gcloud/",
+    ".gnupg/",
+    "*.key",
+    "*.pem",
+    "*.token",
+    "*.credentials",
+    "id_rsa*",
+    "id_ed25519*",
+    ".DS_Store",
     "",
-    `Exported from a [spawn](https://github.com/OpenRouterTeam/spawn) session on \`${cloud}\`.`,
+  ].join("\n");
+}
+
+/** README template — the bash script substitutes __SLUG__, __CLOUD__,
+ *  __NAME__ at runtime once claude has picked a name. */
+export function buildReadmeTemplate(): string {
+  return [
+    "# __NAME__",
+    "",
+    "Exported from a [spawn](https://github.com/OpenRouterTeam/spawn) session on `__CLOUD__`.",
     "",
     "## Quickstart",
     "",
     "```bash",
-    respawn,
+    "spawn claude __CLOUD__ --repo __SLUG__",
     "```",
     "",
     "## First-run checklist",
@@ -123,35 +156,12 @@ export function buildReadme(record: SpawnRecord, slug: string): string {
   ].join("\n");
 }
 
-/** Aggressive default .gitignore — better safe than committing secrets. */
-export function buildGitignore(): string {
-  return [
-    "# spawn export defaults",
-    "node_modules/",
-    "dist/",
-    "build/",
-    ".next/",
-    "target/",
-    ".cache/",
-    "coverage/",
-    "*.log",
-    ".env",
-    ".env.*",
-    "*.key",
-    "*.pem",
-    "id_rsa*",
-    "id_ed25519*",
-    ".DS_Store",
-    "",
-  ].join("\n");
-}
-
 /** Generate the bash script that runs on the VM. */
 export function buildExportScript(opts: {
   spawnMd: string;
-  readme: string;
+  readmeTemplate: string;
   gitignore: string;
-  slug: string;
+  cloud: string;
   visibility: "private" | "public";
   resultPath: string;
 }): string {
@@ -160,28 +170,33 @@ export function buildExportScript(opts: {
     "#!/bin/bash",
     "set -eo pipefail",
     "",
+    `RESULT_PATH=${shSingleQuote(opts.resultPath)}`,
+    `CLOUD=${shSingleQuote(opts.cloud)}`,
+    `VISIBILITY_FLAG=${visibilityFlag}`,
+    "",
     'EXPORT_DIR="$(mktemp -d)"',
     'trap "rm -rf \\"$EXPORT_DIR\\"" EXIT',
     "",
+    "# 1. Heredoc the static files (spawn.md, .gitignore, README template)",
     `cat > "$EXPORT_DIR/spawn.md" <<'SPAWN_MD_EOF'`,
     opts.spawnMd,
     "SPAWN_MD_EOF",
-    "",
-    `cat > "$EXPORT_DIR/README.md" <<'README_EOF'`,
-    opts.readme,
-    "README_EOF",
     "",
     `cat > "$EXPORT_DIR/.gitignore" <<'GITIGNORE_EOF'`,
     opts.gitignore,
     "GITIGNORE_EOF",
     "",
-    "# Copy working tree if present",
+    `cat > "$EXPORT_DIR/README.md" <<'README_EOF'`,
+    opts.readmeTemplate,
+    "README_EOF",
+    "",
+    "# 2. Copy working tree (rsync excludes the obvious junk).",
     'if [ -d "$HOME/project" ]; then',
     '  mkdir -p "$EXPORT_DIR/project"',
     '  rsync -a --exclude=node_modules --exclude=.git --exclude=dist --exclude=.next --exclude=target --exclude=.env --exclude=".env.*" "$HOME/project/" "$EXPORT_DIR/project/"',
     "fi",
     "",
-    "# Copy sanitized claude system dir",
+    "# 3. Copy sanitized claude system dir.",
     'mkdir -p "$EXPORT_DIR/claude"',
     "for d in skills commands hooks; do",
     '  if [ -d "$HOME/.claude/$d" ]; then',
@@ -194,8 +209,7 @@ export function buildExportScript(opts: {
     "  fi",
     "done",
     "",
-    "# Strip likely-secret keys from settings.json (best effort).",
-    "# Removes top-level fields whose name matches token/key/secret/password.",
+    "# 4. Strip token-shaped keys from settings.json.",
     'if [ -f "$EXPORT_DIR/claude/settings.json" ] && command -v bun >/dev/null; then',
     '  _SETTINGS_PATH="$EXPORT_DIR/claude/settings.json" bun -e "',
     "    const path = process.env._SETTINGS_PATH;",
@@ -203,77 +217,92 @@ export function buildExportScript(opts: {
     "    let parsed; try { parsed = JSON.parse(raw); } catch { process.exit(0); }",
     "    if (parsed && typeof parsed === 'object') {",
     "      const denyRe = /(token|secret|password|api[_-]?key|auth)/i;",
-    "      for (const k of Object.keys(parsed)) { if (denyRe.test(k)) delete parsed[k]; }",
-    "      if (parsed.env && typeof parsed.env === 'object') {",
-    "        for (const k of Object.keys(parsed.env)) { if (denyRe.test(k)) delete parsed.env[k]; }",
-    "      }",
+    "      const scrub = (obj) => {",
+    "        if (!obj || typeof obj !== 'object') return;",
+    "        for (const k of Object.keys(obj)) {",
+    "          if (denyRe.test(k)) { delete obj[k]; continue; }",
+    "          if (typeof obj[k] === 'object') scrub(obj[k]);",
+    "        }",
+    "      };",
+    "      scrub(parsed);",
     "      await Bun.write(path, JSON.stringify(parsed, null, 2));",
     "    }",
     '  " || true',
     "fi",
     "",
+    "# 5. Ask claude to suggest a kebab-case repo name.",
+    'PROJECT_NAME=""',
+    "if command -v claude >/dev/null; then",
+    '  CLAUDE_PROMPT="You are choosing a github repo name for an export of this VM. Look at ~/project (the working tree) and any README/package.json to infer the project. Output ONLY a short kebab-case repo name, max 40 chars, lowercase, [a-z0-9-] only. No explanation, no quotes."',
+    '  SUGGESTED="$(claude -p "$CLAUDE_PROMPT" 2>/dev/null | head -n 1 || true)"',
+    '  PROJECT_NAME="$(printf "%s" "$SUGGESTED" | tr "A-Z" "a-z" | sed -E "s/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-//; s/-$//" | cut -c1-40)"',
+    "fi",
+    'if [ -z "$PROJECT_NAME" ]; then',
+    '  if [ -d "$HOME/project" ]; then',
+    '    PROJECT_NAME="$(basename "$HOME/project" | tr "A-Z" "a-z" | sed -E "s/[^a-z0-9-]+/-/g" | cut -c1-40)"',
+    "  fi",
+    "fi",
+    'if [ -z "$PROJECT_NAME" ]; then',
+    '  PROJECT_NAME="spawn-export-$(date +%s)"',
+    "fi",
+    "",
+    "# 6. Look up the gh user. Required.",
+    'GH_USER="$(gh api user --jq .login 2>/dev/null || true)"',
+    'if [ -z "$GH_USER" ]; then',
+    '  printf \'%s\\n\' \'{"ok":false,"error":"gh is not authenticated on the VM. Run `gh auth login` and retry."}\' > "$RESULT_PATH"',
+    "  exit 1",
+    "fi",
+    'SLUG="$GH_USER/$PROJECT_NAME"',
+    "",
+    "# 7. Substitute placeholders into README.",
+    'sed -i "s|__NAME__|$PROJECT_NAME|g; s|__CLOUD__|$CLOUD|g; s|__SLUG__|$SLUG|g" "$EXPORT_DIR/README.md"',
+    "",
+    "# 8. Stage everything.",
     'cd "$EXPORT_DIR"',
     "git init -q -b main",
     "git add -A",
+    "",
+    "# 9. SECRETS SCAN — abort if any staged file matches known API-key shapes.",
+    "SECRET_REGEX='(sk-or-v1-[a-f0-9]{20,})|(sk-ant-api[0-9-]+_[A-Za-z0-9_-]{20,})|(sk-proj-[A-Za-z0-9_-]{20,})|(gh[ops]_[A-Za-z0-9]{36})|(AKIA[0-9A-Z]{16})|(hcloud_[a-zA-Z0-9_-]{20,})|(dop_v1_[a-f0-9]{32,})|(-----BEGIN ([A-Z]+ )?PRIVATE KEY-----)'",
+    'SECRET_HITS="$(git ls-files -z | xargs -0 grep -lEa "$SECRET_REGEX" 2>/dev/null || true)"',
+    'if [ -n "$SECRET_HITS" ]; then',
+    '  printf \'%s\\n\' \'{"ok":false,"error":"Possible secrets detected in staged files; aborting export. SSH in and inspect the files listed below."}\' > "$RESULT_PATH"',
+    '  echo "✗ Possible secrets detected in:" >&2',
+    '  printf "%s\\n" "$SECRET_HITS" >&2',
+    "  exit 1",
+    "fi",
+    "",
+    "# 10. Commit and push.",
     'git -c user.email=spawn-export@openrouter.ai -c user.name="spawn export" commit -q -m "spawn export"',
     "",
-    `gh repo create ${shellQuote(opts.slug)} ${visibilityFlag} --source=. --push --description=${shellQuote("Exported with spawn")}`,
+    'gh repo create "$SLUG" "$VISIBILITY_FLAG" --source=. --push --description="Exported with spawn"',
     "",
-    `printf '%s\\n' '{"slug":${JSON.stringify(opts.slug).replace(/'/g, "'\\''")},"url":"https://github.com/${opts.slug}"}' > ${shellQuote(opts.resultPath)}`,
+    "# 11. Emit the success result.",
+    'printf \'{"ok":true,"slug":"%s","url":"https://github.com/%s"}\\n\' "$SLUG" "$SLUG" > "$RESULT_PATH"',
     "",
   ].join("\n");
 }
 
-/** Prompt for slug + visibility. */
-async function promptForRepo(record: SpawnRecord): Promise<{
-  slug: string;
-  visibility: "private" | "public";
-} | null> {
-  const defaultName = sanitizeRepoName(record.name ?? record.connection?.server_name ?? "spawn-export");
-  const slug = await p.text({
-    message: "GitHub repo to export to (user/repo)",
-    placeholder: `your-username/${defaultName}`,
-    validate: (value) => {
-      if (!value) {
-        return "Required. Format: user/repo";
-      }
-      if (!SLUG_PATTERN.test(value)) {
-        return "Must be in user/repo format with only [a-zA-Z0-9_.-]";
-      }
-      const repoPart = value.split("/")[1];
-      if (!REPO_NAME_PATTERN.test(repoPart)) {
-        return "Repo name must contain only [a-zA-Z0-9_.-]";
-      }
-      return undefined;
-    },
+/** Single-quote a string for safe inclusion in a bash script. */
+function shSingleQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+/** Pick one record from a list of claude spawns. */
+async function pickOne(records: SpawnRecord[]): Promise<SpawnRecord | null> {
+  const options = records.map((r) => ({
+    value: r.id ?? r.timestamp,
+    label: buildRecordLabel(r),
+    hint: buildRecordSubtitle(r, null),
+  }));
+  const choice = await p.select({
+    message: "Which claude spawn do you want to export?",
+    options,
   });
-  if (p.isCancel(slug)) {
+  if (p.isCancel(choice)) {
     return null;
   }
-
-  const visibility = await p.select({
-    message: "Visibility",
-    options: [
-      {
-        value: "private",
-        label: "Private",
-        hint: "default",
-      },
-      {
-        value: "public",
-        label: "Public",
-      },
-    ],
-    initialValue: "private",
-  });
-  if (p.isCancel(visibility)) {
-    return null;
-  }
-
-  return {
-    slug,
-    visibility: visibility === "public" ? "public" : "private",
-  };
+  return records.find((r) => (r.id ?? r.timestamp) === choice) ?? null;
 }
 
 /** Options for cmdExport — injectable for testing. */
@@ -288,76 +317,52 @@ export interface ExportOptions {
     downloadFile: (remotePath: string, localPath: string) => Promise<void>;
     uploadFile: (localPath: string, remotePath: string) => Promise<void>;
   };
-  /** Skip interactive prompts; supply repo info directly. */
-  repo?: {
-    slug: string;
-    visibility: "private" | "public";
-  };
+  /** Override visibility (default private). */
+  visibility?: "private" | "public";
   /** Inject the candidate records directly (test seam to skip filterHistory). */
   records?: SpawnRecord[];
 }
 
 /** Top-level command: `spawn export [target]`. */
 export async function cmdExport(target: string | undefined, options?: ExportOptions): Promise<void> {
-  const record = resolveTarget(target, options?.records);
-  if (!record) {
-    if (target) {
+  const all = options?.records ?? filterHistory();
+  const exportable = exportableClaudeRecords(all);
+  if (exportable.length === 0) {
+    p.log.info("No claude spawns available to export.");
+    p.log.info(`Run ${pc.cyan("spawn claude <cloud>")} first, then export the result.`);
+    process.exit(1);
+  }
+
+  let record: SpawnRecord | null;
+  if (target) {
+    record = matchTarget(exportable, target);
+    if (!record) {
       p.log.error(`No claude spawn matches ${pc.bold(target)}.`);
       p.log.info(`Run ${pc.cyan("spawn list -a claude")} to see available targets.`);
-    } else {
-      p.log.info("No claude spawns recorded yet.");
-      p.log.info(`Run ${pc.cyan("spawn claude <cloud>")} first, then export the result.`);
-    }
-    process.exit(1);
-  }
-
-  if (record.agent !== CLAUDE_AGENT) {
-    p.log.error(`spawn export currently supports claude only (got ${pc.bold(record.agent)}).`);
-    p.log.info("Other agents will be added once their config introspection lands.");
-    process.exit(1);
-  }
-
-  const conn = record.connection;
-  if (!conn) {
-    p.log.error("Cannot export: spawn has no connection information.");
-    process.exit(1);
-  }
-  if (conn.deleted) {
-    p.log.error("Cannot export: server has been deleted.");
-    process.exit(1);
-  }
-  if (conn.ip === "sprite-console") {
-    p.log.error("Cannot export: Sprite-console connections aren't SSH-accessible.");
-    p.log.info("SSH directly into the VM and run `gh repo create` manually.");
-    process.exit(1);
-  }
-
-  p.log.step(`Exporting ${pc.bold(buildRecordLabel(record))} ${pc.dim(`(${buildRecordSubtitle(record, null)})`)}`);
-
-  // Resolve repo target
-  let repo = options?.repo;
-  if (!repo) {
-    if (!isInteractiveTTY()) {
-      p.log.error("spawn export requires --repo <slug> in non-interactive mode (not yet supported).");
       process.exit(1);
     }
-    const prompted = await promptForRepo(record);
-    if (!prompted) {
+  } else if (exportable.length === 1) {
+    record = exportable[0];
+  } else {
+    record = await pickOne(exportable);
+    if (!record) {
       handleCancel();
     }
-    repo = prompted!;
   }
 
-  // Build content
-  const spawnMd = buildSpawnMd(record);
-  const readme = buildReadme(record, repo.slug);
-  const gitignore = buildGitignore();
+  // After the picker, record is guaranteed non-null (handleCancel exits).
+  const r: SpawnRecord = record!;
+  const conn = r.connection!;
+
+  p.log.step(`Exporting ${pc.bold(buildRecordLabel(r))} ${pc.dim(`(${buildRecordSubtitle(r, null)})`)}`);
+
+  const visibility = options?.visibility ?? "private";
   const script = buildExportScript({
-    spawnMd,
-    readme,
-    gitignore,
-    slug: repo.slug,
-    visibility: repo.visibility,
+    spawnMd: buildSpawnMd(r),
+    readmeTemplate: buildReadmeTemplate(),
+    gitignore: buildGitignore(),
+    cloud: r.cloud,
+    visibility,
     resultPath: REMOTE_RESULT_PATH,
   });
 
@@ -368,7 +373,7 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     : makeSshRunner(conn.ip, conn.user, keyOpts);
 
   // Run the export script. 10-min timeout — large repos take time to push.
-  p.log.step("Running export on the VM...");
+  p.log.step("Running export on the VM (claude is naming the repo)...");
   const runResult = await asyncTryCatch(() => runner.runServer(script, 600));
   if (!runResult.ok) {
     p.log.error(`Export failed: ${getErrorMessage(runResult.error)}`);
@@ -398,10 +403,14 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     p.log.error("Export ran but produced no parseable result.");
     process.exit(1);
   }
+  if (!parsed.ok) {
+    p.log.error(parsed.error);
+    process.exit(1);
+  }
   console.log();
   p.log.success(`Exported to ${pc.cyan(parsed.url)}`);
   console.log();
   console.log(pc.dim("Re-spawn with:"));
-  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${record.cloud} --repo ${parsed.slug}`)}`);
+  console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug}`)}`);
   console.log();
 }
