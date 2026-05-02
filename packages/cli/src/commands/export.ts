@@ -13,7 +13,8 @@
 //   comes from `gh api user`.
 // - Before the commit, every staged file is scanned for known API-key
 //   shapes (Anthropic, OpenRouter, OpenAI, GitHub, AWS, PEM, Hetzner,
-//   DigitalOcean). Hits abort the export.
+//   DigitalOcean). Hits are redacted in-place; the file list is
+//   surfaced to the host CLI as a warning.
 
 import type { SpawnRecord } from "../history.js";
 
@@ -70,6 +71,7 @@ const ResultSchema = v.union([
     ok: v.literal(true),
     slug: v.string(),
     url: v.string(),
+    redacted: v.optional(v.array(v.string())),
   }),
   v.object({
     ok: v.literal(false),
@@ -293,14 +295,27 @@ export function buildExportScript(opts: {
     "git init -q -b main",
     "git add -A",
     "",
-    "# 9. SECRETS SCAN — abort if any staged file matches known API-key shapes.",
+    "# 9. SECRETS SCAN — redact any matched API-key shapes in-place. The export",
+    "# proceeds; the redacted file list is included in the result JSON so the",
+    "# host CLI can warn the user.",
     "SECRET_REGEX='(sk-or-v1-[a-f0-9]{20,})|(sk-ant-api[0-9-]+_[A-Za-z0-9_-]{20,})|(sk-proj-[A-Za-z0-9_-]{20,})|(gh[ops]_[A-Za-z0-9]{36})|(AKIA[0-9A-Z]{16})|(hcloud_[a-zA-Z0-9_-]{20,})|(dop_v1_[a-f0-9]{32,})|(-----BEGIN ([A-Z]+ )?PRIVATE KEY-----)'",
+    "REDACT_PLACEHOLDER='***REDACTED-BY-SPAWN-EXPORT***'",
     'SECRET_HITS="$(git ls-files -z | xargs -0 grep -lEa "$SECRET_REGEX" 2>/dev/null || true)"',
+    'REDACTED_JSON="[]"',
     'if [ -n "$SECRET_HITS" ]; then',
-    '  printf \'%s\\n\' \'{"ok":false,"error":"Possible secrets detected in staged files; aborting export. SSH in and inspect the files listed below."}\' > "$RESULT_PATH"',
-    '  echo "✗ Possible secrets detected in:" >&2',
+    '  echo "⚠ Redacting potential secrets in:" >&2',
     '  printf "%s\\n" "$SECRET_HITS" >&2',
-    "  exit 1",
+    "  while IFS= read -r f; do",
+    '    [ -z "$f" ] && continue',
+    '    sed -i -E "s|${SECRET_REGEX}|${REDACT_PLACEHOLDER}|g" "$f"',
+    '  done <<< "$SECRET_HITS"',
+    "  # Re-stage so the redacted blobs replace the originals in the index.",
+    "  git add -A",
+    '  REDACTED_JSON="$(printf "%s\\n" "$SECRET_HITS" | _PATHS_RAW="$SECRET_HITS" bun -e "',
+    "    const raw = process.env._PATHS_RAW || '';",
+    "    const arr = raw.split('\\n').map(s => s.trim()).filter(Boolean);",
+    "    process.stdout.write(JSON.stringify(arr));",
+    '  ")"',
     "fi",
     "",
     "# 10. Commit and push.",
@@ -308,8 +323,8 @@ export function buildExportScript(opts: {
     "",
     'gh repo create "$SLUG" "$VISIBILITY_FLAG" --source=. --push --description="Exported with spawn"',
     "",
-    "# 11. Emit the success result.",
-    'printf \'{"ok":true,"slug":"%s","url":"https://github.com/%s"}\\n\' "$SLUG" "$SLUG" > "$RESULT_PATH"',
+    "# 11. Emit the success result (with the list of redacted files, if any).",
+    'printf \'{"ok":true,"slug":"%s","url":"https://github.com/%s","redacted":%s}\\n\' "$SLUG" "$SLUG" "$REDACTED_JSON" > "$RESULT_PATH"',
     "",
   ].join("\n");
 }
@@ -497,6 +512,14 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
   }
   console.log();
   p.log.success(`Exported to ${pc.cyan(parsed.url)}`);
+  if (parsed.redacted && parsed.redacted.length > 0) {
+    p.log.warn(
+      `Redacted potential secrets in ${parsed.redacted.length} file${parsed.redacted.length === 1 ? "" : "s"}:`,
+    );
+    for (const f of parsed.redacted) {
+      console.log(pc.dim(`  - ${f}`));
+    }
+  }
   console.log();
   console.log(pc.dim("Re-spawn with:"));
   console.log(`  ${pc.cyan(`spawn ${CLAUDE_AGENT} ${r.cloud} --repo ${parsed.slug} --steps ${steps}`)}`);

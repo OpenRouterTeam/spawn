@@ -185,7 +185,7 @@ describe("buildExportScript", () => {
     expect(s).toContain('"error":"gh is not authenticated');
   });
 
-  it("scans staged files for known API-key patterns and aborts on hit", () => {
+  it("scans staged files for known API-key patterns", () => {
     const s = buildExportScript(opts);
     expect(s).toContain("SECRET_REGEX=");
     // Verify a representative pattern from each provider family is present
@@ -197,7 +197,24 @@ describe("buildExportScript", () => {
     expect(s).toContain("hcloud_"); // Hetzner
     expect(s).toContain("dop_v1_"); // DigitalOcean
     expect(s).toContain("BEGIN ([A-Z]+ )?PRIVATE KEY"); // PEM
-    expect(s).toContain("Possible secrets detected");
+  });
+
+  it("redacts matched secrets in-place rather than aborting", () => {
+    const s = buildExportScript(opts);
+    // Redact placeholder is defined and used as the sed replacement.
+    expect(s).toContain("REDACT_PLACEHOLDER='***REDACTED-BY-SPAWN-EXPORT***'");
+    expect(s).toContain("sed -i -E");
+    // The script re-stages after redacting so the redacted blobs replace
+    // the originals.
+    expect(s).toMatch(/sed -i -E[\s\S]*git add -A/);
+    // The legacy abort path is gone — no false "ok":false on secret hits.
+    expect(s).not.toContain("Possible secrets detected in staged files; aborting");
+  });
+
+  it("includes the redacted file list in the success result", () => {
+    const s = buildExportScript(opts);
+    expect(s).toContain('REDACTED_JSON="[]"');
+    expect(s).toContain('"redacted":%s');
   });
 
   it("uses gh repo create with the cloud and slug from the script", () => {
