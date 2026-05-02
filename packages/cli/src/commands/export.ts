@@ -47,11 +47,12 @@ export function parseStepsFromLaunchCmd(cmd: string | undefined): string | null 
   if (!cmd) {
     return null;
   }
-  const eq = cmd.match(/--steps=([^\s]+)/);
+  // Anchor to start or whitespace so `--no-steps` etc. never match.
+  const eq = cmd.match(/(?:^|\s)--steps=([^\s]+)/);
   if (eq) {
     return eq[1];
   }
-  const space = cmd.match(/--steps\s+([^\s]+)/);
+  const space = cmd.match(/(?:^|\s)--steps\s+([^\s]+)/);
   if (space) {
     return space[1];
   }
@@ -233,7 +234,7 @@ export function buildExportScript(opts: {
     'mkdir -p "$EXPORT_DIR/claude"',
     "for d in skills commands hooks; do",
     '  if [ -d "$HOME/.claude/$d" ]; then',
-    '    rsync -a "$HOME/.claude/$d/" "$EXPORT_DIR/claude/$d/"',
+    '    rsync -a --exclude=.git "$HOME/.claude/$d/" "$EXPORT_DIR/claude/$d/"',
     "  fi",
     "done",
     "for f in CLAUDE.md AGENTS.md settings.json; do",
@@ -350,7 +351,8 @@ export interface ExportOptions {
     downloadFile: (remotePath: string, localPath: string) => Promise<void>;
     uploadFile: (localPath: string, remotePath: string) => Promise<void>;
   };
-  /** Override visibility (default private). */
+  /** Override visibility. If omitted, the user is prompted interactively
+   *  with a "make public?" confirm that defaults to no (i.e. private). */
   visibility?: "private" | "public";
   /** Inject the candidate records directly (test seam to skip filterHistory). */
   records?: SpawnRecord[];
@@ -366,30 +368,55 @@ export async function cmdExport(target: string | undefined, options?: ExportOpti
     process.exit(1);
   }
 
-  let record: SpawnRecord | null;
+  let picked: SpawnRecord | null = null;
   if (target) {
-    record = matchTarget(exportable, target);
-    if (!record) {
+    picked = matchTarget(exportable, target);
+    if (!picked) {
       p.log.error(`No claude spawn matches ${pc.bold(target)}.`);
       p.log.info(`Run ${pc.cyan("spawn list -a claude")} to see available targets.`);
       process.exit(1);
     }
   } else if (exportable.length === 1) {
-    record = exportable[0];
+    picked = exportable[0] ?? null;
   } else {
-    record = await pickOne(exportable);
-    if (!record) {
-      handleCancel();
+    picked = await pickOne(exportable);
+    if (!picked) {
+      handleCancel(); // never returns
     }
   }
-
-  // After the picker, record is guaranteed non-null (handleCancel exits).
-  const r: SpawnRecord = record!;
-  const conn = r.connection!;
+  if (!picked) {
+    // Defensive: the branches above either assign or exit, so this should
+    // be unreachable. The explicit check keeps TypeScript narrowing happy
+    // without an `!` non-null assertion.
+    handleCancel();
+  }
+  const r: SpawnRecord = picked;
+  const conn = r.connection;
+  if (!conn) {
+    // exportableClaudeRecords guarantees connection is present — a missing
+    // connection here means state was mutated between filter and use.
+    p.log.error("Internal error: selected spawn has no connection info.");
+    process.exit(1);
+  }
 
   p.log.step(`Exporting ${pc.bold(buildRecordLabel(r))} ${pc.dim(`(${buildRecordSubtitle(r, null)})`)}`);
 
-  const visibility = options?.visibility ?? "public";
+  // Visibility: private by default. If the caller didn't force one (tests do),
+  // ask the user whether to make the exported repo public. A private repo is
+  // the safe default — the secret scan is a backstop, not a guarantee.
+  let visibility: "private" | "public";
+  if (options?.visibility) {
+    visibility = options.visibility;
+  } else {
+    const makePublic = await p.confirm({
+      message: "Make the exported repo public on GitHub?",
+      initialValue: false,
+    });
+    if (p.isCancel(makePublic)) {
+      handleCancel();
+    }
+    visibility = makePublic === true ? "public" : "private";
+  }
   const steps = resolveSteps(r);
   const script = buildExportScript({
     spawnMd: buildSpawnMd(r),

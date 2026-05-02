@@ -119,6 +119,13 @@ describe("parseStepsFromLaunchCmd", () => {
     // --no-steps shouldn't match
     expect(parseStepsFromLaunchCmd("spawn claude hetzner --no-steps")).toBeNull();
   });
+
+  it("does not over-match --no-steps=value", () => {
+    // Without word-boundary anchoring, --no-steps=foo would match and
+    // return "foo". The regex must only fire on the real --steps flag.
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner --no-steps=foo")).toBeNull();
+    expect(parseStepsFromLaunchCmd("spawn claude hetzner --no-steps foo")).toBeNull();
+  });
 });
 
 describe("resolveSteps", () => {
@@ -205,6 +212,22 @@ describe("buildExportScript", () => {
     });
     expect(s).toContain("VISIBILITY_FLAG=--public");
     expect(s).not.toContain("VISIBILITY_FLAG=--private");
+  });
+
+  it("emits --private when visibility is private (safe default)", () => {
+    // `opts.visibility` is "private" above; lock that in so a future default
+    // flip to public doesn't go unnoticed.
+    const s = buildExportScript(opts);
+    expect(s).toContain("VISIBILITY_FLAG=--private");
+    expect(s).not.toContain("VISIBILITY_FLAG=--public");
+  });
+
+  it("excludes .git when copying claude subdirs so nested checkouts don't leak", () => {
+    const s = buildExportScript(opts);
+    // The claude subdir rsync (skills/commands/hooks) targets "$HOME/.claude/$d/".
+    // Without --exclude=.git, a skill that happens to be a git checkout would
+    // ship its history in the exported repo.
+    expect(s).toContain('rsync -a --exclude=.git "$HOME/.claude/$d/"');
   });
 
   it("writes the result JSON to the supplied path", () => {
