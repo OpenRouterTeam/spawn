@@ -609,28 +609,25 @@ async function tryRefreshDoToken(): Promise<string | null> {
   return r.data;
 }
 
-async function tryDoOAuth(): Promise<string | null> {
-  logStep("Attempting DigitalOcean OAuth authentication...");
+/** Mutable state shared between the OAuth callback server and the wait loop. */
+interface OAuthCallbackState {
+  code: string | null;
+  denied: boolean;
+}
 
-  // Check connectivity to DigitalOcean
-  const connCheck = await asyncTryCatch(() =>
-    fetch("https://cloud.digitalocean.com", {
-      method: "HEAD",
-      signal: AbortSignal.timeout(5_000),
-    }),
-  );
-  if (!connCheck.ok) {
-    logWarn("Cannot reach cloud.digitalocean.com — network may be unavailable");
-    return null;
-  }
+/** Start a local HTTP server to receive the DigitalOcean OAuth callback.
+ *  Tries ports in range [DO_OAUTH_CALLBACK_PORT, +10). Returns the server,
+ *  actual port, and a shared state object that the callback handler mutates. */
+function startOAuthCallbackServer(csrfState: string): {
+  server: ReturnType<typeof Bun.serve>;
+  port: number;
+  state: OAuthCallbackState;
+} | null {
+  const cbState: OAuthCallbackState = {
+    code: null,
+    denied: false,
+  };
 
-  const csrfState = generateCsrfState();
-  let oauthCode: string | null = null;
-  let oauthDenied = false;
-  let server: ReturnType<typeof Bun.serve> | null = null;
-
-  // Try ports in range
-  let actualPort = DO_OAUTH_CALLBACK_PORT;
   for (let p = DO_OAUTH_CALLBACK_PORT; p < DO_OAUTH_CALLBACK_PORT + 10; p++) {
     const serveResult = tryCatch(() =>
       Bun.serve({
@@ -644,7 +641,7 @@ async function tryDoOAuth(): Promise<string | null> {
             if (error) {
               const desc = url.searchParams.get("error_description") || error;
               logError(`DigitalOcean authorization denied: ${desc}`);
-              oauthDenied = true;
+              cbState.denied = true;
               return new Response(OAUTH_ERROR_HTML, {
                 status: 403,
                 headers: {
@@ -686,7 +683,7 @@ async function tryDoOAuth(): Promise<string | null> {
               });
             }
 
-            oauthCode = code;
+            cbState.code = code;
             return new Response(OAUTH_SUCCESS_HTML, {
               headers: {
                 "Content-Type": "text/html",
@@ -705,126 +702,114 @@ async function tryDoOAuth(): Promise<string | null> {
     if (!serveResult.ok) {
       continue;
     }
-    server = serveResult.data;
-    actualPort = p;
-    break;
+    return {
+      server: serveResult.data,
+      port: p,
+      state: cbState,
+    };
   }
 
-  if (!server) {
-    logWarn(
-      `Failed to start OAuth server — ports ${DO_OAUTH_CALLBACK_PORT}-${DO_OAUTH_CALLBACK_PORT + 9} may be in use`,
-    );
-    return null;
-  }
+  logWarn(`Failed to start OAuth server — ports ${DO_OAUTH_CALLBACK_PORT}-${DO_OAUTH_CALLBACK_PORT + 9} may be in use`);
+  return null;
+}
 
-  logInfo(`OAuth server listening on port ${actualPort}`);
-
-  const redirectUri = `http://localhost:${actualPort}/callback`;
-  const authParams = new URLSearchParams({
-    client_id: DO_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: DO_SCOPES,
-    state: csrfState,
-  });
-  const authUrl = `${DO_OAUTH_AUTHORIZE}?${authParams.toString()}`;
-
-  logStep("Opening browser to authorize with DigitalOcean...");
-  openBrowser(authUrl);
-
+/** Poll for the OAuth callback, handling the initial 120s timeout, non-interactive
+ *  timeout, and interactive extended-wait with Escape-key detection.
+ *  Returns "code" | "denied" | "manual" | "timeout". */
+async function waitForOAuthCallback(
+  cbState: OAuthCallbackState,
+  server: ReturnType<typeof Bun.serve>,
+): Promise<"code" | "denied" | "manual" | "timeout"> {
   // Initial wait window (after this, interactive TTY keeps the OAuth server up until callback or Escape)
   logStep("Waiting for authorization in browser (extended-wait hint after 120s)...");
   const initialDeadline = Date.now() + 120_000;
-  while (!oauthCode && !oauthDenied && Date.now() < initialDeadline) {
+  while (!cbState.code && !cbState.denied && Date.now() < initialDeadline) {
     await sleep(500);
   }
 
-  if (!oauthCode && !oauthDenied && process.env.SPAWN_NON_INTERACTIVE === "1") {
+  if (cbState.code) {
+    return "code";
+  }
+  if (cbState.denied) {
+    return "denied";
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     server.stop(true);
     logError("OAuth authentication timed out after 120 seconds");
     logError("Alternative: Use a manual API token instead");
     logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
-    return null;
+    return "timeout";
   }
 
   // Past the initial window without callback: keep OAuth server up and keep waiting
+  logWarn("Still waiting for you to complete authorization in your browser.");
   let manualTokenRequested = false;
-  if (!oauthCode && !oauthDenied) {
-    logWarn("Still waiting for you to complete authorization in your browser.");
-    if (isInteractiveTTY()) {
-      logInfo("Press Escape to enter a DigitalOcean API token instead.");
 
-      let pendingEscTimer: ReturnType<typeof setTimeout> | null = null;
-      const onData = (data: Buffer | string) => {
-        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
-        if (buf.length === 0) {
-          return;
-        }
-        if (pendingEscTimer) {
-          clearTimeout(pendingEscTimer);
-          pendingEscTimer = null;
-          return;
-        }
-        if (buf[0] === 0x1b && buf.length === 1) {
-          pendingEscTimer = setTimeout(() => {
-            pendingEscTimer = null;
-            manualTokenRequested = true;
-          }, 75);
-          return;
-        }
-        if (buf[0] === 0x1b && buf.length > 1 && (buf[1] === 0x5b || buf[1] === 0x4f)) {
-          return;
-        }
-      };
+  if (isInteractiveTTY()) {
+    logInfo("Press Escape to enter a DigitalOcean API token instead.");
 
-      process.stdin.resume();
-      process.stdin.setRawMode?.(true);
-      process.stdin.on("data", onData);
-      const waitResult = await asyncTryCatch(async () => {
-        while (!oauthCode && !oauthDenied && !manualTokenRequested) {
-          await sleep(500);
-        }
-      });
+    let pendingEscTimer: ReturnType<typeof setTimeout> | null = null;
+    const onData = (data: Buffer | string) => {
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
+      if (buf.length === 0) {
+        return;
+      }
       if (pendingEscTimer) {
         clearTimeout(pendingEscTimer);
+        pendingEscTimer = null;
+        return;
       }
-      process.stdin.off("data", onData);
-      process.stdin.setRawMode?.(false);
-      process.stdin.pause();
-      if (!waitResult.ok) {
-        throw waitResult.error;
+      if (buf[0] === 0x1b && buf.length === 1) {
+        pendingEscTimer = setTimeout(() => {
+          pendingEscTimer = null;
+          manualTokenRequested = true;
+        }, 75);
+        return;
       }
-    } else {
-      while (!oauthCode && !oauthDenied) {
+      if (buf[0] === 0x1b && buf.length > 1 && (buf[1] === 0x5b || buf[1] === 0x4f)) {
+        return;
+      }
+    };
+
+    process.stdin.resume();
+    process.stdin.setRawMode?.(true);
+    process.stdin.on("data", onData);
+    const waitResult = await asyncTryCatch(async () => {
+      while (!cbState.code && !cbState.denied && !manualTokenRequested) {
         await sleep(500);
       }
+    });
+    if (pendingEscTimer) {
+      clearTimeout(pendingEscTimer);
+    }
+    process.stdin.off("data", onData);
+    process.stdin.setRawMode?.(false);
+    process.stdin.pause();
+    if (!waitResult.ok) {
+      throw waitResult.error;
+    }
+  } else {
+    while (!cbState.code && !cbState.denied) {
+      await sleep(500);
     }
   }
 
-  server.stop(true);
-
-  if (oauthDenied) {
-    logError("OAuth authorization was denied by the user");
-    logError("Alternative: Use a manual API token instead");
-    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
-    return null;
+  if (cbState.code) {
+    return "code";
   }
-
+  if (cbState.denied) {
+    return "denied";
+  }
   if (manualTokenRequested) {
-    logInfo("Switching to manual API token entry.");
-    return null;
+    return "manual";
   }
+  return "timeout";
+}
 
-  if (!oauthCode) {
-    logError("OAuth authentication did not complete");
-    logError("Alternative: Use a manual API token instead");
-    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
-    return null;
-  }
-
-  // Exchange code for token
+/** Exchange an OAuth authorization code for an access token and persist it. */
+async function exchangeOAuthCode(code: string, redirectUri: string): Promise<string | null> {
   logStep("Exchanging authorization code for access token...");
-  const code = oauthCode; // capture for closure (TS can't narrow `let` across async boundaries)
   const exchangeResult = await asyncTryCatch(async () => {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -868,6 +853,66 @@ async function tryDoOAuth(): Promise<string | null> {
     return null;
   }
   return exchangeResult.data;
+}
+
+async function tryDoOAuth(): Promise<string | null> {
+  logStep("Attempting DigitalOcean OAuth authentication...");
+
+  // Check connectivity to DigitalOcean
+  const connCheck = await asyncTryCatch(() =>
+    fetch("https://cloud.digitalocean.com", {
+      method: "HEAD",
+      signal: AbortSignal.timeout(5_000),
+    }),
+  );
+  if (!connCheck.ok) {
+    logWarn("Cannot reach cloud.digitalocean.com — network may be unavailable");
+    return null;
+  }
+
+  const csrfState = generateCsrfState();
+  const serverResult = startOAuthCallbackServer(csrfState);
+  if (!serverResult) {
+    return null;
+  }
+  const { server, port: actualPort, state: cbState } = serverResult;
+
+  logInfo(`OAuth server listening on port ${actualPort}`);
+
+  const redirectUri = `http://localhost:${actualPort}/callback`;
+  const authParams = new URLSearchParams({
+    client_id: DO_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: DO_SCOPES,
+    state: csrfState,
+  });
+  const authUrl = `${DO_OAUTH_AUTHORIZE}?${authParams.toString()}`;
+
+  logStep("Opening browser to authorize with DigitalOcean...");
+  openBrowser(authUrl);
+
+  const outcome = await waitForOAuthCallback(cbState, server);
+  server.stop(true);
+
+  if (outcome === "denied") {
+    logError("OAuth authorization was denied by the user");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
+    return null;
+  }
+  if (outcome === "manual") {
+    logInfo("Switching to manual API token entry.");
+    return null;
+  }
+  if (outcome === "timeout" || !cbState.code) {
+    logError("OAuth authentication did not complete");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...");
+    return null;
+  }
+
+  return exchangeOAuthCode(cbState.code, redirectUri);
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────
