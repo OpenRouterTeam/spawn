@@ -288,10 +288,38 @@ build_and_install() {
     trap '[ -n "${tmpdir}" ] && [ -d "${tmpdir}" ] && rm -rf "${tmpdir}"' EXIT
 
     log_step "Downloading pre-built CLI binary..."
-    curl -fsSL --proto '=https' "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
+    local _release_base="https://github.com/${SPAWN_REPO}/releases/download/cli-latest"
+    curl -fsSL --proto '=https' "${_release_base}/cli.js" -o "${tmpdir}/cli.js"
     if [ ! -s "${tmpdir}/cli.js" ]; then
         log_error "Failed to download pre-built binary"
         exit 1
+    fi
+
+    # Verify SHA-256 of cli.js if the checksum file is published alongside it.
+    # The checksum file contains just the hex digest (no filename).
+    local _expected_sha="" _actual_sha=""
+    if curl -fsSL --proto '=https' "${_release_base}/cli.js.sha256" -o "${tmpdir}/cli.js.sha256" 2>/dev/null \
+       && [ -s "${tmpdir}/cli.js.sha256" ]; then
+        _expected_sha="$(tr -d '[:space:]' < "${tmpdir}/cli.js.sha256")"
+        _actual_sha="$(sha256_file "${tmpdir}/cli.js" 2>/dev/null || true)"
+        if [ -z "$_actual_sha" ]; then
+            log_warn "Cannot verify cli.js (no sha256sum/shasum available), continuing unverified"
+        elif [ "$_actual_sha" != "$_expected_sha" ]; then
+            log_error "cli.js hash mismatch — possible supply chain attack"
+            log_error "Expected: ${_expected_sha}"
+            log_error "Got:      ${_actual_sha}"
+            echo ""
+            echo "The cli.js binary does not match the expected SHA-256 hash."
+            echo "This could indicate a compromised release artifact or CDN."
+            echo ""
+            echo "Please report this at:"
+            echo "  https://github.com/${SPAWN_REPO}/issues"
+            exit 1
+        else
+            log_info "SHA-256 verified"
+        fi
+    else
+        log_warn "No cli.js.sha256 checksum published yet — skipping verification"
     fi
 
     if [ -n "${SPAWN_INSTALL_DIR:-}" ]; then
