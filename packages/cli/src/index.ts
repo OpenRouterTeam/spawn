@@ -752,6 +752,275 @@ async function dispatchSlashNotation(
   return false;
 }
 
+interface ParsedFlags {
+  filteredArgs: string[];
+  prompt: string | undefined;
+  dryRun: boolean;
+  debug: boolean;
+  headless: boolean;
+  custom: boolean;
+  outputFormat: string | undefined;
+  betaFeatures: string[];
+}
+
+/** Extract a boolean flag from args, mutating in place. Returns true if found. */
+function extractBooleanFlag(args: string[], flags: string[]): boolean {
+  const idx = args.findIndex((a) => flags.includes(a));
+  if (idx === -1) {
+    return false;
+  }
+  args.splice(idx, 1);
+  return true;
+}
+
+/** Extract and apply an env-var-setting boolean flag. Returns true if found. */
+function extractEnvFlag(args: string[], flag: string, envVar: string): boolean {
+  const idx = args.indexOf(flag);
+  if (idx === -1) {
+    return false;
+  }
+  args.splice(idx, 1);
+  process.env[envVar] = "1";
+  return true;
+}
+
+/** Extract a value flag and set it as an env var if present. Returns the value. */
+function extractValueToEnv(args: string[], flags: string[], usageHint: string, envVar: string): string | undefined {
+  const [value, remaining] = extractFlagValue(args, flags, usageHint);
+  args.splice(0, args.length, ...remaining);
+  if (value) {
+    process.env[envVar] = value;
+  }
+  return value;
+}
+
+/** Extract a value flag without setting an env var. Returns the value. */
+function extractValue(args: string[], flags: string[], usageHint: string): string | undefined {
+  const [value, remaining] = extractFlagValue(args, flags, usageHint);
+  args.splice(0, args.length, ...remaining);
+  return value;
+}
+
+const VALID_BETA_FEATURES = new Set([
+  "tarball",
+  "images",
+  "parallel",
+  "docker",
+  "recursive",
+  "sandbox",
+  "skills",
+]);
+
+/** Validate beta feature flags and exit with usage info if any are unknown. */
+function validateBetaFeatures(features: string[]): void {
+  for (const flag of features) {
+    if (!VALID_BETA_FEATURES.has(flag)) {
+      console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
+      console.error("\nAvailable beta features:");
+      console.error(`  ${pc.cyan("tarball")}     Use pre-built tarball for agent installation`);
+      console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
+      console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
+      console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
+      console.error(`  ${pc.cyan("sandbox")}     Run local agents in a Docker container (sandboxed)`);
+      console.error(`  ${pc.cyan("skills")}      Pre-install MCP servers and tools on the VM`);
+      console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
+      process.exit(1);
+    }
+  }
+}
+
+/** Parse all global flags from args, returning structured flags and the remaining args. */
+async function parseFlags(rawArgs: string[]): Promise<ParsedFlags> {
+  const args = expandEqualsFlags(rawArgs);
+
+  // Pre-scan for --output json before checkForUpdates() so install script
+  // stdout can be redirected to stderr, preventing JSON output pollution.
+  const preOutputIdx = args.indexOf("--output");
+  const isJsonOutput = preOutputIdx !== -1 && args[preOutputIdx + 1] === "json";
+
+  await checkForUpdates(isJsonOutput);
+
+  const [prompt, filteredArgs] = await resolvePrompt(args);
+
+  // Boolean flags
+  const dryRun = extractBooleanFlag(filteredArgs, [
+    "--dry-run",
+    "-n",
+  ]);
+  const debug = extractBooleanFlag(filteredArgs, [
+    "--debug",
+  ]);
+  const headless = extractBooleanFlag(filteredArgs, [
+    "--headless",
+  ]);
+  const custom = extractBooleanFlag(filteredArgs, [
+    "--custom",
+  ]);
+  if (custom) {
+    process.env.SPAWN_CUSTOM = "1";
+  }
+  extractEnvFlag(filteredArgs, "--reauth", "SPAWN_REAUTH");
+  const fast = extractEnvFlag(filteredArgs, "--fast", "SPAWN_FAST");
+
+  // Beta features (repeatable)
+  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
+  const userOptedIntoBeta = betaFeatures.length > 0 || process.env.SPAWN_FAST === "1";
+  validateBetaFeatures(betaFeatures);
+  if (fast) {
+    betaFeatures.push("tarball", "images", "parallel", "docker");
+  }
+
+  // fast_provision experiment: if the user did NOT pass --beta or --fast,
+  // bucket them on the PostHog `fast_provision` flag. The `test` variant
+  // turns on images by default; control behaves as before.
+  // Exposure is captured for both variants so PostHog can compute conversion.
+  if (!userOptedIntoBeta) {
+    const variant = getFeatureFlag("fast_provision", "control");
+    if (variant === "test") {
+      betaFeatures.push("images");
+    }
+  }
+
+  if (betaFeatures.length > 0) {
+    process.env.SPAWN_BETA = [
+      ...new Set(betaFeatures),
+    ].join(",");
+  }
+
+  // Value flags
+  extractValueToEnv(
+    filteredArgs,
+    [
+      "--model",
+      "-m",
+    ],
+    'spawn <agent> <cloud> --model "openai/gpt-5.3-codex"',
+    "MODEL_ID",
+  );
+
+  // --config loads a config file and applies values as defaults
+  const configPath = extractValue(
+    filteredArgs,
+    [
+      "--config",
+    ],
+    "spawn <agent> <cloud> --config setup.json",
+  );
+  if (configPath) {
+    const { loadSpawnConfig } = await import("./shared/spawn-config.js");
+    const configResult = tryCatch(() => loadSpawnConfig(configPath));
+    if (!configResult.ok) {
+      console.error(pc.red(`Error loading config file: ${getErrorMessage(configResult.error)}`));
+      process.exit(1);
+    }
+    const config = configResult.data;
+    if (config) {
+      if (config.model && !process.env.MODEL_ID) {
+        process.env.MODEL_ID = config.model;
+      }
+      if (config.steps && !process.env.SPAWN_ENABLED_STEPS) {
+        process.env.SPAWN_ENABLED_STEPS = config.steps.join(",");
+      }
+      if (config.name && !process.env.SPAWN_NAME) {
+        process.env.SPAWN_NAME = config.name;
+      }
+      if (config.setup?.telegram_bot_token && !process.env.TELEGRAM_BOT_TOKEN) {
+        process.env.TELEGRAM_BOT_TOKEN = config.setup.telegram_bot_token;
+      }
+      if (config.setup?.github_token && !process.env.GITHUB_TOKEN) {
+        process.env.GITHUB_TOKEN = config.setup.github_token;
+      }
+    }
+  }
+
+  // --steps
+  const stepsFlag = extractValue(
+    filteredArgs,
+    [
+      "--steps",
+    ],
+    "spawn <agent> <cloud> --steps github,browser,telegram",
+  );
+  if (stepsFlag !== undefined) {
+    process.env.SPAWN_ENABLED_STEPS = stepsFlag;
+  }
+
+  // --output
+  const outputFormat = extractValue(
+    filteredArgs,
+    [
+      "--output",
+    ],
+    "spawn <agent> <cloud> --headless --output json",
+  );
+  if (outputFormat && outputFormat !== "json") {
+    console.error(pc.red(`Error: --output only supports "json" (got "${outputFormat}")`));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+    process.exit(1);
+  }
+
+  // --repo <user/repo> — clone a template repo and apply spawn.md
+  extractValueToEnv(
+    filteredArgs,
+    [
+      "--repo",
+    ],
+    'spawn <agent> <cloud> --repo "user/my-template"',
+    "SPAWN_REPO",
+  );
+
+  // --name, --zone/--region, --size/--machine-type
+  extractValueToEnv(
+    filteredArgs,
+    [
+      "--name",
+    ],
+    'spawn <agent> <cloud> --name "my-dev-box"',
+    "SPAWN_NAME",
+  );
+
+  const zoneFlag = extractValue(
+    filteredArgs,
+    [
+      "--zone",
+      "--region",
+    ],
+    "spawn <agent> gcp --zone us-east1-b",
+  );
+  if (zoneFlag) {
+    process.env.GCP_ZONE = zoneFlag;
+    process.env.DO_REGION = zoneFlag;
+    process.env.HETZNER_LOCATION = zoneFlag;
+    process.env.AWS_DEFAULT_REGION = zoneFlag;
+  }
+
+  const sizeFlag = extractValue(
+    filteredArgs,
+    [
+      "--machine-type",
+      "--size",
+    ],
+    "spawn <agent> gcp --machine-type e2-standard-4",
+  );
+  if (sizeFlag) {
+    process.env.GCP_MACHINE_TYPE = sizeFlag;
+    process.env.DO_DROPLET_SIZE = sizeFlag;
+    process.env.HETZNER_SERVER_TYPE = sizeFlag;
+    process.env.LIGHTSAIL_BUNDLE = sizeFlag;
+  }
+
+  return {
+    filteredArgs,
+    prompt,
+    dryRun,
+    debug,
+    headless,
+    custom,
+    outputFormat,
+    betaFeatures,
+  };
+}
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(
   cmd: string,
@@ -882,251 +1151,7 @@ async function main(): Promise<void> {
   // those fast paths never pay the flag-fetch cost.
   await initFeatureFlags();
 
-  const args = expandEqualsFlags(rawArgs);
-
-  // Pre-scan for --output json before checkForUpdates() so install script
-  // stdout can be redirected to stderr, preventing JSON output pollution.
-  const preOutputIdx = args.indexOf("--output");
-  const isJsonOutput = preOutputIdx !== -1 && args[preOutputIdx + 1] === "json";
-
-  await checkForUpdates(isJsonOutput);
-
-  const [prompt, filteredArgs] = await resolvePrompt(args);
-
-  // Extract --dry-run / -n boolean flag
-  const dryRunIdx = filteredArgs.findIndex((a) => a === "--dry-run" || a === "-n");
-  const dryRun = dryRunIdx !== -1;
-  if (dryRun) {
-    filteredArgs.splice(dryRunIdx, 1);
-  }
-
-  // Extract --debug boolean flag
-  const debugIdx = filteredArgs.indexOf("--debug");
-  const debug = debugIdx !== -1;
-  if (debug) {
-    filteredArgs.splice(debugIdx, 1);
-  }
-
-  // Extract --headless boolean flag
-  const headlessIdx = filteredArgs.indexOf("--headless");
-  const headless = headlessIdx !== -1;
-  if (headless) {
-    filteredArgs.splice(headlessIdx, 1);
-  }
-
-  // Extract --custom boolean flag
-  const customIdx = filteredArgs.indexOf("--custom");
-  const custom = customIdx !== -1;
-  if (custom) {
-    filteredArgs.splice(customIdx, 1);
-    process.env.SPAWN_CUSTOM = "1";
-  }
-
-  // Extract --reauth boolean flag
-  const reauthIdx = filteredArgs.indexOf("--reauth");
-  if (reauthIdx !== -1) {
-    filteredArgs.splice(reauthIdx, 1);
-    process.env.SPAWN_REAUTH = "1";
-  }
-
-  // Extract --fast boolean flag — enables images + tarballs + parallel setup
-  const fastIdx = filteredArgs.indexOf("--fast");
-  if (fastIdx !== -1) {
-    filteredArgs.splice(fastIdx, 1);
-    process.env.SPAWN_FAST = "1";
-  }
-
-  // Extract all --beta <feature> flags (repeatable, opt-in to experimental features)
-  const VALID_BETA_FEATURES = new Set([
-    "tarball",
-    "images",
-    "parallel",
-    "docker",
-    "recursive",
-    "sandbox",
-    "skills",
-  ]);
-  const betaFeatures = extractAllFlagValues(filteredArgs, "--beta", "spawn <agent> <cloud> --beta parallel");
-  const userOptedIntoBeta = betaFeatures.length > 0 || process.env.SPAWN_FAST === "1";
-  for (const flag of betaFeatures) {
-    if (!VALID_BETA_FEATURES.has(flag)) {
-      console.error(pc.red(`Unknown beta feature: ${pc.bold(flag)}`));
-      console.error("\nAvailable beta features:");
-      console.error(`  ${pc.cyan("tarball")}     Use pre-built tarball for agent installation`);
-      console.error(`  ${pc.cyan("images")}      Use pre-built DO marketplace images (faster boot)`);
-      console.error(`  ${pc.cyan("parallel")}    Parallelize server boot with setup prompts`);
-      console.error(`  ${pc.cyan("docker")}      Use Docker CE app image on Hetzner/GCP (faster boot)`);
-      console.error(`  ${pc.cyan("sandbox")}     Run local agents in a Docker container (sandboxed)`);
-      console.error(`  ${pc.cyan("skills")}      Pre-install MCP servers and tools on the VM`);
-      console.error(`  ${pc.cyan("recursive")}   Install spawn CLI on VM for recursive spawning`);
-      process.exit(1);
-    }
-  }
-  // --fast implies all beta features
-  if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel", "docker");
-  }
-
-  // fast_provision experiment: if the user did NOT pass --beta or --fast,
-  // bucket them on the PostHog `fast_provision` flag. The `test` variant
-  // turns on images by default; control behaves as before.
-  // Exposure is captured for both variants so PostHog can compute conversion.
-  if (!userOptedIntoBeta) {
-    const variant = getFeatureFlag("fast_provision", "control");
-    if (variant === "test") {
-      betaFeatures.push("images");
-    }
-  }
-
-  if (betaFeatures.length > 0) {
-    process.env.SPAWN_BETA = [
-      ...new Set(betaFeatures),
-    ].join(",");
-  }
-
-  // Extract --model / -m <value> flag → MODEL_ID env var (must be before --config so it takes priority)
-  const [modelFlag, modelFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--model",
-      "-m",
-    ],
-    'spawn <agent> <cloud> --model "openai/gpt-5.3-codex"',
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...modelFilteredArgs);
-  if (modelFlag) {
-    process.env.MODEL_ID = modelFlag;
-  }
-
-  // Extract --config <path> flag — load config file and apply as defaults
-  const [configPath, configFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--config",
-    ],
-    "spawn <agent> <cloud> --config setup.json",
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...configFilteredArgs);
-
-  if (configPath) {
-    const { loadSpawnConfig } = await import("./shared/spawn-config.js");
-    const configResult = tryCatch(() => loadSpawnConfig(configPath));
-    if (!configResult.ok) {
-      console.error(pc.red(`Error loading config file: ${getErrorMessage(configResult.error)}`));
-      process.exit(1);
-    }
-    const config = configResult.data;
-    if (config) {
-      // Apply config values as defaults (explicit flags take priority)
-      if (config.model && !process.env.MODEL_ID) {
-        process.env.MODEL_ID = config.model;
-      }
-      if (config.steps && !process.env.SPAWN_ENABLED_STEPS) {
-        process.env.SPAWN_ENABLED_STEPS = config.steps.join(",");
-      }
-      if (config.name && !process.env.SPAWN_NAME) {
-        process.env.SPAWN_NAME = config.name;
-      }
-      if (config.setup?.telegram_bot_token && !process.env.TELEGRAM_BOT_TOKEN) {
-        process.env.TELEGRAM_BOT_TOKEN = config.setup.telegram_bot_token;
-      }
-      if (config.setup?.github_token && !process.env.GITHUB_TOKEN) {
-        process.env.GITHUB_TOKEN = config.setup.github_token;
-      }
-    }
-  }
-
-  // Extract --steps <value> flag — comma-separated list of setup steps
-  const [stepsFlag, stepsFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--steps",
-    ],
-    "spawn <agent> <cloud> --steps github,browser,telegram",
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...stepsFilteredArgs);
-  if (stepsFlag !== undefined) {
-    // --steps "" means disable all optional steps
-    process.env.SPAWN_ENABLED_STEPS = stepsFlag;
-  }
-
-  // Extract --output <format> flag
-  const [outputFormat, outputFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--output",
-    ],
-    "spawn <agent> <cloud> --headless --output json",
-  );
-  // Replace filteredArgs contents in-place (splice + push to maintain reference)
-  filteredArgs.splice(0, filteredArgs.length, ...outputFilteredArgs);
-
-  // Validate --output value
-  if (outputFormat && outputFormat !== "json") {
-    console.error(pc.red(`Error: --output only supports "json" (got "${outputFormat}")`));
-    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
-    process.exit(1);
-  }
-
-  // Extract --name <value> flag
-  const [nameFlag, nameFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--name",
-    ],
-    'spawn <agent> <cloud> --name "my-dev-box"',
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...nameFilteredArgs);
-  if (nameFlag) {
-    process.env.SPAWN_NAME = nameFlag;
-  }
-
-  // Extract --repo <user/repo> flag — clone a template repo and apply spawn.md
-  const [repoFlag, repoFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--repo",
-    ],
-    'spawn <agent> <cloud> --repo "user/my-template"',
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...repoFilteredArgs);
-  if (repoFlag) {
-    process.env.SPAWN_REPO = repoFlag;
-  }
-
-  // Extract --zone / --region <value> flag (maps to cloud-specific env vars)
-  const [zoneFlag, zoneFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--zone",
-      "--region",
-    ],
-    "spawn <agent> gcp --zone us-east1-b",
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...zoneFilteredArgs);
-  if (zoneFlag) {
-    process.env.GCP_ZONE = zoneFlag;
-    process.env.DO_REGION = zoneFlag;
-    process.env.HETZNER_LOCATION = zoneFlag;
-    process.env.AWS_DEFAULT_REGION = zoneFlag;
-  }
-
-  // Extract --machine-type / --size <value> flag (maps to cloud-specific env vars)
-  const [sizeFlag, sizeFilteredArgs] = extractFlagValue(
-    filteredArgs,
-    [
-      "--machine-type",
-      "--size",
-    ],
-    "spawn <agent> gcp --machine-type e2-standard-4",
-  );
-  filteredArgs.splice(0, filteredArgs.length, ...sizeFilteredArgs);
-  if (sizeFlag) {
-    process.env.GCP_MACHINE_TYPE = sizeFlag;
-    process.env.DO_DROPLET_SIZE = sizeFlag;
-    process.env.HETZNER_SERVER_TYPE = sizeFlag;
-    process.env.LIGHTSAIL_BUNDLE = sizeFlag;
-  }
+  const { filteredArgs, prompt, dryRun, debug, headless, custom, outputFormat } = await parseFlags(rawArgs);
 
   // --output implies --headless
   const effectiveHeadless = headless || !!outputFormat;
