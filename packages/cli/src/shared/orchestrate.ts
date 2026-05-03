@@ -354,6 +354,72 @@ function loadPreferredModel(agentName: string): string | null {
   return result.ok ? result.data : null;
 }
 
+/**
+ * Resolve the model ID from env, saved preferences, or agent default.
+ * Returns undefined when no valid model ID is available.
+ */
+function resolveModelId(agentName: string, agent: AgentConfig): string | undefined {
+  const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
+  const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
+  if (rawModelId && !modelId) {
+    logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
+  }
+  return modelId;
+}
+
+/**
+ * Build the .spawnrc env config string from agent env vars, model, and beta features.
+ */
+function buildEnvConfig(
+  agent: AgentConfig,
+  apiKey: string,
+  modelId: string | undefined,
+  betaFeatures: Set<string>,
+  spawnId: string,
+): string {
+  const envPairs = agent.envVars(apiKey);
+  if (modelId && agent.modelEnvVar) {
+    envPairs.push(`${agent.modelEnvVar}=${modelId}`);
+  }
+  if (betaFeatures.has("recursive")) {
+    appendRecursiveEnvVars(envPairs, spawnId);
+  }
+  return generateEnvConfig(envPairs);
+}
+
+/**
+ * Install the agent via tarball (if eligible) or live install with retry.
+ * The `allowTarball` flag controls whether tarball install is attempted — callers
+ * should pass false for local clouds or when tarballs are disabled.
+ */
+async function installAgentWithRetry(
+  cloud: CloudOrchestrator,
+  agent: AgentConfig,
+  agentName: string,
+  options: OrchestrationOptions | undefined,
+  allowTarball: boolean,
+): Promise<void> {
+  if (cloud.skipAgentInstall) {
+    logInfo("Snapshot boot — skipping agent install");
+    return;
+  }
+  let installed = false;
+  if (allowTarball && !agent.skipTarball) {
+    const tarball = options?.tryTarball ?? tryTarballInstall;
+    installed = await tarball(cloud.runner, agentName);
+  }
+  if (!installed) {
+    for (;;) {
+      const r = await asyncTryCatch(() => agent.install());
+      if (r.ok) {
+        break;
+      }
+      logError(getErrorMessage(r.error));
+      await retryOrQuit("Retry agent install?");
+    }
+  }
+}
+
 export async function runOrchestration(
   cloud: CloudOrchestrator,
   agent: AgentConfig,
@@ -465,43 +531,14 @@ export async function runOrchestration(
       const apiKey = apiKeyResult.value;
       trackFunnel("funnel_credentials_ready");
 
-      // Model ID
-      const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
-      const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
-      if (rawModelId && !modelId) {
-        logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
-      }
-
-      // Env config (computed locally, no SSH needed)
-      const envPairs = agent.envVars(apiKey);
-      if (modelId && agent.modelEnvVar) {
-        envPairs.push(`${agent.modelEnvVar}=${modelId}`);
-      }
-      if (betaFeatures.has("recursive")) {
-        appendRecursiveEnvVars(envPairs, spawnId);
-      }
-      const envContent = generateEnvConfig(envPairs);
+      // Model ID + env config (computed locally, no SSH needed)
+      const modelId = resolveModelId(agentName, agent);
+      const envContent = buildEnvConfig(agent, apiKey, modelId, betaFeatures, spawnId);
 
       // Install agent — remote tarball, fallback to live install
-      if (cloud.skipAgentInstall) {
-        logInfo("Snapshot boot — skipping agent install");
-      } else {
-        let installed = false;
-        if (useTarball && !agent.skipTarball) {
-          const tarball = options?.tryTarball ?? tryTarballInstall;
-          installed = await tarball(cloud.runner, agentName);
-        }
-        if (!installed) {
-          for (;;) {
-            const r = await asyncTryCatch(() => agent.install());
-            if (r.ok) {
-              break;
-            }
-            logError(getErrorMessage(r.error));
-            await retryOrQuit("Retry agent install?");
-          }
-        }
-      }
+      // Fast path is already gated by cloud.cloudName !== "local" (line above),
+      // so tarball is always allowed here when useTarball is true.
+      await installAgentWithRetry(cloud, agent, agentName, options, useTarball);
       trackFunnel("funnel_install_completed");
 
       // Inject env + continue with shared post-install flow
@@ -535,11 +572,7 @@ export async function runOrchestration(
       }
 
       // 4. Model ID
-      const rawModelId = process.env.MODEL_ID || loadPreferredModel(agentName) || agent.modelDefault;
-      const modelId = rawModelId && validateModelId(rawModelId) ? rawModelId : undefined;
-      if (rawModelId && !modelId) {
-        logWarn(`Ignoring invalid MODEL_ID: ${rawModelId}`);
-      }
+      const modelId = resolveModelId(agentName, agent);
 
       // 5. Provision server (retry loop)
       let connection: VMConnection;
@@ -566,35 +599,12 @@ export async function runOrchestration(
       trackFunnel("funnel_vm_ready");
 
       // 7. Env config
-      const envPairs = agent.envVars(apiKey);
-      if (modelId && agent.modelEnvVar) {
-        envPairs.push(`${agent.modelEnvVar}=${modelId}`);
-      }
-      if (betaFeatures.has("recursive")) {
-        appendRecursiveEnvVars(envPairs, spawnId);
-      }
-      const envContent = generateEnvConfig(envPairs);
+      const envContent = buildEnvConfig(agent, apiKey, modelId, betaFeatures, spawnId);
 
       // 8. Install agent
-      if (cloud.skipAgentInstall) {
-        logInfo("Snapshot boot — skipping agent install");
-      } else {
-        let installedFromTarball = false;
-        if (cloud.cloudName !== "local" && !agent.skipTarball && useTarball) {
-          const tarball = options?.tryTarball ?? tryTarballInstall;
-          installedFromTarball = await tarball(cloud.runner, agentName);
-        }
-        if (!installedFromTarball) {
-          for (;;) {
-            const r = await asyncTryCatch(() => agent.install());
-            if (r.ok) {
-              break;
-            }
-            logError(getErrorMessage(r.error));
-            await retryOrQuit("Retry agent install?");
-          }
-        }
-      }
+      // Sequential path: only allow tarball for non-local clouds
+      const allowTarball = cloud.cloudName !== "local" && useTarball;
+      await installAgentWithRetry(cloud, agent, agentName, options, allowTarball);
       trackFunnel("funnel_install_completed");
 
       // Inject env + continue with shared post-install flow
