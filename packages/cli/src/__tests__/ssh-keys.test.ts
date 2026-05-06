@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tryCatch } from "@openrouter/spawn-shared";
 import { mockClackPrompts } from "./test-helpers";
@@ -18,9 +18,8 @@ mockClackPrompts({
 
 // ── Import after @clack/prompts mock ────────────────────────────────────────
 
-const { discoverSshKeys, generateSshKey, getSshFingerprint, ensureSshKeys, getSshKeyOpts, _resetCache } = await import(
-  "../shared/ssh-keys"
-);
+const { discoverSshKeys, generateSshKey, getSshFingerprint, ensureSshKeys, getSshKeyOpts, verifyKeyPair, _resetCache } =
+  await import("../shared/ssh-keys");
 
 // ─── Temp dir helpers ───────────────────────────────────────────────────────
 
@@ -125,6 +124,46 @@ function sshKeygenMd5Result(): Bun.SyncSubprocess<"pipe", "pipe"> {
 }
 
 /**
+ * Smart mock for Bun.spawnSync that handles all three ssh-keygen invocations
+ * used by ssh-keys.ts:
+ *   - `ssh-keygen -y -P "" -f <priv>` (verifyKeyPair) — returns the contents
+ *     of the corresponding .pub file from disk so verification reports "match"
+ *   - `ssh-keygen -lf <pub>` (getKeyType) — returns lf output for the given
+ *     keyType (default ED25519, or RSA if pub path contains "rsa")
+ *   - `ssh-keygen -lf <pub> -E md5` (getSshFingerprint) — returns MD5 output
+ *
+ * Pass `mismatch: true` to make verifyKeyPair return "mismatch" instead.
+ */
+function smartSshKeygenMock(opts: { mismatch?: boolean } = {}): (args: string[]) => Bun.SyncSubprocess<"pipe", "pipe"> {
+  return (args: string[]) => {
+    if (args[1] === "-y") {
+      const privPath = args[args.length - 1];
+      const pubPath = `${privPath}.pub`;
+      if (opts.mismatch) {
+        return makeSyncResult("ssh-ed25519 AAAADIFFERENT spawn\n");
+      }
+      const pubText = unwrapOrEmpty(() => readFileSync(pubPath, "utf-8"));
+      return makeSyncResult(pubText);
+    }
+    if (args.includes("-E") && args[args.indexOf("-E") + 1] === "md5") {
+      return sshKeygenMd5Result();
+    }
+    if (args[1] === "-lf") {
+      const pubPath = args[2];
+      const type = pubPath.includes("rsa") ? "RSA" : "ED25519";
+      return sshKeygenLfResult(type);
+    }
+    // Default: empty success
+    return makeSyncResult("");
+  };
+}
+
+function unwrapOrEmpty<T>(fn: () => T): T | "" {
+  const r = tryCatch(fn);
+  return r.ok ? r.data : "";
+}
+
+/**
  * Build a mock spawnSync result that simulates successful ssh-keygen key generation.
  * Also writes the expected output files so existsSync checks pass.
  */
@@ -180,7 +219,7 @@ describe("discoverSshKeys", () => {
 
   it("discovers a single key pair", () => {
     createFakeKeyPair("id_ed25519", "ed25519");
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("ED25519"));
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(smartSshKeygenMock());
     const keys = discoverSshKeys();
     spawnSpy.mockRestore();
     expect(keys).toHaveLength(1);
@@ -188,6 +227,32 @@ describe("discoverSshKeys", () => {
     expect(keys[0].type).toContain("ED25519");
     expect(keys[0].privPath).toContain("id_ed25519");
     expect(keys[0].pubPath).toContain("id_ed25519.pub");
+  });
+
+  it("skips pairs whose .pub does not match the local private key", () => {
+    createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(
+      smartSshKeygenMock({
+        mismatch: true,
+      }),
+    );
+    const keys = discoverSshKeys();
+    spawnSpy.mockRestore();
+    expect(keys).toEqual([]);
+  });
+
+  it("skips pairs that ssh-keygen cannot derive (e.g. passphrase-protected)", () => {
+    createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      if (args[1] === "-y") {
+        // Simulate ssh-keygen -y failing (e.g. passphrase prompt rejected)
+        return makeSyncResult("", 1);
+      }
+      return sshKeygenLfResult("ED25519");
+    });
+    const keys = discoverSshKeys();
+    spawnSpy.mockRestore();
+    expect(keys).toEqual([]);
   });
 });
 
@@ -279,7 +344,7 @@ describe("ensureSshKeys", () => {
 
   it("uses single key silently when only one is found", async () => {
     createFakeKeyPair("id_rsa", "rsa");
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("RSA"));
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(smartSshKeygenMock());
     const keys = await ensureSshKeys();
     spawnSpy.mockRestore();
     expect(keys).toHaveLength(1);
@@ -290,11 +355,7 @@ describe("ensureSshKeys", () => {
     createFakeKeyPair("id_ed25519", "ed25519");
     createFakeKeyPair("id_rsa", "rsa");
 
-    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
-      const pubPath = args[args.length - 1];
-      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
-      return sshKeygenLfResult(type);
-    });
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(smartSshKeygenMock());
 
     const keys = await ensureSshKeys();
     spawnSpy.mockRestore();
@@ -305,12 +366,56 @@ describe("ensureSshKeys", () => {
 
   it("caches results across calls", async () => {
     createFakeKeyPair("id_ed25519", "ed25519");
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("ED25519"));
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(smartSshKeygenMock());
 
     const keys1 = await ensureSshKeys();
     const keys2 = await ensureSshKeys();
     spawnSpy.mockRestore();
     expect(keys1).toEqual(keys2);
+  });
+});
+
+// ─── verifyKeyPair ──────────────────────────────────────────────────────────
+
+describe("verifyKeyPair", () => {
+  it("returns 'match' when the derived public key equals the .pub file (ignoring comment)", () => {
+    const { privPath, pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+    // Same key core as createFakeKeyPair writes, with a different comment field
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(
+      makeSyncResult("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake different-comment\n"),
+    );
+    const result = verifyKeyPair(privPath, pubPath);
+    spawnSpy.mockRestore();
+    expect(result).toBe("match");
+  });
+
+  it("returns 'mismatch' when the derived public key differs from the .pub file", () => {
+    const { privPath, pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(
+      makeSyncResult("ssh-ed25519 AAAACOMPLETELYDIFFERENT spawn\n"),
+    );
+    const result = verifyKeyPair(privPath, pubPath);
+    spawnSpy.mockRestore();
+    expect(result).toBe("mismatch");
+  });
+
+  it("returns 'unverifiable' when ssh-keygen exits non-zero (e.g. passphrase)", () => {
+    const { privPath, pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(makeSyncResult("", 1));
+    const result = verifyKeyPair(privPath, pubPath);
+    spawnSpy.mockRestore();
+    expect(result).toBe("unverifiable");
+  });
+
+  it("returns 'unverifiable' when the .pub file is missing or empty", () => {
+    const { privPath, pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+    rmSync(pubPath);
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(
+      makeSyncResult("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake spawn\n"),
+    );
+    const result = verifyKeyPair(privPath, pubPath);
+    spawnSpy.mockRestore();
+    expect(result).toBe("unverifiable");
   });
 });
 

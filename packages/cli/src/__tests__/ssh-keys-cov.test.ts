@@ -123,7 +123,7 @@ describe("generateSshKey race recovery", () => {
 });
 
 describe("discoverSshKeys with unknown key type", () => {
-  it("labels key as UNKNOWN when ssh-keygen fails", () => {
+  it("labels key as UNKNOWN when ssh-keygen -lf fails (after verification passes)", () => {
     const sshDir = join(tmpDir, ".ssh");
     mkdirSync(sshDir, {
       recursive: true,
@@ -134,8 +134,11 @@ describe("discoverSshKeys with unknown key type", () => {
     });
     writeFileSync(join(sshDir, "id_custom.pub"), "some-key AAAA fake\n");
 
-    // ssh-keygen throws
-    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation(() => {
+    // verify (`-y`) succeeds with matching pub; getKeyType (`-lf`) throws
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      if (args[1] === "-y") {
+        return makeSyncResult("some-key AAAA fake\n");
+      }
       throw new Error("command not found");
     });
 
@@ -145,7 +148,7 @@ describe("discoverSshKeys with unknown key type", () => {
     expect(keys[0].type).toBe("UNKNOWN");
   });
 
-  it("labels key as UNKNOWN when ssh-keygen output has no parenthesized type", () => {
+  it("labels key as UNKNOWN when ssh-keygen -lf output has no parenthesized type", () => {
     const sshDir = join(tmpDir, ".ssh");
     mkdirSync(sshDir, {
       recursive: true,
@@ -156,9 +159,12 @@ describe("discoverSshKeys with unknown key type", () => {
     });
     writeFileSync(join(sshDir, "id_weird.pub"), "weird-key AAAA fake\n");
 
-    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(
-      makeSyncResult("256 SHA256:abc user@host"), // no (TYPE) suffix
-    );
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      if (args[1] === "-y") {
+        return makeSyncResult("weird-key AAAA fake\n");
+      }
+      return makeSyncResult("256 SHA256:abc user@host"); // no (TYPE) suffix
+    });
 
     const keys = discoverSshKeys();
     spawnSpy.mockRestore();
@@ -210,6 +216,16 @@ describe("discoverSshKeys sorting", () => {
 
     const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
       const path = String(args[args.length - 1]);
+      if (args[1] === "-y") {
+        // verify (`-y`) call: return the matching pub file contents from disk
+        if (path.endsWith("id_ed25519")) {
+          return makeSyncResult("ssh-ed25519 AAAA\n");
+        }
+        if (path.endsWith("id_rsa")) {
+          return makeSyncResult("ssh-rsa AAAA\n");
+        }
+        return makeSyncResult("ecdsa-sha2 AAAA\n");
+      }
       if (path.includes("ed25519")) {
         return makeSyncResult("256 SHA256:x (ED25519)");
       }
