@@ -40,7 +40,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
-import { getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
+import { expandFastProvisionVariant, getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
 import { getInstallRefPath } from "./shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
@@ -962,9 +962,14 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
-  // --fast implies all beta features
+  // --fast: explicit user opt-in to the full provisioning-speed stack. Kept
+  // aligned with the `fast_provision` experiment's `test` variant (images,
+  // docker, sandbox) so the explicit flag and the silent A/B exercise the same
+  // surface — plus tarball + parallel, which are speed-ups outside the
+  // experiment scope. If you change either bundle, update the other or the
+  // alignment comment in expandFastProvisionVariant().
   if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel", "docker");
+    betaFeatures.push("tarball", "images", "parallel", "docker", "sandbox");
   }
 
   // fast_provision experiment: if the user did NOT pass --beta or --fast,
@@ -974,11 +979,11 @@ async function main(): Promise<void> {
   // - docker:  Docker CE host image on Hetzner/GCP (cloud-side faster boot)
   // - sandbox: local agents run in a Docker container (local-side faster boot)
   // Exposure is captured for both variants so PostHog can compute conversion.
+  // Bundle composition lives in expandFastProvisionVariant() for unit testing.
   if (!userOptedIntoBeta) {
     const variant = getFeatureFlag("fast_provision", "control");
-    if (variant === "test") {
-      betaFeatures.push("images", "docker", "sandbox");
-    }
+    const variantStr = isString(variant) ? variant : "control";
+    betaFeatures.push(...expandFastProvisionVariant(variantStr));
   }
 
   if (betaFeatures.length > 0) {
