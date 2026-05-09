@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import {
   _awaitBackgroundRefreshForTest,
   _resetFeatureFlagsForTest,
+  expandFastProvisionVariant,
   getFeatureFlag,
   initFeatureFlags,
 } from "../shared/feature-flags.js";
@@ -223,6 +224,30 @@ describe("feature flags", () => {
       await initFeatureFlags();
       expect(getFeatureFlag("known", "default")).toBe("yes");
       expect(getFeatureFlag("unknown", "default")).toBe("default");
+    });
+  });
+
+  describe("expandFastProvisionVariant", () => {
+    // These tests pin the experiment bundle composition so that tweaking the
+    // list in feature-flags.ts forces an explicit test update — drifting the
+    // bundle silently is the failure mode we're guarding against.
+
+    it("returns the full provisioning-speed bundle for the test variant", () => {
+      expect(expandFastProvisionVariant("test")).toEqual([
+        "images",
+        "docker",
+        "sandbox",
+      ]);
+    });
+
+    it("returns an empty bundle for the control variant", () => {
+      expect(expandFastProvisionVariant("control")).toEqual([]);
+    });
+
+    it("returns an empty bundle for unknown variants (fail-closed)", () => {
+      expect(expandFastProvisionVariant("")).toEqual([]);
+      expect(expandFastProvisionVariant("rollout")).toEqual([]);
+      expect(expandFastProvisionVariant("totally-made-up")).toEqual([]);
     });
   });
 });

@@ -201,6 +201,26 @@ export function getFeatureFlag<T extends string | boolean>(key: string, fallback
   return value;
 }
 
+/**
+ * Beta features bundled by the `fast_provision` PostHog experiment for a given
+ * variant. Returns an empty array for `control` or any unknown variant — the
+ * caller is responsible for de-duping against features the user already passed.
+ *
+ * Kept as a pure, named export so the bundle composition is testable in
+ * isolation from `main()` arg parsing. This is the experiment surface only —
+ * unrelated to `--fast`, which is its own user-facing flag and stays as-is.
+ */
+export function expandFastProvisionVariant(variant: string): readonly string[] {
+  if (variant === "test") {
+    return [
+      "images",
+      "docker",
+      "sandbox",
+    ];
+  }
+  return [];
+}
+
 /** Test-only: reset module state between tests. */
 export function _resetFeatureFlagsForTest(): void {
   _flags = null;

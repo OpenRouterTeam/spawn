@@ -40,7 +40,7 @@ import {
 } from "./commands/index.js";
 import { expandEqualsFlags, findUnknownFlag } from "./flags.js";
 import { agentKeys, cloudKeys, getCacheAge, loadManifest } from "./manifest.js";
-import { getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
+import { expandFastProvisionVariant, getFeatureFlag, initFeatureFlags } from "./shared/feature-flags.js";
 import { getInstallRefPath } from "./shared/paths.js";
 import { asyncTryCatch, asyncTryCatchIf, isFileError, isNetworkError, tryCatch, tryCatchIf } from "./shared/result.js";
 import { captureError, initTelemetry, setTelemetryContext } from "./shared/telemetry.js";
@@ -969,13 +969,16 @@ async function main(): Promise<void> {
 
   // fast_provision experiment: if the user did NOT pass --beta or --fast,
   // bucket them on the PostHog `fast_provision` flag. The `test` variant
-  // turns on images by default; control behaves as before.
+  // turns on images + docker + sandbox by default; control behaves as before.
+  // - images:  pre-built DO marketplace images (cloud-side faster boot)
+  // - docker:  Docker CE host image on Hetzner/GCP (cloud-side faster boot)
+  // - sandbox: local agents run in a Docker container (local-side faster boot)
   // Exposure is captured for both variants so PostHog can compute conversion.
+  // Bundle composition lives in expandFastProvisionVariant() for unit testing.
   if (!userOptedIntoBeta) {
     const variant = getFeatureFlag("fast_provision", "control");
-    if (variant === "test") {
-      betaFeatures.push("images");
-    }
+    const variantStr = isString(variant) ? variant : "control";
+    betaFeatures.push(...expandFastProvisionVariant(variantStr));
   }
 
   if (betaFeatures.length > 0) {
