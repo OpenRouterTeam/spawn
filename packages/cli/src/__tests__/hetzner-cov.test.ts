@@ -585,11 +585,13 @@ describe("hetzner/createServer", () => {
         },
       },
     };
+    let createAttempts = 0;
     let callCount = 0;
-    global.fetch = mock(() => {
+    global.fetch = mock((url: string | URL | Request) => {
       callCount++;
-      if (callCount <= 1) {
-        // Token validation
+      const urlStr = String(url);
+      // Token validation — GET /servers?per_page=1
+      if (urlStr.includes("/servers") && urlStr.includes("per_page=1") && !urlStr.includes("per_page=50")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -598,8 +600,8 @@ describe("hetzner/createServer", () => {
           ),
         );
       }
-      if (callCount <= 2) {
-        // SSH keys
+      // SSH keys
+      if (urlStr.includes("/ssh_keys")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -608,24 +610,28 @@ describe("hetzner/createServer", () => {
           ),
         );
       }
-      if (callCount <= 3) {
-        // First create attempt — resource_limit_exceeded (HTTP 403)
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              error: {
-                code: "resource_limit_exceeded",
-                message: "primary_ip_limit",
+      // Create server (POST /servers) — first attempt fails, retry succeeds
+      if (urlStr.endsWith("/servers")) {
+        createAttempts++;
+        if (createAttempts <= 1) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: {
+                  code: "resource_limit_exceeded",
+                  message: "primary_ip_limit",
+                },
+              }),
+              {
+                status: 403,
               },
-            }),
-            {
-              status: 403,
-            },
-          ),
-        );
+            ),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify(serverResp)));
       }
-      if (callCount <= 4) {
-        // List primary IPs for cleanup
+      // List primary IPs for cleanup
+      if (urlStr.includes("/primary_ips") && !urlStr.includes("/primary_ips/")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -645,22 +651,22 @@ describe("hetzner/createServer", () => {
           ),
         );
       }
-      if (callCount <= 5) {
-        // Delete orphaned IP 100
+      // Delete orphaned IP
+      if (urlStr.includes("/primary_ips/")) {
         return Promise.resolve(
           new Response("", {
             status: 204,
           }),
         );
       }
-      // Retry create — success
-      return Promise.resolve(new Response(JSON.stringify(serverResp)));
+      // Fallback
+      return Promise.resolve(new Response(JSON.stringify({})));
     });
     const { ensureHcloudToken, createServer } = await import("../hetzner/hetzner");
     await ensureHcloudToken();
     const conn = await createServer("test-retry", "cx23", "fsn1");
     expect(conn.ip).toBe("10.0.0.5");
-    // Should have called: token(1), ssh_keys(2), create-fail(3), list-ips(4), delete-ip(5), create-ok(6)
+    // Should have called: token, ssh_keys, create-fail, list-ips, delete-ip, create-ok (at least 6)
     expect(callCount).toBeGreaterThanOrEqual(6);
   });
 
