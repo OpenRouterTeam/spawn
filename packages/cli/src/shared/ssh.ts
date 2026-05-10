@@ -4,7 +4,8 @@ import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
 import { normalize } from "node:path/posix";
 import { asyncTryCatch, tryCatch } from "./result.js";
-import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
+import { promptForSshKey } from "./ssh-keys.js";
+import { logError, logInfo, logStep, logStepDone, logStepInline, logWarn } from "./ui.js";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
 
@@ -328,12 +329,64 @@ export interface WaitForSshOpts {
  * Total budget: ~`maxAttempts` attempts spread across both phases.
  * Effective timeout: ~3 min with defaults.
  */
+/**
+ * Pattern that matches the OpenSSH "Permission denied (publickey...)" error.
+ * SSH prints this to stderr when the server rejects every public key the
+ * client offered. We use it to decide whether to prompt the user for a
+ * different key (vs. silently retrying through transient errors like TCP
+ * resets during boot).
+ *
+ * Matches: "Permission denied (publickey)", "Permission denied (publickey,gssapi-keyex,...)"
+ */
+const PUBKEY_AUTH_FAILURE_RE = /Permission denied \(publickey/i;
+
+/** Number of consecutive publickey-auth failures before we offer the picker. */
+const AUTH_FAILURE_THRESHOLD = 2;
+
+/**
+ * Extract the current "-i <path>" identity files from a built SSH arg list.
+ * Used so the picker can show which keys we already tried.
+ */
+function extractKeyPathsFromArgs(args: string[]): string[] {
+  const paths: string[] = [];
+  for (let i = 0; i < args.length - 1; i++) {
+    if (args[i] === "-i") {
+      paths.push(args[i + 1]);
+    }
+  }
+  return paths;
+}
+
+/**
+ * Replace every "-i <path>" pair in `args` with a single "-i <newPath>" pair.
+ * Returns a new array; does not mutate the input.
+ */
+function replaceKeyPathInArgs(args: string[], newPath: string): string[] {
+  const out: string[] = [];
+  let replaced = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-i" && i + 1 < args.length) {
+      if (!replaced) {
+        out.push("-i", newPath);
+        replaced = true;
+      }
+      i++; // skip the path that followed -i
+      continue;
+    }
+    out.push(args[i]);
+  }
+  if (!replaced) {
+    out.push("-i", newPath);
+  }
+  return out;
+}
+
 export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const { host, user, sshKeyPath, extraSshOpts } = opts;
   const maxAttempts = opts.maxAttempts ?? 36;
 
   // Build SSH args
-  const sshArgs: string[] = [
+  let sshArgs: string[] = [
     ...SSH_BASE_OPTS,
   ];
   if (sshKeyPath) {
@@ -373,6 +426,12 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const remaining = maxAttempts - attempt;
   // At least 5 handshake attempts even if TCP phase used most of the budget
   const handshakeAttempts = Math.max(remaining, 5);
+
+  // Track consecutive publickey rejections so we can offer the picker without
+  // pestering the user during transient connection-refused/timeout failures
+  // that have nothing to do with key selection.
+  let consecutiveAuthFailures = 0;
+  let pickerOffered = false;
 
   for (let i = 1; i <= handshakeAttempts; i++) {
     const r = await asyncTryCatch(async () => {
@@ -418,7 +477,9 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
         } else {
           logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
         }
-        return null;
+        return {
+          failureReason: reason,
+        };
       });
       clearTimeout(timer);
       if (!inner.ok) {
@@ -426,13 +487,43 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
       }
       return inner.data;
     });
-    if (r.ok && r.data !== null) {
+    if (r.ok && "exitCode" in r.data) {
       logInfo("SSH is ready");
       return;
+    }
+
+    // Track auth failures for picker eligibility
+    const failureReason = r.ok && "failureReason" in r.data ? r.data.failureReason : "";
+    if (failureReason && PUBKEY_AUTH_FAILURE_RE.test(failureReason)) {
+      consecutiveAuthFailures++;
+    } else {
+      consecutiveAuthFailures = 0;
     }
     if (!r.ok) {
       logStep(`SSH handshake error (${i}/${handshakeAttempts})`);
     }
+
+    // Offer picker once per call, after enough consecutive auth failures.
+    // Skip if non-interactive, the user already saw it, or we've used most of
+    // our budget (no point swapping keys with one attempt left).
+    const attemptsLeft = handshakeAttempts - i;
+    if (
+      !pickerOffered &&
+      consecutiveAuthFailures >= AUTH_FAILURE_THRESHOLD &&
+      attemptsLeft >= 1 &&
+      process.env.SPAWN_NON_INTERACTIVE !== "1"
+    ) {
+      pickerOffered = true;
+      const triedKeys = extractKeyPathsFromArgs(sshArgs);
+      logWarn("SSH keeps rejecting the offered keys (Permission denied).");
+      const chosen = await promptForSshKey(triedKeys);
+      if (chosen) {
+        logInfo(`Switching to SSH key: ${chosen}`);
+        sshArgs = replaceKeyPathInArgs(sshArgs, chosen);
+        consecutiveAuthFailures = 0;
+      }
+    }
+
     await sleep(3000);
   }
 

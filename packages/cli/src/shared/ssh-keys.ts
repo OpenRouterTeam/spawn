@@ -1,6 +1,7 @@
 // shared/ssh-keys.ts — Spawn-owned SSH key with legacy fallback for back-compat
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import * as p from "@clack/prompts";
 import { getSshDir } from "./paths.js";
 import { isFileError, tryCatch, tryCatchIf, unwrapOr } from "./result.js";
 import { logInfo, logStep } from "./ui.js";
@@ -369,4 +370,112 @@ export function getSshKeyOpts(keys: SshKeyPair[]): string[] {
     opts.push("-i", key.privPath);
   }
   return opts;
+}
+
+// ─── Interactive Picker ─────────────────────────────────────────────────────
+
+/**
+ * Validate a user-supplied private key path. Returns the absolute path on
+ * success, or an error message string on failure (so it can be surfaced in
+ * the clack `validate` callback).
+ */
+function validateCustomKeyPath(input: string | undefined): string | undefined {
+  const trimmed = (input ?? "").trim();
+  if (!trimmed) {
+    return "Path must not be empty";
+  }
+  // Expand leading ~ to $HOME so users can paste familiar paths
+  const home = process.env.HOME ?? "";
+  const expanded = trimmed.startsWith("~/") && home ? `${home}${trimmed.slice(1)}` : trimmed;
+  if (!existsSync(expanded)) {
+    return `File not found: ${expanded}`;
+  }
+  const statResult = tryCatchIf(isFileError, () => statSync(expanded));
+  if (!statResult.ok || !statResult.data.isFile()) {
+    return `Not a regular file: ${expanded}`;
+  }
+  return undefined;
+}
+
+/** Resolve `~/...` to `$HOME/...` and trim whitespace. */
+function expandUserPath(input: string): string {
+  const trimmed = input.trim();
+  const home = process.env.HOME ?? "";
+  return trimmed.startsWith("~/") && home ? `${home}${trimmed.slice(1)}` : trimmed;
+}
+
+/**
+ * Prompt the user to pick an SSH key after a handshake auth failure.
+ *
+ * Behavior:
+ * - Returns `null` in non-interactive mode (no prompt, caller continues
+ *   retrying with whatever keys it already had).
+ * - Otherwise, lists the user's discovered SSH keys plus a "Custom path..."
+ *   option and a "Continue retrying with current keys" escape hatch.
+ * - Returns the chosen private-key path, or `null` if the user keeps the
+ *   current keys.
+ *
+ * The caller is responsible for swapping the returned key into the SSH
+ * identity options on the next retry.
+ */
+export async function promptForSshKey(currentKeyPaths: string[] = []): Promise<string | null> {
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return null;
+  }
+
+  // Discover keys fresh — the user may have generated/added one in another
+  // shell since spawn started, and we want to surface those new options.
+  const discovered = discoverSshKeys();
+  const currentSet = new Set(currentKeyPaths);
+
+  type Option = {
+    value: string;
+    label: string;
+    hint?: string;
+  };
+  const options: Option[] = [];
+
+  for (const key of discovered) {
+    options.push({
+      value: key.privPath,
+      label: key.name,
+      hint: currentSet.has(key.privPath) ? `${key.type} • already tried` : key.type,
+    });
+  }
+  options.push({
+    value: "__custom__",
+    label: "Enter a custom key path...",
+    hint: "e.g. ~/work/keys/id_ed25519",
+  });
+  options.push({
+    value: "__skip__",
+    label: "Continue retrying with current keys",
+  });
+
+  const choice = await p.select({
+    message: "Pick an SSH key to try",
+    options,
+  });
+
+  if (p.isCancel(choice)) {
+    return null;
+  }
+  if (choice === "__skip__") {
+    return null;
+  }
+  if (choice === "__custom__") {
+    const entered = await p.text({
+      message: "Path to private key",
+      placeholder: "~/.ssh/id_ed25519",
+      validate: (value) => validateCustomKeyPath(value),
+    });
+    if (p.isCancel(entered)) {
+      return null;
+    }
+    return expandUserPath(entered);
+  }
+  if (typeof choice !== "string") {
+    return null;
+  }
+  return choice;
 }
