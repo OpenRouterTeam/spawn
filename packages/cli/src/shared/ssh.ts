@@ -4,7 +4,8 @@ import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { connect } from "node:net";
 import { normalize } from "node:path/posix";
 import { asyncTryCatch, tryCatch } from "./result.js";
-import { logError, logInfo, logStep, logStepDone, logStepInline } from "./ui.js";
+import { promptForSshKey, setPreferredSshKeyPath } from "./ssh-keys.js";
+import { logError, logInfo, logStep, logStepDone, logStepInline, logWarn } from "./ui.js";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
 
@@ -328,12 +329,140 @@ export interface WaitForSshOpts {
  * Total budget: ~`maxAttempts` attempts spread across both phases.
  * Effective timeout: ~3 min with defaults.
  */
+/**
+ * Pattern that matches the OpenSSH "Permission denied (publickey...)" error.
+ * SSH prints this to stderr when the server rejects every public key the
+ * client offered. We use it to decide whether to prompt the user for a
+ * different key (vs. silently retrying through transient errors like TCP
+ * resets during boot).
+ *
+ * Matches: "Permission denied (publickey)", "Permission denied (publickey,gssapi-keyex,...)"
+ */
+const PUBKEY_AUTH_FAILURE_RE = /Permission denied \(publickey/i;
+
+/** Number of consecutive publickey-auth failures before we offer the picker. */
+const AUTH_FAILURE_THRESHOLD = 2;
+
+/**
+ * Extract the current "-i <path>" identity files from a built SSH arg list.
+ * Used so the picker can show which keys we already tried.
+ */
+function extractKeyPathsFromArgs(args: string[]): string[] {
+  const paths: string[] = [];
+  for (let i = 0; i < args.length - 1; i++) {
+    if (args[i] === "-i") {
+      paths.push(args[i + 1]);
+    }
+  }
+  return paths;
+}
+
+/**
+ * Replace every "-i <path>" pair in `args` with a single "-i <newPath>" pair.
+ * Returns a new array; does not mutate the input.
+ */
+function replaceKeyPathInArgs(args: string[], newPath: string): string[] {
+  const out: string[] = [];
+  let replaced = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-i" && i + 1 < args.length) {
+      if (!replaced) {
+        out.push("-i", newPath);
+        replaced = true;
+      }
+      i++; // skip the path that followed -i
+      continue;
+    }
+    out.push(args[i]);
+  }
+  if (!replaced) {
+    out.push("-i", newPath);
+  }
+  return out;
+}
+
+/**
+ * Run a single `ssh user@host echo ok` handshake attempt.
+ * Returns either a success marker or the failure reason captured from stderr.
+ */
+async function attemptSshHandshake(
+  sshArgs: string[],
+  user: string,
+  host: string,
+): Promise<
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      reason: string;
+      threw: boolean;
+    }
+> {
+  const result = await asyncTryCatch(async () => {
+    const proc = Bun.spawn(
+      [
+        "ssh",
+        ...sshArgs,
+        `${user}@${host}`,
+        "echo ok",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "pipe",
+        ],
+      },
+    );
+    // Per-process timeout: ConnectTimeout=10 only covers TCP connect, not
+    // the full SSH handshake. If sshd accepts the connection but stalls
+    // during key exchange or auth, the process hangs indefinitely. Kill it
+    // after 30s so the retry loop can continue.
+    const timer = setTimeout(() => killWithTimeout(proc), 30_000);
+    const inner = await asyncTryCatch(async () => {
+      const [stdout, stderr] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const exitCode = await proc.exited;
+      return {
+        stdout,
+        stderr,
+        exitCode,
+      };
+    });
+    clearTimeout(timer);
+    if (!inner.ok) {
+      throw inner.error;
+    }
+    return inner.data;
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: "",
+      threw: true,
+    };
+  }
+  if (result.data.exitCode === 0 && result.data.stdout.includes("ok")) {
+    return {
+      ok: true,
+    };
+  }
+  return {
+    ok: false,
+    reason: result.data.stderr.trim(),
+    threw: false,
+  };
+}
+
 export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const { host, user, sshKeyPath, extraSshOpts } = opts;
   const maxAttempts = opts.maxAttempts ?? 36;
 
   // Build SSH args
-  const sshArgs: string[] = [
+  let sshArgs: string[] = [
     ...SSH_BASE_OPTS,
   ];
   if (sshKeyPath) {
@@ -374,66 +503,103 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   // At least 5 handshake attempts even if TCP phase used most of the budget
   const handshakeAttempts = Math.max(remaining, 5);
 
+  // Track consecutive publickey rejections so we can offer the picker without
+  // pestering the user during transient connection-refused/timeout failures
+  // that have nothing to do with key selection.
+  let consecutiveAuthFailures = 0;
+  let totalAuthFailures = 0;
+  let pickerOffered = false;
+  // Path of any user-picked key (mid-loop or final fallback). Persisted as a
+  // saved preference once it leads to a successful handshake.
+  let userPickedKey: string | null = null;
+
+  /**
+   * Persist the chosen key as a saved preference, but only if the user
+   * actually picked one. Best-effort — failures are surfaced as warnings
+   * inside `setPreferredSshKeyPath` itself.
+   */
+  function persistChosenKey(): void {
+    if (userPickedKey) {
+      setPreferredSshKeyPath(userPickedKey);
+      logInfo(`Saved SSH key preference for future spawn runs: ${userPickedKey}`);
+    }
+  }
+
   for (let i = 1; i <= handshakeAttempts; i++) {
-    const r = await asyncTryCatch(async () => {
-      const proc = Bun.spawn(
-        [
-          "ssh",
-          ...sshArgs,
-          `${user}@${host}`,
-          "echo ok",
-        ],
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-      // Per-process timeout: ConnectTimeout=10 only covers TCP connect, not
-      // the full SSH handshake. If sshd accepts the connection but stalls
-      // during key exchange or auth, the process hangs indefinitely. Kill it
-      // after 30s so the retry loop can continue.
-      const timer = setTimeout(() => killWithTimeout(proc), 30_000);
-      const inner = await asyncTryCatch(async () => {
-        const [stdout, stderr] = await Promise.all([
-          new Response(proc.stdout).text(),
-          new Response(proc.stderr).text(),
-        ]);
-        const exitCode = await proc.exited;
-
-        if (exitCode === 0 && stdout.includes("ok")) {
-          return {
-            stdout,
-            stderr,
-            exitCode,
-          };
-        }
-
-        // Show the actual SSH error reason dimly so users can debug
-        const reason = stderr.trim();
-        if (reason) {
-          logStep(`SSH handshake failed (${i}/${handshakeAttempts}): ${reason}`);
-        } else {
-          logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
-        }
-        return null;
-      });
-      clearTimeout(timer);
-      if (!inner.ok) {
-        throw inner.error;
-      }
-      return inner.data;
-    });
-    if (r.ok && r.data !== null) {
+    const result = await attemptSshHandshake(sshArgs, user, host);
+    if (result.ok) {
       logInfo("SSH is ready");
+      persistChosenKey();
       return;
     }
-    if (!r.ok) {
+
+    // Surface the actual SSH error reason so users can debug.
+    if (result.threw) {
       logStep(`SSH handshake error (${i}/${handshakeAttempts})`);
+    } else if (result.reason) {
+      logStep(`SSH handshake failed (${i}/${handshakeAttempts}): ${result.reason}`);
+    } else {
+      logStep(`SSH handshake failed (${i}/${handshakeAttempts})`);
     }
+
+    // Track auth failures for picker eligibility
+    if (!result.threw && result.reason && PUBKEY_AUTH_FAILURE_RE.test(result.reason)) {
+      consecutiveAuthFailures++;
+      totalAuthFailures++;
+    } else {
+      consecutiveAuthFailures = 0;
+    }
+
+    // Offer the mid-loop picker once per call after enough consecutive
+    // auth failures. Skip if non-interactive, the user already saw it, or
+    // we've used most of our budget (no point swapping keys with one
+    // attempt left — the final fallback will catch that case).
+    const attemptsLeft = handshakeAttempts - i;
+    if (
+      !pickerOffered &&
+      consecutiveAuthFailures >= AUTH_FAILURE_THRESHOLD &&
+      attemptsLeft >= 1 &&
+      process.env.SPAWN_NON_INTERACTIVE !== "1"
+    ) {
+      pickerOffered = true;
+      const triedKeys = extractKeyPathsFromArgs(sshArgs);
+      logWarn("SSH keeps rejecting the offered keys (Permission denied).");
+      const chosen = await promptForSshKey(triedKeys);
+      if (chosen) {
+        logInfo(`Switching to SSH key: ${chosen}`);
+        sshArgs = replaceKeyPathInArgs(sshArgs, chosen);
+        userPickedKey = chosen;
+        consecutiveAuthFailures = 0;
+      }
+    }
+
     await sleep(3000);
+  }
+
+  // ── Final fallback ────────────────────────────────────────────────────────
+  // If the entire retry budget is exhausted AND every failure we saw was
+  // public-key auth (or the user dismissed the mid-loop picker), give them
+  // ONE more chance to point spawn at the right key. This catches the case
+  // where the user's whole `~/.ssh` set of guesses doesn't match the key
+  // the cloud provider actually has registered.
+  if (totalAuthFailures > 0 && process.env.SPAWN_NON_INTERACTIVE !== "1") {
+    logWarn(`SSH handshake failed after ${handshakeAttempts} attempts — every offered key was rejected.`);
+    const triedKeys = extractKeyPathsFromArgs(sshArgs);
+    const chosen = await promptForSshKey(triedKeys);
+    if (chosen) {
+      sshArgs = replaceKeyPathInArgs(sshArgs, chosen);
+      userPickedKey = chosen;
+      logInfo(`Trying one more handshake with: ${chosen}`);
+      const finalResult = await attemptSshHandshake(sshArgs, user, host);
+      if (finalResult.ok) {
+        logInfo("SSH is ready");
+        persistChosenKey();
+        return;
+      }
+      if (finalResult.reason) {
+        logError(`SSH handshake failed with picked key: ${finalResult.reason}`);
+      }
+    }
   }
 
   logError(`SSH handshake failed after ${handshakeAttempts} attempts`);
