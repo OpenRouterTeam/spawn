@@ -3,6 +3,8 @@
 // Lets users re-register a running remote VM by IP address, so that
 // spawn list/delete/fix all work seamlessly on the re-connected server.
 
+import type { Manifest } from "../manifest.js";
+
 import { spawnSync } from "node:child_process";
 import { connect } from "node:net";
 import * as p from "@clack/prompts";
@@ -178,19 +180,18 @@ export interface LinkOptions {
   sshCommand?: SshCommandFn;
 }
 
-// ─── Main command ─────────────────────────────────────────────────────────────
+// ─── Parsed flags ───────────────────────────────────────────────────────────
 
-/**
- * spawn link <ip> [--agent <agent>] [--cloud <cloud>] [--user <user>] [--name <name>]
- *
- * Re-registers an existing cloud deployment in spawn's local state so that
- * spawn list, spawn delete, spawn fix, etc. all work on it.
- */
-export async function cmdLink(args: string[], options?: LinkOptions): Promise<void> {
-  const tcpCheckFn = options?.tcpCheck ?? defaultTcpCheck;
-  const sshCommandFn = options?.sshCommand ?? defaultSshCommand;
+interface LinkFlags {
+  cloudFlag: string | undefined;
+  agentFlag: string | undefined;
+  userFlag: string | undefined;
+  nameFlag: string | undefined;
+  ip: string;
+}
 
-  // ── Parse flags ────────────────────────────────────────────────────────────
+/** Parse and validate CLI flags + positional IP from args. Exits on invalid input. */
+function parseLinkFlags(args: string[]): LinkFlags {
   let remaining = [
     ...args.slice(1),
   ]; // remove "link" command itself
@@ -214,7 +215,6 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   ]);
   remaining = r4;
 
-  // ── Get IP from positional arg ─────────────────────────────────────────────
   const ip = parseIpArg(remaining);
 
   if (!ip) {
@@ -224,7 +224,6 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     process.exit(1);
   }
 
-  // ── Validate IP ────────────────────────────────────────────────────────────
   const ipValidation = tryCatch(() => validateConnectionIP(ip));
   if (!ipValidation.ok) {
     console.error(pc.red(`Invalid IP address: ${pc.bold(ip)}`));
@@ -232,9 +231,17 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     process.exit(1);
   }
 
-  p.intro(`${pc.bold("spawn link")} — reconnect an existing deployment`);
+  return {
+    cloudFlag,
+    agentFlag,
+    userFlag,
+    nameFlag,
+    ip,
+  };
+}
 
-  // ── Determine SSH user ─────────────────────────────────────────────────────
+/** Prompt for (or default) the SSH user and validate it. Exits on invalid input. */
+async function resolveSshUser(ip: string, userFlag: string | undefined): Promise<string> {
   let sshUser = userFlag ?? "root";
 
   if (!userFlag && isInteractiveTTY()) {
@@ -249,7 +256,6 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     sshUser = userInput || "root";
   }
 
-  // Validate SSH user
   const userValidation = tryCatch(() => validateUsername(sshUser));
   if (!userValidation.ok) {
     p.log.error(`Invalid SSH user: ${sshUser}`);
@@ -257,7 +263,11 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     process.exit(1);
   }
 
-  // ── Check connectivity ─────────────────────────────────────────────────────
+  return sshUser;
+}
+
+/** Verify SSH port 22 is reachable. Exits if unreachable. */
+async function checkSshConnectivity(ip: string, tcpCheckFn: TcpCheckFn): Promise<void> {
   const connectSpinner = p.spinner({
     output: process.stderr,
   });
@@ -273,125 +283,111 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   }
 
   connectSpinner.stop(`${ip} is reachable`);
+}
 
-  // ── Get SSH keys ───────────────────────────────────────────────────────────
-  const keysResult = await asyncTryCatch(() => ensureSshKeys());
-  const keyOpts = keysResult.ok ? getSshKeyOpts(keysResult.data) : [];
-
-  // ── Auto-detect agent and cloud ────────────────────────────────────────────
-  let detectedAgent: string | null = agentFlag ?? null;
-  let detectedCloud: string | null = cloudFlag ?? null;
-
-  const needsDetection = !detectedAgent || !detectedCloud;
-
-  if (needsDetection) {
-    const detectSpinner = p.spinner({
-      output: process.stderr,
-    });
-    detectSpinner.start("Auto-detecting agent and cloud provider...");
-
-    if (!detectedAgent) {
-      detectedAgent = detectAgent(ip, sshUser, keyOpts, sshCommandFn);
-    }
-    if (!detectedCloud) {
-      detectedCloud = detectCloud(ip, sshUser, keyOpts, sshCommandFn);
-    }
-
-    const agentStatus = detectedAgent ?? "unknown";
-    const cloudStatus = detectedCloud ?? "unknown";
-    detectSpinner.stop(`Detected: agent=${agentStatus}, cloud=${cloudStatus}`);
+/** Auto-detect or interactively prompt for the agent. Exits in non-TTY if unresolvable. */
+async function resolveAgent(detected: string | null, ip: string, manifest: Manifest | null): Promise<string> {
+  if (detected) {
+    return detected;
   }
 
-  // ── Load manifest for validation and picker ────────────────────────────────
-  const manifestResult = await asyncTryCatch(() => loadManifest());
-  const manifest = manifestResult.ok ? manifestResult.data : null;
-
-  // ── Prompt for agent if not detected ──────────────────────────────────────
-  if (!detectedAgent) {
-    if (!isInteractiveTTY()) {
-      p.log.error("Could not auto-detect agent. Use --agent <agent> to specify it.");
-      p.log.info(`Example: ${pc.cyan(`spawn link ${ip} --agent claude`)}`);
-      if (manifest) {
-        const agents = agentKeys(manifest);
-        p.log.info(`Available agents: ${agents.join(", ")}`);
-      }
-      process.exit(1);
+  if (!isInteractiveTTY()) {
+    p.log.error("Could not auto-detect agent. Use --agent <agent> to specify it.");
+    p.log.info(`Example: ${pc.cyan(`spawn link ${ip} --agent claude`)}`);
+    if (manifest) {
+      const agents = agentKeys(manifest);
+      p.log.info(`Available agents: ${agents.join(", ")}`);
     }
+    process.exit(1);
+  }
 
-    const agentPickOptions =
-      manifest && Object.keys(manifest.agents).length > 0
-        ? agentKeys(manifest).map((key) => ({
+  const agentPickOptions =
+    manifest && Object.keys(manifest.agents).length > 0
+      ? agentKeys(manifest).map((key) => ({
+          value: key,
+          label: manifest.agents[key]?.name ?? key,
+          hint: key,
+        }))
+      : [
+          {
+            value: "claude",
+            label: "Claude Code",
+            hint: "claude",
+          },
+        ];
+
+  const agentPick = await p.select({
+    message: "Which agent is running on this server?",
+    options: agentPickOptions,
+  });
+
+  if (p.isCancel(agentPick)) {
+    handleCancel();
+  }
+
+  return agentPick;
+}
+
+/** Auto-detect or interactively prompt for the cloud provider. Exits in non-TTY if unresolvable. */
+async function resolveCloud(detected: string | null, ip: string, manifest: Manifest | null): Promise<string> {
+  if (detected) {
+    return detected;
+  }
+
+  if (!isInteractiveTTY()) {
+    p.log.error("Could not auto-detect cloud provider. Use --cloud <cloud> to specify it.");
+    p.log.info(`Example: ${pc.cyan(`spawn link ${ip} --cloud hetzner`)}`);
+    if (manifest) {
+      const clouds = cloudKeys(manifest).filter((c) => c !== "local");
+      p.log.info(`Available clouds: ${clouds.join(", ")}`);
+    }
+    process.exit(1);
+  }
+
+  const cloudPickOptions =
+    manifest && Object.keys(manifest.clouds).length > 0
+      ? cloudKeys(manifest)
+          .filter((key) => key !== "local")
+          .map((key) => ({
             value: key,
-            label: manifest.agents[key]?.name ?? key,
+            label: manifest.clouds[key]?.name ?? key,
             hint: key,
           }))
-        : [
-            {
-              value: "claude",
-              label: "Claude Code",
-              hint: "claude",
-            },
-          ];
+      : [];
+  cloudPickOptions.push({
+    value: "other",
+    label: "Other / Unknown",
+    hint: "other",
+  });
 
-    const agentPick = await p.select({
-      message: "Which agent is running on this server?",
-      options: agentPickOptions,
-    });
+  const cloudPick = await p.select({
+    message: "Which cloud provider is this server on?",
+    options: cloudPickOptions,
+  });
 
-    if (p.isCancel(agentPick)) {
-      handleCancel();
-    }
-
-    detectedAgent = agentPick;
+  if (p.isCancel(cloudPick)) {
+    handleCancel();
   }
 
-  // ── Prompt for cloud if not detected ──────────────────────────────────────
-  if (!detectedCloud) {
-    if (!isInteractiveTTY()) {
-      p.log.error("Could not auto-detect cloud provider. Use --cloud <cloud> to specify it.");
-      p.log.info(`Example: ${pc.cyan(`spawn link ${ip} --cloud hetzner`)}`);
-      if (manifest) {
-        const clouds = cloudKeys(manifest).filter((c) => c !== "local");
-        p.log.info(`Available clouds: ${clouds.join(", ")}`);
-      }
-      process.exit(1);
-    }
+  return cloudPick;
+}
 
-    const cloudPickOptions =
-      manifest && Object.keys(manifest.clouds).length > 0
-        ? cloudKeys(manifest)
-            .filter((key) => key !== "local")
-            .map((key) => ({
-              value: key,
-              label: manifest.clouds[key]?.name ?? key,
-              hint: key,
-            }))
-        : [];
-    cloudPickOptions.push({
-      value: "other",
-      label: "Other / Unknown",
-      hint: "other",
-    });
-
-    const cloudPick = await p.select({
-      message: "Which cloud provider is this server on?",
-      options: cloudPickOptions,
-    });
-
-    if (p.isCancel(cloudPick)) {
-      handleCancel();
-    }
-
-    detectedCloud = cloudPick;
-  }
-
-  // ── Confirm details ────────────────────────────────────────────────────────
+/** Confirm link details, save the record, and optionally connect via SSH. */
+async function confirmAndSave(
+  ip: string,
+  sshUser: string,
+  agent: string,
+  cloud: string,
+  nameFlag: string | undefined,
+  manifest: Manifest | null,
+  keyOpts: string[],
+): Promise<void> {
   const safeIpSegment = ip.replace(/\./g, "-");
-  const spawnName = nameFlag ?? `${detectedAgent}-${safeIpSegment}`;
+  const spawnName = nameFlag ?? `${agent}-${safeIpSegment}`;
 
   if (isInteractiveTTY()) {
-    const agentLabel = manifest?.agents[detectedAgent]?.name ?? detectedAgent;
-    const cloudLabel = manifest?.clouds[detectedCloud]?.name ?? detectedCloud;
+    const agentLabel = manifest?.agents[agent]?.name ?? agent;
+    const cloudLabel = manifest?.clouds[cloud]?.name ?? cloud;
 
     p.log.info(`  IP:    ${ip}`);
     p.log.info(`  User:  ${sshUser}`);
@@ -410,17 +406,16 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
     }
   }
 
-  // ── Save to history ────────────────────────────────────────────────────────
   const record = {
     id: generateSpawnId(),
-    agent: detectedAgent,
-    cloud: detectedCloud,
+    agent,
+    cloud,
     timestamp: new Date().toISOString(),
     name: spawnName,
     connection: {
       ip,
       user: sshUser,
-      cloud: detectedCloud,
+      cloud,
     },
   };
 
@@ -432,7 +427,6 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
 
   p.log.success(`Deployment linked! Run ${pc.cyan("spawn list")} to see it.`);
 
-  // ── Offer to connect immediately ───────────────────────────────────────────
   if (isInteractiveTTY()) {
     const connectNow = await p.confirm({
       message: "Connect now?",
@@ -456,4 +450,57 @@ export async function cmdLink(args: string[], options?: LinkOptions): Promise<vo
   }
 
   p.outro(`Linked as ${spawnName}. Run ${pc.cyan("spawn list")} to manage it.`);
+}
+
+// ─── Main command ─────────────────────────────────────────────────────────────
+
+/**
+ * spawn link <ip> [--agent <agent>] [--cloud <cloud>] [--user <user>] [--name <name>]
+ *
+ * Re-registers an existing cloud deployment in spawn's local state so that
+ * spawn list, spawn delete, spawn fix, etc. all work on it.
+ */
+export async function cmdLink(args: string[], options?: LinkOptions): Promise<void> {
+  const tcpCheckFn = options?.tcpCheck ?? defaultTcpCheck;
+  const sshCommandFn = options?.sshCommand ?? defaultSshCommand;
+
+  const { cloudFlag, agentFlag, userFlag, nameFlag, ip } = parseLinkFlags(args);
+
+  p.intro(`${pc.bold("spawn link")} — reconnect an existing deployment`);
+
+  const sshUser = await resolveSshUser(ip, userFlag);
+  await checkSshConnectivity(ip, tcpCheckFn);
+
+  // Get SSH keys for detection and later connection
+  const keysResult = await asyncTryCatch(() => ensureSshKeys());
+  const keyOpts = keysResult.ok ? getSshKeyOpts(keysResult.data) : [];
+
+  // Auto-detect agent and cloud via SSH if not provided as flags
+  let detectedAgent: string | null = agentFlag ?? null;
+  let detectedCloud: string | null = cloudFlag ?? null;
+
+  if (!detectedAgent || !detectedCloud) {
+    const detectSpinner = p.spinner({
+      output: process.stderr,
+    });
+    detectSpinner.start("Auto-detecting agent and cloud provider...");
+
+    if (!detectedAgent) {
+      detectedAgent = detectAgent(ip, sshUser, keyOpts, sshCommandFn);
+    }
+    if (!detectedCloud) {
+      detectedCloud = detectCloud(ip, sshUser, keyOpts, sshCommandFn);
+    }
+
+    detectSpinner.stop(`Detected: agent=${detectedAgent ?? "unknown"}, cloud=${detectedCloud ?? "unknown"}`);
+  }
+
+  // Load manifest for picker options and display labels
+  const manifestResult = await asyncTryCatch(() => loadManifest());
+  const manifest = manifestResult.ok ? manifestResult.data : null;
+
+  const agent = await resolveAgent(detectedAgent, ip, manifest);
+  const cloud = await resolveCloud(detectedCloud, ip, manifest);
+
+  await confirmAndSave(ip, sshUser, agent, cloud, nameFlag, manifest, keyOpts);
 }
