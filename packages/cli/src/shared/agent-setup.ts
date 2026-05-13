@@ -713,15 +713,30 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
 export async function startHermesDashboard(runner: CloudRunner): Promise<void> {
   logStep("Starting Hermes web dashboard...");
 
+  // `hermes` lives inside the install venv; mirror launchCmd's PATH exactly.
+  const hermesPath = 'export PATH="$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH"';
+
+  // Probe whether this hermes build supports the `dashboard` subcommand.
+  // Older versions lack it entirely, which causes confusing argparse errors.
+  const probeScript = [
+    "source ~/.spawnrc 2>/dev/null",
+    hermesPath,
+    "_hermes_bin=$(command -v hermes) || exit 1",
+    '"$_hermes_bin" dashboard --help >/dev/null 2>&1',
+  ].join("\n");
+
+  const probeResult = await asyncTryCatch(() => runner.runServer(probeScript));
+  if (!probeResult.ok) {
+    logWarn("Hermes version does not support 'dashboard' subcommand — skipping dashboard launch");
+    return;
+  }
+
   // Port check — same pattern as startGateway. Debian/Ubuntu bash is compiled
   // without /dev/tcp, so we chain ss → /dev/tcp → nc.
   const portCheck =
     'ss -tln 2>/dev/null | grep -q ":9119 " || ' +
     "(echo >/dev/tcp/127.0.0.1/9119) 2>/dev/null || " +
     "nc -z 127.0.0.1 9119 2>/dev/null";
-
-  // `hermes` lives inside the install venv; mirror launchCmd's PATH exactly.
-  const hermesPath = 'export PATH="$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH"';
 
   const script = [
     "source ~/.spawnrc 2>/dev/null",
