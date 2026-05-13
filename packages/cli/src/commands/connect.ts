@@ -265,14 +265,14 @@ export async function cmdEnterAgent(
         "exec",
         "-s",
         connection.server_name,
-        "-tty",
+        "--tty",
         "--",
         "bash",
         "-lc",
         remoteCmd,
       ],
       `Failed to enter ${agentName}`,
-      `sprite exec -s ${connection.server_name} -tty -- bash -lc '${remoteCmd}'`,
+      `sprite exec -s ${connection.server_name} --tty -- bash -lc '${remoteCmd}'`,
     );
   }
 

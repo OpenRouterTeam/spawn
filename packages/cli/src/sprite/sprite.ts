@@ -145,7 +145,7 @@ export async function ensureSpriteCli(): Promise<void> {
     // Log version if available
     const { stdout } = spawnSync([
       cmd,
-      "version",
+      "--version",
     ]);
     const ver = stdout.match(/v?\d+\.\d+\.\d+(-rc\d+)?/)?.[0];
     if (ver) {
@@ -318,7 +318,7 @@ export async function createSprite(name: string): Promise<void> {
         cmd,
         ...orgFlags(),
         "create",
-        "-skip-console",
+        "--skip-console",
         name,
       ],
       {
@@ -426,7 +426,7 @@ export function startLocalKeepAlive(): void {
   const urlResult = spawnSync([
     cmd,
     ...orgFlags(),
-    "url",
+    "info",
     "-s",
     _state.name,
   ]);
@@ -602,7 +602,7 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         "exec",
         "-s",
         _state.name,
-        "-file",
+        "--file",
         `${localPath}:${tempRemote}`,
         "--",
         "mkdir",
@@ -781,7 +781,7 @@ export async function interactiveSession(cmd: string, spawnFn?: (args: string[])
         "exec",
         "-s",
         _state.name,
-        "-tty",
+        "--tty",
         "--",
         "bash",
         "-c",

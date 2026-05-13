@@ -193,7 +193,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
     expect(capturedSessionScript).toContain(expectedB64);
   });
 
-  it("uses -tty flag for interactive mode (SPAWN_PROMPT not set)", async () => {
+  it("uses --tty flag for interactive mode (SPAWN_PROMPT not set)", async () => {
     delete process.env.SPAWN_PROMPT;
 
     let capturedArgs: string[] = [];
@@ -204,10 +204,10 @@ describe("interactiveSession (keep-alive wrapper)", () => {
 
     await interactiveSession("agent-cmd", mockSpawnInteractive);
 
-    expect(capturedArgs).toContain("-tty");
+    expect(capturedArgs).toContain("--tty");
   });
 
-  it("omits -tty flag when SPAWN_PROMPT is set", async () => {
+  it("omits --tty flag when SPAWN_PROMPT is set", async () => {
     process.env.SPAWN_PROMPT = "non-interactive";
 
     let capturedArgs: string[] = [];
@@ -218,7 +218,7 @@ describe("interactiveSession (keep-alive wrapper)", () => {
 
     await interactiveSession("agent-cmd", mockSpawnInteractive);
 
-    expect(capturedArgs).not.toContain("-tty");
+    expect(capturedArgs).not.toContain("--tty");
   });
 
   it("returns the exit code from spawnInteractive", async () => {
