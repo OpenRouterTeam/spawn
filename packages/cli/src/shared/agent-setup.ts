@@ -709,6 +709,15 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
  * hermes-agent/hermes_cli/main.py) and self-authenticates via a session token
  * injected into the SPA HTML, so no token needs to be appended to the tunnel
  * URL.
+ *
+ * Failure handling — by design, this is non-fatal: hermes's TUI works fine
+ * without the dashboard.  But the previous version swallowed the *cause*
+ * behind a generic "failed to start" warning, so when users reported breakage
+ * (e.g. issue #3407) we had nothing to debug.  Every failure path now writes
+ * a banner-delimited diagnostic block to the spawn output: hermes binary
+ * location + version, whether `dashboard` is even in `hermes --help`, and the
+ * tail of `/tmp/hermes-dashboard.log`.  The user sees the real error, the
+ * spawn session continues into the TUI, and bug reports become actionable.
  */
 export async function startHermesDashboard(runner: CloudRunner): Promise<void> {
   logStep("Starting Hermes web dashboard...");
@@ -723,10 +732,30 @@ export async function startHermesDashboard(runner: CloudRunner): Promise<void> {
   // `hermes` lives inside the install venv; mirror launchCmd's PATH exactly.
   const hermesPath = 'export PATH="$HOME/.local/bin:$HOME/.hermes/hermes-agent/venv/bin:$PATH"';
 
+  // Diagnostic dump — runs on every failure path inside the script so users
+  // (and we, on bug reports) see the actual cause instead of a generic
+  // "failed to start" warning.  All commands tolerate missing tools.
+  const diagDump = [
+    'echo "──── Hermes dashboard diagnostic ────" >&2',
+    "echo \"hermes binary: $(command -v hermes 2>/dev/null || echo '<not found in PATH>')\" >&2",
+    "echo \"hermes version: $(hermes --version 2>&1 | head -1 || echo '<failed>')\" >&2",
+    "if hermes --help 2>&1 | grep -q '^[[:space:]]*dashboard'; then",
+    '  echo "hermes subcommands: includes \\"dashboard\\"" >&2',
+    "else",
+    '  echo "hermes subcommands: \\"dashboard\\" NOT in --help output" >&2',
+    "fi",
+    'echo "─── /tmp/hermes-dashboard.log (last 30 lines) ───" >&2',
+    "tail -30 /tmp/hermes-dashboard.log 2>/dev/null || echo '<log file missing>' >&2",
+    'echo "─────────────────────────────────────" >&2',
+  ].join("\n");
+
   const script = [
     "source ~/.spawnrc 2>/dev/null",
     hermesPath,
     `if ${portCheck}; then echo "Hermes dashboard already running on :9119"; exit 0; fi`,
+    // Trap-style: run the diagnostic dump on any non-zero exit below.
+    `_dashboard_diag() { ${diagDump}; }`,
+    "trap '_dashboard_diag' EXIT",
     "_hermes_bin=$(command -v hermes) || { echo 'hermes not found in PATH' >&2; exit 1; }",
     // --no-open: we're on a remote VM, don't try to spawn a browser there.
     // --host 127.0.0.1: loopback-only; the SSH tunnel is how the user reaches it.
@@ -736,21 +765,24 @@ export async function startHermesDashboard(runner: CloudRunner): Promise<void> {
     '  nohup "$_hermes_bin" dashboard --port 9119 --host 127.0.0.1 --no-open > /tmp/hermes-dashboard.log 2>&1 < /dev/null &',
     "fi",
     "elapsed=0; while [ $elapsed -lt 60 ]; do",
-    `  if ${portCheck}; then echo "Hermes dashboard ready after \${elapsed}s"; exit 0; fi`,
+    // Success path: clear the trap so the diag dump doesn't fire on exit 0.
+    `  if ${portCheck}; then trap - EXIT; echo "Hermes dashboard ready after \${elapsed}s"; exit 0; fi`,
     "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
     "done",
     'echo "Hermes dashboard failed to start within 60s" >&2',
-    "tail -20 /tmp/hermes-dashboard.log 2>/dev/null || true",
     "exit 1",
   ].join("\n");
 
   const result = await asyncTryCatch(() => runner.runServer(script));
   if (result.ok) {
     logInfo("Hermes web dashboard started on :9119");
-  } else {
-    // Non-fatal: the TUI still works even if the dashboard didn't come up.
-    logWarn("Hermes web dashboard failed to start — TUI still available");
+    return;
   }
+  // Non-fatal: the TUI still works even if the dashboard didn't come up.
+  // Surface the error message so the user has something to report — the
+  // diagnostic banner above already streamed via inherited stderr.
+  logWarn(`Hermes web dashboard failed to start — TUI still available (${getErrorMessage(result.error)})`);
+  logWarn("Please paste the diagnostic block above into a GitHub issue if this is unexpected.");
 }
 
 // ─── OpenCode Install Command ────────────────────────────────────────────────
