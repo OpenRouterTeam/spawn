@@ -964,7 +964,7 @@ async function main(): Promise<void> {
   }
   // --fast implies all beta features
   if (process.env.SPAWN_FAST === "1") {
-    betaFeatures.push("tarball", "images", "parallel", "docker");
+    betaFeatures.push("tarball", "images", "parallel", "docker", "sandbox");
   }
 
   // fast_provision experiment: if the user did NOT pass --beta or --fast,
