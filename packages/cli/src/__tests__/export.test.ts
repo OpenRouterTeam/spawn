@@ -194,13 +194,16 @@ describe("buildExportScript", () => {
     const s = buildExportScript(opts);
     expect(s).toContain("SECRET_REGEX=");
     // Verify a representative pattern from each provider family is present
-    expect(s).toContain("sk-or-v1-"); // OpenRouter
+    expect(s).toContain("sk-or-[a-zA-Z0-9_-]"); // OpenRouter (v1, v2+)
     expect(s).toContain("sk-ant-api"); // Anthropic
     expect(s).toContain("sk-proj-"); // OpenAI
     expect(s).toContain("gh[ops]_"); // GitHub PAT/OAuth/server
     expect(s).toContain("AKIA"); // AWS access key
     expect(s).toContain("hcloud_"); // Hetzner
     expect(s).toContain("dop_v1_"); // DigitalOcean
+    expect(s).toContain("xox[abp]-"); // Slack bot/user/app tokens
+    expect(s).toContain("sk_live_"); // Stripe live keys
+    expect(s).toContain("service_account"); // Google service account JSON
     expect(s).toContain("BEGIN ([A-Z]+ )?PRIVATE KEY"); // PEM
   });
 
