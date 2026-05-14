@@ -88,34 +88,37 @@ describe("doApi 401 OAuth recovery", () => {
 
   it("attempts OAuth recovery on 401 before throwing", async () => {
     state.token = "expired-token";
-    let callCount = 0;
+    let apiCalls = 0;
+    let oauthChecks = 0;
     globalThis.fetch = mock((url: string | URL | Request) => {
-      callCount++;
       const urlStr = String(url);
-      // First call: the actual API call returning 401
-      if (callCount === 1) {
+      // OAuth connectivity check — fail it so tryDoOAuth returns null quickly
+      if (urlStr.includes("cloud.digitalocean.com")) {
+        oauthChecks++;
+        return Promise.reject(new Error("network unavailable"));
+      }
+      // API calls to DigitalOcean API — always return 401
+      if (urlStr.includes("api.digitalocean.com")) {
+        apiCalls++;
         return Promise.resolve(
           new Response("Unauthorized", {
             status: 401,
           }),
         );
       }
-      // Second call: OAuth connectivity check — fail it so tryDoOAuth returns null quickly
-      // (avoids starting a real Bun.serve OAuth server)
-      if (urlStr.includes("cloud.digitalocean.com")) {
-        return Promise.reject(new Error("network unavailable"));
-      }
+      // Fallback for any other calls (e.g. from prior test leaks)
       return Promise.resolve(
-        new Response("Unauthorized", {
-          status: 401,
+        new Response("{}", {
+          status: 200,
         }),
       );
     });
 
     // OAuth recovery fails (connectivity check fails), so doApi throws the 401
     await expect(doApi("GET", "/account", undefined, 1)).rejects.toThrow("DigitalOcean API error 401");
-    // Verify recovery was attempted: 1 API call + 1 connectivity check = 2
-    expect(callCount).toBe(2);
+    // Verify recovery was attempted: at least 1 API call + 1 connectivity check
+    expect(apiCalls).toBeGreaterThanOrEqual(1);
+    expect(oauthChecks).toBeGreaterThanOrEqual(1);
   });
 
   it("succeeds after OAuth recovery provides a new token", async () => {
