@@ -6,6 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { isString } from "@openrouter/spawn-shared";
 import { mockClackPrompts } from "./test-helpers";
 
 // ── Mock @clack/prompts (must be before importing agent-setup) ──────────
@@ -96,5 +97,60 @@ describe("startHermesDashboard", () => {
     expect(capturedScript).not.toContain("systemctl enable");
     expect(capturedScript).not.toContain("/etc/systemd/system/");
     expect(capturedScript).not.toContain("crontab");
+  });
+
+  it("emits a diagnostic block on every failure path", () => {
+    // The trap fires on any non-zero exit, so users always see the actual cause
+    // instead of a generic "failed to start" warning.  See issue #3407.
+    expect(capturedScript).toContain("trap '_dashboard_diag' EXIT");
+    // The diagnostic must dump the things bug reports always need:
+    expect(capturedScript).toContain("Hermes dashboard diagnostic");
+    expect(capturedScript).toContain("hermes binary:");
+    expect(capturedScript).toContain("hermes --version");
+    // Detect missing-subcommand case ("hermes dashboard" gone or stub install).
+    expect(capturedScript).toContain("hermes --help");
+    expect(capturedScript).toContain("NOT in --help output");
+    // And the actual hermes process output.
+    expect(capturedScript).toContain("tail -30 /tmp/hermes-dashboard.log");
+  });
+
+  it("clears the diagnostic trap before exiting on success", () => {
+    // Otherwise the diag block would print on every successful launch — too noisy.
+    expect(capturedScript).toContain("trap - EXIT");
+  });
+});
+
+describe("startHermesDashboard — failure surfacing", () => {
+  let stderrSpy: ReturnType<typeof spyOn>;
+  let warnings: string[];
+
+  beforeEach(() => {
+    warnings = [];
+    stderrSpy = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      warnings.push(isString(chunk) ? chunk : new TextDecoder().decode(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  it("includes the runServer error message in the warning so users can grep it", async () => {
+    const failing: CloudRunner = {
+      runServer: mock(async () => {
+        throw new Error("run_server failed (exit 1): hermes dashboard ...");
+      }),
+      uploadFile: mock(async () => {}),
+      downloadFile: mock(async () => {}),
+    };
+    // Should NOT throw — dashboard failure is non-fatal.
+    await startHermesDashboard(failing);
+    const combined = warnings.join("");
+    // Surfaces the underlying cause, not a generic message.
+    expect(combined).toContain("run_server failed (exit 1)");
+    expect(combined).toContain("TUI still available");
+    // Hint to the user about the diagnostic block we printed before this.
+    expect(combined).toMatch(/diagnostic|GitHub issue/i);
   });
 });
